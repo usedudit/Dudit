@@ -433,7 +433,7 @@ export function AdminPartnerDetailView({
             <FadeIn>
                 <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 lg:pb-0">
 
                             {/* Sticky Header */}
                             <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -839,7 +839,7 @@ export function AdminPartnerDetailView({
 
                                                     {totalProductPages > 1 && (
                                                         <div className="pt-4">
-                                                            <Pagination currentPage={productPage} totalPages={totalProductPages} onPageChange={setProductPage} />
+                                                            <Pagination currentPage={productPage} totalPages={totalProductPages} onPageChange={setProductPage} fixedUntil="lg" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -921,7 +921,7 @@ export function AdminPartnerDetailView({
 
                                                     {totalServicePages > 1 && (
                                                         <div className="pt-4">
-                                                            <Pagination currentPage={servicePage} totalPages={totalServicePages} onPageChange={setServicePage} />
+                                                            <Pagination currentPage={servicePage} totalPages={totalServicePages} onPageChange={setServicePage} fixedUntil="lg" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -1007,7 +1007,7 @@ export function AdminPartnerDetailView({
 
                                                     {totalOrderPages > 1 && (
                                                         <div className="pt-4">
-                                                            <Pagination currentPage={orderPage} totalPages={totalOrderPages} onPageChange={setOrderPage} />
+                                                            <Pagination currentPage={orderPage} totalPages={totalOrderPages} onPageChange={setOrderPage} fixedUntil="lg" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -1095,7 +1095,7 @@ export function AdminPartnerDetailView({
 
                                                     {totalReturnPages > 1 && (
                                                         <div className="pt-4">
-                                                            <Pagination currentPage={returnPage} totalPages={totalReturnPages} onPageChange={setReturnPage} />
+                                                            <Pagination currentPage={returnPage} totalPages={totalReturnPages} onPageChange={setReturnPage} fixedUntil="lg" />
                                                         </div>
                                                     )}
                                                 </div>

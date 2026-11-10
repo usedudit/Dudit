@@ -105,7 +105,7 @@ export async function getERPServicesPageAction(
                 const supabase = getAdminClient()
                 let q = supabase
                     .from("services")
-                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, show_in_marketplace, service_categories!category_id(name)")
+                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, show_in_marketplace, service_categories!category_id(name), subcategory_rel:service_categories!subcategory_id(name), resources, tags, technical_details")
                     .eq("partner_id", partnerId)
                 if (options?.storeId) q = q.or(`store_id.eq.${options.storeId},store_id.is.null`)
                 if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
@@ -121,7 +121,11 @@ export async function getERPServicesPageAction(
                     .order("id", { ascending: false })
                     .limit(fetchLimit)
                 if (error) throw error
-                return data || []
+                return (data || []).map((s: any) => ({
+                    ...s,
+                    category: s.service_categories?.name || null,
+                    subcategory: s.subcategory_rel?.name || null,
+                }))
             },
             30,
         )

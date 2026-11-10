@@ -223,16 +223,34 @@ export async function moderateImageWithBase64(
 }
 
 /**
- * Faz requisição ao Sightengine com URL da imagem (para imagens já salvas)
- * Mais rápido se a imagem já está em servidor público
+ * Faz requisição ao Sightengine com URL da imagem (para imagens já salvas).
+ * Nota de arquitetura: Como o CDN da dudit (img.dudit.com.br) possui proteção Cloudflare WAF
+ * que bloqueia bots e crawlers externos com HTTP 403, para imagens armazenadas no R2/CDN
+ * nós baixamos os bytes diretamente do storage via AWS SDK interno e enviamos os bytes crus (base64)
+ * ao Sightengine, garantindo 100% de confiabilidade e evitando bloqueios de WAF.
  */
 export async function moderateImageWithUrl(
   imageUrl: string
 ): Promise<ModerationAnalysis> {
   try {
-    // SSRF PROTECTION: Validate the image URL is from our CDN only.
-    // WHY: Sightengine fetches this URL server-side. An attacker could abuse
-    // this to make Sightengine hit internal targets (SSRF via 3rd-party proxy).
+    // Se for imagem no nosso CDN ou chave de storage R2, usa diretamente o buffer interno do R2
+    const isInternalStorage =
+      imageUrl.includes("dudit.com.br") ||
+      imageUrl.includes("r2.dev") ||
+      imageUrl.startsWith("users/") ||
+      imageUrl.startsWith("products/") ||
+      imageUrl.startsWith("partner-") ||
+      !imageUrl.startsWith("http")
+
+    if (isInternalStorage) {
+      const { getFileBufferFromR2 } = await import("@/lib/r2/server")
+      const buffer = await getFileBufferFromR2(imageUrl)
+      if (buffer && buffer.length > 0) {
+        return moderateImageWithBase64(buffer.toString("base64"))
+      }
+    }
+
+    // SSRF PROTECTION: Validate the image URL is from an allowed CDN only.
     const urlCheck = validateImageUrl(imageUrl)
     if (!urlCheck.valid) {
       console.warn('[SIGHTENGINE] Blocked image URL:', urlCheck.error)
@@ -277,7 +295,13 @@ export async function moderateImageWithUrl(
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.warn('[SIGHTENGINE] API error or rate limit, failing open:', response.status, errorText.slice(0, 200))
+      console.warn('[SIGHTENGINE] API error or rate limit, trying fallback:', response.status, errorText.slice(0, 200))
+      // Tenta fallback com buffer direto
+      const { getFileBufferFromR2 } = await import("@/lib/r2/server")
+      const buffer = await getFileBufferFromR2(imageUrl)
+      if (buffer && buffer.length > 0) {
+        return moderateImageWithBase64(buffer.toString("base64"))
+      }
       return {
         riskLevel: 'low',
         confidence: 0,
@@ -290,7 +314,12 @@ export async function moderateImageWithUrl(
     const result: SightengineResult = await response.json()
 
     if (result.status !== 'success') {
-      console.warn('[SIGHTENGINE] API returned non-success status or quota limit, failing open:', result.status, result.error?.message)
+      console.warn('[SIGHTENGINE] API returned non-success status, trying direct buffer fallback:', result.status, result.error?.message)
+      const { getFileBufferFromR2 } = await import("@/lib/r2/server")
+      const buffer = await getFileBufferFromR2(imageUrl)
+      if (buffer && buffer.length > 0) {
+        return moderateImageWithBase64(buffer.toString("base64"))
+      }
       return {
         riskLevel: 'low',
         confidence: 0,
@@ -303,7 +332,16 @@ export async function moderateImageWithUrl(
     const analysis = analyzeModerationResult(result)
     return analysis
   } catch (error) {
-    console.warn('[SIGHTENGINE] Exception caught in moderateImageWithUrl, failing open:', error instanceof Error ? error.message : error)
+    console.warn('[SIGHTENGINE] Exception caught in moderateImageWithUrl, trying buffer fallback:', error instanceof Error ? error.message : error)
+    try {
+      const { getFileBufferFromR2 } = await import("@/lib/r2/server")
+      const buffer = await getFileBufferFromR2(imageUrl)
+      if (buffer && buffer.length > 0) {
+        return moderateImageWithBase64(buffer.toString("base64"))
+      }
+    } catch {
+      // Ignora erro no fallback
+    }
     return {
       riskLevel: 'low',
       confidence: 0,

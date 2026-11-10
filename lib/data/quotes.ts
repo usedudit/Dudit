@@ -110,6 +110,28 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                     supabase.from("quotes").update({ public_token: newToken }).eq("id", quoteId).then(() => {})
                 }
 
+                const isFinalized = ['approved', 'rejected', 'converted_to_order', 'cancelled'].includes(quote.status) || quote.converted
+                if (!isFinalized && !quote.metadata?.plain_code) {
+                    const crypto = await import("crypto")
+                    const plainCode = crypto.randomInt(1000, 10000).toString()
+                    const salt = crypto.randomBytes(16).toString("hex")
+                    const hash = crypto.createHash("sha256").update(salt + plainCode).digest("hex")
+
+                    const updatedMetadata = {
+                        ...(quote.metadata || {}),
+                        plain_code: plainCode
+                    }
+                    quote.metadata = updatedMetadata
+                    quote.approval_code_salt = salt
+                    quote.approval_code_hash = hash
+
+                    supabase.from("quotes").update({
+                        approval_code_salt: salt,
+                        approval_code_hash: hash,
+                        metadata: updatedMetadata
+                    }).eq("id", quoteId).then(() => {})
+                }
+
                 const { data: items, error: itemsError } = await supabase
                     .from("quote_items")
                     .select(`

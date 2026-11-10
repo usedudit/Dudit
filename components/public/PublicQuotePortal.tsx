@@ -469,51 +469,51 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                                     </div>
 
-                                        {/* ─── TAB: ANEXOS ─── */}
-                                        {activeTab === "Anexos" && (
-                                            <div className="space-y-6 text-left">
-                                                {groupedAttachments.antes.length > 0 && (
-                                                    <FormSection title="Imagens Antes da Proposta">
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                            {groupedAttachments.antes.map((att: any, idx: number) => (
-                                                                <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
-                                                                    <img src={getR2ImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </FormSection>
-                                                )}
+                                    {/* ─── TAB: ANEXOS ─── */}
+                                    {activeTab === "Anexos" && (
+                                        <div className="space-y-6 text-left">
+                                            {groupedAttachments.antes.length > 0 && (
+                                                <FormSection title="Imagens Antes da Proposta">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                        {groupedAttachments.antes.map((att: any, idx: number) => (
+                                                            <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                <img src={getR2ImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </FormSection>
+                                            )}
 
-                                                {groupedAttachments.depois.length > 0 && (
-                                                    <FormSection title="Imagens Após a Proposta" hasSeparator={groupedAttachments.antes.length > 0}>
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                            {groupedAttachments.depois.map((att: any, idx: number) => (
-                                                                <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
-                                                                    <img src={getR2ImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </FormSection>
-                                                )}
+                                            {groupedAttachments.depois.length > 0 && (
+                                                <FormSection title="Imagens Após a Proposta" hasSeparator={groupedAttachments.antes.length > 0}>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                        {groupedAttachments.depois.map((att: any, idx: number) => (
+                                                            <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                <img src={getR2ImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </FormSection>
+                                            )}
 
-                                                {groupedAttachments.docs.length > 0 && (
-                                                    <FormSection title="Anexos" hasSeparator={groupedAttachments.antes.length > 0 || groupedAttachments.depois.length > 0}>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                            {groupedAttachments.docs.map((att: any) => (
-                                                                <ListItem
-                                                                    key={att.id || att.file_key}
-                                                                    icon={FileIcon}
-                                                                    title={att.file_name || "Documento"}
-                                                                    description={att.file_size ? formatFileSize(att.file_size) : undefined}
-                                                                    onClick={() => handleDownloadDoc(att.file_key)}
-                                                                    className="p-3.5"
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </FormSection>
-                                                )}
-                                            </div>
-                                        )}
+                                            {groupedAttachments.docs.length > 0 && (
+                                                <FormSection title="Anexos" hasSeparator={groupedAttachments.antes.length > 0 || groupedAttachments.depois.length > 0}>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                        {groupedAttachments.docs.map((att: any) => (
+                                                            <ListItem
+                                                                key={att.id || att.file_key}
+                                                                icon={FileIcon}
+                                                                title={att.file_name || "Documento"}
+                                                                description={att.file_size ? formatFileSize(att.file_size) : undefined}
+                                                                onClick={() => handleDownloadDoc(att.file_key)}
+                                                                className="p-3.5"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </FormSection>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
                                     <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
@@ -619,7 +619,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                             <InfoCard message={approveModalError} color="red" />
                         )}
 
-                        <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                             {isDirectApprover
                                 ? `Você está conectado como ${currentUser?.email || "usuário autorizado"} e pode aprovar esta proposta diretamente.`
                                 : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
@@ -679,7 +679,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                             <InfoCard message={rejectModalError} color="red" />
                         )}
 
-                        <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                             {isDirectApprover
                                 ? `Você está conectado como ${currentUser?.email || "usuário autorizado"} e pode recusar esta proposta diretamente.`
                                 : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."

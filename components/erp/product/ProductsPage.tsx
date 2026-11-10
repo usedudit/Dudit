@@ -372,7 +372,7 @@ export default function ProductsPage({
             .then((value) => {
                 if (!cancelled && value) setResolvedPartner(value)
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => {
                 partnerLoadInFlightRef.current = false
                 if (!cancelled) setIsLoadingPartner(false)
@@ -540,6 +540,21 @@ export default function ProductsPage({
             const hasCostPriceMatch = !filters.hasCostPrice || (p.cost_price !== null && p.cost_price !== undefined)
             const isOnPromotionMatch = !filters.isOnPromotion || p.is_on_promotion === true
 
+            const searchMatch = !term || (
+                (typeof p.name === "string" && p.name.toLowerCase().includes(term)) ||
+                (typeof p.sku === "string" && p.sku.toLowerCase().includes(term)) ||
+                (typeof p.brand === "string" && p.brand.toLowerCase().includes(term)) ||
+                (typeof p.category === "string" && p.category.toLowerCase().includes(term)) ||
+                (typeof (p as any).subcategory === "string" && (p as any).subcategory.toLowerCase().includes(term)) ||
+                (typeof p.location === "string" && p.location.toLowerCase().includes(term)) ||
+                (typeof p.gtin === "string" && p.gtin.toLowerCase().includes(term)) ||
+                (typeof (p as any).items_included === "string" && (p as any).items_included.toLowerCase().includes(term)) ||
+                (Array.isArray(p.tags) && p.tags.some((t: string) => typeof t === "string" && t.toLowerCase().includes(term))) ||
+                (Array.isArray((p as any).specs_keywords) && (p as any).specs_keywords.some((k: string) => typeof k === "string" && k.toLowerCase().includes(term))) ||
+                (Array.isArray((p as any).variant_names) && (p as any).variant_names.some((vn: string) => typeof vn === "string" && vn.toLowerCase().includes(term))) ||
+                (Array.isArray((p as any).variant_skus) && (p as any).variant_skus.some((vs: string) => typeof vs === "string" && vs.toLowerCase().includes(term)))
+            )
+
             return (
                 tabMatch &&
                 statusMatch &&
@@ -548,7 +563,7 @@ export default function ProductsPage({
                 productTypeMatch &&
                 hasCostPriceMatch &&
                 isOnPromotionMatch &&
-                (p.name?.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)) &&
+                searchMatch &&
                 (filters.stocks.length === 0 || filters.stocks.includes(stockLabel)) &&
                 p.price >= minPrice &&
                 p.price <= maxPrice
@@ -636,17 +651,36 @@ export default function ProductsPage({
                 // refetch immediately after the successful mutation.
                 if (entityState.entityId) afterMutation(entityState.entityId)
 
-                if (isNewProduct && res.data) {
-                    const addedProduct = res.data
-                    queryClient.setQueryData(productsQueryKey, (oldData: any) => {
-                        if (!oldData || !oldData.pages) return oldData
-                        const newPages = [...oldData.pages]
-                        if (newPages.length > 0) {
-                            newPages[0] = { ...newPages[0], items: [addedProduct, ...newPages[0].items] }
-                        }
-                        return { ...oldData, pages: newPages }
-                    })
-                    setProducts((p) => [addedProduct, ...p])
+                if (res.data) {
+                    const savedProduct = res.data
+                    if (isNewProduct) {
+                        queryClient.setQueryData(productsQueryKey, (oldData: any) => {
+                            if (!oldData || !oldData.pages) return oldData
+                            const newPages = [...oldData.pages]
+                            if (newPages.length > 0) {
+                                newPages[0] = { ...newPages[0], items: [savedProduct, ...newPages[0].items] }
+                            }
+                            return { ...oldData, pages: newPages }
+                        })
+                        setProducts((p) => [savedProduct, ...p])
+                    } else {
+                        const targetId = entityState.entityId || savedProduct.id
+                        queryClient.setQueryData(productsQueryKey, (oldData: any) => {
+                            if (!oldData || !oldData.pages) return oldData
+                            return {
+                                ...oldData,
+                                pages: oldData.pages.map((page: any) => ({
+                                    ...page,
+                                    items: (page.items || []).map((item: any) =>
+                                        item.id === targetId ? { ...item, ...savedProduct } : item
+                                    ),
+                                })),
+                            }
+                        })
+                        setProducts((prev) =>
+                            prev.map((p) => (p.id === targetId ? { ...p, ...savedProduct } : p))
+                        )
+                    }
                 }
 
                 closeEntity()

@@ -381,7 +381,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
           />
 
           {/* List/Grid Content */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
             <AnimatePresence mode="wait">
               {isLoading && requests.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center">
@@ -471,9 +471,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
             </AnimatePresence>
 
             {filteredReturns.length > 0 && (
-              <div className="flex justify-center mt-4 pt-4 border-t border-brand-border/60 dark:border-dark-border/60">
-                <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} inline />
-              </div>
+              <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} fixedUntil="lg" />
             )}
           </div>
         </div>

@@ -25,7 +25,7 @@ interface SelectVideoServiceSheetProps {
     onClose: () => void
     partnerId: string
     selectedId: string | null
-    onSave: (id: string | null, name?: string) => void
+    onSave: (id: string | null, details?: { name?: string; price?: number | null; imageUrl?: string | null } | string) => void
 }
 
 export default function SelectVideoServiceSheet({
@@ -72,7 +72,13 @@ export default function SelectVideoServiceSheet({
     const selectedService = tempSelected ? services.find((s) => s.id === tempSelected) : null
 
     const handleSave = () => {
-        onSave(tempSelected, selectedService?.name)
+        const rawImg = selectedService?.images?.[0] || selectedService?.image
+        const imageUrl = rawImg ? getR2ImageUrl(rawImg) : null
+        onSave(tempSelected, selectedService ? {
+            name: selectedService.name,
+            price: selectedService.price ?? null,
+            imageUrl,
+        } : undefined)
         onClose()
     }
 

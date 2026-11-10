@@ -259,6 +259,8 @@ function extractFirstVariantFallback(variants: any[] | null | undefined) {
                     name: storeName,
                     slug: item.slug || undefined,
                     description: item.description || "",
+                    logo_url: item.logo_url,
+                    banner_url: item.banner_url,
                     images: [item.banner_url || storeImage || "https://img.dudit.com.br/static/Placeholder.png"],
                     rating: item.rating || 0,
                     itemType: 'loja',

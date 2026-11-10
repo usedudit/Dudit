@@ -1838,7 +1838,7 @@ export function ExplorarPageClient({
     return (
         <>
             {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
-            <div className="min-h-screen bg-white dark:bg-dark-background font-sans animate-fade-in flex flex-col pt-2">
+            <div className="min-h-screen bg-white dark:bg-dark-background font-sans animate-fade-in flex flex-col">
                 <style>{`
                     .scrollbar-none::-webkit-scrollbar { display: none; }
                     .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -1859,7 +1859,7 @@ export function ExplorarPageClient({
                 {!isLandingPage && rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
-                <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 mt-4 px-4">
+                <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 px-4">
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) - Hide when completely empty */}
                     {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && !isEmptyListing && (
                         <div className="mb-6 lg:mb-8">

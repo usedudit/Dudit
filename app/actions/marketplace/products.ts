@@ -819,6 +819,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       short_id: item.short_id || null,
       name: item.name,
       description: item.description,
+      logo_url: item.logo_url,
+      banner_url: item.banner_url,
       images: [item.banner_url || item.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
       rating: item.rating,
       itemType: 'loja',

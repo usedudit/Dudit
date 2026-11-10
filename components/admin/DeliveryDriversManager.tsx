@@ -385,7 +385,7 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                 />
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-6 px-4 md:px-8">
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-24 lg:pb-6 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {activeList.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
@@ -869,6 +869,7 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                 currentPage={page}
                                 totalPages={totalPages}
                                 onPageChange={setPage}
+                                fixedUntil="lg"
                             />
                         </div>
                     )}

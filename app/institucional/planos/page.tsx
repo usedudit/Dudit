@@ -11,7 +11,6 @@ import {
    ArrowRightIcon
 } from '@/lib/icons';
 import { GridLines, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
-import { Metadata } from "next"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/reusable/Badge';
@@ -30,12 +29,12 @@ const PricingHero = () => {
                   Nossos Planos
                </Badge>
 
-               <h1 className="text-5xl md:text-6xl font-bold text-brand-dark leading-tight mb-6">
-                  Venda localmente com 0% de comissão
+               <h1 className="text-5xl font-bold text-brand-dark leading-tight mb-6">
+                  Venda na sua cidade ou envie para todo o Brasil. Com 0% de comissão.
                </h1>
 
                <p className="text-brand-inactive-text text-lg max-w-2xl mx-auto">
-                  Crie sua vitrine online, gerencie pedidos e organize seu negócio sem taxas abusivas.
+                  Uma vitrine e gestão simples para seu negócio, sem intermediários, taxas por pedido ou surpresas no fim do mês.
                </p>
             </motion.div>
          </div>
@@ -67,12 +66,13 @@ const PricingCards = () => {
             "1 usuário"
          ],
          variant: "outline" as const,
-         popular: false
+         popular: false,
+         isDark: false
       },
       {
          name: "Crescer",
-         price: "19,90",
-         highlight: true,
+         price: "29,90",
+         highlight: false,
          popular: true,
          objective: "Pra quem quer crescer e vender mais",
          features: [
@@ -94,12 +94,14 @@ const PricingCards = () => {
             "Até 150 pedidos por mês",
             "3 usuários"
          ],
-         variant: "default" as const
+         variant: "outline" as const,
+         isDark: false
       },
       {
          name: "Escalar",
          price: "49,90",
-         highlight: false,
+         highlight: true,
+         popular: false,
          objective: "Pra negócios que precisam de mais controle",
          features: [
             "Tudo do plano Crescer +",
@@ -107,20 +109,20 @@ const PricingCards = () => {
             "Controle de entregas e envios",
             "Campanhas promocionais",
             "Metas e desempenho da equipe",
-             "Lembretes e envios automáticos via WhatsApp",
-             "Importação de XML (NF-e)",
-             "Planos e assinaturas recorrentes"
-          ],
-          limits: [
-             "Itens e pedidos ilimitados",
-             "Ordens de serviço ilimitadas",
-             "Agendamentos ilimitados",
-             "Planos e assinaturas recorrentes ilimitados",
-             "Até 15 imagens por item",
-             "10 usuários",
-          ],
-         variant: "outline" as const,
-         popular: false
+            "Lembretes e envios automáticos via WhatsApp",
+            "Importação de XML (NF-e)",
+            "Planos e assinaturas recorrentes"
+         ],
+         limits: [
+            "Itens e pedidos ilimitados",
+            "Ordens de serviço ilimitadas",
+            "Agendamentos ilimitados",
+            "Planos e assinaturas recorrentes ilimitados",
+            "Até 15 imagens por item",
+            "10 usuários",
+         ],
+         variant: "default" as const,
+         isDark: true
       }
    ];
 
@@ -135,9 +137,11 @@ const PricingCards = () => {
                      whileInView={{ opacity: 1, y: 0 }}
                      viewport={{ once: true }}
                      transition={{ delay: index * 0.1 }}
-                     className={`rounded-3xl p-8 flex flex-col h-full relative border overflow-hidden ${plan.popular
+                     className={`rounded-3xl p-8 flex flex-col h-full relative border overflow-hidden transition-all duration-300 ${plan.isDark
                         ? 'bg-brand-dark border-brand-dark md:-translate-y-4 shadow-xl'
-                        : 'bg-white border-brand-border hover:border-brand-green/30 transition-all duration-300'
+                        : plan.popular
+                           ? 'bg-white border-2 border-brand-green md:-translate-y-2 shadow-lg'
+                           : 'bg-white border-brand-border hover:border-brand-green/30'
                         }`}
                   >
                      {plan.popular && (
@@ -148,16 +152,16 @@ const PricingCards = () => {
 
                      {/* Header */}
                      <div className="mb-8">
-                        <h3 className={`text-xl font-bold mb-1 ${plan.popular ? 'text-white' : 'text-brand-dark'}`}>
+                        <h3 className={`text-xl font-bold mb-1 ${plan.isDark ? 'text-white' : 'text-brand-dark'}`}>
                            {plan.name}
                         </h3>
-                        <p className={`text-[10px] font-bold mb-6 ${plan.popular ? 'text-brand-green' : 'text-brand-green'}`}>
+                        <p className="text-[10px] font-bold mb-6 text-brand-green">
                            {plan.objective}
                         </p>
                         <div className="flex items-baseline gap-1">
-                           <span className={`text-sm ${plan.popular ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>R$</span>
-                           <span className={`text-5xl font-bold ${plan.popular ? 'text-white' : 'text-brand-dark'}`}>{plan.price}</span>
-                           <span className={`text-sm ${plan.popular ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>/mês</span>
+                           <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>R$</span>
+                           <span className={`text-5xl font-bold ${plan.isDark ? 'text-white' : 'text-brand-dark'}`}>{plan.price}</span>
+                           <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>/mês</span>
                         </div>
                      </div>
 
@@ -171,7 +175,7 @@ const PricingCards = () => {
                               {plan.features.map((feature, i) => (
                                  <li key={i} className="flex items-start gap-3 text-sm">
                                     <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
-                                    <span className={plan.popular ? 'text-gray-300' : 'text-gray-600'}>
+                                    <span className={plan.isDark ? 'text-gray-300' : 'text-gray-600'}>
                                        {feature}
                                     </span>
                                  </li>
@@ -180,15 +184,15 @@ const PricingCards = () => {
                         </div>
 
                         {/* Seção de Limites
-                        <div className={`pt-6 border-t ${plan.popular ? 'border-white/10' : 'border-brand-border'}`}>
-                           <p className={`text-xs font-bold uppercase mb-3 ${plan.popular ? 'text-gray-400' : 'text-brand-inactive-text'}`}>
+                        <div className={`pt-6 border-t ${plan.isDark ? 'border-white/10' : 'border-brand-border'}`}>
+                           <p className={`text-xs font-bold uppercase mb-3 ${plan.isDark ? 'text-gray-400' : 'text-brand-inactive-text'}`}>
                               Limites do plano:
                            </p>
                            <ul className="space-y-2">
                               {plan.limits.map((limit, i) => (
                                  <li key={i} className="flex items-center gap-2 text-xs">
-                                    <div className={`w-1 h-1 rounded-full ${plan.popular ? 'bg-brand-green' : 'bg-brand-green/40'}`} />
-                                    <span className={plan.popular ? 'text-brand-inactive-text' : 'text-brand-inactive-text'}>
+                                    <div className={`w-1 h-1 rounded-full ${plan.isDark ? 'bg-brand-green' : 'bg-brand-green/40'}`} />
+                                    <span className={plan.isDark ? 'text-brand-inactive-text' : 'text-brand-inactive-text'}>
                                        {limit}
                                     </span>
                                  </li>
@@ -198,8 +202,8 @@ const PricingCards = () => {
                      </div>
 
                      <Button
-                        variant={plan.variant}
-                        className={`w-full mt-10 h-11 ${plan.popular ? 'bg-brand-green text-white hover:bg-brand-green/90 border-0' : ''}`}
+                        variant={plan.isDark ? "default" : "outline"}
+                        className={`w-full mt-10 h-11 ${plan.isDark ? 'bg-brand-green text-white hover:bg-brand-green/90 border-0' : ''}`}
                      >
                         Começar agora
                      </Button>
@@ -260,7 +264,7 @@ const ComparisonTable = () => {
       {
          title: "Marketing e Gestão",
          items: [
-            { name: "Cupons e promoções", g: "x", v: "check", c: "check" },
+            { name: "Cupons de desconto", g: "x", v: "check", c: "check" },
             { name: "Campanhas promocionais", g: "x", v: "x", c: "check" },
             { name: "Metas e desempenho", g: "x", v: "x", c: "check" },
             { name: "Trocas e devoluções", g: "x", v: "check", c: "check" },
@@ -306,11 +310,11 @@ const ComparisonTable = () => {
                         <th className="py-6 px-4 text-center bg-white/50 rounded-t-2xl">
                            <span className="text-base font-bold text-brand-dark">Começar</span>
                         </th>
-                        <th className="py-6 px-4 text-center bg-brand-dark rounded-t-2xl">
-                           <span className="text-base font-bold text-white">Crescer</span>
-                        </th>
                         <th className="py-6 px-4 text-center bg-white/50 rounded-t-2xl">
-                           <span className="text-base font-bold text-brand-dark">Escalar</span>
+                           <span className="text-base font-bold text-brand-dark">Crescer</span>
+                        </th>
+                        <th className="py-6 px-4 text-center bg-brand-dark rounded-t-2xl">
+                           <span className="text-base font-bold text-white">Escalar</span>
                         </th>
                      </tr>
                   </thead>
@@ -330,10 +334,10 @@ const ComparisonTable = () => {
                                  <td className="py-4 px-4 text-center">
                                     {renderValue(item.g)}
                                  </td>
-                                 <td className="py-4 px-4 text-center bg-brand-dark/5">
+                                 <td className="py-4 px-4 text-center">
                                     {renderValue(item.v)}
                                  </td>
-                                 <td className="py-4 px-4 text-center">
+                                 <td className="py-4 px-4 text-center bg-brand-dark/5">
                                     {renderValue(item.c)}
                                  </td>
                               </tr>

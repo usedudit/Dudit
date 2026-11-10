@@ -299,7 +299,7 @@ export default function ServicesPage({
             .then((value) => {
                 if (!cancelled && value) setResolvedPartner(value)
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => {
                 partnerLoadInFlightRef.current = false
                 if (!cancelled) setIsLoadingPartner(false)
@@ -425,13 +425,26 @@ export default function ServicesPage({
             const hasCostPriceMatch = !filters.hasCostPrice || (s.cost_price !== null && s.cost_price !== undefined)
             const durationMatch = s.duration_minutes >= minDuration && s.duration_minutes <= maxDuration
 
+            const searchMatch = !term || (
+                (typeof s.name === "string" && s.name.toLowerCase().includes(term)) ||
+                (typeof s.sku === "string" && s.sku.toLowerCase().includes(term)) ||
+                (typeof s.service_categories?.name === "string" && s.service_categories.name.toLowerCase().includes(term)) ||
+                (typeof (s as any).subcategory === "string" && (s as any).subcategory.toLowerCase().includes(term)) ||
+                (typeof (s as any).technical_details === "string" && (s as any).technical_details.toLowerCase().includes(term)) ||
+                (Array.isArray(s.tags) && s.tags.some((t: string) => typeof t === "string" && t.toLowerCase().includes(term))) ||
+                (Array.isArray(s.resources) && s.resources.some((r: any) =>
+                    (typeof r?.name === "string" && r.name.toLowerCase().includes(term)) ||
+                    (typeof r?.sku === "string" && r.sku.toLowerCase().includes(term))
+                ))
+            )
+
             return (
                 tabMatch &&
                 statusMatch &&
                 categoryMatch &&
                 hasCostPriceMatch &&
                 durationMatch &&
-                (s.name.toLowerCase().includes(term) || s.sku?.toLowerCase().includes(term)) &&
+                searchMatch &&
                 s.price >= minPrice &&
                 s.price <= maxPrice
             )
@@ -795,6 +808,21 @@ export default function ServicesPage({
                 // The action already returned the updated row; avoid fetching
                 // the same detail again after a successful save.
                 cache.setEntity(savedService.id, savedService)
+                setServices((previous) =>
+                    previous.map((service) => (service.id === savedService.id ? { ...service, ...savedService } : service))
+                )
+                queryClient.setQueryData(servicesQueryKey, (oldData: any) => {
+                    if (!oldData?.pages?.length) return oldData
+                    return {
+                        ...oldData,
+                        pages: oldData.pages.map((page: any) => ({
+                            ...page,
+                            items: (page.items || []).map((item: any) =>
+                                item.id === savedService.id ? { ...item, ...savedService } : item
+                            ),
+                        })),
+                    }
+                })
             } else {
                 setServices((previous) => [
                     savedService,

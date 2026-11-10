@@ -303,6 +303,66 @@ export async function verifyUploadedObject(
   return { contentLength, sha256 }
 }
 
+/**
+ * Downloads an object buffer directly from R2 using credentials (bypassing public CDN/Cloudflare WAF).
+ * Accepts either an R2 object key or a full dudit CDN/storage URL.
+ * If given a third-party external URL, safely fetches with size limits.
+ */
+export async function getFileBufferFromR2(keyOrUrl: string): Promise<Buffer | null> {
+  if (!keyOrUrl || typeof keyOrUrl !== "string") return null
+
+  try {
+    let key = keyOrUrl.trim()
+
+    if (key.startsWith("http://") || key.startsWith("https://")) {
+      try {
+        const parsed = new URL(key)
+        const hostname = parsed.hostname.toLowerCase()
+        if (
+          hostname.includes("dudit.com.br") ||
+          hostname.includes("r2.cloudflarestorage.com") ||
+          hostname.includes("r2.dev")
+        ) {
+          key = parsed.pathname.replace(/^\/+/, "")
+          if (key.startsWith("cdn-cgi/image/")) {
+            const parts = key.split("/")
+            key = parts.slice(3).join("/")
+          }
+        } else {
+          // External URL: fetch safely via ssrf-guard
+          const { safeFetch } = await import("@/lib/security/ssrf-guard")
+          const res = await safeFetch(keyOrUrl, { timeoutMs: 10_000, maxResponseBytes: 10 * 1024 * 1024 })
+          if (!res.ok) return null
+          const arrayBuf = await res.arrayBuffer()
+          return Buffer.from(arrayBuf)
+        }
+      } catch {
+        return null
+      }
+    } else {
+      key = key.replace(/^\/+/, "")
+    }
+
+    if (!key || key.startsWith("static/") || key.includes("Placeholder")) {
+      return null
+    }
+
+    const bucketName = getR2BucketNameForKey(key)
+    const client = getR2Client()
+    const object = await client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }))
+    if (!object.Body) return null
+
+    const chunks: Uint8Array[] = []
+    for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk)
+    }
+    return Buffer.concat(chunks)
+  } catch (err: any) {
+    console.warn(`[R2] Failed to get file buffer for key: ${keyOrUrl}`, err?.message || err)
+    return null
+  }
+}
+
 export async function deleteFileFromR2(key: string) {
   // Validate key is not empty and doesn't contain traversal
   if (!key || key.includes("..") || key.startsWith("/")) {

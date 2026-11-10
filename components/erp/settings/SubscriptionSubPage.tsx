@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
-import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input, FormSection, IconPlaceholder, RadioButton, FormTextarea } from "@/components/reusable"
+import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input, FormSection, IconPlaceholder, RadioButton, FormTextarea, ListItem } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import {
     CheckCircleIcon,
@@ -88,51 +88,73 @@ const PlanCard: React.FC<PlanCardProps> = ({
     billingCycle,
     onAction,
 }) => {
+    const isDark = slug === "escalar"
+
     // Calculate display price
     const displayPrice = billingCycle === "annually" ? price * 0.8 : price
     const showTwelveInstallments = billingCycle === "annually" && price > 0
 
     // Dynamic features header
-    let featuresHeader = "Itens inclusos"
-    if (slug === "crescer") featuresHeader = "Tudo do Começar e mais:"
-    else if (slug === "escalar") featuresHeader = "Tudo do Crescer e mais:"
-    else if (slug === "profissional") featuresHeader = "Tudo do Escalar e mais:"
+    let featuresHeader = "O que está incluso:"
+    if (slug === "crescer") featuresHeader = "Tudo do Começar +"
+    else if (slug === "escalar") featuresHeader = "Tudo do Crescer +"
+    else if (slug === "profissional") featuresHeader = "Tudo do Escalar +"
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className={`rounded-3xl p-6 flex flex-col h-full relative transition-all duration-300 bg-white dark:bg-dark-surface ${popular
-                ? "border-2 border-brand-green z-10"
-                : "border border-brand-border dark:border-dark-border"
+            className={`rounded-3xl p-6 md:p-8 flex flex-col h-full relative transition-all duration-300 ${isDark
+                ? "bg-brand-dark border-2 border-brand-dark text-white md:-translate-y-2 shadow-xl z-10"
+                : popular
+                    ? "bg-white dark:bg-dark-surface border-2 border-brand-green z-10 shadow-lg"
+                    : "bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border"
                 }`}
         >
             {popular && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap">
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
                     Mais popular
                 </div>
             )}
 
             {/* Header */}
             <div className="mb-6 pt-2">
-                <h3 className="text-brand-inactive-text dark:text-dark-body text-md font-medium mb-1">
+                <h3 className={`text-xl font-bold mb-1 ${isDark ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
                     {name}
                 </h3>
+                <p className="text-[10px] font-bold text-brand-green mb-4">
+                    {objective}
+                </p>
 
                 <div className="mb-4">
-                    {showTwelveInstallments && <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">12x de</span>}
+                    {showTwelveInstallments && (
+                        <span className={`text-xs font-bold block ${isDark ? "text-white/80" : "text-brand-dark dark:text-dark-heading"}`}>
+                            12x de
+                        </span>
+                    )}
                     <div className="flex items-baseline gap-1 mt-1">
-                        <span className={`${price > 0 ? "text-2xl" : "text-xl"} font-bold text-brand-dark dark:text-dark-heading`}>
+                        <span className={`text-3xl font-bold ${isDark ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
                             {price > 0 ? formatCurrency(displayPrice) : "Grátis"}
                         </span>
-                        {price > 0 && <span className="text-sm text-brand-inactive-text">/mês</span>}
+                        {price > 0 && (
+                            <span className={`text-sm ${isDark ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>
+                                /mês
+                            </span>
+                        )}
                     </div>
                 </div>
 
                 <Button
-                    variant={popular ? "default" : "outline"}
-                    className="w-full h-12"
+                    variant={isDark ? "default" : "outline"}
+                    className={`w-full h-12 ${isDark
+                        ? isCurrent
+                            ? "bg-white/10 text-white/50 border border-white/20 cursor-not-allowed hover:bg-white/10"
+                            : isDowngrade
+                                ? "bg-white/10 text-white border border-white/20 hover:bg-white/20"
+                                : "bg-brand-green text-white hover:bg-brand-green/90 border-0 shadow-lg shadow-brand-green/20"
+                        : ""
+                        }`}
                     onClick={onAction}
                     disabled={isLoading || isCurrent}
                     isLoading={isLoading}
@@ -148,22 +170,26 @@ const PlanCard: React.FC<PlanCardProps> = ({
                     )}
                 </Button>
 
-                <p className="text-center text-xs text-brand-inactive-text mt-3">
+                <p className={`text-center text-xs mt-3 ${isDark ? "text-zinc-400" : "text-brand-inactive-text"}`}>
                     Cancele quando quiser
                 </p>
             </div>
 
-            <div className="w-full h-px bg-brand-border dark:bg-dark-border mb-6" />
+            <div className={`w-full h-px mb-6 ${isDark ? "bg-white/10" : "bg-brand-border dark:bg-dark-border"}`} />
 
             {/* Features */}
             <div className="flex-1 space-y-6">
                 <div>
-                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">{featuresHeader}</p>
+                    <p className="text-xs font-bold uppercase mb-4 text-brand-green tracking-wide">
+                        {featuresHeader}
+                    </p>
                     <ul className="space-y-3.5">
                         {features.map((feature, i) => (
                             <li key={`feat-${i}`} className="flex items-start gap-3 text-sm">
                                 <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
-                                <span className="text-brand-dark/80 dark:text-dark-body">{feature}</span>
+                                <span className={isDark ? "text-gray-300" : "text-gray-600 dark:text-dark-body"}>
+                                    {feature}
+                                </span>
                             </li>
                         ))}
                     </ul>
@@ -171,12 +197,17 @@ const PlanCard: React.FC<PlanCardProps> = ({
             </div>
 
             {/* Limits at the bottom */}
-            <div className="mt-8 pt-6 border-t border-brand-border dark:border-dark-border">
+            <div className={`mt-8 pt-6 border-t ${isDark ? "border-white/10" : "border-brand-border dark:border-dark-border"}`}>
+                <p className={`text-xs font-bold uppercase mb-3 ${isDark ? "text-zinc-400" : "text-brand-inactive-text"}`}>
+                    Limites do plano:
+                </p>
                 <ul className="space-y-2.5">
                     {limits.map((limit, i) => (
                         <li key={`limit-${i}`} className="flex items-center gap-2.5 text-xs">
-                            <div className="w-1.5 h-1.5 rounded-full bg-brand-green/40 shrink-0" />
-                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">{limit}</span>
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isDark ? "bg-brand-green" : "bg-brand-green/40"}`} />
+                            <span className={`font-medium ${isDark ? "text-gray-300" : "text-brand-inactive-text dark:text-dark-body"}`}>
+                                {limit}
+                            </span>
                         </li>
                     ))}
                 </ul>
@@ -243,46 +274,45 @@ const AnnualPromoCard = ({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className={`rounded-2xl border p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 transition-colors duration-300 ${active
-            ? "border-brand-green/40 bg-brand-green/5 dark:bg-brand-green/10"
-            : "border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-surface"
-            }`}
     >
-        <div className="flex items-start gap-3.5 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-brand-green/10 border border-brand-green/20 flex items-center justify-center shrink-0">
-                <GiftIcon size={20} className="text-brand-green" />
-            </div>
-            <div className="min-w-0">
+        <ListItem
+            icon={<GiftIcon size={22} className="text-brand-green" />}
+            iconContainerClassName="bg-brand-green/15 border-brand-green/30 text-brand-green group-hover:bg-brand-green/25"
+            className={`p-4 md:p-5 transition-colors duration-300 ${active
+                ? "border-brand-green/40 bg-brand-green/5 dark:bg-brand-green/10 cursor-default"
+                : "border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-surface hover:border-brand-green/40"
+                }`}
+            title={
                 <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm md:text-base">
+                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm md:text-base">
                         2 meses grátis no plano anual
-                    </p>
+                    </span>
                     <span className="bg-brand-green text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0">
                         Economize 20%
                     </span>
                 </div>
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                    Assine qualquer plano no anual hoje e os 2 primeiros meses são por nossa conta. É a
-                    melhor forma de começar economizando, sem perder a liberdade de cancelar quando quiser.
-                </p>
-            </div>
-        </div>
-
-        {active ? (
-            <div className="flex items-center gap-2 text-brand-green text-sm font-bold shrink-0 md:pl-4">
-                <CheckCircleIcon size={18} />
-                Anual ativo - desconto garantido
-            </div>
-        ) : (
-            <Button
-                variant="outline"
-                className="shrink-0 h-11 md:whitespace-nowrap"
-                onClick={onSwitch}
-                rightIcon={<ArrowRightIcon size={16} />}
-            >
-                Ir para o anual
-            </Button>
-        )}
+            }
+            titleClassName="!whitespace-normal !overflow-visible"
+            description="Assine qualquer plano no anual hoje e os 2 primeiros meses são por nossa conta. É a melhor forma de começar economizando, sem perder a liberdade de cancelar quando quiser."
+            descriptionClassName="mt-1"
+            right={
+                active ? (
+                    <div className="flex items-center gap-2 text-brand-green text-sm font-bold shrink-0 md:pl-4">
+                        <CheckCircleIcon size={18} />
+                        Anual ativo - desconto garantido
+                    </div>
+                ) : (
+                    <Button
+                        variant="outline"
+                        className="shrink-0 h-11 md:whitespace-nowrap"
+                        onClick={onSwitch}
+                        rightIcon={<ArrowRightIcon size={16} />}
+                    >
+                        Ir para o anual
+                    </Button>
+                )
+            }
+        />
     </motion.div>
 )
 
@@ -307,6 +337,7 @@ interface SubscriptionData {
         pending_plan_id: string | null
         trial_end: string | null
         payment_provider: string
+        billing_cycle?: string | null
         next_payment_date?: string | null
         grace_period_ends_at?: string | null
         grace_days_left?: number | null
@@ -949,6 +980,32 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const displayPlanSlug = (!hasActivePaidSub || isPeriodExpired) ? "free" : currentPlanSlug
     const displayPlanPrice = (!hasActivePaidSub || isPeriodExpired) ? 0 : currentPlanPrice
 
+    const planTheme = {
+        escalar: {
+            border: "border-2 border-brand-dark/25 dark:border-brand-green/30 shadow-sm",
+            badgeVariant: "green" as const,
+            badgeText: "Plano Completo",
+            badgeIcon: <ShieldIcon size={12} className="text-brand-green" />,
+        },
+        crescer: {
+            border: "border-2 border-brand-green/35 dark:border-brand-green/30 shadow-sm",
+            badgeVariant: "green" as const,
+            badgeText: "Mais popular",
+            badgeIcon: undefined,
+        },
+        free: {
+            border: "border border-brand-border dark:border-dark-border",
+            badgeVariant: "gray" as const,
+            badgeText: "Plano Gratuito",
+            badgeIcon: undefined,
+        },
+    }[displayPlanSlug] || {
+        border: "border border-brand-border dark:border-dark-border",
+        badgeVariant: "gray" as const,
+        badgeText: "Plano Gratuito",
+        badgeIcon: undefined,
+    }
+
     return (
         <FadeIn className="h-full">
             <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
@@ -1039,15 +1096,20 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">
 
                             {/* Card 1: Current Plan */}
-                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
+                            <div className={`rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface flex flex-col justify-between relative transition-all duration-300 ${planTheme.border}`}>
                                 <div>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
-                                            Plano atual
-                                        </span>
+                                    <div className="flex items-center justify-between mb-4 h-9">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                                                Plano atual
+                                            </span>
+                                            <Badge variant={planTheme.badgeVariant} icon={planTheme.badgeIcon}>
+                                                {planTheme.badgeText}
+                                            </Badge>
+                                        </div>
                                         <Dropdown
                                             trigger={
-                                                <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+                                                <Button variant="outline" className="w-9 h-9 p-0 flex items-center justify-center rounded-full">
                                                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                                                 </Button>
                                             }
@@ -1085,68 +1147,87 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         </Dropdown>
                                     </div>
 
-                                    <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                        {subData ? `Plano ${getHardcodedPlan(displayPlanSlug).name}` : "Carregando..."}
-                                    </h2>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                                        <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {subData ? `Plano ${getHardcodedPlan(displayPlanSlug).name}` : "Carregando..."}
+                                        </h2>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                                                {subData ? (displayPlanPrice > 0 ? formatCurrency(displayPlanPrice) : "Grátis") : "..."}
+                                            </span>
+                                            {displayPlanPrice > 0 && (
+                                                <span className="text-xs text-brand-inactive-text font-normal">/mês</span>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-6">
                                         {subData ? getHardcodedPlan(displayPlanSlug).objective || "Recursos essenciais para gerenciar e impulsionar seu negócio." : "..."}
                                     </p>
                                 </div>
 
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">
-                                            {subData ? (displayPlanPrice > 0 ? formatCurrency(displayPlanPrice) : "Grátis") : "..."}
+                                <div className="pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
+                                    <div className="mb-4">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-2.5">
+                                            Limites inclusos no plano
                                         </span>
-                                        {displayPlanPrice > 0 && (
-                                            <span className="text-xs text-brand-inactive-text font-normal">/mês</span>
-                                        )}
+                                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                            {getHardcodedPlan(displayPlanSlug).limits.slice(0, 4).map((limit, i) => (
+                                                <li key={i} className="flex items-center gap-2 text-brand-dark/80 dark:text-dark-body font-medium">
+                                                    <CheckCircleIcon size={14} className="text-brand-green shrink-0" />
+                                                    <span className="truncate">{limit}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
 
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status === "past_due" && (
-                                            <Button
-                                                variant="destructive"
-                                                className="h-11"
-                                                onClick={handleGenerateManualPayment}
-                                                disabled={manualPaymentModal.loading}
-                                                isLoading={manualPaymentModal.loading}
-                                            >
-                                                Pagar fatura atrasada
-                                            </Button>
-                                        )}
+                                    <div className="pt-4 border-t border-brand-border/60 dark:border-dark-border/60 flex items-center justify-between gap-3">
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">
+                                            {displayPlanSlug === "escalar"
+                                                ? "Acesso a todos os recursos liberados"
+                                                : "Precisa de limites maiores?"}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status === "past_due" && (
+                                                <Button
+                                                    variant="destructive"
+                                                    className="h-10 text-xs px-3"
+                                                    onClick={handleGenerateManualPayment}
+                                                    disabled={manualPaymentModal.loading}
+                                                    isLoading={manualPaymentModal.loading}
+                                                >
+                                                    Pagar fatura
+                                                </Button>
+                                            )}
 
-                                        {displayPlanSlug !== "escalar" && (
-                                            <Button
-                                                variant="default"
-                                                className="h-11"
-                                                onClick={() => setPlansOpen(true)}
-                                                leftIcon={<ArrowUpIcon size={18} />}
-                                            >
-                                                Fazer upgrade
-                                            </Button>
-                                        )}
+                                            {displayPlanSlug !== "escalar" ? (
+                                                <Button
+                                                    variant="default"
+                                                    className="h-10 text-xs px-4"
+                                                    onClick={() => setPlansOpen(true)}
+                                                    leftIcon={<ArrowUpIcon size={16} />}
+                                                >
+                                                    Fazer upgrade
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="outline"
+                                                    className="h-10 text-xs px-4"
+                                                    onClick={() => setPlansOpen(true)}
+                                                >
+                                                    Ver outros planos
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-
-                                {hasActivePaidSub && (
-                                    <div className="mt-5 pt-4 border-t border-brand-border dark:border-dark-border flex items-center justify-between text-xs md:text-sm">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                            {isScheduledToCancel ? "Acesso até" : "Renova em"}
-                                        </span>
-                                        <span className={`font-bold ${isScheduledToCancel ? "text-amber-600 dark:text-amber-400" : "text-brand-dark dark:text-dark-heading"}`}>
-                                            {(isScheduledToCancel ? accessUntilDate : nextInvoiceDate) ? formatDate(isScheduledToCancel ? accessUntilDate! : nextInvoiceDate!) : "-"}
-                                        </span>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Card 2: Cobrança / Renovação */}
-                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
+                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative transition-all duration-300">
                                 <div>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
+                                    <div className="flex items-center justify-between mb-4 h-9">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
                                             {isPendingPayment
                                                 ? "Upgrade pendente"
                                                 : isPastDue
@@ -1184,15 +1265,23 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         )}
                                     </div>
 
-                                    <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                        {subData ? (
-                                            (!hasBillingInfo || isScheduledToCancel)
-                                                ? "R$ 0,00"
-                                                : formatCurrency(shownAmount)
-                                        ) : "..."}
-                                    </h2>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                                        <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {subData ? (
+                                                (!hasBillingInfo || isScheduledToCancel)
+                                                    ? "R$ 0,00"
+                                                    : formatCurrency(shownAmount)
+                                            ) : "..."}
+                                        </h2>
+                                        {hasBillingInfo && !isScheduledToCancel && shownDueDate && (
+                                            <span className="text-[11px] font-bold text-brand-green bg-brand-green/10 dark:bg-brand-green/20 border border-brand-green/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                                                <ClockIcon size={12} />
+                                                Previsto para {formatDate(shownDueDate)}
+                                            </span>
+                                        )}
+                                    </div>
 
-                                    <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                                    <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-6">
                                         {isPendingPayment ? (
                                             `Solicitação de upgrade para o Plano ${shownPlanName}. Expira em até 3 dias se não for confirmada.`
                                         ) : isPastDue ? (
@@ -1211,7 +1300,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     </p>
                                 </div>
 
-                                <div className="space-y-4 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
+                                <div className="pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     {isScheduledToCancel ? (
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs md:text-sm">
@@ -1236,12 +1325,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     ) : !hasBillingInfo ? (
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Começar (Gratuito)
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Cobrança futura</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     Nenhuma cobrança agendada
@@ -1253,15 +1336,15 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     Sem faturas pendentes
                                                 </span>
                                             </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tipo de acesso</span>
+                                                <span className="font-bold text-brand-green">
+                                                    Vitalício gratuito
+                                                </span>
+                                            </div>
                                         </div>
                                     ) : isPendingPayment ? (
                                         <div className="space-y-3">
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano solicitado</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Plano {shownPlanName}
-                                                </span>
-                                            </div>
                                             <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do pedido</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
@@ -1278,7 +1361,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             <div className="pt-2 flex flex-col gap-2">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     <Button
-                                                        className="w-full"
+                                                        className="w-full h-10 text-xs"
                                                         onClick={handleGeneratePendingManualPayment}
                                                         disabled={manualPaymentModal.loading}
                                                         isLoading={manualPaymentModal.loading}
@@ -1288,7 +1371,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     </Button>
                                                     <Button
                                                         variant="outline"
-                                                        className="w-full"
+                                                        className="w-full h-10 text-xs"
                                                         onClick={handlePayPending}
                                                     >
                                                         Pagar com Cartão
@@ -1296,7 +1379,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 </div>
                                                 <Button
                                                     variant="outlinered"
-                                                    className="w-full"
+                                                    className="w-full h-9 text-xs"
                                                     onClick={handleCancelPendingUpgrade}
                                                     disabled={cancellingPendingUpgrade}
                                                     isLoading={cancellingPendingUpgrade}
@@ -1308,13 +1391,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     ) : isPastDue ? (
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Plano {shownPlanName}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento da fatura</span>
                                                 <span className="font-bold text-brand-red">
                                                     {shownDueDate ? formatDate(shownDueDate) : "-"}
                                                 </span>
@@ -1322,7 +1399,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
                                             <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 <Button
-                                                    className="w-full"
+                                                    className="w-full h-10 text-xs"
                                                     onClick={handleGenerateManualPayment}
                                                     disabled={manualPaymentModal.loading}
                                                     isLoading={manualPaymentModal.loading}
@@ -1332,7 +1409,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 </Button>
                                                 <Button
                                                     variant="outline"
-                                                    className="w-full"
+                                                    className="w-full h-10 text-xs"
                                                     onClick={handlePayPending}
                                                 >
                                                     Pagar com Cartão
@@ -1342,13 +1419,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     ) : (
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Plano {shownPlanName}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data da renovação</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data da cobrança</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     {shownDueDate ? formatDate(shownDueDate) : "-"}
                                                 </span>
@@ -1357,6 +1428,12 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de cobrança</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     Cartão de Crédito
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frequência</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {subData?.subscription?.billing_cycle === "annually" ? "Anual (com desconto)" : "Mensal recorrente"}
                                                 </span>
                                             </div>
                                         </div>
@@ -1383,7 +1460,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 <div className="shrink-0 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                                     <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                         <div className="flex items-center gap-2.5">
-                                            <span className="w-2 h-2 rounded-full bg-brand-green shrink-0" />
                                             <div>
                                                 <h2 className="text-lg md:text-xl font-bold leading-tight text-brand-dark dark:text-dark-heading">
                                                     Escolha seu plano

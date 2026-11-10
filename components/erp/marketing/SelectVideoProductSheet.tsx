@@ -25,7 +25,7 @@ interface SelectVideoProductSheetProps {
     onClose: () => void
     partnerId: string
     selectedId: string | null
-    onSave: (id: string | null, name?: string) => void
+    onSave: (id: string | null, details?: { name?: string; price?: number | null; imageUrl?: string | null } | string) => void
 }
 
 export default function SelectVideoProductSheet({
@@ -72,7 +72,13 @@ export default function SelectVideoProductSheet({
     const selectedProduct = tempSelected ? products.find((p) => p.id === tempSelected) : null
 
     const handleSave = () => {
-        onSave(tempSelected, selectedProduct?.name)
+        const rawImg = selectedProduct?.images?.[0] || selectedProduct?.image
+        const imageUrl = rawImg ? getR2ImageUrl(rawImg) : null
+        onSave(tempSelected, selectedProduct ? {
+            name: selectedProduct.name,
+            price: selectedProduct.price ?? null,
+            imageUrl,
+        } : undefined)
         onClose()
     }
 

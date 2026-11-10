@@ -1043,7 +1043,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                         <TabsTrigger value="services">
-                                            Serviços
+                                            Mão de obra
                                             {getTabErrorCount("services") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                         <TabsTrigger value="products">

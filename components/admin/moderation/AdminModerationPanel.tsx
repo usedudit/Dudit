@@ -240,7 +240,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
     return (
         <FadeIn>
             <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
-                <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative pb-24 lg:pb-0">
                     {/* Desktop Controls Bar - Mode Dropdown + Actions */}
                     <div className="hidden md:flex items-center justify-between px-8 py-4 gap-4 border-b border-brand-border dark:border-dark-border">
                         <div className="flex items-center gap-3">
@@ -610,6 +610,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                                         currentPage={videosPage}
                                                         totalPages={videosTotalPages}
                                                         onPageChange={setVideosPage}
+                                                        fixedUntil="lg"
                                                     />
                                                 </div>
                                             )}

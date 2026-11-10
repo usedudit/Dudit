@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Planos e Preços - Sistema ERP com 0% de Comissão | Dudit",
-    description: "Conheça os planos da Dudit: Começar Grátis (R$ 0), Crescer (R$ 19,90/mês) e Escalar (R$ 49,90/mês). Vitrine online, PDV balcão, pedidos e estoque com 0% de taxa por venda.",
+    title: "Planos e Preços - Sistema de Gestão Completo | Dudit",
+    description: "Conheça os planos da Dudit: Começar Grátis (R$ 0), Crescer (R$ 29,90/mês) e Escalar (R$ 49,90/mês). Vitrine online, PDV balcão, pedidos e estoque com 0% de taxa por venda.",
     openGraph: {
         title: "Planos e Preços - Venda com 0% de Comissão | Dudit",
         description: "Crie sua vitrine online, gerencie pedidos, controle estoque e emita ordens de serviço sem pagar comissões abusivas por venda.",

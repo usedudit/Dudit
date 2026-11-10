@@ -34,7 +34,7 @@ export default function CalculadoraTaxasMarketplacePage() {
     const taxaFixaMensal = taxaFixaPorPedido * quantidadePedidos
     const custoTotalMarketplaceMensal = comissaoPercentualMensal + taxaFixaMensal
     const custoTotalMarketplaceAnual = custoTotalMarketplaceMensal * 12
-    const custoDuditMensal = 19.90
+    const custoDuditMensal = 29.90
     const custoDuditAnual = custoDuditMensal * 12
     const economiaAnual = Math.max(0, custoTotalMarketplaceAnual - custoDuditAnual)
 
@@ -49,7 +49,7 @@ export default function CalculadoraTaxasMarketplacePage() {
         },
         {
             question: "Como a Dudit consegue cobrar 0% de comissão por venda?",
-            answer: "A Dudit opera no modelo SaaS (Software como Serviço) com planos fixos muito acessíveis (a partir de R$ 0 no plano gratuito ou R$ 19,90/mês). Nós não cobramos porcentagem sobre as suas vendas. Todo o valor transacionado cai direto na sua conta."
+            answer: "A Dudit opera no modelo SaaS (Software como Serviço) com planos fixos muito acessíveis (a partir de R$ 0 no plano gratuito ou R$ 29,90/mês). Nós não cobramos porcentagem sobre as suas vendas. Todo o valor transacionado cai direto na sua conta.",
         },
         {
             question: "Posso continuar vendendo nos marketplaces e também usar a Dudit?",

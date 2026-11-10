@@ -28,8 +28,6 @@ interface QuoteAttachmentsTabProps {
     onMutation?: () => void
 }
 
-type AttachmentCategory = "normal" | "antes" | "depois"
-
 export default function QuoteAttachmentsTab({
     partnerId,
     quoteId,
@@ -46,7 +44,6 @@ export default function QuoteAttachmentsTab({
     const [localAttachments, setLocalAttachments] = useState<any[]>(attachments)
     const [showCropper, setShowCropper] = useState(false)
     const [imageForCrop, setImageForCrop] = useState<File | null>(null)
-    const [pendingCategory, setPendingCategory] = useState<AttachmentCategory>("normal")
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
     const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
 
@@ -57,7 +54,20 @@ export default function QuoteAttachmentsTab({
     const advancedEnabled = hasMinimumPlan(planSlug, "crescer")
     const imagePlanLimit = getPlanImageAttachmentLimit(planSlug)
 
-    const handleImageUpload = (category: AttachmentCategory, e: React.ChangeEvent<HTMLInputElement>) => {
+    const isImageAttachment = (att: any) => {
+        const type = String(att?.file_type || att?.file?.type || "").toLowerCase()
+        const name = String(att?.file_name || att?.name || att?.file?.name || "").toLowerCase()
+        return (
+            type.startsWith("image/") ||
+            /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(name)
+        )
+    }
+
+    const docs = (localAttachments || []).filter(att => !isImageAttachment(att))
+    const images = (localAttachments || []).filter(isImageAttachment)
+    const imagesForSection = images.map(img => img.file || img.file_key)
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         e.target.value = ""
         if (!file) return
@@ -72,16 +82,13 @@ export default function QuoteAttachmentsTab({
             return
         }
 
-        const totalImagesCount = localAttachments.filter(att =>
-            att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/")
-        ).length
+        const totalImagesCount = localAttachments.filter(isImageAttachment).length
 
         if (totalImagesCount >= imagePlanLimit) {
             toast({ description: `Você atingiu o limite de ${imagePlanLimit} imagem(ns) para o seu plano.` })
             return
         }
 
-        setPendingCategory(category)
         setImageForCrop(file)
         setShowCropper(true)
     }
@@ -125,7 +132,7 @@ export default function QuoteAttachmentsTab({
                     file.name,
                     file.type,
                     file.size,
-                    pendingCategory,
+                    "normal",
                     fileHash
                 )
 
@@ -145,7 +152,7 @@ export default function QuoteAttachmentsTab({
                     file,
                     file_name: file.name,
                     file_type: file.type,
-                    category: pendingCategory,
+                    category: "normal",
                 }
                 const updated = [...localAttachments, newAtt]
                 setLocalAttachments(updated)
@@ -182,12 +189,11 @@ export default function QuoteAttachmentsTab({
         }
     }
 
-    const handleDocUploadClick = (category: AttachmentCategory) => {
+    const handleDocUploadClick = () => {
         if (!advancedEnabled) {
             openPlanUpgrade("crescer")
             return
         }
-        setPendingCategory(category)
         docInputRef.current?.click()
     }
 
@@ -202,7 +208,7 @@ export default function QuoteAttachmentsTab({
         }
 
         if (file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|avif|bmp|svg)$/i.test(file.name)) {
-            toast({ description: "Arquivos de imagem não são permitidos na seção de documentos. Utilize as seções de imagem abaixo." })
+            toast({ description: "Arquivos de imagem não são permitidos na seção de documentos. Utilize a seção de imagens abaixo." })
             return
         }
 
@@ -239,7 +245,7 @@ export default function QuoteAttachmentsTab({
                     file.name,
                     file.type,
                     file.size,
-                    pendingCategory,
+                    "normal",
                     fileHash
                 )
 
@@ -261,7 +267,7 @@ export default function QuoteAttachmentsTab({
                 file,
                 file_name: file.name,
                 file_type: file.type,
-                category: pendingCategory,
+                category: "normal",
             }
             const updated = [...localAttachments, newAtt]
             setLocalAttachments(updated)
@@ -321,25 +327,11 @@ export default function QuoteAttachmentsTab({
         }
     }
 
-    const isImageAttachment = (att: any) =>
-        att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/")
-
-    const getAttachmentsFor = (categories: AttachmentCategory[]) =>
-        (localAttachments || []).filter(att =>
-            categories.includes((att.category || "normal") as AttachmentCategory)
-        )
-
-    const getImagesFor = (categories: AttachmentCategory[]) =>
-        getAttachmentsFor(categories).filter(isImageAttachment)
-
-    const getDocsFor = (categories: AttachmentCategory[]) =>
-        getAttachmentsFor(categories).filter(att => !isImageAttachment(att))
-
-    const renderDocsGrid = (docs: any[]) => {
-        if (docs.length === 0) return null
+    const renderDocsGrid = (docsList: any[]) => {
+        if (docsList.length === 0) return null
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                {docs.map((doc) => (
+                {docsList.map((doc) => (
                     <ListItem
                         key={doc.id}
                         icon={FileIcon}
@@ -373,9 +365,7 @@ export default function QuoteAttachmentsTab({
         )
     }
 
-    const renderDocsContent = (category: AttachmentCategory) => {
-        const docs = getDocsFor([category])
-
+    const renderDocsContent = () => {
         if (docs.length === 0) {
             return isEditing ? (
                 <div className="flex flex-col items-center justify-center text-center py-6">
@@ -385,7 +375,7 @@ export default function QuoteAttachmentsTab({
                         subtitle="Adicione documentos em PDF, Word, Excel, CSV, Zip, etc."
                         itemButton={{
                             text: "Adicionar Documento",
-                            action: () => handleDocUploadClick(category),
+                            action: handleDocUploadClick,
                             variant: "outline",
                         }}
                     />
@@ -401,7 +391,7 @@ export default function QuoteAttachmentsTab({
                         <Button
                             type="button"
                             variant="link"
-                            onClick={() => handleDocUploadClick(category)}
+                            onClick={handleDocUploadClick}
                             className="text-xs gap-1.5"
                         >
                             <UploadIcon className="w-4 h-4" />
@@ -410,24 +400,6 @@ export default function QuoteAttachmentsTab({
                     </div>
                 )}
             </>
-        )
-    }
-
-    const renderImagesContent = (categories: AttachmentCategory[], uploadCategory: AttachmentCategory) => {
-        const images = getImagesFor(categories)
-        const imagesForSection = images.map(img => img.file || img.file_key)
-
-        return (
-            <ProductImagesSection
-                images={imagesForSection}
-                onImageUpload={(e) => handleImageUpload(uploadCategory, e)}
-                onRemoveImage={(idx) => {
-                    const target = images[idx]
-                    if (target) handleRemoveImage(target.id)
-                }}
-                onSetPrimaryImage={() => { }}
-                isEditing={isEditing}
-            />
         )
     }
 
@@ -455,34 +427,28 @@ export default function QuoteAttachmentsTab({
         <>
             <div className="space-y-6">
                 {/* Anexos (documentos) */}
-                {(isEditing || getDocsFor(["normal"]).length > 0) && (
+                {(isEditing || docs.length > 0) && (
                     <FormSection
                         title="Anexos"
                         description="Documentos em PDF, Word, Excel, CSV, etc."
                     >
-                        {renderDocsContent("normal")}
+                        {renderDocsContent()}
                     </FormSection>
                 )}
 
-                {/* Imagens Antes da Proposta */}
-                {(isEditing || getImagesFor(["normal", "antes"]).length > 0) && (
-                    <FormSection
-                        title="Imagens Antes da Proposta"
-                        description="Fotos do item ou ambiente antes do serviço."
-                        hasSeparator
-                    >
-                        {renderImagesContent(["normal", "antes"], "antes")}
-                    </FormSection>
-                )}
-
-                {/* Imagens Após a Proposta */}
-                {(isEditing || getImagesFor(["depois"]).length > 0) && (
-                    <FormSection
-                        title="Imagens Após a Proposta"
-                        description="Fotos do item ou serviço concluído."
-                        hasSeparator
-                    >
-                        {renderImagesContent(["depois"], "depois")}
+                {/* Imagens */}
+                {(isEditing || images.length > 0) && (
+                    <FormSection title="Imagens">
+                        <ProductImagesSection
+                            images={imagesForSection}
+                            onImageUpload={handleImageUpload}
+                            onRemoveImage={(idx) => {
+                                const target = images[idx]
+                                if (target) handleRemoveImage(target.id)
+                            }}
+                            onSetPrimaryImage={() => { }}
+                            isEditing={isEditing}
+                        />
                     </FormSection>
                 )}
 

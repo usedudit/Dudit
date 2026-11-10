@@ -1,18 +1,20 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { Tabs, TabsList, TabsTrigger, Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard, ActionsDropdown, ListItem } from "@/components/reusable"
-import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
+import { Tabs, TabsList, TabsTrigger, Button, Input, FormTextarea, Badge, FormSection, SidebarCard, ActionsDropdown, AlertModal } from "@/components/reusable"
 import { ChevronLeftIcon, ChevronDownIcon, LinkIcon, EditIcon, SaveIcon, ThreeDotsIcon } from "@/lib/icons"
 import { useSidebar } from "@/lib/sidebar-context"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import CommunityVideoUploadSection from "./CommunityVideoUploadSection"
 import SelectVideoProductSheet from "./SelectVideoProductSheet"
 import SelectVideoServiceSheet from "./SelectVideoServiceSheet"
+import { getVideoLinkedItemSummary } from "@/app/actions/marketplace/community-videos"
 import type { VideoMetadata } from "@/lib/video/shared"
 import { formatDate } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils/formatters"
 
 interface VideoFormPageProps {
     video?: any
@@ -23,6 +25,14 @@ interface VideoFormPageProps {
     isLoading?: boolean
     partnerId?: string
     readOnly?: boolean
+}
+
+interface LinkedItemState {
+    id: string
+    name: string
+    type: "product" | "service"
+    price?: number | null
+    imageUrl?: string | null
 }
 
 const EMPTY_VIDEO: VideoMetadata = {
@@ -81,11 +91,9 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
     const [title, setTitle] = useState("")
     const [description, setDescription] = useState("")
     const [videoMeta, setVideoMeta] = useState<VideoMetadata>(EMPTY_VIDEO)
-    const [tags, setTags] = useState<string[]>([])
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
-    const [isTagsModalOpen, setIsTagsModalOpen] = useState(false)
 
-    const [linkedItem, setLinkedItem] = useState<{ id: string; name: string; type: "product" | "service" } | null>(null)
+    const [linkedItem, setLinkedItem] = useState<LinkedItemState | null>(null)
     const [linkedCollectionUrl, setLinkedCollectionUrl] = useState("")
 
     const [showProductSheet, setShowProductSheet] = useState(false)
@@ -115,16 +123,88 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                 video_provider_id: video.video_provider_id || null,
             })
             if (video.linked_item_type === "product" && video.linked_item_id) {
-                setLinkedItem({ id: video.linked_item_id, name: video.linked_item_name || "", type: "product" })
+                const li = video.linked_item
+                setLinkedItem({
+                    id: video.linked_item_id,
+                    name: li?.name || video.linked_item_name || "",
+                    type: "product",
+                    price: li?.price ?? null,
+                    imageUrl: li?.imageUrl ?? null,
+                })
             } else if (video.linked_item_type === "service" && video.linked_item_id) {
-                setLinkedItem({ id: video.linked_item_id, name: video.linked_item_name || "", type: "service" })
+                const li = video.linked_item
+                setLinkedItem({
+                    id: video.linked_item_id,
+                    name: li?.name || video.linked_item_name || "",
+                    type: "service",
+                    price: li?.price ?? null,
+                    imageUrl: li?.imageUrl ?? null,
+                })
             } else {
                 setLinkedItem(null)
             }
             setLinkedCollectionUrl(video.linked_collection_url || (video.linked_item_type === "collection" && video.linked_collection_short_id ? `/colecoes/${video.linked_collection_short_id}` : ""))
-            setTags(video.tags || [])
         }
     }, [video])
+
+    // Fallback: carregar dados de produto/serviço se faltarem informações na visualização
+    useEffect(() => {
+        if (
+            video?.linked_item_id &&
+            (video?.linked_item_type === "product" || video?.linked_item_type === "service") &&
+            (!linkedItem?.imageUrl || !linkedItem?.name || linkedItem?.price == null)
+        ) {
+            getVideoLinkedItemSummary(video.linked_item_type, video.linked_item_id)
+                .then((summary) => {
+                    if (summary) {
+                        setLinkedItem((prev) => {
+                            if (prev && prev.id === summary.id) {
+                                return {
+                                    ...prev,
+                                    name: summary.name || prev.name,
+                                    price: summary.price ?? prev.price,
+                                    imageUrl: summary.imageUrl || prev.imageUrl,
+                                }
+                            }
+                            return prev
+                        })
+                    }
+                })
+                .catch(() => {})
+        }
+    }, [video?.linked_item_id, video?.linked_item_type, linkedItem?.imageUrl, linkedItem?.name, linkedItem?.price])
+
+    const isDirty = useMemo(() => {
+        if (readOnly) return false
+        if (video) {
+            const titleChanged = title.trim() !== (video.title || "").trim()
+            const descChanged = description.trim() !== (video.description || "").trim()
+            const videoChanged = (videoMeta.video_url || null) !== (video.video_url || null)
+
+            const initialLinkedId = (video.linked_item_type === "product" || video.linked_item_type === "service") ? (video.linked_item_id || null) : null
+            const currentLinkedId = linkedItem?.id || null
+            const linkedItemChanged = initialLinkedId !== currentLinkedId
+
+            const initialCollectionUrl = video.linked_collection_url || (video.linked_item_type === "collection" && video.linked_collection_short_id ? `/colecoes/${video.linked_collection_short_id}` : "")
+            const collectionChanged = linkedCollectionUrl.trim() !== initialCollectionUrl.trim()
+
+            return titleChanged || descChanged || videoChanged || linkedItemChanged || collectionChanged
+        } else {
+            const hasTitle = title.trim().length > 0
+            const hasDesc = description.trim().length > 0
+            const hasVideo = !!videoMeta.video_url
+            const hasLinkedItem = linkedItem !== null
+            const hasCollection = linkedCollectionUrl.trim().length > 0
+
+            return hasTitle || hasDesc || hasVideo || hasLinkedItem || hasCollection
+        }
+    }, [readOnly, video, title, description, videoMeta.video_url, linkedItem, linkedCollectionUrl])
+
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(!readOnly && !saving && isDirty)
+
+    const handleBack = useCallback(() => {
+        handleNavigation(() => onBack?.())
+    }, [handleNavigation, onBack])
 
     const linkedProductId = linkedItem?.type === "product" ? linkedItem.id : null
     const linkedServiceId = linkedItem?.type === "service" ? linkedItem.id : null
@@ -151,7 +231,6 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                 duration: videoMeta.video_duration ? Math.round(videoMeta.video_duration) : null,
                 video_type: videoMeta.video_type,
                 video_provider_id: videoMeta.video_provider_id,
-                tags,
                 linked_product_id: linkedProductId,
                 linked_service_id: linkedServiceId,
                 linked_collection_url: linkedCollectionUrl.trim() || null,
@@ -160,8 +239,6 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
             setSaving(false)
         }
     }
-
-    const handleBack = useCallback(() => onBack?.(), [onBack])
 
     const pageTitle = readOnly ? (video?.title || "Vídeo") : isEditing ? "Editar Vídeo" : "Novo Vídeo"
 
@@ -322,7 +399,7 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
 
                                                         {/* Vídeo */}
                                                         {videoMeta.video_url && (
-                                                            <FormSection title="Vídeo">
+                                                            <FormSection hasSeparator title="Vídeo">
                                                                 <div className="w-full aspect-video overflow-hidden rounded-lg border border-brand-border dark:border-dark-border bg-black">
                                                                     {videoMeta.video_type === "youtube" || videoMeta.video_type === "vimeo" ? (
                                                                         <iframe
@@ -394,41 +471,87 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                                 )}
                                             </div>
 
-                                            {/* DIREITA (SidebarCard) */}
+                                            {/* DIREITA (SidebarCard Organização) */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                                 <SidebarCard hasSeparator hasTopStrip title="Organização">
                                                     {readOnly ? (
                                                         <div className="space-y-4">
-                                                            <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Produto Vinculado</span>
-                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {linkedItem?.type === "product" ? (linkedItem.name || linkedItem.id) : "-"}
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Serviço Vinculado</span>
-                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {linkedItem?.type === "service" ? (linkedItem.name || linkedItem.id) : "-"}
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Link da Coleção</span>
-                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate max-w-[150px]">
-                                                                    {linkedCollectionUrl || "-"}
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center py-2">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Palavras-chave</span>
-                                                                <div className="flex flex-wrap gap-1 justify-end">
-                                                                    {tags.length > 0 ? tags.map((tag, i) => (
-                                                                        <Badge key={i} variant="gray" className="whitespace-nowrap scale-90">
-                                                                            {tag}
-                                                                        </Badge>
-                                                                    )) : (
-                                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">-</span>
-                                                                    )}
+                                                            {linkedItem?.type === "product" ? (
+                                                                <div className="space-y-2">
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Produto vinculado
+                                                                    </span>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <img
+                                                                            src={linkedItem.imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                            alt={linkedItem.name || "Produto"}
+                                                                            className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border object-cover shrink-0"
+                                                                        />
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading line-clamp-2 block leading-snug">
+                                                                                {linkedItem.name || linkedItem.id}
+                                                                            </span>
+                                                                            {linkedItem.price != null && (
+                                                                                <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                                    {formatCurrency(linkedItem.price)}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
+                                                            ) : linkedItem?.type === "service" ? (
+                                                                <div className="space-y-2">
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Serviço vinculado
+                                                                    </span>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <img
+                                                                            src={linkedItem.imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                            alt={linkedItem.name || "Serviço"}
+                                                                            className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border object-cover shrink-0"
+                                                                        />
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading line-clamp-2 block leading-snug">
+                                                                                {linkedItem.name || linkedItem.id}
+                                                                            </span>
+                                                                            {linkedItem.price != null && (
+                                                                                <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                                    {formatCurrency(linkedItem.price)}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (linkedCollectionUrl || (video?.linked_item_type === "collection" && video?.linked_item)) ? (
+                                                                <div className="space-y-2">
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Link da coleção
+                                                                    </span>
+                                                                    <div className="flex items-center gap-3">
+                                                                        {video?.linked_item?.imageUrl && (
+                                                                            <img
+                                                                                src={video.linked_item.imageUrl}
+                                                                                alt={video.linked_item.name || "Coleção"}
+                                                                                className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border object-cover shrink-0"
+                                                                            />
+                                                                        )}
+                                                                        <div className="min-w-0 flex-1">
+                                                                            {video?.linked_item?.name && (
+                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading line-clamp-1 block">
+                                                                                    {video.linked_item.name}
+                                                                                </span>
+                                                                            )}
+                                                                            <span className="text-xs font-medium text-brand-primary truncate block mt-0.5">
+                                                                                {linkedCollectionUrl || video?.linked_item?.name || "-"}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body py-1">
+                                                                    Nenhum item vinculado
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="space-y-5">
@@ -437,15 +560,32 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                                                     Produto Vinculado
                                                                 </label>
                                                                 {linkedItem?.type === "product" ? (
-                                                                    <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
-                                                                        <Badge variant="green" className="whitespace-nowrap">Vinculado</Badge>
-                                                                        <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
-                                                                            {linkedItem.name || linkedItem.id}
-                                                                        </span>
+                                                                    <div className="flex items-center gap-3 rounded-xl border border-brand-border bg-brand-gray/20 p-3 dark:border-dark-border dark:bg-dark-border/20">
+                                                                        {linkedItem.imageUrl ? (
+                                                                            <img
+                                                                                src={linkedItem.imageUrl}
+                                                                                alt={linkedItem.name}
+                                                                                className="w-11 h-11 rounded-full border border-brand-border dark:border-dark-border object-cover shrink-0"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-11 h-11 rounded-full border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 shrink-0 flex items-center justify-center text-xs font-bold text-brand-inactive-text">
+                                                                                IMG
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate block">
+                                                                                {linkedItem.name || linkedItem.id}
+                                                                            </span>
+                                                                            {linkedItem.price != null && (
+                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body block">
+                                                                                    {formatCurrency(linkedItem.price)}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => setLinkedItem(null)}
-                                                                            className="text-sm text-red-500 hover:text-red-600"
+                                                                            className="text-xs font-semibold text-red-500 hover:text-red-600 shrink-0 ml-1"
                                                                         >
                                                                             Remover
                                                                         </button>
@@ -461,15 +601,32 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                                                     Serviço Vinculado
                                                                 </label>
                                                                 {linkedItem?.type === "service" ? (
-                                                                    <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
-                                                                        <Badge variant="cyan" className="whitespace-nowrap">Vinculado</Badge>
-                                                                        <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
-                                                                            {linkedItem.name || linkedItem.id}
-                                                                        </span>
+                                                                    <div className="flex items-center gap-3 rounded-xl border border-brand-border bg-brand-gray/20 p-3 dark:border-dark-border dark:bg-dark-border/20">
+                                                                        {linkedItem.imageUrl ? (
+                                                                            <img
+                                                                                src={linkedItem.imageUrl}
+                                                                                alt={linkedItem.name}
+                                                                                className="w-11 h-11 rounded-full border border-brand-border dark:border-dark-border object-cover shrink-0"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-11 h-11 rounded-full border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 shrink-0 flex items-center justify-center text-xs font-bold text-brand-inactive-text">
+                                                                                IMG
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate block">
+                                                                                {linkedItem.name || linkedItem.id}
+                                                                            </span>
+                                                                            {linkedItem.price != null && (
+                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body block">
+                                                                                    {formatCurrency(linkedItem.price)}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => setLinkedItem(null)}
-                                                                            className="text-sm text-red-500 hover:text-red-600"
+                                                                            className="text-xs font-semibold text-red-500 hover:text-red-600 shrink-0 ml-1"
                                                                         >
                                                                             Remover
                                                                         </button>
@@ -489,39 +646,6 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                                                 prefix={<LinkIcon size={18} />}
                                                                 disabled={readOnly}
                                                             />
-                                                            <div>
-                                                                <ListItem
-                                                                    title="Gerenciar palavras-chave"
-                                                                    description={tags.length > 0 ? `${tags.length} tag${tags.length !== 1 ? "s" : ""} cadastrada${tags.length !== 1 ? "s" : ""}` : "Nenhuma tag cadastrada"}
-                                                                    right={tags.length > 0 ? (
-                                                                        <div className="flex flex-wrap gap-1.5 max-w-[70%]">
-                                                                            {tags.slice(0, 3).map((tag: string, i: number) => (
-                                                                                <Badge key={i} variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium">
-                                                                                    {tag}
-                                                                                </Badge>
-                                                                            ))}
-                                                                            {tags.length > 3 && (
-                                                                                <Badge variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium text-brand-inactive-text">
-                                                                                    +{tags.length - 3}
-                                                                                </Badge>
-                                                                            )}
-                                                                        </div>
-                                                                    ) : null}
-                                                                    showChevron
-                                                                    onClick={() => setIsTagsModalOpen(true)}
-                                                                    disabled={readOnly}
-                                                                    className={`cursor-pointer ${readOnly ? "opacity-50" : ""}`}
-                                                                />
-                                                                <TagsManagerModal
-                                                                    isOpen={isTagsModalOpen}
-                                                                    onClose={() => setIsTagsModalOpen(false)}
-                                                                    tags={tags}
-                                                                    onChange={setTags}
-                                                                    disabled={readOnly}
-                                                                    title="Palavras-chave de busca"
-                                                                    description="Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca."
-                                                                />
-                                                            </div>
                                                         </div>
                                                     )}
                                                 </SidebarCard>
@@ -645,17 +769,47 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                             onClose={() => setShowProductSheet(false)}
                             partnerId={partnerId || ""}
                             selectedId={linkedProductId}
-                            onSave={(id, name) => setLinkedItem(id ? { id, name: name || "", type: "product" } : null)}
+                            onSave={(id, details) => {
+                                if (!id) {
+                                    setLinkedItem(null)
+                                    return
+                                }
+                                const name = typeof details === "string" ? details : details?.name || ""
+                                const price = typeof details === "object" ? details?.price ?? null : null
+                                const imageUrl = typeof details === "object" ? details?.imageUrl ?? null : null
+                                setLinkedItem({ id, name, type: "product", price, imageUrl })
+                            }}
                         />
                         <SelectVideoServiceSheet
                             isOpen={showServiceSheet}
                             onClose={() => setShowServiceSheet(false)}
                             partnerId={partnerId || ""}
                             selectedId={linkedServiceId}
-                            onSave={(id, name) => setLinkedItem(id ? { id, name: name || "", type: "service" } : null)}
+                            onSave={(id, details) => {
+                                if (!id) {
+                                    setLinkedItem(null)
+                                    return
+                                }
+                                const name = typeof details === "string" ? details : details?.name || ""
+                                const price = typeof details === "object" ? details?.price ?? null : null
+                                const imageUrl = typeof details === "object" ? details?.imageUrl ?? null : null
+                                setLinkedItem({ id, name, type: "service", price, imageUrl })
+                            }}
                         />
                     </>
                 )}
+
+                {/* Modal de sair sem salvar */}
+                <AlertModal
+                    isOpen={showConfirmDialog}
+                    onClose={cancelNavigation}
+                    onConfirm={confirmNavigation}
+                    title="Sair sem salvar?"
+                    description="Você tem alterações no vídeo que ainda não foram salvas."
+                    confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
+                    variant="warning"
+                />
             </div>
         </FadeIn>
     )

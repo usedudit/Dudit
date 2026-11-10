@@ -122,8 +122,8 @@ export async function getSuperFreteStatusAction(): Promise<{
         balance,
         webhookConfigured: Boolean(
           integration?.webhook_id &&
-            (integration.config as Record<string, any> | null)?.webhook_version ===
-              SUPERFRETE_WEBHOOK_SETUP_VERSION,
+          (integration.config as Record<string, any> | null)?.webhook_version ===
+          SUPERFRETE_WEBHOOK_SETUP_VERSION,
         ),
         planAllowed,
         config: (integration?.config as SuperFreteConfig) || null,
@@ -764,7 +764,7 @@ async function performLabelCheckout(
           } else {
             return {
               success: false,
-              error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+              error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}. Recarregue em https://web.superfrete.com/#/account/credits`,
             }
           }
         }
@@ -808,9 +808,9 @@ async function performLabelCheckout(
 
     const trackingUrl = orderData.tracking
       ? buildCarrierTrackingUrl(
-          Number(orderData.service_id ?? shipmentServiceCode) || undefined,
-          orderData.tracking,
-        ) || undefined
+        Number(orderData.service_id ?? shipmentServiceCode) || undefined,
+        orderData.tracking,
+      ) || undefined
       : undefined
 
     await supabase
@@ -849,7 +849,7 @@ async function performLabelCheckout(
       }
       return {
         success: false,
-        error: "Saldo insuficiente na carteira SuperFrete. Recarregue em https://sandbox.superfrete.com/#/account/credits",
+        error: "Saldo insuficiente na carteira SuperFrete. Recarregue em https://web.superfrete.com/#/account/credits",
       }
     }
     console.error(
@@ -1748,7 +1748,7 @@ export async function createOrderShippingLabelAction(payload: {
       if (Number.isFinite(balance) && estimated > 0 && balance < estimated) {
         return {
           success: false,
-          error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário aproximadamente R$ ${estimated.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+          error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário aproximadamente R$ ${estimated.toFixed(2)}. Recarregue em https://web.superfrete.com/#/account/credits`,
         }
       }
     }
@@ -1796,7 +1796,7 @@ export async function createOrderShippingLabelAction(payload: {
     if (priceMismatch) {
       console.warn(
         `[SuperFrete] Divergência de preço na etiqueta: checkout=R$ ${checkoutPrice.toFixed(2)} ` +
-          `vs SuperFrete=R$ ${labelPrice.toFixed(2)}. label=${label.id} service=${serviceId}`,
+        `vs SuperFrete=R$ ${labelPrice.toFixed(2)}. label=${label.id} service=${serviceId}`,
       )
     }
 
@@ -2087,7 +2087,7 @@ export async function getOrderCarrierLabelStateAction(payload: { orderId: string
     const [plan, integration, shipmentRes] = await Promise.all([
       getPartnerPlan(ctx.partnerId),
       getSuperFreteIntegration(supabase, ctx.partnerId),
-       supabase
+      supabase
         .from("order_shipments")
         .select(
           "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at, payload",
@@ -2098,7 +2098,7 @@ export async function getOrderCarrierLabelStateAction(payload: { orderId: string
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-     ])
+    ])
 
     return {
       success: true,

@@ -382,33 +382,6 @@ export default function AdminReturnDetailView({ detail, onBack, initialMode = "v
     notifySuccess("Link da solicitação copiado!");
   }, [notifySuccess]);
 
-  if (isLoadingDetail) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <ThreeDotsLoader />
-      </div>
-    );
-  }
-
-  if (!request) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
-        <IconPlaceholder
-          icon={ReturnIcon}
-          containerSize="w-16 h-16 mb-2"
-          iconSize="w-6 h-6"
-          title="Solicitação não encontrada"
-          subtitle="A solicitação pode ter sido removida ou o link está incorreto."
-          itemButton={{
-            text: "Voltar às devoluções",
-            action: onBack,
-            variant: "outline",
-          }}
-        />
-      </div>
-    );
-  }
-
   // Admin action gate
   const adminActionGate = useCallback(
     async (changedFields: string[]): Promise<{ cancelled?: boolean; ctx?: ReturnAdminActionContext }> => {
@@ -568,6 +541,35 @@ export default function AdminReturnDetailView({ detail, onBack, initialMode = "v
     images.unshift(primary);
     setEvidenceImages(images);
   }, [evidenceImages]);
+
+  // IMPORTANT: all hooks must run before these early returns, otherwise React
+  // throws "Rendered fewer hooks than expected" when the detail finishes loading.
+  if (isLoadingDetail) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <ThreeDotsLoader />
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+        <IconPlaceholder
+          icon={ReturnIcon}
+          containerSize="w-16 h-16 mb-2"
+          iconSize="w-6 h-6"
+          title="Solicitação não encontrada"
+          subtitle="A solicitação pode ter sido removida ou o link está incorreto."
+          itemButton={{
+            text: "Voltar às devoluções",
+            action: onBack,
+            variant: "outline",
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <PermissionProvider

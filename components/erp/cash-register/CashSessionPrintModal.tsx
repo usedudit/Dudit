@@ -201,7 +201,7 @@ export default function CashSessionPrintModal({ isOpen, onClose, sessionId, part
                                                         title="Impressora térmica (80mm)"
                                                         description="Formato em bobina contínua, ideal para impressoras térmicas e comprovante rápido de balcão."
                                                         onClick={() => setFormat("thermal")}
-                                                        className="px-4 py-3 gap-4"
+                                                        className="px-4 py-3"
                                                         right={
                                                             <RadioButton
                                                                 name={"format"}
@@ -216,7 +216,7 @@ export default function CashSessionPrintModal({ isOpen, onClose, sessionId, part
                                                         title="Impressora térmica (58mm)"
                                                         description="Bobina estreita de 58mm, comprovante compacto ideal para balcão e impressoras portáteis."
                                                         onClick={() => setFormat("thermal-58")}
-                                                        className="px-4 py-3 gap-4"
+                                                        className="px-4 py-3"
                                                         right={
                                                             <RadioButton
                                                                 name={"format"}
@@ -231,7 +231,7 @@ export default function CashSessionPrintModal({ isOpen, onClose, sessionId, part
                                                         title="Documento A4 (PDF)"
                                                         description="Formato folha inteira A4, ideal para impressão comum, arquivamento e envio em PDF."
                                                         onClick={() => setFormat("a4")}
-                                                        className="px-4 py-3 gap-4"
+                                                        className="px-4 py-3"
                                                         right={
                                                             <RadioButton
                                                                 name={"format"}

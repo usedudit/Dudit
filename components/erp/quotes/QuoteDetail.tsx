@@ -11,8 +11,12 @@ import {
     TelegramIcon,
     ClockIcon,
     CheckCircleIcon,
+    CopyIcon,
+    ReloadIcon,
+    ShareIcon,
+    ChartIcon,
 } from '@/lib/icons';
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, DropdownItem, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -118,6 +122,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const [pendingStatus, setPendingStatus] = useState(initialQuote?.status || 'draft');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
+    const [showStatsModal, setShowStatsModal] = useState(false);
     const [showUnapprovedConvertModal, setShowUnapprovedConvertModal] = useState(false);
     const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -214,17 +219,19 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     }, []);
 
     useEffect(() => {
-        if (initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial) {
+        if (initialQuote && initialQuote.items && !initialQuote.__partial) {
             setQuote(initialQuote);
             setLoading(false);
             setIsLoadingQuoteItems(false);
             lastLoadedQuoteId.current = quoteId;
+        } else if (initialQuote && !quote) {
+            setQuote(initialQuote);
         }
-    }, [initialQuote, quoteId]);
+    }, [initialQuote, quoteId, quote]);
 
     useEffect(() => {
         if (lastLoadedQuoteId.current === quoteId) return;
-        if (initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial) {
+        if (initialQuote && initialQuote.items && !initialQuote.__partial) {
             setQuote(initialQuote);
             setPendingStatus(initialQuote.status || 'draft');
             setLoading(false);
@@ -388,6 +395,26 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         }
     };
 
+    const handleShareQuote = () => {
+        if (quote?.status === 'draft' || quote?.status === 'pending_client') {
+            notifyError("Não é possível compartilhar", "Orçamentos rascunho ou pendentes não podem ser compartilhados.");
+            return;
+        }
+        if (!hasMinimumPlan(planSlug, "crescer")) {
+            openPlanUpgrade("crescer");
+            return;
+        }
+        setShowShareModal(true);
+    };
+
+    const handleCopyPublicLink = () => {
+        const link = `${window.location.origin}/quote/${quote.public_token}`;
+        navigator.clipboard.writeText(link);
+        setCopiedLink(true);
+        notifySuccess("Link copiado", "Link do orçamento copiado para a área de transferência.");
+        setTimeout(() => setCopiedLink(false), 2000);
+    };
+
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
@@ -526,17 +553,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             <ActionsDropdown
                                                 onEdit={() => onEditQuote && onEditQuote(quote)}
                                                 onPrint={() => setShowPrintModal(true)}
-                                                onShare={() => {
-                                                    if (quote?.status === 'draft' || quote?.status === 'pending_client') {
-                                                        notifyError("Não é possível compartilhar", "Orçamentos rascunho ou pendentes não podem ser compartilhados.");
-                                                        return;
-                                                    }
-                                                    if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                        openPlanUpgrade("crescer");
-                                                    } else {
-                                                        setShowShareModal(true);
-                                                    }
-                                                }}
+                                                onShare={handleShareQuote}
                                                 onDelete={() => setShowDeleteModal(true)}
                                                 onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
                                                 onStatus={handleOpenStatusModal}
@@ -792,57 +809,49 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         Link de Aprovação Online
                                                     </h3>
 
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                        Compartilhe o link do orçamento para o cliente aprovar online.
+                                                    </p>
+
                                                     <div className="space-y-3">
                                                         <div className="flex gap-2">
                                                             <input
                                                                 type="text"
                                                                 readOnly
                                                                 value={`${typeof window !== 'undefined' ? window.location.origin : ''}/quote/${quote.public_token}`}
-                                                                className="flex-1 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
+                                                                className="flex-1 min-w-0 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
                                                             />
                                                             <Button
                                                                 variant="outline"
-                                                                className="p-2.5 h-auto text-xs shrink-0 rounded-xl"
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(`${window.location.origin}/quote/${quote.public_token}`);
-                                                                    setCopiedLink(true);
-                                                                    notifySuccess("Link copiado", "Link do orçamento copiado para a área de transferência.");
-                                                                    setTimeout(() => setCopiedLink(false), 2000);
-                                                                }}
+                                                                className="shrink-0 h-auto w-[42px] p-0 rounded-xl"
+                                                                title="Copiar link"
+                                                                onClick={handleCopyPublicLink}
                                                             >
-                                                                {copiedLink ? "Copiado!" : "Copiar"}
+                                                                {copiedLink ? <CheckCircleIcon size={18} className="text-brand-green" /> : <CopyIcon size={18} />}
                                                             </Button>
                                                         </div>
 
-                                                        <Button
-                                                            variant="outline"
-                                                            className="w-full"
-                                                            onClick={() => {
-                                                                const text = `Olá! Segue o link para visualizar e aprovar a proposta comercial *${quote.quote_number}*:\n\n${window.location.origin}/quote/${quote.public_token}\n\n*Código de Aprovação:* ${quote.metadata?.plain_code || "Enviado por aqui"}`;
-                                                                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
-                                                            }}
-                                                        >
-                                                            Compartilhar no WhatsApp
-                                                        </Button>
-
-                                                        <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center">
-                                                            <div>
+                                                        <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center gap-3">
+                                                            <div className="min-w-0">
                                                                 <span className="text-xs text-brand-inactive-text block">Código de Aprovação</span>
                                                                 <span className="text-lg font-bold text-emerald-500 tracking-wider">
                                                                     {quote.metadata?.plain_code || "---"}
                                                                 </span>
                                                             </div>
 
-                                                            {quote.status !== "approved" && quote.status !== "rejected" && !quote.converted && (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    className="text-xs py-1 h-[32px] rounded-lg border-brand-border dark:border-dark-border"
-                                                                    onClick={handleRegenerateCode}
-                                                                    disabled={isRegeneratingCode}
-                                                                >
-                                                                    {isRegeneratingCode ? "Gerando..." : "Novo Código"}
-                                                                </Button>
-                                                            )}
+                                                            <ActionsDropdown>
+                                                                {quote.status !== "approved" && quote.status !== "rejected" && !quote.converted && (
+                                                                    <DropdownItem onClick={handleRegenerateCode} disabled={isRegeneratingCode}>
+                                                                        <ReloadIcon size={18} /> {isRegeneratingCode ? "Gerando..." : "Novo Código"}
+                                                                    </DropdownItem>
+                                                                )}
+                                                                <DropdownItem onClick={handleShareQuote}>
+                                                                    <ShareIcon size={18} /> Compartilhar
+                                                                </DropdownItem>
+                                                                <DropdownItem onClick={() => setShowStatsModal(true)}>
+                                                                    <ChartIcon size={18} /> Logs e Estatísticas
+                                                                </DropdownItem>
+                                                            </ActionsDropdown>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -861,67 +870,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     </div>
                                                 </div>
                                             )}
-
-                                            {/* Painel de Auditoria e Visualização */}
-                                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
-                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
-                                                    Logs e Estatísticas
-                                                </h3>
-
-                                                <div className="space-y-3 text-xs text-brand-dark dark:text-dark-body">
-                                                    <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
-                                                        <span className="text-brand-inactive-text">Visualizações:</span>
-                                                        <span className="font-semibold">{quote.total_views || 0}</span>
-                                                    </div>
-                                                    {quote.first_viewed_at && (
-                                                        <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
-                                                            <span className="text-brand-inactive-text">Primeira Visualização:</span>
-                                                            <span className="font-semibold">{formatDate(quote.first_viewed_at)} às {formatTime(new Date(quote.first_viewed_at))}</span>
-                                                        </div>
-                                                    )}
-                                                    {quote.last_viewed_at && (
-                                                        <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
-                                                            <span className="text-brand-inactive-text">Última Visualização:</span>
-                                                            <span className="font-semibold">{formatDate(quote.last_viewed_at)} às {formatTime(new Date(quote.last_viewed_at))}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Approval Details */}
-                                                    {quote.status === "approved" && (
-                                                        <div className="mt-3 bg-emerald-50 dark:bg-emerald-950/10 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/20 space-y-2">
-                                                            <div className="font-bold text-emerald-800 dark:text-emerald-300">Detalhes da Aprovação:</div>
-                                                            <div>Aprovador: <span className="font-semibold">{quote.approver_name || "Lojista"}</span></div>
-                                                            <div>Data: <span className="font-semibold">{quote.approved_at ? `${formatDate(quote.approved_at)} às ${formatTime(new Date(quote.approved_at))}` : "-"}</span></div>
-                                                            <div>Método: <span className="font-semibold">
-                                                                {quote.approval_method === "erp_manual" ? "Manual pelo ERP" :
-                                                                    quote.approval_method === "erp_portal" ? "Lojista (Portal)" :
-                                                                        quote.approval_method === "code" ? "Código 4-dígitos" :
-                                                                            quote.approval_method === "auth" ? "Cliente Autenticado" :
-                                                                                quote.approval_method || "Manual pelo ERP"}
-                                                            </span></div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Rejection Details */}
-                                                    {quote.status === "rejected" && (
-                                                        <div className="mt-3 bg-red-50 dark:bg-red-950/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20 space-y-2">
-                                                            <div className="font-bold text-red-800 dark:text-red-300">Detalhes da Recusa:</div>
-                                                            <div>Recusado por: <span className="font-semibold">{quote.approver_name || "Lojista"}</span></div>
-                                                            <div>Data: <span className="font-semibold">{quote.rejected_at ? `${formatDate(quote.rejected_at)} às ${formatTime(new Date(quote.rejected_at))}` : "-"}</span></div>
-                                                            <div>Método: <span className="font-semibold">
-                                                                {quote.approval_method === "erp_manual" ? "Manual pelo ERP" :
-                                                                    quote.approval_method === "erp_portal" ? "Lojista (Portal)" :
-                                                                        quote.approval_method === "code" ? "Código 4-dígitos" :
-                                                                            quote.approval_method === "auth" ? "Cliente Autenticado" :
-                                                                                quote.approval_method || "Manual pelo ERP"}
-                                                            </span></div>
-                                                            {quote.rejection_reason && (
-                                                                <div>Motivo: <span className="font-semibold text-red-600 dark:text-red-400 italic">"{quote.rejection_reason}"</span></div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
 
                                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6">
                                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4">Informações Adicionais</h3>
@@ -995,17 +943,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                             <ActionsDropdown
                                 onEdit={() => onEditQuote && onEditQuote(quote)}
                                 onPrint={() => setShowPrintModal(true)}
-                                onShare={() => {
-                                    if (quote?.status === 'draft' || quote?.status === 'pending_client') {
-                                        notifyError("Não é possível compartilhar", "Orçamentos rascunho ou pendentes não podem ser compartilhados.");
-                                        return;
-                                    }
-                                    if (!hasMinimumPlan(planSlug, "crescer")) {
-                                        openPlanUpgrade("crescer");
-                                    } else {
-                                        setShowShareModal(true);
-                                    }
-                                }}
+                                onShare={handleShareQuote}
                                 onDelete={() => setShowDeleteModal(true)}
                                 onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
                                 onStatus={handleOpenStatusModal}
@@ -1092,6 +1030,67 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         { value: 'cancelled', label: 'Cancelado' }
                                     ]}
                                 />
+                            </div>
+                        </DefaultModal>
+
+                        <DefaultModal
+                            isOpen={showStatsModal}
+                            onClose={() => setShowStatsModal(false)}
+                            title="Logs e Estatísticas"
+                            maxWidth="sm"
+                        >
+                            <div className="space-y-3 text-xs text-brand-dark dark:text-dark-body">
+                                <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                    <span className="text-brand-inactive-text">Visualizações:</span>
+                                    <span className="font-semibold">{quote.total_views || 0}</span>
+                                </div>
+                                {quote.first_viewed_at && (
+                                    <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                        <span className="text-brand-inactive-text">Primeira Visualização:</span>
+                                        <span className="font-semibold">{formatDate(quote.first_viewed_at)} às {formatTime(new Date(quote.first_viewed_at))}</span>
+                                    </div>
+                                )}
+                                {quote.last_viewed_at && (
+                                    <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                        <span className="text-brand-inactive-text">Última Visualização:</span>
+                                        <span className="font-semibold">{formatDate(quote.last_viewed_at)} às {formatTime(new Date(quote.last_viewed_at))}</span>
+                                    </div>
+                                )}
+
+                                {/* Approval Details */}
+                                {quote.status === "approved" && (
+                                    <div className="mt-3 bg-emerald-50 dark:bg-emerald-950/10 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/20 space-y-2">
+                                        <div className="font-bold text-emerald-800 dark:text-emerald-300">Detalhes da Aprovação:</div>
+                                        <div>Aprovador: <span className="font-semibold">{quote.approver_name || "Lojista"}</span></div>
+                                        <div>Data: <span className="font-semibold">{quote.approved_at ? `${formatDate(quote.approved_at)} às ${formatTime(new Date(quote.approved_at))}` : "-"}</span></div>
+                                        <div>Método: <span className="font-semibold">
+                                            {quote.approval_method === "erp_manual" ? "Manual pelo ERP" :
+                                                quote.approval_method === "erp_portal" ? "Lojista (Portal)" :
+                                                    quote.approval_method === "code" ? "Código 4-dígitos" :
+                                                        quote.approval_method === "auth" ? "Cliente Autenticado" :
+                                                            quote.approval_method || "Manual pelo ERP"}
+                                        </span></div>
+                                    </div>
+                                )}
+
+                                {/* Rejection Details */}
+                                {quote.status === "rejected" && (
+                                    <div className="mt-3 bg-red-50 dark:bg-red-950/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20 space-y-2">
+                                        <div className="font-bold text-red-800 dark:text-red-300">Detalhes da Recusa:</div>
+                                        <div>Recusado por: <span className="font-semibold">{quote.approver_name || "Lojista"}</span></div>
+                                        <div>Data: <span className="font-semibold">{quote.rejected_at ? `${formatDate(quote.rejected_at)} às ${formatTime(new Date(quote.rejected_at))}` : "-"}</span></div>
+                                        <div>Método: <span className="font-semibold">
+                                            {quote.approval_method === "erp_manual" ? "Manual pelo ERP" :
+                                                quote.approval_method === "erp_portal" ? "Lojista (Portal)" :
+                                                    quote.approval_method === "code" ? "Código 4-dígitos" :
+                                                        quote.approval_method === "auth" ? "Cliente Autenticado" :
+                                                            quote.approval_method || "Manual pelo ERP"}
+                                        </span></div>
+                                        {quote.rejection_reason && (
+                                            <div>Motivo: <span className="font-semibold text-red-600 dark:text-red-400 italic">"{quote.rejection_reason}"</span></div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </DefaultModal>
 

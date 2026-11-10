@@ -3044,19 +3044,41 @@ const fetchVariantAggregates = async (productIds: string[]) => {
     const supabase = getAdminClient()
     const { data } = await supabase
         .from("product_variants")
-        .select("product_id, price_adjustment, stock_quantity, stock_reserved, is_active")
+        .select("product_id, price_adjustment, stock_quantity, stock_reserved, is_active, variant_name, sku")
         .in("product_id", productIds)
     if (!data) return {}
-    const map: Record<string, { variant_min_price: number; variant_max_price: number; variant_total_stock: number; variant_total_reserved: number; variant_total_available: number }> = {}
+    const map: Record<string, {
+        variant_min_price: number
+        variant_max_price: number
+        variant_total_stock: number
+        variant_total_reserved: number
+        variant_total_available: number
+        variant_names: string[]
+        variant_skus: string[]
+    }> = {}
     for (const v of data) {
         if (!v.is_active) continue
-        if (!map[v.product_id]) map[v.product_id] = { variant_min_price: Infinity, variant_max_price: -Infinity, variant_total_stock: 0, variant_total_reserved: 0, variant_total_available: 0 }
+        if (!map[v.product_id]) map[v.product_id] = {
+            variant_min_price: Infinity,
+            variant_max_price: -Infinity,
+            variant_total_stock: 0,
+            variant_total_reserved: 0,
+            variant_total_available: 0,
+            variant_names: [],
+            variant_skus: []
+        }
         const m = map[v.product_id]
         const price = Number(v.price_adjustment) || 0
         if (price < m.variant_min_price) m.variant_min_price = price
         if (price > m.variant_max_price) m.variant_max_price = price
         m.variant_total_stock += Number(v.stock_quantity) || 0
         m.variant_total_reserved += Math.max(0, Number(v.stock_reserved) || 0)
+        if (v.variant_name && !m.variant_names.includes(v.variant_name)) {
+            m.variant_names.push(v.variant_name)
+        }
+        if (v.sku && !m.variant_skus.includes(v.sku)) {
+            m.variant_skus.push(v.sku)
+        }
     }
     for (const pid of productIds) {
         if (map[pid]) {
@@ -3073,19 +3095,48 @@ const fetchProductsStatic = unstable_cache(
         const supabase = getAdminClient()
         let query = supabase
             .from("products")
-            .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
+            .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), subcategory_id, subcategory:product_categories!subcategory_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name), tags, technical_specs, items_included")
             .eq("partner_id", partnerId)
             .limit(100)
             .order("created_at", { ascending: false })
         if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
         const { data, error } = await query
         if (error) throw error
-        const rows = (data || []).map((p: any) => ({
-            ...p,
-            category: p.category?.name || null,
-            brand: p.brand_rel?.name || p.brand || null,
-            location: p.location_rel?.name || p.location || null
-        }))
+        const rows = (data || []).map((p: any) => {
+            const specsKeywords: string[] = []
+            if (p.technical_specs && typeof p.technical_specs === "object") {
+                const attrs = Array.isArray(p.technical_specs.attributes)
+                    ? p.technical_specs.attributes
+                    : Array.isArray(p.technical_specs)
+                        ? p.technical_specs
+                        : []
+                for (const attr of attrs) {
+                    if (attr?.name) specsKeywords.push(String(attr.name))
+                    if (attr?.value) specsKeywords.push(String(attr.value))
+                }
+                const addons = p.technical_specs.addon_groups || p.addon_groups
+                if (Array.isArray(addons)) {
+                    for (const grp of addons) {
+                        if (grp?.name) specsKeywords.push(String(grp.name))
+                        if (Array.isArray(grp?.options)) {
+                            for (const opt of grp.options) {
+                                if (opt?.name) specsKeywords.push(String(opt.name))
+                            }
+                        }
+                    }
+                }
+            }
+            return {
+                ...p,
+                category: p.category?.name || null,
+                subcategory: p.subcategory?.name || null,
+                brand: p.brand_rel?.name || p.brand || null,
+                location: p.location_rel?.name || p.location || null,
+                specs_keywords: specsKeywords,
+                tags: Array.isArray(p.tags) ? p.tags : [],
+                items_included: p.items_included || null,
+            }
+        })
         const withVariants = rows.filter((p: any) => {
             const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
             return count > 0
@@ -3100,6 +3151,8 @@ const fetchProductsStatic = unstable_cache(
                     p.variant_total_stock = agg.variant_total_stock
                     p.variant_total_reserved = agg.variant_total_reserved
                     p.variant_total_available = agg.variant_total_available
+                    p.variant_names = agg.variant_names || []
+                    p.variant_skus = agg.variant_skus || []
                 }
             }
         }
@@ -3315,7 +3368,7 @@ export async function getERPProductsPageAction(
                 const supabase = getAdminClient()
                 let q = supabase
                     .from("products")
-                    .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
+                    .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), subcategory_id, subcategory:product_categories!subcategory_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name), tags, technical_specs, items_included")
                     .eq("partner_id", partnerId)
 
                 if (storeId) q = q.or(`store_id.eq.${storeId},store_id.is.null`)
@@ -3337,12 +3390,41 @@ export async function getERPProductsPageAction(
 
                 if (error) throw error
 
-                const mappedRows = (data || []).map((p: any) => ({
-                    ...p,
-                    category: p.category?.name || null,
-                    brand: p.brand_rel?.name || p.brand || null,
-                    location: p.location_rel?.name || p.location || null,
-                }))
+                const mappedRows = (data || []).map((p: any) => {
+                    const specsKeywords: string[] = []
+                    if (p.technical_specs && typeof p.technical_specs === "object") {
+                        const attrs = Array.isArray(p.technical_specs.attributes)
+                            ? p.technical_specs.attributes
+                            : Array.isArray(p.technical_specs)
+                                ? p.technical_specs
+                                : []
+                        for (const attr of attrs) {
+                            if (attr?.name) specsKeywords.push(String(attr.name))
+                            if (attr?.value) specsKeywords.push(String(attr.value))
+                        }
+                        const addons = p.technical_specs.addon_groups || p.addon_groups
+                        if (Array.isArray(addons)) {
+                            for (const grp of addons) {
+                                if (grp?.name) specsKeywords.push(String(grp.name))
+                                if (Array.isArray(grp?.options)) {
+                                    for (const opt of grp.options) {
+                                        if (opt?.name) specsKeywords.push(String(opt.name))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return {
+                        ...p,
+                        category: p.category?.name || null,
+                        subcategory: p.subcategory?.name || null,
+                        brand: p.brand_rel?.name || p.brand || null,
+                        location: p.location_rel?.name || p.location || null,
+                        specs_keywords: specsKeywords,
+                        tags: Array.isArray(p.tags) ? p.tags : [],
+                        items_included: p.items_included || null,
+                    }
+                })
 
                 const withVariants = mappedRows.filter((p: any) => {
                     const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
@@ -3358,6 +3440,8 @@ export async function getERPProductsPageAction(
                             p.variant_total_stock = agg.variant_total_stock
                             p.variant_total_reserved = agg.variant_total_reserved
                             p.variant_total_available = agg.variant_total_available
+                            p.variant_names = agg.variant_names || []
+                            p.variant_skus = agg.variant_skus || []
                         }
                     }
                 }

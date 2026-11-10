@@ -2,6 +2,7 @@
 
 import React from "react"
 import { ChevronRightIcon } from "@/lib/icons"
+import { cn } from "@/lib/utils"
 
 interface ListItemProps {
     icon?: React.ComponentType<any> | React.ReactNode
@@ -13,6 +14,8 @@ interface ListItemProps {
     showChevron?: boolean
     titleClassName?: string
     descriptionClassName?: string
+    rightClassName?: string
+    iconContainerClassName?: string
     className?: string
     disabled?: boolean
 }
@@ -27,6 +30,8 @@ export const ListItem: React.FC<ListItemProps> = ({
     showChevron = false,
     titleClassName = "",
     descriptionClassName = "",
+    rightClassName = "",
+    iconContainerClassName = "",
     className = "",
     disabled = false,
 }) => {
@@ -72,15 +77,24 @@ export const ListItem: React.FC<ListItemProps> = ({
     return (
         <div
             onClick={disabled ? undefined : (right ? handleContainerClick : onClick)}
-            className={`group flex items-center rounded-2xl gap-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface transition-all ${className} ${disabled
+            className={cn(
+                "group flex items-center rounded-2xl gap-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface transition-all",
+                disabled
                     ? "opacity-50 cursor-not-allowed"
-                    : "hover:border-brand-dark/30 dark:hover:border-brand-gray/30 cursor-pointer"
-                }`}
+                    : "hover:border-brand-dark/30 dark:hover:border-brand-gray/30 cursor-pointer",
+                className
+            )}
         >
             {left && <div className="shrink-0">{left}</div>}
 
             {icon && (
-                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors overflow-hidden">
+                <div
+                    className={cn(
+                        "w-12 h-12 rounded-full flex border items-center justify-center shrink-0 transition-colors overflow-hidden",
+                        iconContainerClassName ||
+                            "bg-brand-slate dark:bg-dark-border/50 border-brand-border dark:border-dark-border group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90"
+                    )}
+                >
                     {isComponent ? (
                         React.createElement(icon as React.ComponentType<any>, {
                             className: "text-brand-dark dark:text-dark-heading",
@@ -115,7 +129,7 @@ export const ListItem: React.FC<ListItemProps> = ({
             </div>
 
             {right ? (
-                <div ref={rightRef} className="shrink-0">
+                <div ref={rightRef} className={cn("shrink-0", rightClassName)}>
                     {right}
                 </div>
             ) : showChevron ? (

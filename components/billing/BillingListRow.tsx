@@ -6,6 +6,7 @@ import { Badge, DropdownItem } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Crown, Tag, CreditCard, ShoppingCart, Calendar, Wallet } from "lucide-react"
+import Image from "next/image"
 
 interface ColumnDef {
     id: string
@@ -34,6 +35,8 @@ interface BillingListRowProps {
     statusLabel: string
     statusVariant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"
     paymentMethodLabel: string
+    paymentMethodIcon?: string
+    paymentMethodDetails?: string
     createdAt: string
     invoiceId?: string | null
     columns: ColumnDef[]
@@ -54,6 +57,8 @@ const BillingListRow = React.memo(
         statusLabel,
         statusVariant,
         paymentMethodLabel,
+        paymentMethodIcon,
+        paymentMethodDetails,
         createdAt,
         invoiceId,
         columns,
@@ -63,6 +68,8 @@ const BillingListRow = React.memo(
         onPay,
     }: BillingListRowProps) => {
         const dateStr = formatDate(createdAt)
+
+        const TypeIcon = TYPE_ICONS[type] || Tag
 
         const getAlignClass = (align?: string) => {
             if (align === "center") return "text-center"
@@ -78,15 +85,15 @@ const BillingListRow = React.memo(
 
         const renderCellContent = (colId: string) => {
             switch (colId) {
-                case "type":
-                    return (
-                        <span className="text-xs text-brand-inactive-text">{typeLabel}</span>
-                    )
                 case "description":
                     return (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate max-w-[200px] block">
                                 {description || typeLabel}
+                            </span>
+                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
+                                <TypeIcon className="w-3 h-3" />
+                                {typeLabel}
                             </span>
                         </div>
                     )
@@ -100,7 +107,20 @@ const BillingListRow = React.memo(
                     )
                 case "payment_method":
                     return (
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{paymentMethodLabel || "Não informado"}</span>
+                        <div className="flex items-center gap-2">
+                            {paymentMethodIcon && (
+                                <Image
+                                    src={paymentMethodIcon}
+                                    alt=""
+                                    width={20}
+                                    height={20}
+                                    className="w-5 h-5 object-contain"
+                                />
+                            )}
+                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                {paymentMethodLabel || "Não informado"}
+                            </span>
+                        </div>
                     )
                 case "date":
                     return (
@@ -153,7 +173,9 @@ const BillingListRow = React.memo(
         prev.status === next.status &&
         prev.totalAmount === next.totalAmount &&
         prev.invoiceId === next.invoiceId &&
-        prev.paymentMethodLabel === next.paymentMethodLabel
+        prev.paymentMethodLabel === next.paymentMethodLabel &&
+        prev.paymentMethodIcon === next.paymentMethodIcon &&
+        prev.paymentMethodDetails === next.paymentMethodDetails
 )
 
 BillingListRow.displayName = "BillingListRow"

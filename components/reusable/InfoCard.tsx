@@ -69,31 +69,27 @@ const colorMap: Record<
 export function InfoCard({ title, message, color = "orange", className = "", rightElement, bottomElement }: InfoCardProps) {
   const c = colorMap[color]
   return (
-    <div className={`${c.bg} ${c.border} rounded-lg flex flex-row gap-3 ${className} border`}>
+    <div className={`${c.bg} ${c.border} rounded-lg px-4 py-3 flex flex-row gap-3 ${className} border`}>
       <div className={`${c.bar} w-1 rounded-full self-stretch shrink-0 min-h-5`} />
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="px-4 py-3">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-            <div className="flex-1 min-w-0">
-              {title && <p className={`text-sm font-bold mb-0.5 ${c.text}`}>{title}</p>}
-              <p className={`text-sm ${c.text}`}>{message}</p>
-            </div>
-            {rightElement && (
-              <div className="shrink-0 flex items-center justify-start sm:justify-end self-start sm:self-center pl-4 sm:pl-2">
-                {rightElement}
-              </div>
-            )}
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+          <div className="flex-1 min-w-0">
+            {title && <p className={`text-sm font-bold mb-0.5 ${c.text}`}>{title}</p>}
+            <p className={`text-sm ${c.text}`}>{message}</p>
           </div>
+          {rightElement && (
+            <div className="shrink-0 flex items-center justify-start sm:justify-end self-start sm:self-center pl-4 sm:pl-2">
+              {rightElement}
+            </div>
+          )}
         </div>
         {bottomElement && (
           // The wrapper carries the card text color so any link button placed
           // here automatically inherits the title color (no per-button color
           // classNames needed). The `hover:` shade dims slightly on hover.
-          // Negative margins counteract the parent's px-4 py-3 to make bottomElement
-          // extend to the card edges (no horizontal/bottom padding).
           <div
             data-infocard-bottom
-            className={`shrink-0 flex items-center justify-start -mx-4 -mb-3 pt-2 ${c.text} ${c.linkHover}`}
+            className={`shrink-0 flex items-center justify-start -px-4 -py-3 mt-2 ${c.text} ${c.linkHover}`}
           >
             {bottomElement}
           </div>

@@ -373,7 +373,7 @@ function FavoritesEmpty({
                     title={`Sem ${label} favorito`}
                     subtitle={`Você ainda não tem ${label} nos seus favoritos. Explore a Dudit e favorite o que gostar!`}
                     itemButton={{
-                        text: "Explorar Dudit",
+                        text: "Explorar a Dudit",
                         action: () => window.location.href = "/explorar",
                         variant: "default"
                     }}
@@ -391,7 +391,7 @@ function FavoritesEmpty({
                 title="Seus favoritos estão vazios"
                 subtitle="Clique no 💚 nos produtos e serviços que gostar para encontrá-los rapidamente aqui depois!"
                 itemButton={{
-                    text: "Explorar marketplace",
+                    text: "Explorar a Dudit",
                     action: () => window.location.href = "/explorar",
                     variant: "default"
                 }}

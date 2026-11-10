@@ -63,6 +63,9 @@ interface Quote {
     displayId: string;
     customer_name: string;
     customer_id: string | null;
+    customer_email?: string | null;
+    item_keywords?: string[];
+    notes?: string | null;
     total_amount: number;
     statusLabel: string;
     statusColor: BadgeVariant;
@@ -308,6 +311,9 @@ export default function QuotesPage({
                     displayId: q.quote_number || `#${q.id.substring(0, 8)}`,
                     customer_name: q.customers?.name || "Cliente sem nome",
                     customer_id: q.customers?.id ? `CST-${q.customers.id.substring(0, 4).toUpperCase()}` : null,
+                    customer_email: q.customers?.email || q.customer_email || null,
+                    item_keywords: q.item_keywords || [],
+                    notes: q.notes || "",
                     items_count: q.items_count?.[0]?.count || 0,
                     total_amount: Number(q.total),
                     statusLabel: statusInfo.label,
@@ -322,10 +328,20 @@ export default function QuotesPage({
                 }
             })
             .filter((q: Quote) => {
-                const searchMatch =
+                const itemMatch = Array.isArray(q.item_keywords) && q.item_keywords.some((k: string) =>
+                    typeof k === "string" && k.toLowerCase().includes(term)
+                )
+                const emailMatch = typeof q.customer_email === "string" && q.customer_email.toLowerCase().includes(term)
+                const notesMatch = typeof q.notes === "string" && q.notes.toLowerCase().includes(term)
+
+                const searchMatch = !term || (
                     q.displayId.toLowerCase().includes(term) ||
                     q.customer_name.toLowerCase().includes(term) ||
-                    (q.customer_id || "").toLowerCase().includes(term)
+                    (q.customer_id || "").toLowerCase().includes(term) ||
+                    itemMatch ||
+                    emailMatch ||
+                    notesMatch
+                )
 
                 return searchMatch
             })

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
@@ -84,7 +85,6 @@ function getTypeLabel(type: string): string {
 }
 
 const COLUMNS = [
-    { id: "type", label: "Tipo", align: "left" as const, width: "100px" },
     { id: "description", label: "Descrição", align: "left" as const },
     { id: "amount", label: "Valor", align: "right" as const, width: "120px" },
     { id: "status", label: "Status", align: "left" as const, width: "120px" },
@@ -100,12 +100,11 @@ interface BillingPageProps {
 
 export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
     const isMobile = useMediaQuery("(max-width: 767px)")
-    const [data, setData] = useState<PurchaseWithRelations[]>([])
-    const [total, setTotal] = useState(0)
+    const queryClient = useQueryClient()
     const [page, setPage] = useState(1)
     const [pageSize] = useState(8)
-    const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [viewMode, setViewMode] = useState<"grid" | "list">("list")
     const [filters, setFilters] = useState<Record<string, any>>({})
     const [filterOpen, setFilterOpen] = useState(false)
@@ -127,14 +126,20 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
     const effectiveViewMode = isMobile ? "grid" : viewMode
     const filteredColumns = COLUMNS
 
+    // Debounce the search so typing doesn't trigger a request per keystroke.
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
     const billingFilters: BillingFilters = useMemo(() => ({
         partner_id: initialPartnerId,
         purchase_type: filters.purchase_type?.length ? (filters.purchase_type.length === 1 ? filters.purchase_type[0] : filters.purchase_type) : undefined,
         status: filters.status?.length ? (filters.status.length === 1 ? filters.status[0] : filters.status) : undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         date_from: filters.date?.from || undefined,
         date_to: filters.date?.to || undefined,
-    }), [initialPartnerId, filters, search])
+    }), [initialPartnerId, filters, debouncedSearch])
 
     const hasActiveFilters = useMemo(() => {
         return !!(
@@ -145,28 +150,77 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
         )
     }, [filters])
 
-    const loadPage = useCallback(async (p: number) => {
-        setLoading(true)
-        try {
-            const sortKey = sortConfig?.key === "amount" ? "total_amount"
-                : sortConfig?.key === "date" ? "created_at"
-                    : sortConfig?.key === "type" ? "purchase_type"
-                        : sortConfig?.key === "status" ? "status"
-                            : undefined
-            const result = await listPurchasesPageAction(p, pageSize, billingFilters, sortKey, sortConfig?.direction)
-            setData(result.data)
-            setTotal(result.total)
-            setPage(result.page)
-        } catch (err) {
-            console.error("[BillingPage] Error loading:", err)
-        } finally {
-            setLoading(false)
-        }
-    }, [pageSize, billingFilters, sortConfig])
+    const sortKey = sortConfig?.key === "amount" ? "total_amount"
+        : sortConfig?.key === "date" ? "created_at"
+            : sortConfig?.key === "status" ? "status"
+                : undefined
+    const sortDir = sortConfig?.direction
+
+    // Pages are cached per (filters, sort, page). Neighbouring pages are
+    // prefetched in the background, so switching pages is instant.
+    const makeQueryKey = useCallback((targetPage: number) => ([
+        "billing-purchases",
+        initialPartnerId ?? "all",
+        billingFilters,
+        sortKey ?? "created_at",
+        sortDir ?? "desc",
+        targetPage,
+        pageSize,
+    ] as const), [initialPartnerId, billingFilters, sortKey, sortDir, pageSize])
+
+    const fetchPage = useCallback(
+        (targetPage: number) => listPurchasesPageAction(targetPage, pageSize, billingFilters, sortKey, sortDir),
+        [pageSize, billingFilters, sortKey, sortDir],
+    )
+
+    const purchasesQueryKey = useMemo(() => makeQueryKey(page), [makeQueryKey, page])
+
+    const purchasesQuery = useQuery({
+        queryKey: purchasesQueryKey,
+        queryFn: () => fetchPage(page),
+        placeholderData: keepPreviousData,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+    })
+
+    const data = (purchasesQuery.data?.data ?? []) as PurchaseWithRelations[]
+    const total = purchasesQuery.data?.total ?? 0
+    const isInitialLoading = purchasesQuery.isPending
+    const isSwitchingPage = purchasesQuery.isFetching && !purchasesQuery.isPending
+
+    // Any filter/sort change starts again from the first page.
+    const listKey = useMemo(
+        () => JSON.stringify([billingFilters, sortKey, sortDir]),
+        [billingFilters, sortKey, sortDir],
+    )
+    const listKeyRef = useRef(listKey)
+    if (listKeyRef.current !== listKey) {
+        listKeyRef.current = listKey
+        if (page !== 1) setPage(1)
+    }
 
     useEffect(() => {
-        loadPage(1)
-    }, [loadPage])
+        if (!purchasesQuery.data) return
+        const totalPages = Math.max(1, Math.ceil((purchasesQuery.data.total || 0) / pageSize))
+        const targets: number[] = []
+        for (let offset = 1; offset <= 3; offset++) {
+            const next = page + offset
+            if (next <= totalPages) targets.push(next)
+        }
+        if (page > 1) targets.push(page - 1)
+
+        for (const target of targets) {
+            void queryClient.prefetchQuery({
+                queryKey: makeQueryKey(target),
+                queryFn: () => fetchPage(target),
+                staleTime: 60_000,
+            })
+        }
+    }, [purchasesQuery.data, page, pageSize, makeQueryKey, fetchPage, queryClient])
+
+    const refresh = useCallback(() => {
+        void queryClient.invalidateQueries({ queryKey: ["billing-purchases"] })
+    }, [queryClient])
 
     const totalPages = Math.ceil(total / pageSize)
 
@@ -281,7 +335,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 setSelectedPurchase((prev) =>
                     prev ? { ...prev, invoice: newInvoice, invoice_id: newInvoice.id } : prev,
                 )
-                loadPage(page)
+                refresh()
             } else if (!result.success) {
                 toast.error("Erro ao gerar fatura", result.error || "Tente novamente.")
             }
@@ -291,7 +345,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
         } finally {
             setInvoiceLoading(null)
         }
-    }, [selectedPurchase, page, loadPage])
+    }, [selectedPurchase, refresh])
 
     // Resolve an MP checkout link for a pending subscription invoice so the
     // billing history list can offer a per-row "Pagar" action without storing
@@ -317,7 +371,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
         await updatePurchaseStatusAction(cancelTarget.id, "cancelled", csrf)
         setCancelOpen(false)
         setCancelTarget(null)
-        loadPage(page)
+        refresh()
     }
 
     const handleSort = (colId: string) => {
@@ -349,7 +403,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 />
 
                 <div className={showTitle ? "px-4 md:px-8 pb-8" : "px-0 pb-8"}>
-                    {loading && data.length === 0 ? (
+                    {isInitialLoading && data.length === 0 ? (
                         <div className="flex justify-center py-20">
                             <ThreeDotsLoader />
                         </div>
@@ -407,7 +461,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                             return (
                                                 <th
                                                     key={col.id}
-                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""} ${col.id === "type" ? "rounded-l-lg" : ""}`}
+                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""} ${col.id === "description" ? "rounded-l-lg" : ""}`}
                                                     style={{ width: col.width }}
                                                     onClick={() => handleSort(col.id)}
                                                 >
@@ -443,6 +497,8 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                                 statusLabel={getStatusLabel(p.status, p.metadata)}
                                                 statusVariant={getStatusVariant(p.status, p.metadata)}
                                                 paymentMethodLabel={pm.name}
+                                                paymentMethodIcon={pm.iconUrl}
+                                                paymentMethodDetails={pm.detailsText}
                                                 createdAt={p.created_at}
                                                 columns={filteredColumns}
                                                 invoiceId={p.invoice_id}
@@ -470,7 +526,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                             <Pagination
                                 currentPage={page}
                                 totalPages={totalPages}
-                                onPageChange={(p) => loadPage(p)}
+                                onPageChange={(p) => setPage(p)}
                             />
                         </div>
                     )}
@@ -499,7 +555,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 }}
                 onGenerateInvoice={handleGenerateInvoice}
                 generateLoading={invoiceLoading === "generate"}
-                onRefundSuccess={() => loadPage(page)}
+                onRefundSuccess={() => refresh()}
                 isHydrating={detailHydrating}
             />
 

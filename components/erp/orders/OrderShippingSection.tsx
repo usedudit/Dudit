@@ -97,7 +97,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 const balance = res.balance
                 setGate((prev) => (prev ? { ...prev, balance } : prev))
             })
-            .catch(() => {})
+            .catch(() => { })
         return () => {
             active = false
         }
@@ -324,7 +324,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                                         className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
                                             ? "border-brand-green bg-green-50/40 dark:bg-green-900/10"
                                             : "border-brand-border dark:border-dark-border hover:border-brand-green/60 dark:hover:border-brand-green/40"
-                                        }`}
+                                            }`}
                                     >
                                         <span className="min-w-0">
                                             <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -410,17 +410,17 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
 
                     <div className="flex flex-wrap gap-3">
                         {shippingStatus === "pending" && (
-                            <Button type="button" onClick={handlePay} isLoading={paying}>
+                            <Button onClick={handlePay} isLoading={paying}>
                                 Pagar etiqueta
                             </Button>
                         )}
                         {shippingStatus !== "cancelled" && shippingStatus !== "failed" && (
-                            <Button type="button" variant="outline" onClick={handlePrint} isLoading={printing}>
+                            <Button variant="outline" onClick={handlePrint} isLoading={printing}>
                                 Imprimir
                             </Button>
                         )}
                         {(shippingStatus === "pending" || shippingStatus === "released") && (
-                            <Button type="button" variant="ghostred" onClick={() => setCancelOpen(true)}>
+                            <Button variant="ghostred" onClick={() => setCancelOpen(true)}>
                                 Cancelar etiqueta
                             </Button>
                         )}

@@ -6,6 +6,7 @@ import { Badge, DropdownItem } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Crown, Tag, CreditCard, ShoppingCart, Calendar, Wallet } from "lucide-react"
+import Image from "next/image"
 
 const TYPE_ICONS: Record<string, any> = {
     subscription: Crown,
@@ -76,10 +77,14 @@ const BillingGridCard = React.memo(
 
                     <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start gap-1">
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex flex-col gap-0.5 min-w-0">
                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={description || typeLabel}>
                                     {description || typeLabel}
                                 </h3>
+                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
+                                    <TypeIcon className="w-3 h-3" />
+                                    {typeLabel}
+                                </span>
                             </div>
                             <Badge variant={statusVariant} className="shrink-0 scale-90">{statusLabel}</Badge>
                         </div>
@@ -94,10 +99,6 @@ const BillingGridCard = React.memo(
 
                     <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                            <div className="flex flex-col gap-0.5">
-                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{typeLabel}</span>
-                            </div>
                             <div className="flex flex-col gap-0.5 items-end">
                                 <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
                                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{dateStr}</span>
@@ -107,18 +108,17 @@ const BillingGridCard = React.memo(
                         {(paymentMethodLabel || paymentMethodIcon) && (
                             <div className="flex items-center gap-2 pt-1">
                                 {paymentMethodIcon && (
-                                    <img src={paymentMethodIcon} alt="" className="w-5 h-5 object-contain" />
+                                    <Image
+                                        src={paymentMethodIcon}
+                                        alt=""
+                                        width={20}
+                                        height={20}
+                                        className="w-5 h-5 object-contain"
+                                    />
                                 )}
-                                <div className="flex flex-col">
-                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
-                                        {paymentMethodLabel || "Não informado"}
-                                    </span>
-                                    {paymentMethodDetails && (
-                                        <span className="text-[10px] text-brand-inactive-text truncate">
-                                            {paymentMethodDetails}
-                                        </span>
-                                    )}
-                                </div>
+                                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                    {paymentMethodLabel || "Não informado"}
+                                </span>
                             </div>
                         )}
 
@@ -148,7 +148,9 @@ const BillingGridCard = React.memo(
         prev.id === next.id &&
         prev.status === next.status &&
         prev.totalAmount === next.totalAmount &&
-        prev.invoiceId === next.invoiceId
+        prev.invoiceId === next.invoiceId &&
+        prev.paymentMethodIcon === next.paymentMethodIcon &&
+        prev.paymentMethodDetails === next.paymentMethodDetails
 )
 
 BillingGridCard.displayName = "BillingGridCard"

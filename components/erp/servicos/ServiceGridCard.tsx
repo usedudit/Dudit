@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { EyeIcon, EyeOffIcon } from "@/lib/icons"
 
 interface ServiceGridCardProps {
     service: any
@@ -86,12 +87,21 @@ const ServiceGridCard = React.memo(
                                 {(() => {
                                     const isArchived = service.status === "arquivado" || service.status === "archived"
                                     return (
-                                        <Tooltip text={isArchived ? "Status: Arquivado" : service.is_active ? "Status: Ativo" : "Status: Inativo"}>
-                                            <Badge
-                                                variant={isArchived ? "orange" : service.is_active ? "green" : "red"}
-                                                className="whitespace-nowrap scale-90 shrink-0"
-                                            />
-                                        </Tooltip>
+                                        <>
+                                            <Tooltip text={isArchived ? "Status: Arquivado" : service.is_active ? "Status: Ativo" : "Status: Inativo"}>
+                                                <Badge
+                                                    variant={isArchived ? "orange" : service.is_active ? "green" : "red"}
+                                                    className="whitespace-nowrap scale-90 shrink-0"
+                                                />
+                                            </Tooltip>
+                                            <Tooltip text={service.show_in_marketplace ? "Visível" : "Oculto"}>
+                                                {service.show_in_marketplace ? (
+                                                    <EyeIcon className="w-4 h-4 text-brand-green shrink-0" />
+                                                ) : (
+                                                    <EyeOffIcon className="w-4 h-4 text-brand-inactive-text shrink-0" />
+                                                )}
+                                            </Tooltip>
+                                        </>
                                     )
                                 })()}
                             </div>
@@ -124,13 +134,13 @@ const ServiceGridCard = React.memo(
 
                 {/* Área do Rodapé */}
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    {/* Linha A: Visibilidade (Esq) e Unidade (Dir) */}
+                    {/* Linha A: Categoria (Esq) e Unidade (Dir) */}
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Visibilidade</span>
-                            <Tooltip text={service.show_in_marketplace ? "Visibilidade: Visível" : "Visibilidade: Oculto"}>
-                                <Badge variant={service.show_in_marketplace ? "green" : "gray"} className="whitespace-nowrap scale-90" />
-                            </Tooltip>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Categoria</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                {service.service_categories?.name || "—"}
+                            </span>
                         </div>
 
                         <div className="flex flex-col gap-0.5 items-end">

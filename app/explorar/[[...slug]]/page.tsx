@@ -360,9 +360,6 @@ export default async function ExplorarPage({
                         <h1 className="text-2xl lg:text-4xl font-bold text-brand-dark dark:text-dark-heading">
                             Explore por categoria
                         </h1>
-                        <p className="text-sm lg:text-base text-gray-500 dark:text-gray-400 mt-2">
-                            Encontre o que precisa perto de você
-                        </p>
                     </div>
 
                     {(() => {

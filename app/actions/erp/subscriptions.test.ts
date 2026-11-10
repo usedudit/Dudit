@@ -88,7 +88,7 @@ describe("getSubscriptionStatusAction — pending subscription", () => {
       id: "plan-crescer",
       name: "Crescer",
       slug: "crescer",
-      price: 19.9,
+      price: 29.9,
       limits_json: {},
       features_json: ["mercado_pago_checkout"],
       is_active: true,
@@ -106,7 +106,7 @@ describe("getSubscriptionStatusAction — pending subscription", () => {
       trial_end: null,
       payment_provider: "mercado_pago",
       mercado_pago_subscription_id: "preapproval-123",
-      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 19.9 },
+      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 29.9 },
     } as any)
 
     vi.mocked(getUsageCounters).mockResolvedValue({} as any)
@@ -139,7 +139,7 @@ describe("getSubscriptionStatusAction — pending subscription", () => {
     expect(res.data.next_invoice).not.toBeNull()
     expect(res.data.next_invoice.invoice_number).toBe("INV-2026-000030")
     expect(res.data.next_invoice.status).toBe("pending")
-    expect(res.data.next_invoice.amount).toBe(19.9)
+    expect(res.data.next_invoice.amount).toBe(29.9)
     expect(res.data.next_invoice.period_start).toBe("2026-10-30T03:00:00.000Z")
     expect(res.data.next_invoice.period_end).toBe("2026-11-30T03:00:00.000Z")
   })
@@ -163,7 +163,7 @@ describe("getSubscriptionStatusAction — pending subscription", () => {
       trial_end: null,
       payment_provider: "manual",
       mercado_pago_subscription_id: null,
-      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 19.9 },
+      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 29.9 },
     } as any)
 
     const res: any = await getSubscriptionStatusAction()
@@ -182,7 +182,7 @@ describe("getSubscriptionStatusAction — pending plan change", () => {
       id: "plan-crescer",
       name: "Crescer",
       slug: "crescer",
-      price: 19.9,
+      price: 29.9,
       limits_json: {},
       features_json: ["mercado_pago_checkout"],
       is_active: true,
@@ -200,7 +200,7 @@ describe("getSubscriptionStatusAction — pending plan change", () => {
       trial_end: null,
       payment_provider: "mercado_pago",
       mercado_pago_subscription_id: null,
-      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 19.9 },
+      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 29.9 },
     } as any)
 
     vi.mocked(getUsageCounters).mockResolvedValue({} as any)
@@ -300,7 +300,7 @@ describe("getSubscriptionPaymentUrlAction", () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    vi.mocked(getPartnerPlan).mockResolvedValue({ id: "plan-1", name: "Crescer", slug: "crescer", price: 19.9, sort_order: 1 } as any)
+    vi.mocked(getPartnerPlan).mockResolvedValue({ id: "plan-1", name: "Crescer", slug: "crescer", price: 29.9, sort_order: 1 } as any)
     vi.mocked(getPartnerSubscription).mockResolvedValue(null as any)
     vi.mocked(getUsageCounters).mockResolvedValue({} as any)
     vi.mocked(computeSubscriptionPeriods).mockReturnValue({

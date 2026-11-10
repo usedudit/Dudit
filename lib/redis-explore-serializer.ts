@@ -17,7 +17,7 @@ const PUBLIC_SERVICE_FIELDS = [
 ] as const
 
 const PUBLIC_STORE_FIELDS = [
-  "id", "name", "slug", "description", "images", "rating", "category", "partners", "created_at", "updated_at", "itemType",
+  "id", "name", "slug", "description", "logo_url", "banner_url", "images", "rating", "category", "partners", "created_at", "updated_at", "itemType",
 ] as const
 
 function pickFields<T extends Record<string, any>>(data: T, fields: readonly string[]) {

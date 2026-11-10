@@ -143,7 +143,7 @@ describe("updateMpSubscription — downgrade paid → paid", () => {
       id: "plan-crescer",
       name: "Crescer",
       slug: "crescer",
-      price: 19.9,
+      price: 29.9,
       is_active: true,
       limits_json: {},
       features_json: [],
@@ -162,7 +162,7 @@ describe("updateMpSubscription — downgrade paid → paid", () => {
     const putCall = findPreapprovalPut()
     expect(putCall[1].method).toBe("PUT")
     const body = JSON.parse(putCall[1].body)
-    expect(body.auto_recurring.transaction_amount).toBe(19.9)
+    expect(body.auto_recurring.transaction_amount).toBe(29.9)
     expect(body.auto_recurring.currency_id).toBe("BRL")
 
     // The SAME preapproval id is kept on the row (no cancellation happened).
@@ -177,7 +177,7 @@ describe("updateMpSubscription — downgrade paid → paid", () => {
 
 describe("updateMpSubscription — downgrade paid → free", () => {
   it("cancels the preapproval and writes cancel_at_period_end: true", async () => {
-    const currentSub = makeCurrentSub("crescer", 19.9)
+    const currentSub = makeCurrentSub("crescer", 29.9)
     const newPlan = {
       id: "plan-free",
       name: "Começar",

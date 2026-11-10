@@ -10,6 +10,8 @@ interface TagsInputProps {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /** Classes aplicadas à caixa interna (onde ficam as tags e o input). */
+  boxClassName?: string
   label?: string
   error?: boolean
   errorMessage?: string
@@ -21,6 +23,7 @@ export function TagsInput({
   placeholder = "Digite e pressione Enter",
   disabled = false,
   className,
+  boxClassName,
   label,
   error: externalError = false,
   errorMessage: externalErrorMessage,
@@ -64,23 +67,24 @@ export function TagsInput({
       {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>}
       <div
         className={cn(
-          "flex flex-wrap gap-2 h-[42px] px-3 py-2 rounded-lg border focus-within:border-brand-dark dark:focus-within:border-dark-body focus-within:outline-none transition-all bg-white dark:bg-dark-surface",
+          "flex flex-wrap items-center content-start gap-2 min-h-[42px] px-3 py-2 rounded-lg border focus-within:border-brand-dark dark:focus-within:border-dark-body focus-within:outline-none transition-all bg-white dark:bg-dark-surface",
           hasError ? "border-brand-red" : "border-brand-border dark:border-dark-border",
           disabled && "opacity-50 cursor-not-allowed bg-brand-gray dark:bg-dark-border/20",
+          boxClassName,
         )}
         onClick={() => !disabled && inputRef.current?.focus()}
       >
         {tags.map((tag, index) => (
           <div
-            key={index}
+            key={`${tag}-${index}`}
             className={cn(
-              "flex items-center gap-1 px-2 rounded-md text-sm font-medium animate-fadeIn",
+              "flex max-w-full items-center gap-1 rounded-md px-2 py-1 text-sm font-medium animate-fadeIn",
               tag.length > 30
                 ? "bg-red-100 dark:bg-red-900/30 text-brand-red"
                 : "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
             )}
           >
-            <span>{tag}</span>
+            <span className="truncate">{tag}</span>
             {!disabled && (
               <button
                 type="button"
@@ -88,7 +92,7 @@ export function TagsInput({
                   e.stopPropagation()
                   removeTag(tag)
                 }}
-                className="hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-full p-0.5 transition-colors"
+                className="shrink-0 hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-full p-0.5 transition-colors"
               >
                 <XIcon className="w-3 h-3" />
               </button>
@@ -104,7 +108,7 @@ export function TagsInput({
           disabled={disabled}
           placeholder={tags.length === 0 ? placeholder : ""}
           className={cn(
-            "flex-1 min-w-[120px] outline-none bg-transparent text-sm",
+            "flex-1 min-w-[120px] h-6 outline-none bg-transparent text-sm",
             "placeholder:text-gray-400 dark:placeholder:text-dark-body/60",
             disabled && "cursor-not-allowed",
           )}

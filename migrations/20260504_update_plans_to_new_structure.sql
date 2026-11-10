@@ -61,11 +61,11 @@ UPDATE plans SET
     sort_order = 3
 WHERE slug = 'crescer' OR slug = 'comerciante';
 
--- Update 'vendedor' (19.90) to 'crescer'
+-- Update 'vendedor' (29.90) to 'crescer'
 UPDATE plans SET 
     name = 'Crescer',
     slug = 'crescer',
-    price = 19.90,
+    price = 29.90,
     limits_json = '{
         "items": 100,
         "images_per_item": 5,

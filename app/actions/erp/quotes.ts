@@ -84,8 +84,11 @@ export async function getERPQuotesPageAction(
                     created_at,
                     updated_at,
                     public_token,
+                    notes,
+                    metadata,
                     customers (id, name, email),
-                    items_count:quote_items(count)
+                    items_count:quote_items(count),
+                    quote_items (custom_name, product_name_snapshot, product_sku_snapshot, description)
                 `
             const selectWithoutCreator = `
                     id,
@@ -99,8 +102,11 @@ export async function getERPQuotesPageAction(
                     created_at,
                     updated_at,
                     public_token,
+                    notes,
+                    metadata,
                     customers (id, name, email),
-                    items_count:quote_items(count)
+                    items_count:quote_items(count),
+                    quote_items (custom_name, product_name_snapshot, product_sku_snapshot, description)
                 `
             const queryResult = await getCachedErpPage(
                 ["erp-quotes-page", partnerId, storeId || "all-stores", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit)],
@@ -154,8 +160,19 @@ export async function getERPQuotesPageAction(
                     cleanToken = generateShortId(6)
                     getAdminClient().from("quotes").update({ public_token: cleanToken }).eq("id", row.id).then(() => {})
                 }
+                const itemKeywords: string[] = []
+                if (Array.isArray(row.quote_items)) {
+                    for (const it of row.quote_items) {
+                        const name = it.custom_name || it.product_name_snapshot
+                        if (name) itemKeywords.push(String(name))
+                        if (it.product_sku_snapshot) itemKeywords.push(String(it.product_sku_snapshot))
+                        if (it.description) itemKeywords.push(String(it.description))
+                    }
+                }
                 const mappedRow = {
                     ...row,
+                    item_keywords: itemKeywords,
+                    customer_email: row.customers?.email || null,
                     public_token: cleanToken,
                     user_profiles: (row.user_id || row.created_by_user_id)
                         ? { full_name: creatorNameById.get(String(row.user_id || row.created_by_user_id)) || "Sistema" }
@@ -492,30 +509,46 @@ export async function createQuoteAction(data: {
                 return errorResponse(rpcError?.message || "Erro fatal ao criar orçamento. Operação revertida.")
             }
 
-            // Save preview customization to metadata
-            if (data.preview) {
-                const previewMeta = {
-                    preview: {
-                        primaryColor: data.preview.primaryColor || null,
-                        secondaryColor: data.preview.secondaryColor || null,
-                        quoteTitle: data.preview.quoteTitle || null,
-                        quoteSubtitle: data.preview.quoteSubtitle || null,
-                        showDecoration: data.preview.showDecoration ?? true,
-                    }
-                }
-                await supabase
-                    .from("quotes")
-                    .update({ metadata: previewMeta as any })
-                    .eq("id", quoteResult.id)
+            // Fetch created row to preserve trigger defaults (plain_code, approval_code_hash, salt)
+            const { data: createdQuoteRow } = await supabase
+                .from("quotes")
+                .select("metadata, approval_code_hash, approval_code_salt")
+                .eq("id", quoteResult.id)
+                .single()
+
+            const existingMeta = ((createdQuoteRow?.metadata || {}) as Record<string, any>)
+            let finalSalt = createdQuoteRow?.approval_code_salt
+            let finalHash = createdQuoteRow?.approval_code_hash
+
+            if (!existingMeta.plain_code) {
+                const crypto = await import("crypto")
+                const plainCode = crypto.randomInt(1000, 10000).toString()
+                finalSalt = crypto.randomBytes(16).toString("hex")
+                finalHash = crypto.createHash("sha256").update(finalSalt + plainCode).digest("hex")
+                existingMeta.plain_code = plainCode
             }
 
-            // Set store_id after RPC creation
-            if (data.storeId) {
-                await supabase
-                    .from("quotes")
-                    .update({ store_id: data.storeId })
-                    .eq("id", quoteResult.id)
+            if (data.preview) {
+                existingMeta.preview = {
+                    primaryColor: data.preview.primaryColor || null,
+                    secondaryColor: data.preview.secondaryColor || null,
+                    quoteTitle: data.preview.quoteTitle || null,
+                    quoteSubtitle: data.preview.quoteSubtitle || null,
+                    showDecoration: data.preview.showDecoration ?? true,
+                }
             }
+
+            const updatePayload: Record<string, any> = {
+                metadata: existingMeta,
+                ...(finalSalt ? { approval_code_salt: finalSalt } : {}),
+                ...(finalHash ? { approval_code_hash: finalHash } : {}),
+                ...(data.storeId ? { store_id: data.storeId } : {}),
+            }
+
+            await supabase
+                .from("quotes")
+                .update(updatePayload)
+                .eq("id", quoteResult.id)
 
             // Sync full state to compute native triggers (subtotals)
             const { data: updatedQuote } = await supabase
@@ -2311,11 +2344,13 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
 
             const hash = hashData as string
 
-            // Clean any legacy plain_code from metadata
-            const cleanMetadata = { ...(quote.metadata || {}) }
-            delete cleanMetadata.plain_code
+            // Store plain_code in metadata for merchant viewing and sharing
+            const updatedMetadata = {
+                ...(quote.metadata || {}),
+                plain_code: plainCode
+            }
 
-            // 3. Update quote without persisting plain_code
+            // 3. Update quote with plain_code in metadata
             const { error: updateErr } = await supabase
                 .from("quotes")
                 .update({
@@ -2324,7 +2359,7 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
                     failed_attempts: 0,
                     lockout_until: null,
                     lockout_count: 0,
-                    metadata: cleanMetadata,
+                    metadata: updatedMetadata,
                 })
                 .eq("id", quoteId)
                 .eq("partner_id", partnerId)
@@ -2632,7 +2667,11 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 items: formattedItems,
                 payment_terms: quote.metadata?.payment_terms || null,
                 coupon_data: quote.metadata?.coupon_data || null,
-                metadata: quote.metadata || {}
+                metadata: (() => {
+                    const safeMeta = { ...(quote.metadata || {}) }
+                    delete safeMeta.plain_code
+                    return safeMeta
+                })()
             }
 
             let resolvedSnapshot = (quote.converted && quote.snapshot) ? quote.snapshot : liveSnapshot
@@ -2719,7 +2758,11 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         plan_tier: planTier,
                     },
                     items: formattedItems,
-                    metadata: quote.metadata || {},
+                    metadata: (() => {
+                        const safeMeta = { ...(quote.metadata || {}) }
+                        delete safeMeta.plain_code
+                        return safeMeta
+                    })(),
                     primary_color: previewMeta.primaryColor || null,
                     secondary_color: previewMeta.secondaryColor || null,
                     quote_title: previewMeta.quoteTitle || null,

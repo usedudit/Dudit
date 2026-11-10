@@ -219,7 +219,7 @@ const jsonLd = {
                 "@type": "Offer",
                 price: "0",
                 priceCurrency: "BRL",
-                description: "Plano gratuito disponível. Planos pagos a partir de R$ 19,90/mês com 0% de comissão por venda.",
+                description: "Plano gratuito disponível. Planos pagos a partir de R$ 29,90/mês com 0% de comissão por venda.",
             },
             featureList: [
                 "0% de comissão por venda (lucro 100% do comerciante)",

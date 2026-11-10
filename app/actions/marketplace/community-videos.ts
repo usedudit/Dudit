@@ -14,8 +14,19 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getR2PublicUrl } from "@/lib/r2/r2-server-config"
 import { resolveCityAndStateFromSlug } from "./products"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { isUuid } from "@/lib/utils/short-id"
 
 type ActionResult<T = void> = { success: true; data?: T } | { success: false; error: string }
+
+export interface CommunityVideoLinkedItem {
+  id: string
+  name: string
+  type: "product" | "service" | "collection"
+  price?: number | null
+  imageUrl?: string | null
+  url?: string | null
+}
 
 export interface CommunityVideoItem {
   id: string
@@ -31,11 +42,14 @@ export interface CommunityVideoItem {
   moderation_status: string
   views_count: number
   clicks_count: number
+  views_last_30_days?: number
+  clicks_last_30_days?: number
   orders_origin_count: number
   published_at: string | null
   created_at: string
   linked_collection_short_id?: string | null
-   partner?: { name?: string; store_image_url?: string | null; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
+  linked_item?: CommunityVideoLinkedItem | null
+  partner?: { name?: string; store_image_url?: string | null; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
 }
 
 export async function getCommunityVideos(citySlug?: string, cursor?: string, limit = 20): Promise<{
@@ -193,14 +207,93 @@ export async function getPartnerCommunityVideos(partnerId: string, cursor?: stri
   if (items.length > 0) {
     const collectionItems = items.filter(i => i.linked_item_type === "collection" && i.linked_item_id)
     if (collectionItems.length > 0) {
-      const { data: collections } = await supabase
-        .from("collections")
-        .select("id, short_id")
-        .in("id", collectionItems.map(i => i.linked_item_id!))
+      const colUuids = collectionItems.map(i => i.linked_item_id!).filter(isUuid)
+      const colShortIds = collectionItems.map(i => i.linked_item_id!).filter(id => !isUuid(id))
 
-      const colMap = new Map((collections || []).map(c => [c.id, c.short_id]))
+      let colQuery = supabase.from("collections").select("id, name, short_id, cover_url")
+      if (colUuids.length > 0 && colShortIds.length > 0) {
+        colQuery = colQuery.or(`id.in.(${colUuids.join(",")}),short_id.in.(${colShortIds.join(",")})`)
+      } else if (colUuids.length > 0) {
+        colQuery = colQuery.in("id", colUuids)
+      } else if (colShortIds.length > 0) {
+        colQuery = colQuery.in("short_id", colShortIds)
+      }
+
+      const { data: collections } = await colQuery
+      const colById = new Map((collections || []).map(c => [c.id, c]))
+      const colByShort = new Map((collections || []).map(c => [c.short_id, c]))
+
       for (const item of collectionItems) {
-        item.linked_collection_short_id = colMap.get(item.linked_item_id!) || null
+        const c = colById.get(item.linked_item_id!) || colByShort.get(item.linked_item_id!)
+        if (c) {
+          item.linked_collection_short_id = c.short_id || null
+          item.linked_item = {
+            id: c.id,
+            name: c.name,
+            type: "collection",
+            imageUrl: c.cover_url ? (c.cover_url.startsWith("http") ? c.cover_url : getR2ImageUrl(c.cover_url)) : null,
+          }
+        }
+      }
+    }
+
+    const productItems = items.filter(i => i.linked_item_type === "product" && i.linked_item_id && isUuid(i.linked_item_id))
+    if (productItems.length > 0) {
+      const pIds = [...new Set(productItems.map(i => i.linked_item_id!))]
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, price, promotional_price, images")
+        .in("id", pIds)
+
+      const prodMap = new Map((products || []).map(p => [p.id, p]))
+      for (const item of productItems) {
+        const p = prodMap.get(item.linked_item_id!)
+        if (p) {
+          const rawImages = p.images
+          let img: string | null = null
+          if (Array.isArray(rawImages) && rawImages.length > 0) {
+            img = getR2ImageUrl(rawImages[0])
+          } else if (typeof rawImages === "string" && rawImages) {
+            img = getR2ImageUrl(rawImages)
+          }
+          item.linked_item = {
+            id: p.id,
+            name: p.name,
+            type: "product",
+            price: p.promotional_price != null ? Number(p.promotional_price) : (p.price != null ? Number(p.price) : null),
+            imageUrl: img,
+          }
+        }
+      }
+    }
+
+    const serviceItems = items.filter(i => i.linked_item_type === "service" && i.linked_item_id && isUuid(i.linked_item_id))
+    if (serviceItems.length > 0) {
+      const sIds = [...new Set(serviceItems.map(i => i.linked_item_id!))]
+      const { data: services } = await supabase
+        .from("services")
+        .select("id, name, price, promotional_price, images")
+        .in("id", sIds)
+
+      const servMap = new Map((services || []).map(s => [s.id, s]))
+      for (const item of serviceItems) {
+        const s = servMap.get(item.linked_item_id!)
+        if (s) {
+          const rawImages = s.images
+          let img: string | null = null
+          if (Array.isArray(rawImages) && rawImages.length > 0) {
+            img = getR2ImageUrl(rawImages[0])
+          } else if (typeof rawImages === "string" && rawImages) {
+            img = getR2ImageUrl(rawImages)
+          }
+          item.linked_item = {
+            id: s.id,
+            name: s.name,
+            type: "service",
+            price: s.promotional_price != null ? Number(s.promotional_price) : (s.price != null ? Number(s.price) : null),
+            imageUrl: img,
+          }
+        }
       }
     }
   }
@@ -464,5 +557,58 @@ export async function recordVideoClick(id: string): Promise<void> {
     await admin.rpc("increment_community_video_clicks", { p_video_id: videoId })
   } catch {
     // fire-and-forget
+  }
+}
+
+export async function getVideoLinkedItemSummary(
+  type: "product" | "service",
+  id: string
+): Promise<{ id: string; name: string; price: number | null; imageUrl: string | null } | null> {
+  try {
+    const supabase = await getSupabaseServerClient()
+    if (type === "product") {
+      const { data: p } = await supabase
+        .from("products")
+        .select("id, name, price, promotional_price, images")
+        .eq("id", id)
+        .maybeSingle()
+      if (!p) return null
+      const rawImages = p.images
+      let img: string | null = null
+      if (Array.isArray(rawImages) && rawImages.length > 0) {
+        img = getR2ImageUrl(rawImages[0])
+      } else if (typeof rawImages === "string" && rawImages) {
+        img = getR2ImageUrl(rawImages)
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.promotional_price != null ? Number(p.promotional_price) : (p.price != null ? Number(p.price) : null),
+        imageUrl: img,
+      }
+    } else if (type === "service") {
+      const { data: s } = await supabase
+        .from("services")
+        .select("id, name, price, promotional_price, images")
+        .eq("id", id)
+        .maybeSingle()
+      if (!s) return null
+      const rawImages = s.images
+      let img: string | null = null
+      if (Array.isArray(rawImages) && rawImages.length > 0) {
+        img = getR2ImageUrl(rawImages[0])
+      } else if (typeof rawImages === "string" && rawImages) {
+        img = getR2ImageUrl(rawImages)
+      }
+      return {
+        id: s.id,
+        name: s.name,
+        price: s.promotional_price != null ? Number(s.promotional_price) : (s.price != null ? Number(s.price) : null),
+        imageUrl: img,
+      }
+    }
+    return null
+  } catch {
+    return null
   }
 }

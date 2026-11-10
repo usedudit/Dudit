@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard, ListItem } from "@/components/reusable"
+import { Input, FormDropdown, RichTextEditor, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard } from "@/components/reusable"
 import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
+import { TagsListItem } from "@/components/erp/shared/TagsListItem"
 import { TrashIcon, PlusIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
 import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import ProductVideoSection from "./ProductVideoSection"
@@ -555,36 +556,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                         hasSeparator
                     >
-                        <ListItem
-                            title="Gerenciar palavras-chave"
-                            description={tags.length > 0 ? `${tags.length} tag${tags.length !== 1 ? "s" : ""} cadastrada${tags.length !== 1 ? "s" : ""}` : "Nenhuma tag cadastrada"}
-                            right={tags.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5 max-w-[70%]">
-                                    {tags.slice(0, 3).map((tag: string, i: number) => (
-                                        <Badge key={i} variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium">
-                                            {tag}
-                                        </Badge>
-                                    ))}
-                                    {tags.length > 3 && (
-                                        <Badge variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium text-brand-inactive-text">
-                                            +{tags.length - 3}
-                                        </Badge>
-                                    )}
-                                </div>
-                            ) : null}
-                            showChevron
+                        <TagsListItem
+                            tags={tags}
                             onClick={() => setIsTagsModalOpen(true)}
                             disabled={!isEditing}
-                            className={`cursor-pointer ${!isEditing ? "opacity-50" : ""}`}
-                        />
-                        <TagsManagerModal
-                            isOpen={isTagsModalOpen}
-                            onClose={() => setIsTagsModalOpen(false)}
-                            tags={tags}
-                            onChange={(t) => manualChange("tags", t)}
-                            disabled={!isEditing}
-                            title="Palavras-chave de busca"
-                            description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                         />
                     </FormSection>
                 </div>
@@ -720,38 +695,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             <p className="text-sm text-brand-inactive-text mb-2">
                                 Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine.
                             </p>
-                            <ListItem
-                                title="Gerenciar palavras-chave"
-                                description={tags.length > 0 ? `${tags.length} tag${tags.length !== 1 ? "s" : ""} cadastrada${tags.length !== 1 ? "s" : ""}` : "Nenhuma tag cadastrada"}
-                                right={tags.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1.5 max-w-[70%]">
-                                        {tags.slice(0, 3).map((tag: string, i: number) => (
-                                            <Badge key={i} variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium">
-                                                {tag}
-                                            </Badge>
-                                        ))}
-                                        {tags.length > 3 && (
-                                            <Badge variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium text-brand-inactive-text">
-                                                +{tags.length - 3}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                ) : null}
-                                showChevron
+                            <TagsListItem
+                                tags={tags}
                                 onClick={() => setIsTagsModalOpen(true)}
                                 disabled={!isEditing}
-                                className={`cursor-pointer ${!isEditing ? "opacity-50" : ""}`}
                             />
                         </div>
-                        <TagsManagerModal
-                            isOpen={isTagsModalOpen}
-                            onClose={() => setIsTagsModalOpen(false)}
-                            tags={tags}
-                            onChange={(t) => manualChange("tags", t)}
-                            disabled={!isEditing}
-                            title="Palavras-chave de busca"
-                            description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
-                        />
                     </SidebarCard>
                 </div>
 
@@ -760,6 +709,16 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     onChange={(id) => manualChange("marketplace_category_id", id)}
                     type="product"
                     isEditing={isEditing}
+                />
+
+                <TagsManagerModal
+                    isOpen={isTagsModalOpen}
+                    onClose={() => setIsTagsModalOpen(false)}
+                    tags={tags}
+                    onChange={(t) => manualChange("tags", t)}
+                    disabled={!isEditing}
+                    title="Palavras-chave de busca"
+                    description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                 />
             </div>
         </div>

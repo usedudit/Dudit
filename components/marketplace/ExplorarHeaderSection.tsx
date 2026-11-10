@@ -19,10 +19,10 @@ export function ExplorarHeaderSection({
     isLoading = false,
 }: ExplorarHeaderSectionProps) {
     return (
-        <div className="mb-6">
+        <div className="hidden lg:block mb-6">
             <div className="flex items-start gap-3">
                 {showBackButton && (
-                    <div className="flex pt-1">
+                    <div className="hidden lg:flex pt-1">
                         <Button
                             variant="filled"
                             onClick={onBack}
@@ -35,17 +35,17 @@ export function ExplorarHeaderSection({
 
                 <div className="flex-1 min-w-0">
                     {/* Título e contador: desktop apenas.
-                        Em tablet/mobile a cidade é exibida como badge de filtro
-                        fixa na barra de filtros, então repita informação é redundante. */}
-                    <h1 className="hidden lg:block text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-1 truncate">
+                        Em tablet/mobile a cidade e filtros são exibidos na barra
+                        e badges de filtro, então essa seção é ocultada. */}
+                    <h1 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-1 truncate">
                         {title}
                     </h1>
                     {isLoading ? (
-                        <div className="hidden lg:flex items-center mt-1">
+                        <div className="flex items-center mt-1">
                             <span className="inline-block w-28 h-3.5 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
                         </div>
                     ) : (
-                        <p className="hidden lg:block text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
+                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
                             {resultsCount} resultado{resultsCount !== 1 ? "s" : ""} encontrado{resultsCount !== 1 ? "s" : ""}
                         </p>
                     )}

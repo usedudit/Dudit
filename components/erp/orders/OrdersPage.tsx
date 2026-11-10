@@ -125,6 +125,8 @@ interface Order {
     isCarrierDelivery?: boolean;
     carrier_status?: string | null;
     order_items?: any[];
+    customer_email?: string | null;
+    customer_phone?: string | null;
 }
 
 interface FilterState {
@@ -613,14 +615,38 @@ export default function OrdersPage({
                     order_shipments: shipments,
                     isCarrierDelivery,
                     carrier_status: carrierStatus,
+                    order_items: orderItems,
+                    customer_email: cust?.email || (typeof o.buyer_email === "string" ? o.buyer_email : null),
+                    customer_phone: cust?.phone || null,
                 }
             })
             .filter((o: Order) => {
-                const searchMatch =
+                const itemMatch = Array.isArray(o.order_items) && o.order_items.some((item: any) =>
+                    (typeof item?.product_name === "string" && item.product_name.toLowerCase().includes(term)) ||
+                    (typeof item?.name === "string" && item.name.toLowerCase().includes(term))
+                )
+                const emailMatch = typeof (o as any).customer_email === "string" && (o as any).customer_email.toLowerCase().includes(term)
+                const phoneMatch = typeof (o as any).customer_phone === "string" && (o as any).customer_phone.toLowerCase().includes(term)
+                const paymentMatch = (
+                    (typeof o.payment_method_label === "string" && o.payment_method_label.toLowerCase().includes(term)) ||
+                    (typeof o.payment_method === "string" && o.payment_method.toLowerCase().includes(term)) ||
+                    (typeof o.payment_provider === "string" && o.payment_provider.toLowerCase().includes(term))
+                )
+                const storeMatch = typeof o.store_name === "string" && o.store_name.toLowerCase().includes(term)
+                const notesMatch = typeof o.notes === "string" && o.notes.toLowerCase().includes(term)
+
+                const searchMatch = !term || (
                     o.displayId.toLowerCase().includes(term) ||
                     o.customer_name.toLowerCase().includes(term) ||
                     (o.customer_id || "").toLowerCase().includes(term) ||
-                    (o.tracking_number || "").toLowerCase().includes(term)
+                    (o.tracking_number || "").toLowerCase().includes(term) ||
+                    itemMatch ||
+                    emailMatch ||
+                    phoneMatch ||
+                    paymentMatch ||
+                    storeMatch ||
+                    notesMatch
+                )
 
                 return searchMatch
             })

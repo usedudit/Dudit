@@ -1065,7 +1065,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const isEditLoadingLocked = mode !== "create" && isLoadingDetails;
 
     const headerContent = (
-        <div className="flex items-center justify-between gap-3">
+        <div className="hidden lg:flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
                 <Button variant="filled" onClick={handleBack} className={`w-10 h-10 p-0 flex items-center justify-center shrink-0 ${isScrolled ? "scale-90" : "scale-100"}`}>
                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -1086,8 +1086,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 </div>
             </div>
 
-            {/* Action buttons - Desktop & Tablet */}
-            <div className="hidden md:flex items-center gap-2 md:gap-3 shrink-0">
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
                 <Button variant="outline" onClick={handleBack} disabled={isSaving || isEditLoadingLocked} className="h-9">
                     {mode === 'view' ? "Voltar" : "Cancelar"}
                 </Button>
@@ -1103,175 +1103,340 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                {/* Top Header & Tabs (Desktop, Tablet & Mobile) */}
-                <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 px-4 md:px-8 ${isScrolled ? "py-2.5" : "pt-4 pb-0"}`}>
-                    {headerContent}
-                    <div className={`w-full transition-all duration-300 ${isScrolled ? "mt-2" : "mt-4"}`}>
-                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 overflow-x-auto custom-scrollbar">
-                            <TabsTrigger value="Dados Gerais">
-                                Dados Gerais
-                                {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                            </TabsTrigger>
-                            <TabsTrigger value="Layout">Personalizar</TabsTrigger>
-                            <TabsTrigger value="Observações">
-                                Observações
-                                {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                            </TabsTrigger>
-                            <TabsTrigger value="Anexos">Anexos</TabsTrigger>
-                            <TabsTrigger value="Visualização">Visualização</TabsTrigger>
-                        </TabsList>
-                    </div>
-                </div>
-
-                {/* Content Area */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
-                    {isEditLoadingLocked && (
-                        <div className="flex items-center justify-center h-full min-h-[200px] w-full">
-                            <ThreeDotsLoader />
+                {/* DESKTOP (lg:): 50/50 Split View */}
+                <div className="hidden lg:flex lg:flex-row w-full h-full overflow-hidden">
+                    {/* LEFT SIDE - HEADER & CONTENT */}
+                    <div className="w-1/2 flex flex-col flex-1 min-h-0 shrink-0 h-full border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
+                        {/* Header confined to Left Half */}
+                        <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 px-6 ${isScrolled ? "py-2.5" : "pt-4 pb-0"}`}>
+                            {headerContent}
+                            {/* Desktop Tabs - below subtitle, above items */}
+                            <div className={`w-full transition-all duration-300 ${isScrolled ? "mt-2" : "mt-4"}`}>
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 overflow-x-auto custom-scrollbar">
+                                    <TabsTrigger value="Dados Gerais">
+                                        Dados Gerais
+                                        {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                    </TabsTrigger>
+                                    <TabsTrigger value="Layout">Personalizar</TabsTrigger>
+                                    <TabsTrigger value="Observações">
+                                        Observações
+                                        {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                    </TabsTrigger>
+                                    <TabsTrigger value="Anexos">Anexos</TabsTrigger>
+                                </TabsList>
+                            </div>
                         </div>
-                    )}
-                    <div className="px-3 md:px-8 py-6 max-w-[1300px] mx-auto min-h-[400px] pb-24 md:pb-12">
-                        {/* QuoteEditor internally handles TabsContent for "Dados Gerais", "Layout" and "Observações" */}
-                        <QuoteEditor
-                            mode={mode}
-                            searchQuery={productBucket.searchQuery}
-                            setSearchQuery={productBucket.setSearchQuery}
-                            isProductSearchOpen={isProductSearchOpen}
-                            setIsProductSearchOpen={setIsProductSearchOpen}
-                            filteredProducts={productBucket.filteredResults}
-                            isSearching={productBucket.isLoading}
-                            onSearchFocus={productBucket.loadBucket}
-                            loadMoreProducts={productBucket.loadMore}
-                            hasMoreProducts={productBucket.hasMore}
-                            quotePromotions={quotePromotions}
-                            handleProductClick={handleProductClick}
-                            addBlankItem={addBlankItem}
-                            quoteItems={quoteItems}
-                            updateItemPrice={updateItemPrice}
-                            updateItemQty={updateItemQty}
-                            updateItemField={updateItemField}
-                            toggleItemEdit={toggleItemEdit}
-                            removeItem={removeItem}
-                            discount={discount}
-                            setDiscount={setDiscount}
-                            discountType={discountType}
-                            setDiscountType={setDiscountType}
-                            shippingFee={shippingFee}
-                            setShippingFee={setShippingFee}
-                            otherCosts={otherCosts}
-                            setOtherCosts={setOtherCosts}
-                            subtotal={subtotal}
-                            discountValue={discountValue}
-                            total={total}
-                            selectedCustomer={selectedCustomer}
-                            setSelectedCustomer={setSelectedCustomer}
-                            setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                            quoteDate={quoteDate}
-                            setQuoteDate={setQuoteDate}
-                            expiryDate={expiryDate}
-                            setExpiryDate={setExpiryDate}
-                            status={status}
-                            setStatus={setStatus}
-                            internalNote={internalNote}
-                            setInternalNote={setInternalNote}
-                            staffInternalNotes={staffInternalNotes}
-                            setStaffInternalNotes={setStaffInternalNotes}
-                            editCaps={editCaps}
-                            onReopenQuote={mode === "edit" ? handleReopenQuote : undefined}
-                            onDuplicateQuote={mode === "edit" ? handleDuplicateFromEditor : undefined}
-                            primaryColor={primaryColor}
-                            setPrimaryColor={setPrimaryColor}
-                            secondaryColor={secondaryColor}
-                            setSecondaryColor={setSecondaryColor}
-                            quoteTitle={quoteTitle}
-                            setQuoteTitle={setQuoteTitle}
-                            quoteSubtitle={quoteSubtitle}
-                            setQuoteSubtitle={setQuoteSubtitle}
-                            showDecoration={showDecoration}
-                            setShowDecoration={setShowDecoration}
-                            isReadOnly={mode === 'view'}
-                            fieldErrors={fieldErrors}
-                            setFieldErrors={setFieldErrors}
-                            manualItemNameErrors={manualItemNameErrors}
-                            manualItemPriceErrors={manualItemPriceErrors}
-                            isLoadingItems={isLoadingProposalItems}
-                            salespersonId={salespersonId}
-                            setSalespersonId={setSalespersonId}
-                            salespeople={salespeople}
-                            canApplyDiscount={canDiscount}
-                            isMarketplaceOrigin={isMarketplaceOrigin}
-                        />
 
-                        {/* ANEXOS TAB */}
-                        <TabsContent value="Anexos" className="mt-0 focus-visible:outline-none">
-                            <FadeIn key="Anexos">
-                                <QuoteAttachmentsTab
-                                    partnerId={partnerId}
-                                    quoteId={mode === "edit" ? existingQuote?.id : undefined}
-                                    attachments={quoteAttachments}
-                                    isEditing={mode !== "view"}
-                                    onChange={(newAtts) => setQuoteAttachments(newAtts)}
-                                    onMutation={mode === "edit" && existingQuote?.id ? async () => {
-                                        const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
-                                        if (res.success && (res.data as any)?.attachments) {
-                                            setQuoteAttachments((res.data as any).attachments);
-                                        }
-                                    } : undefined}
-                                />
-                            </FadeIn>
-                        </TabsContent>
-
-                        {/* VISUALIZAÇÃO TAB */}
-                        <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none">
-                            <FadeIn key="Visualização" className="w-full h-[calc(100vh-220px)] min-h-[600px] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden p-2 sm:p-4 md:p-6">
-                                <QuotePreview
-                                    invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
-                                    quoteDate={quoteDate}
-                                    expiryDate={expiryDate}
-                                    selectedCustomer={selectedCustomer}
+                        {/* Scrollable details on Left Half */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
+                            {isEditLoadingLocked && (
+                                <div className="flex items-center justify-center h-full min-h-[200px] w-full">
+                                    <ThreeDotsLoader />
+                                </div>
+                            )}
+                            <div className="flex-1 pt-4 pb-12 px-6">
+                                <QuoteEditor
+                                    mode={mode}
+                                    searchQuery={productBucket.searchQuery}
+                                    setSearchQuery={productBucket.setSearchQuery}
+                                    isProductSearchOpen={isProductSearchOpen}
+                                    setIsProductSearchOpen={setIsProductSearchOpen}
+                                    filteredProducts={productBucket.filteredResults}
+                                    isSearching={productBucket.isLoading}
+                                    onSearchFocus={productBucket.loadBucket}
+                                    loadMoreProducts={productBucket.loadMore}
+                                    hasMoreProducts={productBucket.hasMore}
+                                    quotePromotions={quotePromotions}
+                                    handleProductClick={handleProductClick}
+                                    addBlankItem={addBlankItem}
                                     quoteItems={quoteItems}
+                                    updateItemPrice={updateItemPrice}
+                                    updateItemQty={updateItemQty}
+                                    updateItemField={updateItemField}
+                                    toggleItemEdit={toggleItemEdit}
+                                    removeItem={removeItem}
+                                    discount={discount}
+                                    setDiscount={setDiscount}
+                                    discountType={discountType}
+                                    setDiscountType={setDiscountType}
+                                    shippingFee={shippingFee}
+                                    setShippingFee={setShippingFee}
+                                    otherCosts={otherCosts}
+                                    setOtherCosts={setOtherCosts}
                                     subtotal={subtotal}
-                                    shippingNum={shippingNum}
-                                    otherCosts={parseFloat(otherCosts) || 0}
                                     discountValue={discountValue}
                                     total={total}
-                                    note={internalNote}
+                                    selectedCustomer={selectedCustomer}
+                                    setSelectedCustomer={setSelectedCustomer}
+                                    setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                    quoteDate={quoteDate}
+                                    setQuoteDate={setQuoteDate}
+                                    expiryDate={expiryDate}
+                                    setExpiryDate={setExpiryDate}
+                                    status={status}
+                                    setStatus={setStatus}
+                                    internalNote={internalNote}
+                                    setInternalNote={setInternalNote}
+                                    staffInternalNotes={staffInternalNotes}
+                                    setStaffInternalNotes={setStaffInternalNotes}
+                                    editCaps={editCaps}
+                                    onReopenQuote={mode === "edit" ? handleReopenQuote : undefined}
+                                    onDuplicateQuote={mode === "edit" ? handleDuplicateFromEditor : undefined}
                                     primaryColor={primaryColor}
+                                    setPrimaryColor={setPrimaryColor}
                                     secondaryColor={secondaryColor}
+                                    setSecondaryColor={setSecondaryColor}
                                     quoteTitle={quoteTitle}
+                                    setQuoteTitle={setQuoteTitle}
                                     quoteSubtitle={quoteSubtitle}
-                                    partnerName={partnerName}
-                                    partnerAddress={partnerAddress}
-                                    partnerPhone={partnerPhone}
-                                    partnerAvatar={partnerAvatar}
+                                    setQuoteSubtitle={setQuoteSubtitle}
                                     showDecoration={showDecoration}
-                                    salespersonName={salespeople.find(s => s.id === salespersonId)?.name}
+                                    setShowDecoration={setShowDecoration}
+                                    isReadOnly={mode === 'view'}
+                                    fieldErrors={fieldErrors}
+                                    setFieldErrors={setFieldErrors}
+                                    manualItemNameErrors={manualItemNameErrors}
+                                    manualItemPriceErrors={manualItemPriceErrors}
+                                    isLoadingItems={isLoadingProposalItems}
+                                    salespersonId={salespersonId}
+                                    setSalespersonId={setSalespersonId}
+                                    salespeople={salespeople}
+                                    canApplyDiscount={canDiscount}
+                                    isMarketplaceOrigin={isMarketplaceOrigin}
                                 />
-                            </FadeIn>
-                        </TabsContent>
+
+                                {/* ANEXOS TAB */}
+                                <TabsContent value="Anexos" className="mt-0 focus-visible:outline-none">
+                                    <FadeIn key="Anexos">
+                                        <QuoteAttachmentsTab
+                                            partnerId={partnerId}
+                                            quoteId={mode === "edit" ? existingQuote?.id : undefined}
+                                            attachments={quoteAttachments}
+                                            isEditing={mode !== "view"}
+                                            onChange={(newAtts) => setQuoteAttachments(newAtts)}
+                                            onMutation={mode === "edit" && existingQuote?.id ? async () => {
+                                                const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
+                                                if (res.success && (res.data as any)?.attachments) {
+                                                    setQuoteAttachments((res.data as any).attachments);
+                                                }
+                                            } : undefined}
+                                        />
+                                    </FadeIn>
+                                </TabsContent>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT SIDE - PREVIEW (always visible on desktop) */}
+                    <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-hidden flex flex-col h-full min-h-0">
+                        <div className="flex-1 min-h-0 flex flex-col">
+                            <QuotePreview
+                                invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
+                                quoteDate={quoteDate}
+                                expiryDate={expiryDate}
+                                selectedCustomer={selectedCustomer}
+                                quoteItems={quoteItems}
+                                subtotal={subtotal}
+                                shippingNum={shippingNum}
+                                otherCosts={parseFloat(otherCosts) || 0}
+                                discountValue={discountValue}
+                                total={total}
+                                note={internalNote}
+                                primaryColor={primaryColor}
+                                secondaryColor={secondaryColor}
+                                quoteTitle={quoteTitle}
+                                quoteSubtitle={quoteSubtitle}
+                                partnerName={partnerName}
+                                partnerAddress={partnerAddress}
+                                partnerPhone={partnerPhone}
+                                partnerAvatar={partnerAvatar}
+                                showDecoration={showDecoration}
+                                salespersonName={salespeople.find(s => s.id === salespersonId)?.name}
+                            />
+                        </div>
                     </div>
                 </div>
 
-                {/* Mobile Bottom Action Bar */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                    <Button
-                        variant="outline"
-                        onClick={handleBack}
-                        disabled={isSaving || isEditLoadingLocked}
-                        className="flex-1 h-12"
-                    >
-                        {mode === 'view' ? "Voltar" : "Cancelar"}
-                    </Button>
-                    {mode !== 'view' && (
+                {/* MOBILE / TABLET VIEW (lg:hidden) */}
+                <div className="lg:hidden flex flex-col h-full w-full overflow-hidden">
+                    {/* Top Header & Tabs for Mobile/Tablet */}
+                    <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border px-4 pt-3 pb-0">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </Button>
+                                <div className="min-w-0">
+                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 truncate">
+                                        <span className="truncate">{pageTitle}</span>
+                                        {mode === "edit" && (
+                                            <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
+                                        )}
+                                    </h1>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 overflow-x-auto custom-scrollbar">
+                                <TabsTrigger value="Dados Gerais">
+                                    Dados Gerais
+                                    {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                </TabsTrigger>
+                                <TabsTrigger value="Layout">Personalizar</TabsTrigger>
+                                <TabsTrigger value="Observações">
+                                    Observações
+                                    {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                </TabsTrigger>
+                                <TabsTrigger value="Anexos">Anexos</TabsTrigger>
+                                <TabsTrigger value="Visualização">Visualização</TabsTrigger>
+                            </TabsList>
+                        </div>
+                    </div>
+
+                    {/* Mobile/Tablet Content Area */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-24">
+                        <div className="px-4 py-4">
+                            <QuoteEditor
+                                mode={mode}
+                                searchQuery={productBucket.searchQuery}
+                                setSearchQuery={productBucket.setSearchQuery}
+                                isProductSearchOpen={isProductSearchOpen}
+                                setIsProductSearchOpen={setIsProductSearchOpen}
+                                filteredProducts={productBucket.filteredResults}
+                                isSearching={productBucket.isLoading}
+                                onSearchFocus={productBucket.loadBucket}
+                                loadMoreProducts={productBucket.loadMore}
+                                hasMoreProducts={productBucket.hasMore}
+                                quotePromotions={quotePromotions}
+                                handleProductClick={handleProductClick}
+                                addBlankItem={addBlankItem}
+                                quoteItems={quoteItems}
+                                updateItemPrice={updateItemPrice}
+                                updateItemQty={updateItemQty}
+                                updateItemField={updateItemField}
+                                toggleItemEdit={toggleItemEdit}
+                                removeItem={removeItem}
+                                discount={discount}
+                                setDiscount={setDiscount}
+                                discountType={discountType}
+                                setDiscountType={setDiscountType}
+                                shippingFee={shippingFee}
+                                setShippingFee={setShippingFee}
+                                otherCosts={otherCosts}
+                                setOtherCosts={setOtherCosts}
+                                subtotal={subtotal}
+                                discountValue={discountValue}
+                                total={total}
+                                selectedCustomer={selectedCustomer}
+                                setSelectedCustomer={setSelectedCustomer}
+                                setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                quoteDate={quoteDate}
+                                setQuoteDate={setQuoteDate}
+                                expiryDate={expiryDate}
+                                setExpiryDate={setExpiryDate}
+                                status={status}
+                                setStatus={setStatus}
+                                internalNote={internalNote}
+                                setInternalNote={setInternalNote}
+                                staffInternalNotes={staffInternalNotes}
+                                setStaffInternalNotes={setStaffInternalNotes}
+                                editCaps={editCaps}
+                                onReopenQuote={mode === "edit" ? handleReopenQuote : undefined}
+                                onDuplicateQuote={mode === "edit" ? handleDuplicateFromEditor : undefined}
+                                primaryColor={primaryColor}
+                                setPrimaryColor={setPrimaryColor}
+                                secondaryColor={secondaryColor}
+                                setSecondaryColor={setSecondaryColor}
+                                quoteTitle={quoteTitle}
+                                setQuoteTitle={setQuoteTitle}
+                                quoteSubtitle={quoteSubtitle}
+                                setQuoteSubtitle={setQuoteSubtitle}
+                                showDecoration={showDecoration}
+                                setShowDecoration={setShowDecoration}
+                                isReadOnly={mode === 'view'}
+                                fieldErrors={fieldErrors}
+                                setFieldErrors={setFieldErrors}
+                                manualItemNameErrors={manualItemNameErrors}
+                                manualItemPriceErrors={manualItemPriceErrors}
+                                isLoadingItems={isLoadingProposalItems}
+                                salespersonId={salespersonId}
+                                setSalespersonId={setSalespersonId}
+                                salespeople={salespeople}
+                                canApplyDiscount={canDiscount}
+                                isMarketplaceOrigin={isMarketplaceOrigin}
+                            />
+
+                            {/* ANEXOS TAB */}
+                            <TabsContent value="Anexos" className="mt-0 focus-visible:outline-none">
+                                <FadeIn key="Anexos">
+                                    <QuoteAttachmentsTab
+                                        partnerId={partnerId}
+                                        quoteId={mode === "edit" ? existingQuote?.id : undefined}
+                                        attachments={quoteAttachments}
+                                        isEditing={mode !== "view"}
+                                        onChange={(newAtts) => setQuoteAttachments(newAtts)}
+                                        onMutation={mode === "edit" && existingQuote?.id ? async () => {
+                                            const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
+                                            if (res.success && (res.data as any)?.attachments) {
+                                                setQuoteAttachments((res.data as any).attachments);
+                                            }
+                                        } : undefined}
+                                    />
+                                </FadeIn>
+                            </TabsContent>
+
+                            {/* VISUALIZAÇÃO TAB */}
+                            <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none">
+                                <div className="w-full h-[calc(100vh-220px)] min-h-[500px] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden p-2 sm:p-4">
+                                    <QuotePreview
+                                        invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
+                                        quoteDate={quoteDate}
+                                        expiryDate={expiryDate}
+                                        selectedCustomer={selectedCustomer}
+                                        quoteItems={quoteItems}
+                                        subtotal={subtotal}
+                                        shippingNum={shippingNum}
+                                        otherCosts={parseFloat(otherCosts) || 0}
+                                        discountValue={discountValue}
+                                        total={total}
+                                        note={internalNote}
+                                        primaryColor={primaryColor}
+                                        secondaryColor={secondaryColor}
+                                        quoteTitle={quoteTitle}
+                                        quoteSubtitle={quoteSubtitle}
+                                        partnerName={partnerName}
+                                        partnerAddress={partnerAddress}
+                                        partnerPhone={partnerPhone}
+                                        partnerAvatar={partnerAvatar}
+                                        showDecoration={showDecoration}
+                                        salespersonName={salespeople.find(s => s.id === salespersonId)?.name}
+                                    />
+                                </div>
+                            </TabsContent>
+                        </div>
+                    </div>
+
+                    {/* Mobile Bottom Action Bar */}
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
                         <Button
-                            onClick={handleSave}
-                            disabled={isEditLoadingLocked}
-                            isLoading={isSaving}
+                            variant="outline"
+                            onClick={handleBack}
+                            disabled={isSaving || isEditLoadingLocked}
                             className="flex-1 h-12"
                         >
-                            {mode === 'edit' ? "Salvar" : "Salvar"}
+                            {mode === 'view' ? "Voltar" : "Cancelar"}
                         </Button>
-                    )}
+                        {mode !== 'view' && (
+                            <Button
+                                onClick={handleSave}
+                                disabled={isEditLoadingLocked}
+                                isLoading={isSaving}
+                                className="flex-1 h-12"
+                            >
+                                {mode === 'edit' ? "Salvar" : "Salvar"}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </Tabs>
 

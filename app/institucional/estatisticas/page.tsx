@@ -175,7 +175,7 @@ export default function EstatisticasPage() {
                                     <tr>
                                         <td className="px-6 py-4 font-semibold text-brand-dark">Preço de Assinatura</td>
                                         <td className="px-6 py-4">Percentual ilimitado sobre receita</td>
-                                        <td className="px-6 py-4 font-bold text-brand-dark bg-brand-green/5">Grátis ou R$ 19,90/mês fixo</td>
+                                        <td className="px-6 py-4 font-bold text-brand-dark bg-brand-green/5">Grátis ou R$ 29,90/mês fixo</td>
                                     </tr>
                                 </tbody>
                             </table>

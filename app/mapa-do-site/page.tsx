@@ -87,11 +87,11 @@ const sitemapSections: SiteMapSection[] = [
         ],
     },
     {
-        title: "Marketplace & Plataforma",
+        title: "Vitrine & Plataforma",
         description: "Encontre produtos, serviços e gerencie suas compras ou loja.",
         icon: Compass,
         links: [
-            { label: "Explorar Marketplace", href: "/explorar", description: "Encontre produtos, serviços e comércios na sua região ou com envio nacional" },
+            { label: "Explorar", href: "/explorar", description: "Encontre produtos, serviços e comércios na sua região ou com envio nacional" },
             { label: "Cadastrar meu Negócio", href: "/auth/login?mode=partner", description: "Crie sua loja ou perfil profissional gratuitamente", badge: "Grátis" },
             { label: "Central de Ajuda e Tutoriais", href: "/ajuda", description: "Guias passo a passo sobre pedidos, PDV, estoque e entregas" },
             { label: "Termos de Uso", href: "/institucional/termos", description: "Termos e condições gerais de uso da plataforma" },

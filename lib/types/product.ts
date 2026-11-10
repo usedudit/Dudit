@@ -74,6 +74,10 @@ export interface Product {
   accepts_offers?: boolean | null
   accepts_trades?: boolean | null
   items_included?: string | null
+  tags?: string[] | null
+  specs_keywords?: string[]
+  variant_names?: string[]
+  variant_skus?: string[]
   expiry_date?: string | null
   pickup_neighborhood?: string | null
 }
@@ -147,6 +151,10 @@ export interface ProductInput {
   accepts_offers?: boolean | null
   accepts_trades?: boolean | null
   items_included?: string | null
+  tags?: string[] | null
+  specs_keywords?: string[]
+  variant_names?: string[]
+  variant_skus?: string[]
   expiry_date?: string | null
   pickup_neighborhood?: string | null
 }

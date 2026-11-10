@@ -7,6 +7,7 @@ import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getStockStatus, formatCurrency } from "./product-utils"
 import StockAvailabilityHint from "./StockAvailabilityHint"
+import { EyeIcon, EyeOffIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 
 interface ProductGridCardProps {
@@ -95,12 +96,21 @@ const ProductGridCard = React.memo(
                                 {(() => {
                                     const isArchived = product.status === "arquivado" || product.status === "archived"
                                     return (
-                                        <Tooltip text={isArchived ? "Arquivado" : product.is_active ? "Ativo" : "Inativo"}>
-                                            <Badge
-                                                variant={isArchived ? "orange" : product.is_active ? "green" : "red"}
-                                                className="whitespace-nowrap scale-90 shrink-0"
-                                            />
-                                        </Tooltip>
+                                        <>
+                                            <Tooltip text={isArchived ? "Arquivado" : product.is_active ? "Ativo" : "Inativo"}>
+                                                <Badge
+                                                    variant={isArchived ? "orange" : product.is_active ? "green" : "red"}
+                                                    className="whitespace-nowrap scale-90 shrink-0"
+                                                />
+                                            </Tooltip>
+                                            <Tooltip text={product.show_in_marketplace ? "Visível" : "Oculto"}>
+                                                {product.show_in_marketplace ? (
+                                                    <EyeIcon className="w-4 h-4 text-brand-green shrink-0" />
+                                                ) : (
+                                                    <EyeOffIcon className="w-4 h-4 text-brand-inactive-text shrink-0" />
+                                                )}
+                                            </Tooltip>
+                                        </>
                                     )
                                 })()}
                             </div>
@@ -168,19 +178,19 @@ const ProductGridCard = React.memo(
                 {/* Área do Rodapé */}
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
 
-                    {/* Linha A: Visibilidade (Esq) e Unidade (Dir) - TROCADO AQUI */}
+                    {/* Linha A: Categoria (Esq) e Marca (Dir) */}
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Visibilidade</span>
-                            <Tooltip text={product.show_in_marketplace ? "Visibilidade: Visível" : "Visibilidade: Oculto"}>
-                                <Badge variant={product.show_in_marketplace ? "green" : "gray"} className="whitespace-nowrap scale-90" />
-                            </Tooltip>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Categoria</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                {product.category || "—"}
+                            </span>
                         </div>
 
                         <div className="flex flex-col gap-0.5 items-end">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Unidade</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                {product.unit || "UN"}
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Marca</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                {product.brand || "—"}
                             </span>
                         </div>
                     </div>
@@ -191,7 +201,7 @@ const ProductGridCard = React.memo(
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Estoque</span>
                             <div className="flex items-center gap-2.5">
-                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{effectiveStock}</span>
+                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{effectiveStock} {product.unit || "UN"}</span>
                                 <Tooltip text={`Estoque: ${status.label}`}>
                                     <Badge variant={status.variant} className="whitespace-nowrap scale-90" />
                                 </Tooltip>

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { SidebarCard } from "@/components/reusable"
+import { Badge, SidebarCard } from "@/components/reusable"
 import { Package, CheckCircleIcon, EditIcon, PlusIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
@@ -43,10 +43,10 @@ export const OfficialCategoryCard: React.FC<OfficialCategoryCardProps> = ({
     const itemLabel = type === "product" ? "produto" : "serviço"
 
     const categorizadoBadge = categoryPath && (
-        <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-            <CheckCircleIcon className="w-3 h-3" /> Categorizado
-        </span>
-    )
+        <Badge variant="green">
+            <span>Categorizado</span>
+        </Badge>
+    );
 
     const renderButton = () => (
         <div

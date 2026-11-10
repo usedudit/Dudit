@@ -192,6 +192,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                     <Dropdown
                         align="right"
                         fullWidth={false}
+                        showChevron={false}
                         width="w-52"
                         trigger={
                             <Button variant="outline" className="h-9 w-9 shrink-0 p-0 flex items-center justify-center" aria-label="Ações da etiqueta">

@@ -190,7 +190,7 @@ export function AdminDeliveryDriverDetailView({
             <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 lg:pb-0">
 
                             {/* Sticky Header */}
                             <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -576,6 +576,7 @@ export function AdminDeliveryDriverDetailView({
                                                                     currentPage={historyPage}
                                                                     totalPages={totalHistoryPages}
                                                                     onPageChange={setHistoryPage}
+                                                                    fixedUntil="lg"
                                                                 />
                                                             </div>
                                                         )}

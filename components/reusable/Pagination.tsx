@@ -11,6 +11,16 @@ interface PaginationProps {
   totalPages: number
   onPageChange: (page: number) => void
   inline?: boolean
+  /**
+   * Breakpoint at which the pagination stops being a fixed bottom bar.
+   * Use "lg" on tablet-first pages so the bottom bar also shows on tablets.
+   */
+  fixedUntil?: "md" | "lg"
+}
+
+const FIXED_BAR_CLASSES: Record<NonNullable<PaginationProps["fixedUntil"]>, string> = {
+  md: "bg-white dark:bg-dark-background md:relative md:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border md:border-0 shadow-lg md:shadow-none",
+  lg: "bg-white dark:bg-dark-background lg:relative lg:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border lg:border-0 shadow-lg lg:shadow-none",
 }
 
 export type CompactPaginationModel = {
@@ -70,16 +80,14 @@ export function getCompactPaginationModel(
   }
 }
 
-const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, inline = false }) => {
+const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, inline = false, fixedUntil = "md" }) => {
   const model = getCompactPaginationModel(currentPage, totalPages, 3)
 
   return (
     <div
       className={cn(
         "flex-none pb-4 pt-4 flex justify-center z-40",
-        inline
-          ? "relative bg-transparent w-full"
-          : "bg-white dark:bg-dark-background md:relative md:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border md:border-0 shadow-lg md:shadow-none"
+        inline ? "relative bg-transparent w-full" : FIXED_BAR_CLASSES[fixedUntil]
       )}
     >
       <AnimatePresence>

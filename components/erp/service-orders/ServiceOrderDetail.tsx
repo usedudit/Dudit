@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, FormSection, SidebarCard, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, SidebarCard, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
-import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, PackageIcon } from "@/lib/icons"
+import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, PackageIcon, CopyIcon, ReloadIcon, ShareIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
@@ -67,6 +67,8 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [order, setOrder] = useState(data)
     const [loading, setLoading] = useState(false)
     const [showSignature, setShowSignature] = useState(false)
+    const [showSignatureModal, setShowSignatureModal] = useState(false)
+    const [copiedLink, setCopiedLink] = useState(false)
     const [teamMembers, setTeamMembers] = useState<any[]>(propTeamMembers)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -107,6 +109,42 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             setIsRegeneratingCode(false);
         }
     };
+
+    const handleShareOnline = async () => {
+        if (!hasMinimumPlan(planSlug, "crescer")) {
+            openPlanUpgrade("crescer");
+            return
+        }
+        setShareLoading(true);
+        setShowShareModal(true);
+        const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+        const token = await ensurePublicTokenAction(partnerId, order.id)
+        if (token) {
+            setOrder((prev: any) => ({ ...prev, public_token: token }))
+        } else {
+            setShowShareModal(false)
+        }
+        setShareLoading(false);
+    }
+
+    const handleCopyPublicLink = async () => {
+        let token = order.public_token
+        if (!token) {
+            setShareLoading(true)
+            const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+            token = await ensurePublicTokenAction(partnerId, order.id)
+            setShareLoading(false)
+            if (!token) {
+                toast({ description: "Não foi possível gerar o link da OS." })
+                return
+            }
+            setOrder((prev: any) => ({ ...prev, public_token: token }))
+        }
+        navigator.clipboard.writeText(`${window.location.origin}/os/${token}`)
+        setCopiedLink(true)
+        toast({ description: "Link da OS copiado para a área de transferência." })
+        setTimeout(() => setCopiedLink(false), 2000)
+    }
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {
@@ -406,22 +444,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                         <ActionsDropdown
                                             onEdit={handleEditClick}
                                             onStatus={() => { setSelectedStatus(order.status || ""); setShowStatusModal(true) }}
-                                            onShare={async () => {
-                                                if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                    openPlanUpgrade("crescer");
-                                                    return
-                                                }
-                                                setShareLoading(true);
-                                                setShowShareModal(true);
-                                                const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                                const token = await ensurePublicTokenAction(partnerId, order.id)
-                                                if (token) {
-                                                    setOrder((prev: any) => ({ ...prev, public_token: token }))
-                                                } else {
-                                                    setShowShareModal(false)
-                                                }
-                                                setShareLoading(false);
-                                            }}
+                                            onShare={handleShareOnline}
                                             onPrint={() => setShowPrintModal(true)}
                                             onDelete={() => setConfirmDelete(true)}
                                         />
@@ -429,7 +452,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                 </div>
 
                                 {/* Tabs Navigation */}
-                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                <div className="w-full transition-all duration-500">
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="summary">Resumo</TabsTrigger>
                                         <TabsTrigger value="services">Mão de obra</TabsTrigger>
@@ -745,39 +768,60 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Online Signature Link & Code Card */}
                                                 {hasMinimumPlan(planSlug, "crescer") ? (
-                                                    <SidebarCard hasSeparator hasTopStrip title="Aprovação e Assinatura Online">
+                                                    <SidebarCard
+                                                        hasSeparator
+                                                        hasTopStrip
+                                                        title={
+                                                            <span className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                Aprovação e Assinatura Online
+                                                            </span>
+                                                        }
+                                                    >
                                                         <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente aprovar e assinar online.</p>
 
                                                         <div className="space-y-3">
-                                                            <Button
-                                                                variant="outline"
-                                                                className="w-full"
-                                                                onClick={() => {
-                                                                    const text = `Olá! Segue o link para visualizar, aprovar e assinar a Ordem de Serviço *#${order.order_number}*:\n\n${window.location.origin}/os/${order.public_token}\n\n*Código de Aprovação:* ${order.metadata?.plain_code || "Enviado por aqui"}`;
-                                                                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
-                                                                }}
-                                                            >
-                                                                Compartilhar no WhatsApp
-                                                            </Button>
+                                                            <div className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    readOnly
+                                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/os/${order.public_token || ''}`}
+                                                                    className="flex-1 min-w-0 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
+                                                                />
+                                                                <Button
+                                                                    variant="outline"
+                                                                    className="shrink-0 h-auto w-[42px] p-0 rounded-xl"
+                                                                    title="Copiar link"
+                                                                    onClick={handleCopyPublicLink}
+                                                                    disabled={shareLoading}
+                                                                >
+                                                                    {copiedLink ? <CheckCircleIcon size={18} className="text-brand-green" /> : <CopyIcon size={18} />}
+                                                                </Button>
+                                                            </div>
 
-                                                            <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center">
-                                                                <div>
+                                                            <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center gap-3">
+                                                                <div className="min-w-0">
                                                                     <span className="text-xs text-brand-inactive-text block">Código de Aprovação</span>
                                                                     <span className="text-lg font-bold text-emerald-500 tracking-wider">
                                                                         {order.metadata?.plain_code || "---"}
                                                                     </span>
                                                                 </div>
 
-                                                                {!order.signature_image_key && order.status !== "concluida" && order.status !== "entregue" && order.status !== "cancelada" && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        className="text-xs py-1 h-[32px] rounded-lg border-brand-border dark:border-dark-border"
-                                                                        onClick={handleRegenerateCode}
-                                                                        disabled={isRegeneratingCode}
-                                                                    >
-                                                                        {isRegeneratingCode ? "Gerando..." : "Novo Código"}
-                                                                    </Button>
-                                                                )}
+                                                                <ActionsDropdown>
+                                                                    {!order.signature_image_key && order.status !== "concluida" && order.status !== "entregue" && order.status !== "cancelada" && (
+                                                                        <DropdownItem onClick={handleRegenerateCode} disabled={isRegeneratingCode}>
+                                                                            <ReloadIcon size={18} /> {isRegeneratingCode ? "Gerando..." : "Novo Código"}
+                                                                        </DropdownItem>
+                                                                    )}
+                                                                    <DropdownItem onClick={handleShareOnline}>
+                                                                        <ShareIcon size={18} /> Compartilhar
+                                                                    </DropdownItem>
+                                                                    {order.status !== "cancelada" && (
+                                                                        <DropdownItem onClick={() => setShowSignatureModal(true)}>
+                                                                            <CheckCircleIcon size={18} /> Assinatura do Cliente
+                                                                        </DropdownItem>
+                                                                    )}
+                                                                </ActionsDropdown>
                                                             </div>
                                                         </div>
                                                     </SidebarCard>
@@ -791,48 +835,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             </Button>
                                                         </div>
                                                     </SidebarCard>
-                                                )}
-
-                                                {/* Client Signature Card where Totals used to be */}
-                                                {order.signature_image_key ? (
-                                                    <SidebarCard hasSeparator hasTopStrip title="Assinatura do Cliente">
-                                                        <div className="flex flex-col items-center">
-                                                            <img
-                                                                src={buildImageUrl(order.signature_image_key)}
-                                                                alt="Assinatura do cliente"
-                                                                className="w-full max-h-[120px] object-contain border border-brand-border rounded-lg p-2 bg-white"
-                                                            />
-                                                            <p className="text-xs text-brand-inactive-text mt-2 text-center">
-                                                                Assinado em: {formatDateTime(order.signed_at)}
-                                                            </p>
-                                                        </div>
-                                                    </SidebarCard>
-                                                ) : (
-                                                    order.status !== "cancelada" && (
-                                                        <SidebarCard hasSeparator hasTopStrip title="Assinatura do Cliente">
-                                                            <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                                                                {order.status === "aberta" || order.status === "aguardando_aprovacao" ? (
-                                                                    <p className="text-sm text-brand-inactive-text text-center">
-                                                                        A assinatura ficará disponível após a aprovação da ordem de serviço.
-                                                                    </p>
-                                                                ) : (
-                                                                    <>
-                                                                        <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
-                                                                        <Button variant="outline" size="sm" onClick={() => {
-                                                                            if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                                                openPlanUpgrade("crescer");
-                                                                            } else {
-                                                                                setShowSignature(true);
-                                                                            }
-                                                                        }} className="w-full">
-                                                                            <CheckCircleIcon className="w-4 h-4 mr-2" />
-                                                                            Assinar OS
-                                                                        </Button>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </SidebarCard>
-                                                    )
                                                 )}
 
                                             </div>
@@ -1033,6 +1035,49 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                     />
                 )
             }
+
+            <DefaultModal
+                isOpen={showSignatureModal}
+                onClose={() => setShowSignatureModal(false)}
+                title="Assinatura do Cliente"
+                maxWidth="sm"
+            >
+                {order.signature_image_key ? (
+                    <div className="flex flex-col items-center">
+                        <img
+                            src={buildImageUrl(order.signature_image_key)}
+                            alt="Assinatura do cliente"
+                            className="w-full max-h-[180px] object-contain border border-brand-border rounded-lg p-2 bg-white"
+                        />
+                        <p className="text-xs text-brand-inactive-text mt-2 text-center">
+                            Assinado em: {formatDateTime(order.signed_at)}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
+                        {order.status === "aberta" || order.status === "aguardando_aprovacao" ? (
+                            <p className="text-sm text-brand-inactive-text text-center">
+                                A assinatura ficará disponível após a aprovação da ordem de serviço.
+                            </p>
+                        ) : (
+                            <>
+                                <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    if (!hasMinimumPlan(planSlug, "crescer")) {
+                                        openPlanUpgrade("crescer");
+                                    } else {
+                                        setShowSignatureModal(false);
+                                        setShowSignature(true);
+                                    }
+                                }} className="w-full">
+                                    <CheckCircleIcon className="w-4 h-4 mr-2" />
+                                    Assinar OS
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                )}
+            </DefaultModal>
 
             {/* Status Change Modal */}
             <DefaultModal

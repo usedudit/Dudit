@@ -171,8 +171,8 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                 </nav>
 
                 <div className="hidden md:block">
-                    <Button className="py-2.5 text-sm bg-brand-green text-white hover:bg-brand-green" onClick={() => handleNav('start-selling')}>
-                        Começar agora
+                    <Button onClick={() => handleNav('start-selling')}>
+                        Começar Grátis
                     </Button>
                 </div>
 
@@ -345,15 +345,15 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white rounded-full"></div>
                     </div>
 
-                    <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                        Pronto para vender <br />na sua cidade?
+                    <h2 className="text-4xl md:text-4xl font-bold text-white mb-6">
+                        Pronto para vender na sua cidade <br />e em todo o Brasil?
                     </h2>
-                    <h3 className="text-xl md:text-2xl text-gray-300 mb-10 max-w-xl mx-auto">
-                        Crie sua vitrine em minutos, receba pedidos direto no celular e mantenha 100% do seu lucro.
+                    <h3 className="text-xl md:text-xl text-gray-300 mb-10 max-w-xl mx-auto">
+                        Crie sua vitrine em minutos, receba pedidos pelo WhatsApp e venda sem comissões.
                     </h3>
 
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button className="bg-brand-green text-white hover:bg-brand-green font-bold h-12 px-8" onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+                        <Button className="h-12" onClick={() => onNavigate('start-selling')}>Começar Grátis</Button>
                     </div>
                 </div>
             </div>

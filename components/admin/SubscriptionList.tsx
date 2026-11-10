@@ -225,7 +225,7 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                 />
 
                 {/* List Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
                     <AnimatePresence mode="wait">
                         {paginatedItems.length === 0 ? (
                             <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
@@ -465,6 +465,7 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                             currentPage={page}
                                             totalPages={totalPages}
                                             onPageChange={setPage}
+                                            fixedUntil="lg"
                                         />
                                     </div>
                                 )}

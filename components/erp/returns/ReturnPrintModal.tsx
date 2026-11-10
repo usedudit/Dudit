@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem, RadioButton } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon, ThreeDotsIcon, EditIcon } from "@/lib/icons"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
@@ -177,69 +177,54 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
                                                     Formato de impressão
                                                 </p>
-                                                    <div className="space-y-3">
-                                                        <ListItem
-                                                            icon={PrinterIcon}
-                                                            title="Cupom de troca (Impressora térmica)"
-                                                            description="Formato em 80mm para comprovante rápido de devolução/troca no balcão."
-                                                            onClick={() => setFormat("thermal")}
-                                                            className={`transition-all px-4 py-3 gap-4 ${format === "thermal"
-                                                                ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                                : "opacity-80 hover:opacity-100"
-                                                                }`}
-                                                            right={
-                                                                <div
-                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal"
-                                                                        ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                        : "border-brand-border dark:border-dark-border"
-                                                                        }`}
-                                                                >
-                                                                    {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                                </div>
-                                                            }
-                                                        />
-                                                        <ListItem
-                                                            icon={PrinterIcon}
-                                                            title="Impressora térmica (58mm)"
-                                                            description="Bobina estreita de 58mm, comprovante compacto ideal para balcão e impressoras portáteis."
-                                                            onClick={() => setFormat("thermal-58")}
-                                                            className={`transition-all px-4 py-3 gap-4 ${format === "thermal-58"
-                                                                ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                                : "opacity-80 hover:opacity-100"
-                                                                }`}
-                                                            right={
-                                                                <div
-                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal-58"
-                                                                        ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                        : "border-brand-border dark:border-dark-border"
-                                                                        }`}
-                                                                >
-                                                                    {format === "thermal-58" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                                </div>
-                                                            }
-                                                        />
-                                                        <ListItem
-                                                            icon={FileTextIcon}
-                                                            title="Documento A4 (PDF)"
-                                                            description="Formato folha A4 com comprovante completo e termo assinado de troca."
-                                                            onClick={() => setFormat("a4")}
-                                                            className={`transition-all px-4 py-3 gap-4 ${format === "a4"
-                                                                ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                                : "opacity-80 hover:opacity-100"
-                                                                }`}
-                                                            right={
-                                                                <div
-                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "a4"
-                                                                        ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                        : "border-brand-border dark:border-dark-border"
-                                                                        }`}
-                                                                >
-                                                                    {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                                </div>
-                                                            }
-                                                        />
-                                                    </div>
+                                                <div className="space-y-3">
+                                                    <ListItem
+                                                        icon={PrinterIcon}
+                                                        title="Impressora térmica (80mm)"
+                                                        description="Formato em 80mm para comprovante rápido de devolução/troca no balcão."
+                                                        onClick={() => setFormat("thermal")}
+                                                        className="px-4 py-3"
+                                                        right={
+                                                            <RadioButton
+                                                                name={"format"}
+                                                                value={"thermal"}
+                                                                checked={format === "thermal"}
+                                                                onChange={() => setFormat("thermal")}
+                                                            />
+                                                        }
+                                                    />
+                                                    <ListItem
+                                                        icon={PrinterIcon}
+                                                        title="Impressora térmica (58mm)"
+                                                        description="Bobina estreita de 58mm, comprovante compacto ideal para balcão e impressoras portáteis."
+                                                        onClick={() => setFormat("thermal-58")}
+                                                        className="px-4 py-3"
+                                                        right={
+                                                            <RadioButton
+                                                                name={"format"}
+                                                                value={"thermal-58"}
+                                                                checked={format === "thermal-58"}
+                                                                onChange={() => setFormat("thermal-58")}
+                                                            />
+                                                        }
+                                                    />
+                                                    <ListItem
+                                                        icon={FileTextIcon}
+                                                        title="Documento A4 (PDF)"
+                                                        description="Formato folha A4 com comprovante completo e termo assinado de troca."
+                                                        onClick={() => setFormat("a4")}
+                                                        className="px-4 py-3"
+                                                        right={
+                                                            <RadioButton
+                                                                name={"format"}
+                                                                value={"a4"}
+                                                                checked={format === "a4"}
+                                                                onChange={() => setFormat("a4")}
+                                                            />
+                                                        }
+                                                    />
                                                 </div>
+                                            </div>
 
                                             <div className="hidden lg:flex gap-3 pt-2">
                                                 <Button className="flex-1 h-12" onClick={onEdit} leftIcon={<EditIcon size={18} />}>
