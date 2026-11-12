@@ -63,6 +63,7 @@ export type ReturnRequestListItem = {
   customerAddress?: string
   orderStatus?: string
   deliveryStatus?: string
+  deliveryType?: string
   createdAt: string
   updatedAt: string
   source: "erp" | "marketplace" | "moderation"

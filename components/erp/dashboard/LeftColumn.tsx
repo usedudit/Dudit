@@ -28,7 +28,7 @@ import { formatCurrency as brl } from "@/lib/utils";
 import { Button, IconPlaceholder } from "@/components/reusable";
 import { useRouter } from "next/navigation";
 
-export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], variant?: "grid" | "horizontal" }) {
+export function SummaryCards({ metrics, variant = "grid", showTrend = true }: { metrics: any[], variant?: "grid" | "horizontal", showTrend?: boolean }) {
   const defaultIcons = [MoneyIcon, SalesIcon, TagIcon, Users];
 
   const parseTrend = (trendStr: string) => {
@@ -69,14 +69,16 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
                   </div>
                   <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{metric.title}</span>
                 </div>
-                <span
-                  className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
-                    }`}
-                >
-                  <span>{percent.split(" ")[0]}</span>
-                  <span>{percent.split(" ")[1]}</span>
-                  <span>{percent.split(" ")[2]}</span>
-                </span>
+                {showTrend && (
+                  <span
+                    className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
+                      }`}
+                  >
+                    <span>{percent.split(" ")[0]}</span>
+                    <span>{percent.split(" ")[1]}</span>
+                    <span>{percent.split(" ")[2]}</span>
+                  </span>
+                )}
               </div>
 
               <div className="flex items-baseline mt-2 min-w-0">
@@ -104,14 +106,16 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
                 </div>
                 <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{metric.title}</span>
               </div>
-              <span
-                className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
-                  }`}
-              >
-                <span>{percent.split(" ")[0]}</span>
-                <span>{percent.split(" ")[1]}</span>
-                <span>{percent.split(" ")[2]}</span>
-              </span>
+              {showTrend && (
+                <span
+                  className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
+                    }`}
+                >
+                  <span>{percent.split(" ")[0]}</span>
+                  <span>{percent.split(" ")[1]}</span>
+                  <span>{percent.split(" ")[2]}</span>
+                </span>
+              )}
             </div>
 
             <div className="flex items-baseline mt-2 min-w-0">

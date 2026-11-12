@@ -138,17 +138,19 @@ const ServiceOrderGridCard = React.memo(
             </div>
           </div>
 
-          {/* Row 3: Valor & Actions */}
-          <div className="flex justify-between items-center gap-2">
-            <div></div>
+          {/* Row 3: Total & Actions */}
+          <div className="flex justify-between items-start gap-2">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total</span>
+              <span className="text-sm font-bold text-brand-primary truncate">
+                {formatCurrency(order.total_amount || 0)}
+              </span>
+            </div>
             {/* Botão de Ações */}
             <div
               className="shrink-0 flex items-center gap-3"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="text-sm font-bold text-brand-primary mr-1">
-                {formatCurrency(order.total_amount || 0)}
-              </span>
               <ActionsDropdown
                 onEdit={onEdit}
                 onStatus={onStatus}

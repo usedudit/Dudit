@@ -23,7 +23,8 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 import { FadeIn } from '@/components/animations/FadeIn';
-import { computeItemDisplayPrice } from "@/lib/services/pricing-engine";
+
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem";
 import { Switch } from '@/components/reusable/Switch';
 
 
@@ -231,6 +232,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     placeholder="Buscar itens para adicionar..."
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     value={props.searchQuery}
+                                    variant="full-rounded"
                                     onChange={(e) => {
                                         props.setSearchQuery(e.target.value);
                                         props.setIsProductSearchOpen(true);
@@ -271,49 +273,12 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                             <ThreeDotsLoader />
                                         ) : props.filteredProducts.length > 0 ? (
                                             props.filteredProducts.map(product => (
-                                                <div
+                                                <ProductSearchResultItem
                                                     key={product.id}
+                                                    item={product}
+                                                    promotions={props.quotePromotions || []}
                                                     onClick={() => props.handleProductClick(product)}
-                                                    className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                >
-                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                        <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
-                                                            {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                        {(() => {
-                                                            if (product.variants && product.variants.length > 0) {
-                                                                const prices = product.variants.map((v: any) => Number(v.price || 0))
-                                                                const minP = Math.min(...prices)
-                                                                const maxP = Math.max(...prices)
-                                                                const priceText = minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
-                                                                return <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{priceText}</span>
-                                                            }
-                                                            const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined });
-                                                            return (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
-                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>
-                                                                    {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                    {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                </div>
-                                                            )
-                                                        })()}
-                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                            {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
-                                                        </div>
-                                                    </div>
-                                                    {product.variants && product.variants.length > 0 && (
-                                                        <div className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-700 text-[10px] font-bold rounded text-brand-inactive-text uppercase whitespace-nowrap">
-                                                            Opções
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                />
                                             ))
                                         ) : (
                                             <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>

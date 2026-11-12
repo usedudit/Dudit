@@ -15,7 +15,14 @@ export async function StorePage({ storeData }: { storeData: any }) {
 
     const user = await getCurrentUser()
     const sessionData = user ? await getUserSessionData(user.id) : null
-    const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null, avatar_url: sessionData.profile.avatar_url || null, latitude: sessionData.profile.latitude, longitude: sessionData.profile.longitude } : null
+    const userProfile = sessionData?.profile ? { 
+        userId: user?.id,
+        full_name: sessionData.profile.full_name, 
+        address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null, 
+        avatar_url: sessionData.profile.avatar_url || null, 
+        latitude: sessionData.profile.latitude, 
+        longitude: sessionData.profile.longitude 
+    } : null
     const cartCount = sessionData?.cartCount || 0
 
     const [products, services, reviews, stats, activePromotions] = await Promise.all([

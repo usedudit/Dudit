@@ -355,14 +355,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                                 icon={PinIcon}
                                                                 title="Motivo"
                                                                 description={reason || "-"}
-                                                                className="px-4 py-3 gap-4"
+                                                                className="px-4 py-3"
                                                             />
                                                             {data.referenceName && (
                                                                 <ListItem
                                                                     icon={LinkIcon}
                                                                     title="Referência"
                                                                     description={data.referenceName}
-                                                                    className="px-4 py-3 gap-4"
+                                                                    className="px-4 py-3"
                                                                 />
                                                             )}
                                                         </div>
@@ -377,12 +377,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                             <div>
                                                                 <InfoCard
                                                                     color="orange"
-                                                                    message={
-                                                                        <div className="flex flex-col">
-                                                                            <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
-                                                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
-                                                                        </div>
-                                                                    }
+                                                                    title="Observações"
+                                                                    message={notes}
                                                                 />
                                                             </div>
                                                         </div>
@@ -391,43 +387,43 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             </div >
                                         </div >
 
-                                         {/* Mobile/Tablet View */}
-                                         < div className="xl:hidden space-y-6" >
-                                             {/* Operation Summary below items (like XML import page sidebar) */}
-                                             <FormSection title="Resumo da Operação" hasSeparator>
-                                                 <div className="space-y-4">
-                                                     <ListItem
-                                                         icon={PinIcon}
-                                                         title="Motivo"
-                                                         description={reason || "-"}
-                                                         className="px-4 py-3 gap-4"
-                                                     />
-                                                     {data.referenceName && (
-                                                         <ListItem
-                                                             icon={LinkIcon}
-                                                             title="Referência"
-                                                             description={data.referenceName}
-                                                             className="px-4 py-3 gap-4"
-                                                         />
-                                                     )}
-                                                 </div>
-                                             </FormSection >
+                                        {/* Mobile/Tablet View */}
+                                        < div className="xl:hidden space-y-6" >
+                                            {/* Operation Summary below items (like XML import page sidebar) */}
+                                            <FormSection title="Resumo da Operação" hasSeparator>
+                                                <div className="space-y-4">
+                                                    <ListItem
+                                                        icon={PinIcon}
+                                                        title="Motivo"
+                                                        description={reason || "-"}
+                                                        className="px-4 py-3 gap-4"
+                                                    />
+                                                    {data.referenceName && (
+                                                        <ListItem
+                                                            icon={LinkIcon}
+                                                            title="Referência"
+                                                            description={data.referenceName}
+                                                            className="px-4 py-3 gap-4"
+                                                        />
+                                                    )}
+                                                </div>
+                                            </FormSection >
 
-                                             {/* Notes Mobile */}
-                                             {
-                                                 notes && (
-                                                     <InfoCard
-                                                         color="orange"
-                                                         message={
-                                                             <div className="flex flex-col">
-                                                                 <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
-                                                                 <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
-                                                             </div>
-                                                         }
-                                                     />
-                                                 )
-                                              }
-                                          </div>
+                                            {/* Notes Mobile */}
+                                            {
+                                                notes && (
+                                                    <InfoCard
+                                                        color="orange"
+                                                        message={
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
+                                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
+                                                            </div>
+                                                        }
+                                                    />
+                                                )
+                                            }
+                                        </div>
                                     </FadeIn >
                                 </TabsContent >
 

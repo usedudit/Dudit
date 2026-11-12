@@ -1,12 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useCallback } from "react"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { Input, Button, ThreeDotsLoader } from "@/components/reusable"
-import { SearchIcon, Package } from "@/lib/icons"
-import { getERPProductsPageAction } from "@/app/actions/erp/products"
-import { formatCurrency } from "@/lib/utils"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { Input, ThreeDotsLoader } from "@/components/reusable"
+import { SearchIcon } from "@/lib/icons"
+import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
+import { useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
 
 interface SelectProductSheetProps {
   open: boolean
@@ -16,28 +16,13 @@ interface SelectProductSheetProps {
   storeId?: string | null
 }
 
-export default function SelectProductSheet({ open, onOpenChange, onSelect, partnerId, storeId }: SelectProductSheetProps) {
-  const [products, setProducts] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState("")
-
-  useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    getERPProductsPageAction(partnerId, { cursor: null, limit: 200, storeId: storeId || undefined })
-      .then((res) => {
-        if (res.success) setProducts(res.items || [])
-      })
-      .finally(() => setLoading(false))
-  }, [open, partnerId, storeId])
-
-  const filtered = useMemo(() => {
-    const term = search.toLowerCase()
-    if (!term) return products
-    return products.filter((p: any) =>
-      p.name?.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)
-    )
-  }, [products, search])
+export default function SelectProductSheet({ open, onOpenChange, onSelect, storeId }: SelectProductSheetProps) {
+  const loadProducts = useCallback(() => fetchPartnerProductsBucket(storeId), [storeId])
+  const productBucket = useProductBucket<ProductBucketItem>(loadProducts, {
+    pageSize: 20,
+    preload: open,
+    showAllWhenEmpty: true,
+  })
 
   return (
     <DefaultModal isOpen={open} onClose={() => onOpenChange(false)} title="Selecionar Produto" maxWidth="lg">
@@ -45,57 +30,37 @@ export default function SelectProductSheet({ open, onOpenChange, onSelect, partn
         <div className="relative">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
           <Input
-            placeholder="Buscar produto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar produto por nome, SKU ou variação..."
+            value={productBucket.searchQuery}
+            onChange={(e) => productBucket.setSearchQuery(e.target.value)}
+            onFocus={() => productBucket.loadBucket()}
             className="pl-9"
           />
         </div>
 
-        {loading ? (
-          <ThreeDotsLoader />
-        ) : filtered.length === 0 ? (
+        {productBucket.isLoading ? (
+          <div className="py-8"><ThreeDotsLoader /></div>
+        ) : productBucket.filteredResults.length === 0 ? (
           <p className="text-sm text-brand-inactive-text text-center py-8">Nenhum produto encontrado</p>
         ) : (
-          <div className="max-h-[400px] overflow-y-auto space-y-1">
-            {filtered.map((prod: any) => (
-              <button
-                key={prod.id}
-                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border transition-colors text-left"
+          <div
+            className="max-h-[400px] overflow-y-auto custom-scrollbar"
+            onScroll={(event) => {
+              const target = event.currentTarget
+              if (target.scrollHeight - target.scrollTop - target.clientHeight < 24) {
+                productBucket.loadMore()
+              }
+            }}
+          >
+            {productBucket.filteredResults.map((product) => (
+              <ProductSearchResultItem
+                key={product.id}
+                item={product}
                 onClick={() => {
-                  onSelect(prod)
+                  onSelect(product)
                   onOpenChange(false)
                 }}
-              >
-                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden">
-                  {prod.images?.[0] ? (
-                    <img
-                      src={getR2ImageUrl(prod.images[0], "thumbnail")}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Package className="w-5 h-5 text-brand-inactive-text" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">{prod.name}</p>
-                  <p className="text-[11px] text-brand-inactive-text">
-                    {(prod.variants && prod.variants.length > 0) ? "Múltiplos SKUs" : (prod.sku || "N/A")}
-                  </p>
-                </div>
-                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading shrink-0">
-                  {(() => {
-                    if (prod.variants && prod.variants.length > 0) {
-                      const prices = prod.variants.map((v: any) => Number(v.price || 0))
-                      const minP = Math.min(...prices)
-                      const maxP = Math.max(...prices)
-                      return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
-                    }
-                    return formatCurrency(prod.price || 0)
-                  })()}
-                </span>
-              </button>
+              />
             ))}
           </div>
         )}

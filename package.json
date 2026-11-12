@@ -13,6 +13,7 @@
     "icons:generate": "node scripts/generate-icons.mjs",
     "seed:legal": "npx tsx scripts/seed-legal-documents.ts",
     "seed:explore": "npx tsx scripts/seed-explore-redis.ts",
+    "cleanup:moderation-keys": "npx tsx scripts/cleanup-legacy-moderation-keys.ts",
     "migrate:r2-private": "npx tsx scripts/migrate-r2-private-objects.ts",
     "reconcile:r2": "npx tsx scripts/reconcile-r2-objects.ts",
     "trigger:dev": "npx trigger.dev@latest dev",

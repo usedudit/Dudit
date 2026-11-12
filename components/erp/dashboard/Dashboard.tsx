@@ -3,7 +3,6 @@ import { SummaryCards, NeedsAttention } from "./LeftColumn"
 import { RecentActivities } from "./RightColumn"
 import { LatestOrdersCard, CriticalStockCard, NextAppointmentsCard } from "./BottomCards"
 import { InsightsRegister } from "./InsightsRegister"
-import { RevenueLimitCard } from "./widgets/general/RevenueLimitCard"
 import {
   DashboardLineChart,
   DashboardDonutChart,
@@ -159,12 +158,20 @@ export async function Dashboard({
     getDashboardGeneralData(partnerId),
   ])
 
-  let metrics = metricsData.metrics
-  let revenueData = revenueChartData.revenue
+  const showComparison = Boolean(compareInfo)
+  let metrics = showComparison
+    ? metricsData.metrics
+    : metricsData.metrics.map((m) => ({ ...m, trend: "" }))
+  let revenueData = showComparison
+    ? revenueChartData.revenue.map((point: any, i: number) => ({
+        ...point,
+        secondary: compareRevenueData?.revenue[i]?.value || 0,
+      }))
+    : revenueChartData.revenue.map(({ secondary: _secondary, ...point }: any) => point)
   let compareLabel: string | undefined
 
-  if (compareInfo && compareMetricsData && compareRevenueData) {
-    compareLabel = compareInfo.label
+  if (showComparison && compareMetricsData && compareRevenueData) {
+    compareLabel = compareInfo!.label
 
     metrics = metricsData.metrics.map((m, i) => {
       const compareMetric = compareMetricsData.metrics[i]
@@ -174,11 +181,6 @@ export async function Dashboard({
       const trend = computePercent(currVal, compVal)
       return { ...m, trend: `${trend} vs ${compareLabel}` }
     })
-
-    revenueData = revenueChartData.revenue.map((point, i) => ({
-      ...point,
-      secondary: compareRevenueData.revenue[i]?.value || 0
-    }))
   }
 
   const revenueMetric = metrics.find(m => m.title.toLowerCase().includes("faturamento") || m.title.toLowerCase().includes("receita"))
@@ -207,7 +209,11 @@ export async function Dashboard({
     insights.push({ message: `${alertCount} alerta(s) precisam de atenção no painel.`, color: "orange" })
   }
 
-  const evoData = revenueData.map(p => ({ label: p.label, value: p.value, secondary: p.secondary }))
+  const evoData = revenueData.map((p: any) => ({
+    label: p.label,
+    value: p.value,
+    ...(p.secondary !== undefined ? { secondary: p.secondary } : {}),
+  }))
   const originDonutData = revenueOriginData.origins.map(o => ({ label: o.label, value: Number(o.value) }))
   const totalOrigin = revenueOriginData.origins.reduce((s, o) => s + Number(o.value), 0)
   const ordersBarData = ordersChartData.orders.map(p => ({ label: p.label, value: p.value }))
@@ -220,12 +226,9 @@ export async function Dashboard({
       {/* Row 1: KPI Horizontal Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-12">
-          <SummaryCards metrics={metrics} variant="horizontal" />
+          <SummaryCards metrics={metrics} variant="horizontal" showTrend={showComparison} />
         </div>
       </div>
-
-      {/* Limite de faturamento (MEI / nano). Oculto quando o perfil não foi informado. */}
-      <RevenueLimitCard />
 
       {/* Row 2: Faturamento (8) + Origem da Receita (4) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
@@ -234,7 +237,7 @@ export async function Dashboard({
             <CardHeader
               icon={TrendingUpIcon}
               title="Faturamento"
-              legendItems={[{ label: "Este Período", color: "#79c325" }, { label: compareLabel || "Período Anterior", color: "#94a3b8" }]}
+              legendItems={[{ label: "Este Período", color: "#79c325" }, ...(compareLabel ? [{ label: compareLabel, color: "#94a3b8" }] : [])]}
             />
             <DashboardLineChart data={evoData} format="currency" />
           </div>

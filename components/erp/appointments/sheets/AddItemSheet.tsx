@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Package, SearchIcon, XIcon, PlusIcon } from "@/lib/icons"
-import { Button, Input, FormDropdown, ThreeDotsLoader, IconPlaceholder, Badge } from "@/components/reusable"
+import { Button, Input, FormDropdown, ThreeDotsLoader } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { searchProductsForAppointmentItems } from "@/app/actions/erp/appointment-items"
+import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
+import { useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { formatCurrency } from "@/lib/utils/formatters"
-import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 interface AddItemSheetProps {
@@ -28,8 +29,6 @@ interface AddItemSheetProps {
 
 export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onConfirm }: AddItemSheetProps) {
     const [searchQuery, setSearchQuery] = useState("")
-    const [searchResults, setSearchResults] = useState<any[]>([])
-    const [isLoading, setIsLoading] = useState(false)
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
     const [quantity, setQuantity] = useState(1)
@@ -39,6 +38,10 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
     const [showResults, setShowResults] = useState(false)
     const [activePromotions, setActivePromotions] = useState<any[]>([])
     const searchRef = useRef<HTMLDivElement>(null)
+
+    const loadProducts = useCallback(() => fetchPartnerProductsBucket(storeId), [storeId])
+    const productBucket = useProductBucket<ProductBucketItem>(loadProducts, { pageSize: 10, preload: isOpen })
+    const setBucketSearchQuery = productBucket.setSearchQuery
 
     useEffect(() => {
         if (isOpen && partnerId) {
@@ -51,7 +54,6 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
             })
         } else if (!isOpen) {
             setSearchQuery("")
-            setSearchResults([])
             setSelectedProduct(null)
             setSelectedVariantId(null)
             setQuantity(1)
@@ -60,30 +62,16 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
             setManualName("")
             setShowResults(false)
             setActivePromotions([])
+            setBucketSearchQuery("")
         }
-    }, [isOpen, partnerId])
+    }, [isOpen, partnerId, setBucketSearchQuery])
 
     useEffect(() => {
         if (!searchQuery || searchQuery.trim().length < 2) {
-            setSearchResults([])
             setShowResults(false)
             return
         }
-
-        const timer = setTimeout(async () => {
-            setIsLoading(true)
-            setShowResults(true)
-            try {
-                const results = await searchProductsForAppointmentItems(searchQuery, storeId)
-                setSearchResults(results)
-            } catch {
-                setSearchResults([])
-            } finally {
-                setIsLoading(false)
-            }
-        }, 300)
-
-        return () => clearTimeout(timer)
+        setShowResults(true)
     }, [searchQuery])
 
     useEffect(() => {
@@ -134,7 +122,7 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                 name: selectedVariant ? `${selectedProduct.name} - ${selectedVariant.name}` : selectedProduct.name,
                 quantity,
                 usage_type: usageType as any,
-                image: selectedProduct.image || null,
+                image: selectedVariant?.image || selectedProduct.image || selectedProduct.variants?.find((v: any) => v.image)?.image || null,
             })
         }
         onClose()
@@ -196,10 +184,12 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                             value={searchQuery}
                                             onChange={(e) => {
                                                 setSearchQuery(e.target.value)
+                                                setBucketSearchQuery(e.target.value)
                                                 setShowResults(true)
                                             }}
                                             onFocus={() => {
-                                                if (searchResults.length > 0 || isLoading) setShowResults(true)
+                                                productBucket.loadBucket()
+                                                setShowResults(true)
                                             }}
                                             prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                             className="mb-0"
@@ -213,53 +203,16 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                                     exit={{ opacity: 0, y: 5 }}
                                                     className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
                                                 >
-                                                    {isLoading ? (
+                                                    {productBucket.isLoading ? (
                                                         <div className="p-4"><ThreeDotsLoader /></div>
-                                                     ) : searchResults.length > 0 ? (
-                                                         searchResults.map((product) => (
-                                                             <button
+                                                     ) : productBucket.filteredResults.length > 0 ? (
+                                                         productBucket.filteredResults.map((product) => (
+                                                             <ProductSearchResultItem
                                                                  key={product.id}
+                                                                 item={product}
+                                                                 promotions={activePromotions}
                                                                  onClick={() => handleProductSelect(product)}
-                                                                 className="w-full flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors text-left"
-                                                             >
-                                                                 <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 shrink-0 overflow-hidden border border-brand-border dark:border-dark-border flex items-center justify-center">
-                                                                     {product.image ? (
-                                                                         <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover rounded-full" alt="" />
-                                                                     ) : (
-                                                                         <Package size={18} className="text-brand-inactive-text" />
-                                                                     )}
-                                                                 </div>
-                                                                 <div className="flex-1 min-w-0">
-                                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                                     <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
-                                                                         {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
-                                                                     </div>
-                                                                 </div>
-                                                                 <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                         {(() => {
-                                                                             if (product.variants && product.variants.length > 0) {
-                                                                                 const prices = product.variants.map((v: any) => Number(v.price || 0))
-                                                                                 const minP = Math.min(...prices)
-                                                                                 const maxP = Math.max(...prices)
-                                                                                 return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
-                                                                             }
-                                                                             const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, activePromotions, { productId: product.id, categoryId: product.category_id || undefined });
-                                                                             return (
-                                                                                 <div className="flex items-center gap-1.5">
-                                                                                     {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
-                                                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>
-                                                                                     {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                                     {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                                 </div>
-                                                                             )
-                                                                         })()}
-                                                                     </div>
-                                                                     <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                         {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
-                                                                     </div>
-                                                                 </div>
-                                                             </button>
+                                                             />
                                                          ))
                                                      ) : (
                                                          <div className="p-4 text-center text-sm text-brand-inactive-text">
@@ -288,11 +241,14 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/20">
                                             <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                {selectedProduct.image ? (
-                                                    <img src={getR2ImageUrl(selectedProduct.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                                ) : (
-                                                    <Package size={24} className="text-brand-inactive-text" />
-                                                )}
+                                                {(() => {
+                                                    const selectedImage = selectedVariant?.image || selectedProduct.image || selectedProduct.variants?.find((v: any) => v.image)?.image
+                                                    return selectedImage ? (
+                                                        <img src={getR2ImageUrl(selectedImage, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                                    ) : (
+                                                        <Package size={24} className="text-brand-inactive-text" />
+                                                    )
+                                                })()}
                                             </div>
                                             <div>
                                                 <p className="font-bold text-brand-dark dark:text-dark-heading">{selectedProduct.name}</p>
@@ -307,7 +263,7 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                                 onClick={() => {
                                                     setSelectedProduct(null)
                                                     setSearchQuery("")
-                                                    setSearchResults([])
+                                                    setBucketSearchQuery("")
                                                 }}
                                             >
                                                 Trocar

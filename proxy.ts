@@ -1,17 +1,24 @@
 import { after, NextResponse, type NextRequest } from "next/server"
 import { middleware as supabaseMiddleware } from "@/lib/supabase/middleware"
 import { getTrustedClientCountry, getTrustedClientIP } from "@/lib/security/client-ip"
-import { recordApplicationAccess, sanitizeAccessLogPath } from "@/lib/security/application-access-log"
+import { recordApplicationAccess, sanitizeAccessLogPath, shouldSkipAccessLog } from "@/lib/security/application-access-log"
 
 function scheduleAccessLog(request: NextRequest, statusCode: number): void {
+  const pathname = request.nextUrl.pathname
+  const userAgent = request.headers.get("user-agent")?.slice(0, 500) ?? null
+
+  if (shouldSkipAccessLog(pathname, userAgent)) {
+    return
+  }
+
   const platformIp = (request as NextRequest & { ip?: string }).ip
   const input = {
     ipAddress: getTrustedClientIP(request.headers, platformIp),
     country: getTrustedClientCountry(request.headers),
     method: request.method.slice(0, 12),
-    path: sanitizeAccessLogPath(request.nextUrl.pathname),
+    path: sanitizeAccessLogPath(pathname),
     statusCode,
-    userAgent: request.headers.get("user-agent")?.slice(0, 500) ?? null,
+    userAgent,
     cloudflareRayId: request.headers.get("cf-ray")?.slice(0, 100) ?? null,
   }
 

@@ -239,6 +239,43 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
             }
         )
 
+        // 8. Webhook Discord: notificar solicitação de reembolso de assinatura da Dudit (fail-open)
+        try {
+            const { sendSubscriptionRefundRequested } = await import("@/lib/services/discord-general-webhook.service")
+            const { data: partnerData } = await supabase
+                .from("partners")
+                .select("name, store_name")
+                .eq("id", data.partnerId)
+                .maybeSingle()
+
+            let planName: string | undefined = undefined
+            if (purchase.subscription_id) {
+                const { data: subData } = await supabase
+                    .from("subscriptions")
+                    .select("plan:plans!plan_id(name)")
+                    .eq("id", purchase.subscription_id)
+                    .maybeSingle()
+                planName = (subData as any)?.plan?.name
+            }
+
+            sendSubscriptionRefundRequested({
+                refundRequestId: newRefund.id,
+                partnerId: data.partnerId,
+                partnerName: partnerData?.store_name || partnerData?.name,
+                userId: user.id,
+                userEmail: user.email,
+                userName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+                planName,
+                amount: purchaseAmount,
+                reasonCategory: data.reasonCategory,
+                reasonDescription: data.reasonDescription,
+                isWithin7Days,
+                createdAt: newRefund.requested_at,
+            }).catch(err => console.warn("[BILLING_REFUND] Discord webhook failed (non-blocking):", err))
+        } catch (discordErr) {
+            console.warn("[BILLING_REFUND] Discord webhook setup failed (non-blocking):", discordErr)
+        }
+
         return {
             success: true,
             token: publicToken,
@@ -772,6 +809,26 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
                 refundRequestId: refundReq.id,
             }
         )
+
+        // 13. Webhook Discord: notificar estorno de assinatura processado (fail-open)
+        try {
+            const { sendRefundProcessed } = await import("@/lib/services/discord-general-webhook.service")
+            const { data: partnerData } = await supabase
+                .from("partners")
+                .select("name, store_name")
+                .eq("id", refundReq.partner_id)
+                .maybeSingle()
+
+            sendRefundProcessed({
+                returnRequestId: refundReq.id,
+                partnerId: refundReq.partner_id,
+                partnerName: partnerData?.store_name || partnerData?.name,
+                resolution: "Reembolso de Plano (Dudit)",
+                refundAmount: targetAmount,
+                refundStatus: "APPROVED",
+                processedBy: adminEmail || adminUser.id,
+            }).catch(err => console.warn("[ADMIN_REFUND] Discord webhook failed (non-blocking):", err))
+        } catch {}
 
         return {
             success: true,

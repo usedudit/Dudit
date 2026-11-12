@@ -976,3 +976,237 @@ export async function getStockMovementAttachmentUrlAction(
     return { success: false, error: err.message || "Erro ao obter URL de download" }
   }
 }
+
+export async function getProductStockStatusAction(productId: string, variantId?: string | null) {
+  try {
+    await requireUser()
+    const ctx = await getCurrentPartnerContext()
+    if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
+    const partnerId = ctx.partnerId
+
+    const admin = createAdminClient()
+
+    if (variantId) {
+      const { data, error } = await admin
+        .from("product_variants")
+        .select("id, product_id, stock_quantity, stock_reserved, stock_available, products!inner(partner_id, store_id)")
+        .eq("id", variantId)
+        .eq("product_id", productId)
+        .single()
+
+      if (error || !data) return errorResponse("Variação não encontrada")
+      if ((data.products as any)?.partner_id !== partnerId) {
+        return errorResponse("Variação não pertence ao parceiro ativo")
+      }
+
+      const stockQuantity = Number(data.stock_quantity) || 0
+      const stockReserved = Math.max(0, Number(data.stock_reserved) || 0)
+      const stockAvailable = Number(data.stock_available ?? (stockQuantity - stockReserved))
+
+      return successResponse({
+        stock_quantity: stockQuantity,
+        stock_reserved: stockReserved,
+        stock_available: stockAvailable,
+      })
+    } else {
+      const { data, error } = await admin
+        .from("products")
+        .select("id, stock_quantity, stock_reserved, stock_available, partner_id, store_id")
+        .eq("id", productId)
+        .eq("partner_id", partnerId)
+        .single()
+
+      if (error || !data) return errorResponse("Produto não encontrado")
+
+      const stockQuantity = Number(data.stock_quantity) || 0
+      const stockReserved = Math.max(0, Number(data.stock_reserved) || 0)
+      const stockAvailable = Number(data.stock_available ?? (stockQuantity - stockReserved))
+
+      return successResponse({
+        stock_quantity: stockQuantity,
+        stock_reserved: stockReserved,
+        stock_available: stockAvailable,
+      })
+    }
+  } catch (err: any) {
+    console.error("getProductStockStatusAction error:", err)
+    return errorResponse(err.message || "Erro ao consultar status de estoque")
+  }
+}
+
+export async function releaseReservedStockAction(data: {
+  productId: string
+  variantId?: string | null
+  quantity?: number
+  reason: string
+  notes?: string
+}) {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+  try {
+    const user = await requireUser()
+    const ctx = await getCurrentPartnerContext()
+    if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
+    const partnerId = ctx.partnerId
+
+    await requirePermission(partnerId, "stock_movements", "create")
+    if (ctx.activeStoreId) {
+      await requireStorePermission(ctx.activeStoreId, partnerId, "stock_movements", "create")
+    }
+
+    if (!data.productId) return errorResponse("Produto inválido")
+    const trimmedReason = (data.reason || "").trim()
+    if (!trimmedReason || trimmedReason === "Selecione um motivo...") {
+      return errorResponse("Selecione um motivo para a liberação de reserva")
+    }
+
+    const admin = createAdminClient()
+
+    if (data.variantId) {
+      const { data: variant, error: varErr } = await admin
+        .from("product_variants")
+        .select("id, product_id, variant_name, stock_quantity, stock_reserved, stock_available, products!inner(id, name, partner_id, store_id)")
+        .eq("id", data.variantId)
+        .eq("product_id", data.productId)
+        .single()
+
+      if (varErr || !variant) {
+        return errorResponse("Variação não encontrada")
+      }
+      if ((variant.products as any)?.partner_id !== partnerId) {
+        return errorResponse("Variação não pertence ao parceiro ativo")
+      }
+      if (ctx.activeStoreId && (variant.products as any)?.store_id && (variant.products as any).store_id !== ctx.activeStoreId) {
+        return errorResponse("A variação pertence a outra loja")
+      }
+
+      const currentReserved = Math.max(0, Number(variant.stock_reserved) || 0)
+      if (currentReserved <= 0) {
+        return errorResponse("Esta variação não possui estoque reservado para liberar")
+      }
+
+      const requestedQty = data.quantity !== undefined && data.quantity !== null ? Number(data.quantity) : currentReserved
+      if (!Number.isFinite(requestedQty) || requestedQty <= 0) {
+        return errorResponse("A quantidade a liberar deve ser maior que zero")
+      }
+
+      const qtyToRelease = Math.min(requestedQty, currentReserved)
+      const newReserved = Math.max(0, currentReserved - qtyToRelease)
+      const currentStock = Number(variant.stock_quantity) || 0
+      const newAvailable = Math.max(0, currentStock - newReserved)
+
+      const { error: updateErr } = await admin
+        .from("product_variants")
+        .update({
+          stock_reserved: newReserved,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", data.variantId)
+        .eq("product_id", data.productId)
+
+      if (updateErr) {
+        console.error("releaseReservedStockAction variant update error:", updateErr)
+        return errorResponse("Falha ao atualizar estoque reservado da variação")
+      }
+
+      const { logAuditEvent } = await import("@/lib/services/timeline.service")
+      const variantName = variant.variant_name || "Variação"
+      await logAuditEvent({
+        partnerId,
+        actorUserId: user.id,
+        entityType: "product",
+        entityId: data.productId,
+        actionType: "stock_reservation_released",
+        source: "manual",
+        changeLines: [
+          `Liberação de estoque reservado na variação "${variantName}": ${qtyToRelease} unidade(s) liberada(s). Reserva anterior: ${currentReserved}, nova reserva: ${newReserved}. Motivo: ${trimmedReason}.${data.notes ? ` Obs: ${sanitizeNotes(data.notes)}` : ""}`
+        ],
+      })
+
+      await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
+      await revalidateStockMovements(partnerId)
+      revalidatePath('/erp/produtos')
+      revalidatePath(`/erp/produtos/${data.productId}`)
+      revalidatePath('/erp/movimentacao-estoque')
+
+      return successResponse({
+        releasedQuantity: qtyToRelease,
+        stock_quantity: currentStock,
+        stock_reserved: newReserved,
+        stock_available: newAvailable,
+      })
+    } else {
+      const { data: product, error: prodErr } = await admin
+        .from("products")
+        .select("id, name, partner_id, store_id, stock_quantity, stock_reserved, stock_available")
+        .eq("id", data.productId)
+        .eq("partner_id", partnerId)
+        .single()
+
+      if (prodErr || !product) {
+        return errorResponse("Produto não encontrado")
+      }
+      if (ctx.activeStoreId && product.store_id && product.store_id !== ctx.activeStoreId) {
+        return errorResponse("O produto pertence a outra loja")
+      }
+
+      const currentReserved = Math.max(0, Number(product.stock_reserved) || 0)
+      if (currentReserved <= 0) {
+        return errorResponse("Este produto não possui estoque reservado para liberar")
+      }
+
+      const requestedQty = data.quantity !== undefined && data.quantity !== null ? Number(data.quantity) : currentReserved
+      if (!Number.isFinite(requestedQty) || requestedQty <= 0) {
+        return errorResponse("A quantidade a liberar deve ser maior que zero")
+      }
+
+      const qtyToRelease = Math.min(requestedQty, currentReserved)
+      const newReserved = Math.max(0, currentReserved - qtyToRelease)
+      const currentStock = Number(product.stock_quantity) || 0
+      const newAvailable = Math.max(0, currentStock - newReserved)
+
+      const { error: updateErr } = await admin
+        .from("products")
+        .update({
+          stock_reserved: newReserved,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", data.productId)
+        .eq("partner_id", partnerId)
+
+      if (updateErr) {
+        console.error("releaseReservedStockAction product update error:", updateErr)
+        return errorResponse("Falha ao atualizar estoque reservado do produto")
+      }
+
+      const { logAuditEvent } = await import("@/lib/services/timeline.service")
+      await logAuditEvent({
+        partnerId,
+        actorUserId: user.id,
+        entityType: "product",
+        entityId: data.productId,
+        actionType: "stock_reservation_released",
+        source: "manual",
+        changeLines: [
+          `Liberação de estoque reservado no produto "${product.name}": ${qtyToRelease} unidade(s) liberada(s). Reserva anterior: ${currentReserved}, nova reserva: ${newReserved}. Motivo: ${trimmedReason}.${data.notes ? ` Obs: ${sanitizeNotes(data.notes)}` : ""}`
+        ],
+      })
+
+      await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
+      await revalidateStockMovements(partnerId)
+      revalidatePath('/erp/produtos')
+      revalidatePath(`/erp/produtos/${data.productId}`)
+      revalidatePath('/erp/movimentacao-estoque')
+
+      return successResponse({
+        releasedQuantity: qtyToRelease,
+        stock_quantity: currentStock,
+        stock_reserved: newReserved,
+        stock_available: newAvailable,
+      })
+    }
+  } catch (err: any) {
+    console.error("releaseReservedStockAction error:", err)
+    return errorResponse(err.message || "Erro interno ao liberar estoque reservado")
+  }
+}

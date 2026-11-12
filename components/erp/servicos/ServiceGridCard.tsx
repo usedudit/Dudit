@@ -95,11 +95,15 @@ const ServiceGridCard = React.memo(
                                                 />
                                             </Tooltip>
                                             <Tooltip text={service.show_in_marketplace ? "Visível" : "Oculto"}>
-                                                {service.show_in_marketplace ? (
-                                                    <EyeIcon className="w-4 h-4 text-brand-green shrink-0" />
-                                                ) : (
-                                                    <EyeOffIcon className="w-4 h-4 text-brand-inactive-text shrink-0" />
-                                                )}
+                                                <Badge
+                                                    variant={service.show_in_marketplace ? "green" : "gray"}
+                                                    className="whitespace-nowrap scale-90 shrink-0"
+                                                    icon={service.show_in_marketplace ? (
+                                                        <EyeIcon />
+                                                    ) : (
+                                                        <EyeOffIcon />
+                                                    )}
+                                                />
                                             </Tooltip>
                                         </>
                                     )

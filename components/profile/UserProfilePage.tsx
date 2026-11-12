@@ -4,6 +4,13 @@ import { useState, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { updateProfileAction } from "@/app/actions/profile"
 import { changePasswordAction } from "@/app/actions/shared/password"
+import {
+    requestAccountDeletionCodeAction,
+    confirmAccountDeletionAction,
+    getAccountDeletionDryRunAction,
+    cancelAllActiveRecurringSubscriptionsAction,
+} from "@/app/actions/shared/account"
+import { getCSRFToken } from "@/lib/utils/fetch-with-csrf"
 import { useNotification } from "@/hooks/use-notification"
 import { useSearchParams } from "next/navigation"
 import { pushUrl, replaceUrl } from "@/lib/navigation/history"
@@ -73,9 +80,11 @@ export function UserProfilePage({
     const [isConfirmingCode, setIsConfirmingCode] = useState(false)
     const [dryRunReport, setDryRunReport] = useState<any>(null)
     const [loadingDryRun, setLoadingDryRun] = useState(false)
+    const [cancellingAllSubscriptions, setCancellingAllSubscriptions] = useState(false)
     const [confirmText, setConfirmText] = useState("")
     const [activeSubModalOpen, setActiveSubModalOpen] = useState(false)
     const deleteCooldownRef = useRef<NodeJS.Timeout | null>(null)
+    const activeRecurringSubscriptions = dryRunReport?.activeRecurringSubscriptionsCount ?? 0
 
     const startDeleteCooldown = (seconds: number) => {
         setDeleteCooldown(seconds)
@@ -99,9 +108,7 @@ export function UserProfilePage({
         setConfirmText("")
         setLoadingDryRun(true)
         try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
             const token = await getCSRFToken()
-            const { getAccountDeletionDryRunAction } = await import("@/app/actions/shared/account")
             const res = await getAccountDeletionDryRunAction(token)
             if (res.success && res.report) {
                 setDryRunReport(res.report)
@@ -113,13 +120,43 @@ export function UserProfilePage({
         }
     }
 
+    const handleCancelAllRecurringSubscriptions = async () => {
+        setCancellingAllSubscriptions(true)
+        setDeleteError(null)
+        try {
+            const token = await getCSRFToken()
+            const res = await cancelAllActiveRecurringSubscriptionsAction(token)
+            if (res.error || !res.success) {
+                const msg = res.error || "Não foi possível cancelar as assinaturas recorrentes."
+                setDeleteError(msg)
+                notifyError("Erro ao cancelar assinaturas", msg)
+                return
+            }
+
+            setDryRunReport((prev: any) =>
+                prev ? { ...prev, activeRecurringSubscriptionsCount: 0 } : prev
+            )
+            notifySuccess(
+                "Assinaturas canceladas",
+                `${res.cancelled ?? 0} assinatura(s) cancelada(s).${(res.failed ?? 0) > 0 ? ` ${res.failed} falharam.` : ""}`
+            )
+        } catch {
+            setDeleteError("Erro inesperado ao cancelar as assinaturas recorrentes.")
+            notifyError("Erro", "Erro inesperado ao cancelar as assinaturas recorrentes.")
+        } finally {
+            setCancellingAllSubscriptions(false)
+        }
+    }
+
     const handleRequestDeletionCode = async () => {
+        if (activeRecurringSubscriptions > 0) {
+            setDeleteError("Cancele todas as assinaturas recorrentes ativas antes de continuar.")
+            return
+        }
         setIsRequestingCode(true)
         setDeleteError(null)
         try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
             const token = await getCSRFToken()
-            const { requestAccountDeletionCodeAction } = await import("@/app/actions/shared/account")
             const res = await requestAccountDeletionCodeAction(customReason.trim() || null, token)
 
             if (res.error) {
@@ -170,9 +207,7 @@ export function UserProfilePage({
         setIsConfirmingCode(true)
         setDeleteError(null)
         try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
             const token = await getCSRFToken()
-            const { confirmAccountDeletionAction } = await import("@/app/actions/shared/account")
             const res = await confirmAccountDeletionAction({
                 code: deleteCode.trim(),
                 reason: customReason.trim() || null,
@@ -642,7 +677,7 @@ export function UserProfilePage({
                             <Button
                                 variant="outline"
                                 onClick={() => setDeleteStep("none")}
-                                disabled={isRequestingCode || loadingDryRun}
+                                disabled={isRequestingCode || cancellingAllSubscriptions}
                                 className="flex-1 h-12"
                             >
                                 Continuar com minha conta
@@ -650,7 +685,7 @@ export function UserProfilePage({
                             <Button
                                 variant="destructive"
                                 onClick={handleRequestDeletionCode}
-                                disabled={isRequestingCode || loadingDryRun}
+                                disabled={isRequestingCode || loadingDryRun || cancellingAllSubscriptions || activeRecurringSubscriptions > 0}
                                 className="flex-1 h-12 bg-red-600 hover:bg-red-700 font-bold"
                             >
                                 {isRequestingCode ? "Enviando código..." : "Enviar código de confirmação"}
@@ -666,6 +701,24 @@ export function UserProfilePage({
                             message="Ao solicitar a exclusão, enviaremos um código de 6 dígitos para seu e-mail cadastrado para validação de segurança."
                             color="red"
                         />
+
+                        {activeRecurringSubscriptions > 0 && (
+                            <InfoCard
+                                title={`${activeRecurringSubscriptions} assinatura(s) recorrente(s) ativa(s)`}
+                                message="Você possui assinaturas recorrentes ativas no ERP. Cancele todas as assinaturas para não continuar cobrando seus clientes e liberar a exclusão da conta."
+                                color="orange"
+                                bottomElement={
+                                    <Button
+                                        variant="link"
+                                        onClick={handleCancelAllRecurringSubscriptions}
+                                        isLoading={cancellingAllSubscriptions}
+                                        disabled={cancellingAllSubscriptions || isRequestingCode}
+                                    >
+                                        Cancelar todas as assinaturas ativas
+                                    </Button>
+                                }
+                            />
+                        )}
 
                         {deleteError && (
                             <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl text-xs font-semibold text-red-700 dark:text-red-400">

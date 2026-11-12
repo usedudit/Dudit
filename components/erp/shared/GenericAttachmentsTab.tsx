@@ -167,6 +167,7 @@ export function GenericAttachmentsTab({
     const dropZoneRef = useRef<HTMLDivElement>(null)
 
     const [attachments, setAttachments] = useState<any[]>([])
+    const [imageUrlMap, setImageUrlMap] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(false)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -209,6 +210,7 @@ export function GenericAttachmentsTab({
     const loadAttachments = async () => {
         if (!entityId || isNewMode) {
             setAttachments([])
+            setImageUrlMap({})
             return
         }
         setLoading(true)
@@ -216,6 +218,25 @@ export function GenericAttachmentsTab({
             const res = await actions.fetch(entityId, partnerId)
             if (res.success && res.data) {
                 setAttachments(res.data)
+
+                // Imagens ficam em buckets privados: resolve uma URL assinada para exibir.
+                const imageRows = res.data.filter(isImageFile)
+                if (imageRows.length > 0) {
+                    const entries = await Promise.all(
+                        imageRows.map(async (att: any) => {
+                            if (!att?.file_key) return [att?.id, ""] as const
+                            try {
+                                const urlRes = await actions.url(entityId, att.file_key, partnerId)
+                                return [att.id, urlRes.success ? (urlRes.downloadUrl || "") : ""] as const
+                            } catch {
+                                return [att.id, ""] as const
+                            }
+                        }),
+                    )
+                    setImageUrlMap(Object.fromEntries(entries.filter(([, url]) => Boolean(url))))
+                } else {
+                    setImageUrlMap({})
+                }
             } else {
                 toast({ description: `Erro ao carregar anexos de ${entityType}.` })
             }
@@ -386,7 +407,7 @@ export function GenericAttachmentsTab({
     const dbDocAttachments = (attachments || []).filter((att) => !isImageFile(att))
 
     const allImages: (string | File)[] = [
-        ...dbImageAttachments.map(att => att.file_key),
+        ...dbImageAttachments.map(att => imageUrlMap[att.id] || att.file_key),
         ...currentStagedImages
     ]
 
@@ -499,7 +520,21 @@ export function GenericAttachmentsTab({
                 </div>
             ) : (
                 <>
-                    {/* Seção 1: Anexos (Documentos) */}
+                    {/* Seção 1: Imagens usando ProductImagesSection */}
+                    {(canEdit || allImages.length > 0) && (
+                        <FormSection title="Imagens">
+                            <ProductImagesSection
+                                images={allImages}
+                                onImageUpload={handleImageSectionUpload}
+                                onRemoveImage={handleRemoveImageFromSection}
+                                onSetPrimaryImage={() => { }}
+                                isEditing={canEdit}
+                                isSaving={false}
+                            />
+                        </FormSection>
+                    )}
+
+                    {/* Seção 2: Anexos (Documentos) */}
                     {(canEdit || dbDocAttachments.length > 0 || currentStagedFiles.length > 0) && (
                         <FormSection title="Anexos" description="Documentos em PDF, Word, Excel, CSV, Zip, etc.">
                             {dbDocAttachments.length === 0 && currentStagedFiles.length === 0 ? (
@@ -590,20 +625,6 @@ export function GenericAttachmentsTab({
                                     )}
                                 </div>
                             )}
-                        </FormSection>
-                    )}
-
-                    {/* Seção 2: Imagens usando ProductImagesSection */}
-                    {(canEdit || allImages.length > 0) && (
-                        <FormSection title="Imagens">
-                            <ProductImagesSection
-                                images={allImages}
-                                onImageUpload={handleImageSectionUpload}
-                                onRemoveImage={handleRemoveImageFromSection}
-                                onSetPrimaryImage={() => { }}
-                                isEditing={canEdit}
-                                isSaving={false}
-                            />
                         </FormSection>
                     )}
 

@@ -248,6 +248,14 @@ export async function moderateImageWithUrl(
       if (buffer && buffer.length > 0) {
         return moderateImageWithBase64(buffer.toString("base64"))
       }
+      console.warn('[SIGHTENGINE] Buffer R2 não encontrado para imagem interna:', imageUrl)
+      return {
+        riskLevel: 'low',
+        confidence: 0,
+        categories: [],
+        rawResponse: null,
+        isUnavailable: true,
+      }
     }
 
     // SSRF PROTECTION: Validate the image URL is from an allowed CDN only.

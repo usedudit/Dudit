@@ -8,6 +8,7 @@ import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { PlusIcon, TrashIcon, SearchIcon, CheckCircleIcon, EditIcon, AlertTriangleIcon } from "@/lib/icons"
 import { useProductBucket } from "../hooks"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import AlertModal from "@/components/reusable/AlertModal"
 
@@ -128,22 +129,11 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                                         <div className="p-4"><ThreeDotsLoader /></div>
                                     ) : productBucket.filteredResults.length > 0 ? (
                                         productBucket.filteredResults.map((product: any) => (
-                                            <div
+                                            <ProductSearchResultItem
                                                 key={product.id}
+                                                item={product}
                                                 onClick={() => handleProductClick(product)}
-                                                className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
-                                            >
-                                                <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border object-cover" />
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                        <div className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${product.stock > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                                                            {product.stock} em estoque
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">SKU: {product.sku}</div>
-                                                </div>
-                                            </div>
+                                            />
                                         ))
                                     ) : (
                                         <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum item encontrado.</div>

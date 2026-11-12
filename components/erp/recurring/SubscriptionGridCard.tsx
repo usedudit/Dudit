@@ -17,13 +17,15 @@ import type { SubscriptionRowTab } from "./SubscriptionListRow"
 interface SubscriptionGridCardProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
   canManage: boolean
+  canAdvanceCycle?: boolean
   onOpen: (id: string, tab?: SubscriptionRowTab) => void
-  onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", id: string) => void
+  onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle", id: string) => void
 }
 
 export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
   sub,
   canManage,
+  canAdvanceCycle,
   onOpen,
   onRunAction
 }) => {
@@ -125,6 +127,11 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
               onCancel={canCancel ? () => onRunAction("cancel", sub.id) : undefined}
               cancelLabel="Cancelar assinatura"
             >
+              {canAdvanceCycle && sub.status === "active" && (
+                <DropdownItem onClick={() => onRunAction("advance_cycle", sub.id)}>
+                  <RepeatIcon size={18} /> Antecipar ciclo
+                </DropdownItem>
+              )}
               {canManage && sub.mpPreapprovalId && (
                 <DropdownItem onClick={() => onRunAction("sync", sub.id)}>
                   <RepeatIcon size={18} /> Sincronizar com MP

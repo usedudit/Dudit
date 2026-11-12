@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, RepeatIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, FilterIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, RepeatIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, FilterIcon, MotorbikeIcon, EnergyIcon, ShieldIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -16,12 +16,14 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { trackEvent } from "@/lib/analytics"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours, getOpenNowStatus } from "@/lib/utils/opening-hours"
-import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange } from "@/lib/services/location.service"
+import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange, estimateDeliveryTimeRange } from "@/lib/services/location.service"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, FormSection, InfoCard, RadioButton } from "@/components/reusable"
+import { Button, DefaultModal, Input, FormSection, InfoCard, RadioButton, Spinner } from "@/components/reusable"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
@@ -663,6 +665,85 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId, promotions 
     )
 }
 
+function CampaignSection({ name, onSeeAll, children }: { name: string; onSeeAll: () => void; children: ReactNode }) {
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [canLeft, setCanLeft] = useState(false)
+    const [canRight, setCanRight] = useState(false)
+    const update = useCallback(() => {
+        const node = scrollRef.current
+        if (!node) return
+        setCanLeft(node.scrollLeft > 4)
+        setCanRight(node.scrollLeft + node.clientWidth < node.scrollWidth - 4)
+    }, [])
+    useEffect(() => {
+        update()
+        const node = scrollRef.current
+        node?.addEventListener("scroll", update, { passive: true })
+        window.addEventListener("resize", update)
+        const frame = requestAnimationFrame(update)
+        const timer = setTimeout(update, 500)
+        return () => {
+            cancelAnimationFrame(frame)
+            clearTimeout(timer)
+            node?.removeEventListener("scroll", update)
+            window.removeEventListener("resize", update)
+        }
+    }, [update])
+    const scroll = (dir: number) => scrollRef.current?.scrollBy({ left: dir * 720, behavior: "smooth" })
+
+    return (
+        <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{name}</h2>
+                </div>
+
+                <div className="flex items-center gap-4 flex-wrap">
+                    <Button
+                        variant="link"
+                        onClick={onSeeAll}
+                        className="text-sm text-white hover:text-white"
+                    >
+                        Ver tudo
+                    </Button>
+                    <div className="hidden lg:flex items-center gap-2">
+                        {canLeft && (
+                            <Button
+                                variant="filled"
+                                size="icon"
+                                onClick={() => scroll(-1)}
+                                className="!w-8 !h-8 bg-white/25 text-brand-dark hover:bg-white/40"
+                                aria-label="Rolar ofertas para a esquerda"
+                            >
+                                <ChevronLeftIcon size={16} />
+                            </Button>
+                        )}
+                        {canRight && (
+                            <Button
+                                variant="filled"
+                                size="icon"
+                                onClick={() => scroll(1)}
+                                className="!w-8 !h-8 bg-white/25 text-brand-dark hover:bg-white/40"
+                                aria-label="Rolar ofertas para a direita"
+                            >
+                                <ChevronRightIcon size={16} />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="relative">
+                <div ref={scrollRef} className="flex gap-3 overflow-x-auto scrollbar-hide px-1 snap-x snap-mandatory">
+                    {children}
+                </div>
+                <div className={`pointer-events-none absolute inset-y-0 left-0 hidden lg:block w-12 bg-gradient-to-r from-brand-green to-transparent transition-opacity duration-300 ${canLeft ? "opacity-100" : "opacity-0"}`} />
+                <div className={`pointer-events-none absolute inset-y-0 right-0 hidden lg:block w-12 bg-gradient-to-l from-brand-green to-transparent transition-opacity duration-300 ${canRight ? "opacity-100" : "opacity-0"}`} />
+            </div>
+        </>
+    )
+}
+
 function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponClick: (coupon: any) => void }) {
     const ref = useRef<HTMLDivElement>(null)
     if (!coupons.length) return null
@@ -822,6 +903,409 @@ function VendorListItem({ item, partner }: { item: any; partner: any }) {
     )
 }
 
+function DeliveryCalculatorBottomSheet({
+    isOpen,
+    onClose,
+    partner,
+    userProfile,
+    currentAddressLabel,
+    onApplyLocation,
+}: {
+    isOpen: boolean
+    onClose: () => void
+    partner: any
+    userProfile: any
+    currentAddressLabel: string | null
+    onApplyLocation: (data: { lat: number; lng: number; label: string; cep?: string | null }) => void
+}) {
+    const [calcCep, setCalcCep] = useState("")
+    const [calcLoading, setCalcLoading] = useState(false)
+    const [calcError, setCalcError] = useState<string | null>(null)
+    const [calcResult, setCalcResult] = useState<{
+        distanceKm: number | null
+        deliveryTime: string | null
+        feeLabel: string | null
+        isFree: boolean
+        outOfRadius: boolean
+        addressLabel: string
+        lat: number | null
+        lng: number | null
+        cep?: string | null
+    } | null>(null)
+
+    const [savedAddresses, setSavedAddresses] = useState<any[]>([])
+    const [loadingSavedAddresses, setLoadingSavedAddresses] = useState(false)
+
+    // Carrega endereços salvos do usuário se estiver logado
+    useEffect(() => {
+        if (!isOpen) return
+        setCalcError(null)
+
+        const userId = userProfile?.userId || userProfile?.user_id
+        if (userId) {
+            setLoadingSavedAddresses(true)
+            getAddressesAction(userId, "user")
+                .then((res: any) => {
+                    if (res?.addresses) {
+                        setSavedAddresses(res.addresses)
+                    }
+                })
+                .catch(() => { })
+                .finally(() => {
+                    setLoadingSavedAddresses(false)
+                })
+        }
+    }, [isOpen, userProfile?.userId, userProfile?.user_id])
+
+    const formatCepMask = (val: string) => {
+        const clean = val.replace(/\D/g, "").slice(0, 8)
+        if (clean.length > 5) {
+            return `${clean.slice(0, 5)}-${clean.slice(5)}`
+        }
+        return clean
+    }
+
+    const processCoordsCalculation = async (
+        destCoords: { lat: number; lng: number } | null,
+        label: string,
+        cep?: string
+    ) => {
+        const storeLat = partner?.lat ?? partner?.latitude ?? null
+        const storeLng = partner?.lng ?? partner?.longitude ?? null
+        const rawSettings = partner?.delivery_settings || null
+        const settings = Array.isArray(rawSettings) ? rawSettings[0] : rawSettings
+        const isDeliveryEnabled = settings?.is_delivery_enabled !== false && settings?.isDeliveryEnabled !== false
+
+        let distanceKm: number | null = null
+        if (destCoords && storeLat != null && storeLng != null && !isNaN(Number(storeLat)) && !isNaN(Number(storeLng))) {
+            distanceKm = Number(calculateDistance(destCoords, { lat: Number(storeLat), lng: Number(storeLng) }).toFixed(1))
+        }
+
+        let fee = 0
+        let feeLabel: string | null = null
+        let outOfRadius = false
+        const maxDeliveryKm = settings?.max_delivery_km ?? settings?.maxDeliveryKm ? Number(settings?.max_delivery_km ?? settings?.maxDeliveryKm) : null
+
+        // Se a loja não tem coordenadas salvas no parceiro, chamamos quoteDeliveryFeeAction que resolve no banco
+        if (distanceKm == null && (partner.partner_id || partner.partnerId)) {
+            try {
+                const quoteRes = await quoteDeliveryFeeAction({
+                    partnerId: partner.partner_id || partner.partnerId,
+                    storeId: partner.id,
+                    destinationAddress: label,
+                    destinationCoords: destCoords,
+                })
+                if (quoteRes?.success) {
+                    distanceKm = quoteRes.distanceKm != null ? Number(quoteRes.distanceKm.toFixed(1)) : null
+                    fee = Number(quoteRes.fee || 0)
+                    feeLabel = fee === 0 ? "Grátis" : formatCurrency(fee)
+                    if (quoteRes.maxDeliveryKm != null && distanceKm != null && distanceKm > quoteRes.maxDeliveryKm) {
+                        outOfRadius = true
+                    }
+                }
+            } catch { }
+        }
+
+        if (distanceKm != null) {
+            if (maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm) {
+                outOfRadius = true
+            }
+            if (!feeLabel) {
+                feeLabel = estimateDeliveryFeeLabel({
+                    distanceKm,
+                    baseFee: settings?.base_fee ?? settings?.baseFee,
+                    includedKm: settings?.included_km ?? settings?.includedKm,
+                    extraKmPrice: settings?.extra_km_price ?? settings?.extraKmPrice,
+                    maxDeliveryKm,
+                    isDeliveryEnabled,
+                    deliveryPayer: settings?.delivery_payer ?? settings?.deliveryPayer,
+                })
+            }
+        }
+
+        let deliveryTime: string | null = null
+        if (distanceKm != null && !outOfRadius) {
+            const rawRange = estimateDeliveryTimeRange(distanceKm)
+            deliveryTime = rawRange ? rawRange.replace("-", " a ") : estimateAverageDeliveryTime(distanceKm)
+        } else if (!outOfRadius && partner?.delivery_time_formatted) {
+            deliveryTime = formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted)?.replace("-", " a ") || null
+        }
+
+        const isFree = feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller")
+
+        setCalcResult({
+            distanceKm,
+            deliveryTime: deliveryTime || "",
+            feeLabel: feeLabel || (isDeliveryEnabled ? "A consultar" : "Apenas retirada"),
+            isFree,
+            outOfRadius,
+            addressLabel: label,
+            lat: destCoords?.lat ?? null,
+            lng: destCoords?.lng ?? null,
+            cep: cep || null,
+        })
+    }
+
+    const handleCalculateByCep = async (cepInput?: string) => {
+        const targetCep = (cepInput || calcCep).replace(/\D/g, "")
+        if (targetCep.length !== 8) {
+            setCalcError("Digite um CEP válido com 8 dígitos.")
+            return
+        }
+        setCalcLoading(true)
+        setCalcError(null)
+        setCalcResult(null)
+        try {
+            const res = await fetch(`/api/cep?cep=${targetCep}`)
+            if (!res.ok) {
+                throw new Error("CEP não encontrado")
+            }
+            const data = await res.json()
+            if (data.error) {
+                throw new Error(data.error)
+            }
+            const destCoords = data.latitude && data.longitude ? { lat: Number(data.latitude), lng: Number(data.longitude) } : null
+            const labelParts = [data.logradouro, data.bairro, `${data.localidade || ""}/${data.uf || ""}`].filter(Boolean)
+            const addressLabel = labelParts.length > 0 ? labelParts.join(", ") : `CEP ${formatCepMask(targetCep)}`
+
+            await processCoordsCalculation(destCoords, addressLabel, targetCep)
+        } catch (err: any) {
+            setCalcError(err?.message || "Erro ao consultar CEP. Verifique o número e tente novamente.")
+        } finally {
+            setCalcLoading(false)
+        }
+    }
+
+    const handleUseGps = () => {
+        if (typeof window === "undefined" || !navigator.geolocation) {
+            setCalcError("Geolocalização não suportada no seu navegador.")
+            return
+        }
+        setCalcLoading(true)
+        setCalcError(null)
+        setCalcResult(null)
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                try {
+                    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                    await processCoordsCalculation(coords, "Minha localização atual")
+                } catch {
+                    setCalcError("Erro ao calcular entrega para sua localização.")
+                } finally {
+                    setCalcLoading(false)
+                }
+            },
+            () => {
+                setCalcLoading(false)
+                setCalcError("Não foi possível obter sua localização. Permita o acesso ao GPS ou digite o CEP.")
+            },
+            { timeout: 10000, enableHighAccuracy: true }
+        )
+    }
+
+    const handleSelectSavedAddress = async (addr: any) => {
+        setCalcLoading(true)
+        setCalcError(null)
+        setCalcResult(null)
+        try {
+            const label = [addr.street ? `${addr.street}${addr.number ? `, ${addr.number}` : ""}` : "", addr.neighborhood, `${addr.city}/${addr.state}`].filter(Boolean).join(" - ")
+            let coords: { lat: number; lng: number } | null = null
+            if (addr.latitude && addr.longitude) {
+                coords = { lat: Number(addr.latitude), lng: Number(addr.longitude) }
+            } else if (addr.zip_code) {
+                const res = await fetch(`/api/cep?cep=${addr.zip_code.replace(/\D/g, "")}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.latitude && data.longitude) {
+                        coords = { lat: Number(data.latitude), lng: Number(data.longitude) }
+                    }
+                }
+            }
+            await processCoordsCalculation(coords, label || "Endereço cadastrado", addr.zip_code)
+        } catch {
+            setCalcError("Erro ao calcular para este endereço.")
+        } finally {
+            setCalcLoading(false)
+        }
+    }
+
+    const handleConfirm = () => {
+        if (!calcResult) return
+        onApplyLocation({
+            lat: calcResult.lat || 0,
+            lng: calcResult.lng || 0,
+            label: calcResult.addressLabel,
+            cep: calcResult.cep || null,
+        })
+        onClose()
+    }
+
+    return (
+        <BottomSheet isOpen={isOpen} onClose={onClose}>
+            <div className="flex flex-col p-1 pb-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-brand-border/60 dark:border-dark-border/60 pb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
+                            <MotorbikeIcon size={16} />
+                        </div>
+                        <div>
+                            <h3 className="text-[16px] font-semibold text-brand-dark dark:text-dark-heading leading-tight">
+                                Calcular Entrega
+                            </h3>
+                            <p className="text-[12px] text-brand-inactive-text dark:text-dark-body">
+                                {partner?.storeName || "Loja"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Input de CEP */}
+                <div>
+                    <label className="block text-[12px] font-semibold text-brand-dark dark:text-dark-heading mb-1.5">
+                        Digite seu CEP
+                    </label>
+                    <div className="flex gap-2">
+                        <div className="flex-1">
+                            <Input
+                                placeholder="00000-000"
+                                value={calcCep}
+                                onChange={(e) => {
+                                    const masked = formatCepMask(e.target.value)
+                                    setCalcCep(masked)
+                                    if (masked.replace(/\D/g, "").length === 8) {
+                                        void handleCalculateByCep(masked)
+                                    }
+                                }}
+                                disabled={calcLoading}
+                                prefix={<MapPinIcon size={16} className="text-brand-inactive-text" />}
+                            />
+                        </div>
+                        <Button
+                            onClick={() => handleCalculateByCep()}
+                            disabled={calcLoading || calcCep.replace(/\D/g, "").length !== 8}
+                            className="px-4 shrink-0 font-semibold"
+                        >
+                            {calcLoading ? <Spinner size={16} /> : "Calcular"}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Opção GPS */}
+                <div className="flex items-center justify-between pt-1">
+                    <button
+                        type="button"
+                        onClick={handleUseGps}
+                        disabled={calcLoading}
+                        className="flex items-center gap-1.5 text-[12px] font-semibold text-brand-green hover:underline active:opacity-75 transition-opacity"
+                    >
+                        <MapPinIcon size={14} /> Usar minha localização atual (GPS)
+                    </button>
+                    <a
+                        href="https://buscacepinter.correios.com.br/app/endereco/index.php"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-brand-inactive-text dark:text-dark-body hover:underline"
+                    >
+                        Não sei meu CEP
+                    </a>
+                </div>
+
+                {calcError && (
+                    <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-[12px] text-brand-red">
+                        {calcError}
+                    </div>
+                )}
+
+                {/* Endereços Salvos */}
+                {savedAddresses.length > 0 && (
+                    <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40">
+                        <p className="text-[11px] font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-2">
+                            Seus Endereços Salvos
+                        </p>
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                            {savedAddresses.map((addr) => (
+                                <button
+                                    key={addr.id}
+                                    type="button"
+                                    onClick={() => handleSelectSavedAddress(addr)}
+                                    disabled={calcLoading}
+                                    className="w-full flex items-center justify-between p-2.5 rounded-xl border border-brand-border/70 dark:border-dark-border hover:border-brand-green bg-white dark:bg-dark-surface text-left transition-colors active:scale-[0.99]"
+                                >
+                                    <div className="min-w-0 pr-2">
+                                        <p className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading truncate">
+                                            {addr.street ? `${addr.street}${addr.number ? `, ${addr.number}` : ""}` : addr.label || "Endereço"}
+                                        </p>
+                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
+                                            {[addr.neighborhood, `${addr.city}/${addr.state}`].filter(Boolean).join(" - ")}
+                                        </p>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-brand-green shrink-0">
+                                        Selecionar
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Resultado do Cálculo */}
+                {calcResult && (
+                    <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-dark-surface/80 border border-brand-border/80 dark:border-dark-border space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-brand-border/60 dark:border-dark-border/60">
+                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">Destino:</span>
+                            <span className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading text-right truncate max-w-[200px]">
+                                {calcResult.addressLabel}
+                            </span>
+                        </div>
+
+                        {calcResult.outOfRadius ? (
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[12px] text-amber-800 dark:text-amber-300">
+                                <p className="font-semibold mb-0.5">Fora da área de entrega</p>
+                                <p>Este endereço está a ~{calcResult.distanceKm} km da loja, fora do raio máximo configurado pelo vendedor. Você ainda pode optar por retirar seu pedido no local.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div className="p-3 rounded-xl bg-white dark:bg-dark-card border border-brand-border/60 dark:border-dark-border">
+                                    <div className="flex items-center gap-1.5 text-brand-inactive-text dark:text-dark-body mb-1">
+                                        <EnergyIcon size={14} className="text-brand-green shrink-0" />
+                                        <span className="text-[10px] uppercase font-semibold">Tempo Estimado</span>
+                                    </div>
+                                    <p className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                        {calcResult.deliveryTime}
+                                    </p>
+                                    <p className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        {calcResult.distanceKm != null ? `~${calcResult.distanceKm} km da loja` : "Estimado"}
+                                    </p>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-white dark:bg-dark-card border border-brand-border/60 dark:border-dark-border">
+                                    <div className="flex items-center gap-1.5 text-brand-inactive-text dark:text-dark-body mb-1">
+                                        <MotorbikeIcon size={14} className={calcResult.isFree ? "text-brand-green shrink-0" : "text-brand-dark dark:text-dark-heading shrink-0"} />
+                                        <span className="text-[10px] uppercase font-semibold">Taxa de Entrega</span>
+                                    </div>
+                                    <p className={`text-[15px] font-bold ${calcResult.isFree ? "text-brand-green dark:text-emerald-400" : "text-brand-dark dark:text-dark-heading"}`}>
+                                        {calcResult.feeLabel}
+                                    </p>
+                                    <p className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        {calcResult.isFree ? "Entrega gratuita" : "Taxa de entrega"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        <Button
+                            onClick={handleConfirm}
+                            className="w-full mt-2 font-semibold"
+                        >
+                            Usar este Endereço
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </BottomSheet>
+    )
+}
+
 export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], initialPromotions = [], userProfile, cartCount, isShowcaseActive: propIsShowcaseActive, initialCategory }: VendorPageClientProps) {
     const isShowcaseActive = propIsShowcaseActive !== undefined
         ? propIsShowcaseActive
@@ -830,11 +1314,38 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return getOpenNowStatus(partner?.openingHours, undefined, partner?.timezone || "America/Sao_Paulo")
     }, [partner?.openingHours, partner?.timezone])
 
+    // Delivery calculation states
+    const [isDeliveryCalculatorOpen, setIsDeliveryCalculatorOpen] = useState(false)
+    const [customCoords, setCustomCoords] = useState<{ lat: number; lng: number } | null>(null)
+    const [customAddressLabel, setCustomAddressLabel] = useState<string | null>(null)
+
+    // Recupera cálculo persistido anteriormente em localStorage
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem("dudit_vendor_delivery_calc")
+            if (saved) {
+                const parsed = JSON.parse(saved)
+                if (parsed && typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+                    setCustomCoords({ lat: parsed.lat, lng: parsed.lng })
+                    if (parsed.label) setCustomAddressLabel(parsed.label)
+                }
+            }
+        } catch { }
+    }, [])
+
     const userCoords = useMemo(() => {
         return userProfile?.latitude && userProfile?.longitude
             ? { lat: Number(userProfile.latitude), lng: Number(userProfile.longitude) }
             : null
     }, [userProfile?.latitude, userProfile?.longitude])
+
+    const effectiveCoords = useMemo(() => {
+        return customCoords || userCoords
+    }, [customCoords, userCoords])
+
+    const effectiveAddressLabel = useMemo(() => {
+        return customAddressLabel || userProfile?.address || null
+    }, [customAddressLabel, userProfile?.address])
 
     const deliveryInfo = useMemo(() => {
         const rawSettings = partner?.delivery_settings || null
@@ -845,8 +1356,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         const storeLat = partner?.lat ?? partner?.latitude ?? null
         const storeLng = partner?.lng ?? partner?.longitude ?? null
         let distanceKm: number | null = null
-        if (userCoords && storeLat != null && storeLng != null && !isNaN(Number(storeLat)) && !isNaN(Number(storeLng))) {
-            distanceKm = Number(calculateDistance(userCoords, { lat: Number(storeLat), lng: Number(storeLng) }).toFixed(1))
+        if (effectiveCoords && storeLat != null && storeLng != null && !isNaN(Number(storeLat)) && !isNaN(Number(storeLng))) {
+            distanceKm = Number(calculateDistance(effectiveCoords, { lat: Number(storeLat), lng: Number(storeLng) }).toFixed(1))
         }
 
         const maxDeliveryKmRaw = settings?.max_delivery_km ?? settings?.maxDeliveryKm
@@ -857,11 +1368,23 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             && maxDeliveryKm > 0
             && distanceKm > maxDeliveryKm
 
-        const deliveryTime = outOfRadius ? null
+        // Formata o tempo estimado como faixa "20 a 30 min", estilo da imagem do usuário
+        let deliveryTimeRange: string | null = null
+        if (distanceKm != null && !outOfRadius) {
+            const rawRange = estimateDeliveryTimeRange(distanceKm)
+            if (rawRange) {
+                deliveryTimeRange = rawRange.replace("-", " a ")
+            }
+        }
+
+        const fallbackDeliveryTime = outOfRadius ? null
             : (distanceKm != null
                 ? estimateAverageDeliveryTime(distanceKm)
-                : formatAverageDeliveryTimeFromRange(partner?.delivery_time_formatted))
+                : (partner?.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted)?.replace("-", " a ") || null : null))
 
+        const deliveryTime = deliveryTimeRange || fallbackDeliveryTime
+
+        const baseFee = Number(settings?.base_fee ?? settings?.baseFee ?? 0)
         const feeLabel = outOfRadius ? null : estimateDeliveryFeeLabel({
             distanceKm,
             baseFee: settings?.base_fee ?? settings?.baseFee,
@@ -872,8 +1395,21 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             deliveryPayer: settings?.delivery_payer ?? settings?.deliveryPayer,
         })
 
-        return { isDeliveryEnabled, sellsProducts, outOfRadius, deliveryTime, feeLabel }
-    }, [partner?.delivery_settings, partner?.lat, partner?.latitude, partner?.lng, partner?.longitude, partner?.offeringType, partner?.delivery_time_formatted, products, userCoords])
+        const isFreeDelivery = feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller")
+
+        return {
+            isDeliveryEnabled,
+            sellsProducts,
+            outOfRadius,
+            distanceKm,
+            deliveryTime,
+            feeLabel,
+            baseFee,
+            isFreeDelivery,
+            maxDeliveryKm,
+            settings,
+        }
+    }, [partner?.delivery_settings, partner?.lat, partner?.latitude, partner?.lng, partner?.longitude, partner?.offeringType, partner?.delivery_time_formatted, products, effectiveCoords])
 
     const deliveryNode = useMemo<ReactNode | null>(() => {
         if (deliveryInfo.outOfRadius) {
@@ -1611,7 +2147,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto md:px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-28 lg:pb-12">
+        <div className="container mx-auto md:px-4 max-w-[1400px] lg:mt-2 mb-6 flex-grow pb-28 lg:pb-12">
             <MarketplaceHeader
                 productName={partner.storeName}
                 storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
@@ -1722,11 +2258,172 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             )}
 
-            {hasStatusLine && (
-                <div className="lg:hidden px-5 mb-3">
-                    <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} />
+            {/* Tablet / Mobile (lg:hidden): Card de Horário, Entrega e Cálculo de Tempo Estimado no estilo da imagem */}
+            <div className="lg:hidden px-4 md:px-6 mb-4">
+                {/* 3-Column Pill Card */}
+                <div className="bg-white dark:bg-dark-card border border-brand-border/70 dark:border-dark-border rounded-2xl shadow-sm p-3">
+                    <div className="grid grid-cols-3 divide-x divide-brand-border/40 dark:divide-dark-border/40">
+                        {/* 1. Coisa de horário ali primeiro */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setMobileModalTab("info")
+                                setIsAboutPageOpen(true)
+                            }}
+                            className="flex flex-col items-center justify-center text-center px-1 py-0.5 hover:opacity-80 active:scale-[0.98] transition-all group min-w-0"
+                            title="Ver horários de funcionamento"
+                        >
+                            <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
+                                <ClockIcon
+                                    size={14}
+                                    className={
+                                        openStatus?.status === "open"
+                                            ? "text-brand-green shrink-0"
+                                            : openStatus?.status === "closing_soon"
+                                                ? "text-brand-yellow shrink-0"
+                                                : "text-brand-red shrink-0"
+                                    }
+                                />
+                                <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                    {openStatus ? (
+                                        openStatus.status === "open"
+                                            ? (openStatus.label.includes("até") ? openStatus.label.replace("Aberto até ", "Até ") : "Aberto")
+                                            : openStatus.status === "closing_soon"
+                                                ? "Fecha logo"
+                                                : "Fechado"
+                                    ) : "Aberto"}
+                                </span>
+                            </div>
+                            <span className="text-[11px] sm:text-[12px] text-brand-inactive-text dark:text-dark-body flex items-center justify-center gap-0.5 mt-0.5 group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors">
+                                Horários <ChevronRightIcon size={11} className="shrink-0" />
+                            </span>
+                        </button>
+
+                        {/* 2. Dps bglh de entrega ali com preço msm */}
+                        <button
+                            type="button"
+                            onClick={() => setIsDeliveryCalculatorOpen(true)}
+                            className="flex flex-col items-center justify-center text-center px-1 py-0.5 hover:opacity-80 active:scale-[0.98] transition-all group min-w-0"
+                            title="Opções e taxa de entrega"
+                        >
+                            <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
+                                <MotorbikeIcon
+                                    size={15}
+                                    className={
+                                        deliveryInfo.isFreeDelivery
+                                            ? "text-brand-green dark:text-emerald-400 shrink-0"
+                                            : "text-brand-dark dark:text-dark-heading shrink-0"
+                                    }
+                                />
+                                <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${deliveryInfo.outOfRadius
+                                    ? "text-brand-red font-semibold text-[12px]"
+                                    : deliveryInfo.isFreeDelivery
+                                        ? "text-brand-green dark:text-emerald-400"
+                                        : "text-brand-dark dark:text-dark-heading"
+                                    }`}>
+                                    {deliveryInfo.outOfRadius
+                                        ? "Fora da área"
+                                        : !deliveryInfo.isDeliveryEnabled || !deliveryInfo.sellsProducts
+                                            ? "Retirada"
+                                            : deliveryInfo.feeLabel || "A consultar"}
+                                </span>
+                            </div>
+                            <span className="text-[11px] sm:text-[12px] text-brand-inactive-text dark:text-dark-body flex items-center justify-center gap-0.5 mt-0.5 group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors">
+                                {deliveryInfo.isFreeDelivery && deliveryInfo.baseFee > 0 ? (
+                                    <span className="line-through">{formatCurrency(deliveryInfo.baseFee)}</span>
+                                ) : (
+                                    <span>Entrega</span>
+                                )}
+                                <ChevronRightIcon size={11} className="shrink-0" />
+                            </span>
+                        </button>
+
+                        {/* 3. Tempo Estimado */}
+                        <button
+                            type="button"
+                            onClick={() => setIsDeliveryCalculatorOpen(true)}
+                            className="flex flex-col items-center justify-center text-center px-1 py-0.5 hover:opacity-80 active:scale-[0.98] transition-all group min-w-0"
+                            title="Calcular tempo estimado de entrega"
+                        >
+                            <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
+                                {deliveryInfo.deliveryTime ? (
+                                    <>
+                                        <EnergyIcon size={13} className="text-brand-green dark:text-emerald-400 shrink-0" />
+                                        <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                            {deliveryInfo.deliveryTime}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="font-bold text-[13px] sm:text-[14px] text-brand-green dark:text-emerald-400 truncate leading-tight">
+                                        Calcular
+                                    </span>
+                                )}
+                            </div>
+                            <span className="text-[11px] sm:text-[12px] text-brand-inactive-text dark:text-dark-body flex items-center justify-center gap-0.5 mt-0.5 group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors">
+                                Tempo est. <ChevronRightIcon size={11} className="shrink-0" />
+                            </span>
+                        </button>
+                    </div>
                 </div>
-            )}
+
+                {/* Ai abaixo ali se der pra calcular o tempo estimado de entrega tbm */}
+                <div className="mt-2">
+                    {effectiveCoords ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsDeliveryCalculatorOpen(true)}
+                            className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-gray-50/90 dark:bg-dark-surface/60 border border-brand-border/60 dark:border-dark-border text-left hover:bg-gray-100/70 dark:hover:bg-dark-border/30 transition-colors"
+                        >
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
+                                    <MapPinIcon size={13} />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading">
+                                            {deliveryInfo.deliveryTime ? `Tempo estimado: ${deliveryInfo.deliveryTime}` : "Tempo estimado de entrega"}
+                                        </span>
+                                        {deliveryInfo.distanceKm != null && (
+                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                • ~{deliveryInfo.distanceKm} km
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                        {effectiveAddressLabel ? `Entregar em: ${effectiveAddressLabel}` : "Endereço selecionado"}
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="text-[11px] font-medium text-brand-green shrink-0 flex items-center gap-0.5">
+                                Alterar <ChevronRightIcon size={11} />
+                            </span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setIsDeliveryCalculatorOpen(true)}
+                            className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-colors text-left"
+                        >
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded-full bg-brand-green/15 flex items-center justify-center text-brand-green shrink-0">
+                                    <MapPinIcon size={13} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading leading-tight">
+                                        Calcular tempo estimado de entrega
+                                    </p>
+                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                        Informe seu CEP para calcular o prazo e taxa
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="text-[11px] font-semibold text-brand-green shrink-0 flex items-center gap-0.5">
+                                Calcular <ChevronRightIcon size={11} />
+                            </span>
+                        </button>
+                    )}
+                </div>
+            </div>
 
             <div ref={mobileTabsRef} className={categoryView ? "hidden" : "lg:hidden"}>
                 <div className="flex items-center gap-2 px-3 mb-6 border-b border-brand-border dark:border-dark-border h-[46px]">
@@ -1917,7 +2614,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     showSeller={false}
                                                     className="w-full"
                                                     promotions={partnerPromotions}
-                                                    hidePromoBadge={isCampaignView}
                                                     hideSalesCount
                                                 />
                                             ))}
@@ -1941,25 +2637,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         const promo = bestCampaignSection.promotion
                                         const items = bestCampaignSection.items.slice(0, 20)
                                         return (
-                                            <div key={promo.id} className="mb-10 w-full rounded-2xl p-4 bg-gradient-to-r from-amber-400 to-amber-300 text-brand-dark animate-fade-in shadow-md">
-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xl md:text-2xl">⚡</span>
-                                                        <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{promo.name}</h2>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-4 flex-wrap">
-                                                        <Button
-                                                            variant="link"
-                                                            onClick={() => openCategory(`campaign-${promo.id}`)}
-                                                            className="text-[13px] px-2 py-1 select-none"
-                                                        >
-                                                            Ver tudo
-                                                        </Button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex gap-3 overflow-x-auto scrollbar-hide px-1 snap-x snap-mandatory">
+                                            <div key={promo.id} className="mb-10 w-full rounded-2xl p-4 bg-brand-green text-brand-dark animate-fade-in shadow-md">
+                                                <CampaignSection name={promo.name} onSeeAll={() => openCategory(`campaign-${promo.id}`)}>
                                                     {items.map((item: any) => (
                                                         <div key={item.id} className="snap-start shrink-0">
                                                             <ItemCard
@@ -1968,11 +2647,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                                 promotions={partnerPromotions}
                                                                 hidePromoBadge={true}
                                                                 hideSalesCount
-                                                                className="w-[145px] md:w-[175px] bg-white dark:bg-dark-surface p-2.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-sm"
+                                                                className="w-[145px] md:w-[175px] bg-white dark:bg-dark-surface p-2 rounded-xl border border-gray-100 dark:border-dark-border shadow-sm"
                                                             />
                                                         </div>
                                                     ))}
-                                                </div>
+                                                </CampaignSection>
                                             </div>
                                         )
                                     })()}
@@ -2111,6 +2790,30 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     </div>
                 </div>
             </BottomSheet>
+
+            <DeliveryCalculatorBottomSheet
+                isOpen={isDeliveryCalculatorOpen}
+                onClose={() => setIsDeliveryCalculatorOpen(false)}
+                partner={partner}
+                userProfile={userProfile}
+                currentAddressLabel={effectiveAddressLabel}
+                onApplyLocation={(data) => {
+                    if (data.lat && data.lng) {
+                        setCustomCoords({ lat: data.lat, lng: data.lng })
+                    }
+                    if (data.label) {
+                        setCustomAddressLabel(data.label)
+                    }
+                    try {
+                        localStorage.setItem("dudit_vendor_delivery_calc", JSON.stringify({
+                            lat: data.lat,
+                            lng: data.lng,
+                            label: data.label,
+                            cep: data.cep,
+                        }))
+                    } catch { }
+                }}
+            />
 
             <ExplorarFiltersBottomSheet
                 isOpen={isCategoryFiltersOpen}

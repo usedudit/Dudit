@@ -11,6 +11,8 @@ export function mapProductToFormData(initialProduct: Product | null | undefined)
     ...initialProduct,
     images,
     stock: initialProduct.stock_quantity !== undefined ? initialProduct.stock_quantity : (initialProduct as any).stock,
+    stock_reserved: initialProduct.stock_reserved !== undefined ? Math.max(0, Number(initialProduct.stock_reserved) || 0) : (Math.max(0, Number((initialProduct as any).stock_reserved) || 0)),
+    stock_available: initialProduct.stock_available !== undefined ? Number(initialProduct.stock_available) : undefined,
     minStock: initialProduct.min_stock !== undefined ? initialProduct.min_stock : (initialProduct as any).minStock,
     maxStock: (initialProduct as any).max_stock !== undefined ? (initialProduct as any).max_stock : (initialProduct as any).maxStock,
     costPrice: initialProduct.cost_price !== undefined ? initialProduct.cost_price : (initialProduct as any).costPrice,

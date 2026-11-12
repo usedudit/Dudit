@@ -565,6 +565,9 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         </label>
                                     </div>
                                 </div>
+
+                                <div className="border-t border-brand-border dark:border-dark-border my-4" />
+
                                 <Turnstile
                                     ref={turnstileRef}
                                     action="partner-signup"
@@ -572,8 +575,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                     onExpire={() => setTurnstileToken(null)}
                                     onError={() => setTurnstileToken(null)}
                                 />
-                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                    <Button variant="outline" onClick={handleGoogleAuth} disabled={isLoading} className="w-full gap-3 pl-4 bg-transparent">
+                                <div>
+                                    <Button variant="outline" onClick={handleGoogleAuth} disabled={isLoading} className="w-full gap-3 pl-4">
                                         <svg width="20" height="20" viewBox="0 0 18 18" fill="none" className="shrink-0">
                                             <path d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="#4285F4" />
                                             <path d="M8.99976 18C11.4298 18 13.467 17.1941 14.9561 15.8195L12.0475 13.5613C11.2416 14.1013 10.2107 14.4204 8.99976 14.4204C6.65567 14.4204 4.67158 12.8372 3.96385 10.71V4.95818H0.957031V13.0418C2.43794 15.9831 5.48158 18 8.99976 18Z" fill="#34A853" />
@@ -595,7 +598,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         icon={opt.icon}
                                         title={opt.title}
                                         description={opt.description}
-                                        className="px-4 py-3 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                        className="px-4 py-3"
                                         onClick={() => setMode(opt.value)}
                                         right={
                                             <RadioButton

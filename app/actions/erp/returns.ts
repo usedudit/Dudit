@@ -36,7 +36,7 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { isSystemResourceActive } from "@/lib/system-resources"
-import { sendRefundProcessed, sendHighValueRefund, sendSlaExpired, sendRefundRequested, sendExchangeCreated } from "@/lib/services/discord-general-webhook.service"
+import { sendSlaExpired, sendExchangeCreated } from "@/lib/services/discord-general-webhook.service"
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
@@ -327,6 +327,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         customerAddress: row.orders?.delivery_address || undefined,
         orderStatus: row.orders?.situation || undefined,
         deliveryStatus: row.orders?.delivery_status || undefined,
+        deliveryType: row.orders?.delivery_type || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         source: row.source || "erp",
@@ -480,7 +481,7 @@ export async function getReturnRequestDetailsAction(
             .from("return_requests")
             .select(`
         *,
-        orders!order_id(order_number, customer_name, customer_id, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id, store_id),
+        orders!order_id(order_number, customer_name, customer_id, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_type, delivery_address, buyer_id, store_id),
         return_items!return_items_return_request_id_fkey(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_refunds(*),
@@ -818,24 +819,6 @@ export async function createReturnRequestAction(input: unknown) {
             }
         }
 
-        // Webhook Discord: notificar nova solicitação de reembolso/troca (fail-open)
-        if (data.resolution === "refund" || data.resolution === "exchange") {
-            const orderNumber = (order as any)?.order_number || data.orderId.slice(0, 8).toUpperCase()
-            sendRefundRequested({
-                returnRequestId: requestId,
-                orderNumber,
-                customerId: data.customerId || user.id,
-                partnerId: data.partnerId,
-                resolution: data.resolution as "refund" | "exchange",
-                reason: data.reason,
-                refundValue: data.items.reduce((sum, item) => sum + (item.quantity * (Number(item.metadata?.price) || 0)), 0),
-                items: data.items.map(item => ({
-                    name: item.sku || item.order_item_id,
-                    quantity: item.quantity,
-                    price: Number(item.metadata?.price || 0),
-                })),
-            }).catch(err => console.warn("[RETURN] Discord webhook failed (non-blocking):", err))
-        }
 
         await revalidateReturns(data.partnerId, data.orderId, requestId)
         return successResponse({ id: requestId })
@@ -2016,29 +1999,6 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
             revalidateEntityTimeline("order", order.id),
         ])
 
-        // Webhook Discord: notificar reembolso processado (fail-open)
-        sendRefundProcessed({
-            returnRequestId: data.requestId,
-            orderNumber: order.order_number,
-            partnerId: data.partnerId,
-            resolution: "refund",
-            refundAmount: cappedAmount,
-            refundStatus: "APPROVED",
-            processedBy: user.email || user.id,
-        }).catch(err => console.warn("[REFUND] Discord webhook failed (non-blocking):", err))
-
-        // Webhook Discord: alertar reembolso de alto valor (fail-open)
-        if (cappedAmount >= REFUND_PASSWORD_THRESHOLD) {
-            sendHighValueRefund({
-                returnRequestId: data.requestId,
-                orderNumber: order.order_number,
-                refundAmount: cappedAmount,
-                threshold: cappedAmount >= REFUND_CRITICAL_THRESHOLD ? 2000 : 300,
-                partnerId: data.partnerId,
-                customerEmail: order.customer_name || undefined,
-                requiresPassword: cappedAmount > REFUND_PASSWORD_THRESHOLD,
-            }).catch(err => console.warn("[REFUND] Discord high-value webhook failed (non-blocking):", err))
-        }
 
         return successResponse({
             refundId: data.refundId,
@@ -2177,6 +2137,9 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         created_at,
         situation,
         delivery_status,
+        delivery_type,
+        delivery_breakdown,
+        order_shipments ( id, status, kind, carrier, created_at ),
         order_source,
         payment_method,
         payment_provider,
@@ -2223,6 +2186,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         // Batch query to get returned quantities and active returns for all retrieved orders
         const orderIds = (orders || []).map((o: any) => o.id)
         const returnedQtyMap: Record<string, number> = {}
+        const returnCountMap: Record<string, number> = {}
         const ACTIVE_RETURN_STATUSES = new Set([
             "PENDING_REVIEW", "UNDER_ANALYSIS", "WAITING_CUSTOMER",
             "WAITING_ITEM_RETURN", "ESCALATED", "PROCESSING",
@@ -2249,6 +2213,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                     if (ACTIVE_RETURN_STATUSES.has(status)) {
                         ordersWithActiveReturns.add(rr.order_id)
                     }
+                    returnCountMap[rr.order_id] = (returnCountMap[rr.order_id] || 0) + 1
                     if (status === "REJECTED" || status === "EXPIRED" || status === "CANCELLED") return
                     const riList = rr.return_items || []
                     riList.forEach((ri: any) => {
@@ -2288,6 +2253,14 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                 order_number: order.order_number || null,
                 status: order.situation || "pending",
                 deliveryStatus: order.delivery_status || "not_sent",
+                delivery_status: order.delivery_status || "not_sent",
+                delivery_type: order.delivery_type || "delivery",
+                delivery_breakdown: order.delivery_breakdown || null,
+                order_shipments: Array.isArray(order.order_shipments)
+                    ? order.order_shipments.filter((shipment: any) => shipment?.kind !== "return")
+                    : [],
+                returnCount: returnCountMap[order.id] || 0,
+                return_count: returnCountMap[order.id] || 0,
                 totalAmount: toNumber(order.total_amount),
                 total_amount: toNumber(order.total_amount),
                 amountPaid,
@@ -2510,11 +2483,14 @@ export async function saveReturnEvidenceAction(
 
         const { R2_PREFIXES } = await import("@/lib/r2/config")
         const { validateKeyOwnership } = await import("@/lib/r2/server")
-        const expectedPrefix = `users/${user.id}/${R2_PREFIXES.orderAttachments}`
+        const allowedPrefixes = [
+            `users/${user.id}/${R2_PREFIXES.orderAttachments}`,
+            `users/${user.id}/returns/`,
+        ]
         if (
             typeof fileKey !== "string" ||
             !validateKeyOwnership(fileKey, user.id) ||
-            !fileKey.startsWith(expectedPrefix) ||
+            !allowedPrefixes.some((prefix) => fileKey.startsWith(prefix)) ||
             fileKey.includes("..") ||
             fileKey.startsWith("/")
         ) {

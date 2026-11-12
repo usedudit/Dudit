@@ -408,15 +408,15 @@ function isRoutineCrud(actionType: string, entityType: string, metadata?: Record
     return true
   }
 
-  // For 'updated' action, only keep orders, quotes, transactions, service_orders
+  // For 'updated' action, only keep financial/status-critical entities
   if (actionType === "updated") {
-    const keepUpdatedEntities = new Set(["order", "quote", "transaction", "service_order"])
+    const keepUpdatedEntities = new Set(["order", "quote", "transaction", "service_order", "appointment"])
     return !keepUpdatedEntities.has(entityType)
   }
 
   // For 'status_changed', keep only financial/status-critical entities
   if (actionType === "status_changed") {
-    const keepStatusEntities = new Set(["order", "quote", "transaction", "service_order", "return_request"])
+    const keepStatusEntities = new Set(["order", "quote", "transaction", "service_order", "return_request", "appointment"])
     return !keepStatusEntities.has(entityType)
   }
 

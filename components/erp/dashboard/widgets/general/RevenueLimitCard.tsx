@@ -33,7 +33,7 @@ export function RevenueLimitCard() {
       .then((res) => {
         if (active && res.success && res.data) setStatus(res.data)
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         if (active) setLoaded(true)
       })
@@ -60,13 +60,12 @@ export function RevenueLimitCard() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-              meta.tone === "red"
-                ? "bg-red-50 dark:bg-red-900/10 text-brand-red"
-                : meta.tone === "orange"
-                  ? "bg-yellow-50 dark:bg-yellow-900/10 text-yellow-600 dark:text-yellow-400"
-                  : "bg-green-50 dark:bg-green-900/10 text-brand-green"
-            }`}
+            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${meta.tone === "red"
+              ? "bg-red-50 dark:bg-red-900/10 text-brand-red"
+              : meta.tone === "orange"
+                ? "bg-yellow-50 dark:bg-yellow-900/10 text-yellow-600 dark:text-yellow-400"
+                : "bg-green-50 dark:bg-green-900/10 text-brand-green"
+              }`}
           >
             {meta.tone === "green" ? (
               <TrendingUpIcon className="h-5 w-5" />
@@ -115,7 +114,7 @@ export function RevenueLimitCard() {
           </span>
         )}
         {snapshot.projectedBreachDate && (
-          <span className="text-orange-600 dark:text-orange-400">
+          <span className="text-brand-orange">
             Limite estimado em{" "}
             {new Date(`${snapshot.projectedBreachDate}T00:00:00`).toLocaleDateString("pt-BR")}
           </span>

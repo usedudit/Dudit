@@ -16,7 +16,7 @@ import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getPOSCustomerDetailsAction, createPOSCustomerAddressAction } from "@/app/actions/erp/pdv"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
-import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders"
+import { fetchPartnerSalesCatalogBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { replaceUrl } from "@/lib/navigation/history"
@@ -333,29 +333,7 @@ export default function CreateOrder({
     const [items, setItems] = useState<any[]>([])
 
     // Instant product+services search (client-side bucket)
-    const fetchCombinedBucket = useCallback(async () => {
-        const [products, services] = await Promise.all([
-            fetchPartnerProductsBucket(),
-            fetchPartnerServicesBucket()
-        ]);
-        const mappedServices = services.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            sku: 'SERVIÇO',
-            gtin: null,
-            price: s.price,
-            promotional_price: s.promotional_price,
-            category_id: s.category_id,
-            stock: 0,
-            allow_sell_without_stock: true,
-            image: null,
-            has_variants: false,
-            unit: null,
-            isService: true,
-        }));
-        return [...products, ...mappedServices];
-    }, []);
-    const productBucket = useProductBucket(fetchCombinedBucket, { pageSize: 10 })
+    const productBucket = useProductBucket(fetchPartnerSalesCatalogBucket, { pageSize: 10 })
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false)
 
     const [orderPromotions, setOrderPromotions] = useState<any[]>([])
@@ -2214,31 +2192,31 @@ export default function CreateOrder({
 
                                                 // Helpers for correct effective amount
                                                 const getLegEffectiveAmount = (entry: any): number => {
-                                                  const effective = Number(entry?.effectiveAmount ?? 0);
-                                                  if (effective > 0.009) return effective;
-                                                  const amount = Number(entry?.amount ?? 0);
-                                                  const received = Number(entry?.amountReceived ?? 0);
-                                                  const hasPricingAdjustment =
-                                                    Number(entry?.interestAmount || 0) > 0.009 ||
-                                                    Number(entry?.feeAmount || 0) > 0.009 ||
-                                                    Number(entry?.fixedFeeAmount || 0) > 0.009 ||
-                                                    Number(entry?.paymentMethodDiscountAmount || 0) > 0.009 ||
-                                                    String(entry?.adjustmentType || "none").toLowerCase() !== "none";
-                                                  if (
-                                                    !hasPricingAdjustment &&
-                                                    received > 0.009 &&
-                                                    received < amount - 0.009
-                                                  ) {
-                                                    return received;
-                                                  }
-                                                  return amount > 0.009 ? amount : received;
+                                                    const effective = Number(entry?.effectiveAmount ?? 0);
+                                                    if (effective > 0.009) return effective;
+                                                    const amount = Number(entry?.amount ?? 0);
+                                                    const received = Number(entry?.amountReceived ?? 0);
+                                                    const hasPricingAdjustment =
+                                                        Number(entry?.interestAmount || 0) > 0.009 ||
+                                                        Number(entry?.feeAmount || 0) > 0.009 ||
+                                                        Number(entry?.fixedFeeAmount || 0) > 0.009 ||
+                                                        Number(entry?.paymentMethodDiscountAmount || 0) > 0.009 ||
+                                                        String(entry?.adjustmentType || "none").toLowerCase() !== "none";
+                                                    if (
+                                                        !hasPricingAdjustment &&
+                                                        received > 0.009 &&
+                                                        received < amount - 0.009
+                                                    ) {
+                                                        return received;
+                                                    }
+                                                    return amount > 0.009 ? amount : received;
                                                 };
 
                                                 const isCashLeg = (entry: any): boolean => {
-                                                  const method = String(entry?.method || "")
-                                                    .toLowerCase()
-                                                    .trim();
-                                                  return method === "cash" || method.includes("dinheiro");
+                                                    const method = String(entry?.method || "")
+                                                        .toLowerCase()
+                                                        .trim();
+                                                    return method === "cash" || method.includes("dinheiro");
                                                 };
 
                                                 return isPaidOrder ? (
@@ -2258,22 +2236,22 @@ export default function CreateOrder({
                                                             type PaymentValueLine = { label: string; amount: number; baseAmount: number; installmentNumber: number };
                                                             const grouped = new Map<string, PaymentValueLine>();
                                                             for (const entry of paidBreakdown) {
-                                                              const method = String(entry?.method || "").trim();
-                                                              const methodLabel = method
-                                                                ? formatPaymentMethodLabel(method, null)
-                                                                : "Método não informado";
-                                                              const label = methodLabel;
-                                                              const amount = getLegEffectiveAmount(entry);
-                                                              const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
-                                                              const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
-                                                              const key = `${label.toLowerCase()}::${installmentNumber}`;
-                                                              const existing = grouped.get(key);
-                                                              if (existing) {
-                                                                existing.amount += amount;
-                                                                existing.baseAmount += baseAmount;
-                                                              } else {
-                                                                grouped.set(key, { label, amount, baseAmount, installmentNumber });
-                                                              }
+                                                                const method = String(entry?.method || "").trim();
+                                                                const methodLabel = method
+                                                                    ? formatPaymentMethodLabel(method, null)
+                                                                    : "Método não informado";
+                                                                const label = methodLabel;
+                                                                const amount = getLegEffectiveAmount(entry);
+                                                                const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
+                                                                const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
+                                                                const key = `${label.toLowerCase()}::${installmentNumber}`;
+                                                                const existing = grouped.get(key);
+                                                                if (existing) {
+                                                                    existing.amount += amount;
+                                                                    existing.baseAmount += baseAmount;
+                                                                } else {
+                                                                    grouped.set(key, { label, amount, baseAmount, installmentNumber });
+                                                                }
                                                             }
                                                             const paymentValueLines = Array.from(grouped.values());
 
@@ -2411,21 +2389,21 @@ export default function CreateOrder({
                                                                         />
                                                                     )}
                                                                     {deliveryMethod === "delivery" && (() => {
-                                                                         const savedDelivery = deliveryBreakdown as any | null
-                                                                         const isCarrier = savedDelivery?.source === "superfrete"
-                                                                         const carrierIcon = isCarrier
-                                                                             ? getCarrierBrandIcon(savedDelivery?.companyName, savedDelivery?.serviceName, savedDelivery?.carrier)
-                                                                             : null
-                                                                    if (savedDelivery) {
-                                                                        return (
-                                                                            <ListItem
-                                                                                icon={
-                                                                                    isCarrier ? (
-                                                                                        <img src={carrierIcon || ""} alt="Transportadora" className="object-contain" />
-                                                                                    ) : (
-                                                                                        <MotorbikeIcon className="text-brand-dark dark:text-dark-heading" />
-                                                                                    )
-                                                                                }
+                                                                        const savedDelivery = deliveryBreakdown as any | null
+                                                                        const isCarrier = savedDelivery?.source === "superfrete"
+                                                                        const carrierIcon = isCarrier
+                                                                            ? getCarrierBrandIcon(savedDelivery?.companyName, savedDelivery?.serviceName, savedDelivery?.carrier)
+                                                                            : null
+                                                                        if (savedDelivery) {
+                                                                            return (
+                                                                                <ListItem
+                                                                                    icon={
+                                                                                        isCarrier ? (
+                                                                                            <img src={carrierIcon || ""} alt="Transportadora" className="object-contain" />
+                                                                                        ) : (
+                                                                                            <MotorbikeIcon className="text-brand-dark dark:text-dark-heading" />
+                                                                                        )
+                                                                                    }
                                                                                     title={
                                                                                         isCarrier
                                                                                             ? [savedDelivery?.companyName, savedDelivery?.serviceName].filter(Boolean).join(" - ") || "Transportadora"

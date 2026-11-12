@@ -66,6 +66,62 @@ async function postToDiscord(
   }
 }
 
+// --- Solicitação de Reembolso de Assinatura (Dudit) ---
+
+export async function sendSubscriptionRefundRequested(payload: {
+  refundRequestId: string
+  partnerId: string
+  partnerName?: string
+  storeName?: string
+  userId: string
+  userEmail?: string
+  userName?: string
+  planName?: string
+  amount: number
+  reasonCategory: string
+  reasonDescription: string
+  isWithin7Days: boolean
+  createdAt?: string
+}): Promise<{ success: boolean; error?: string }> {
+  const url = GENERAL_URL()
+  if (!isValidUrl(url)) return { success: true }
+
+  const categoryLabels: Record<string, string> = {
+    repentance_7_days: "Direito de Arrependimento (CDC 7 dias)",
+    double_charge: "Cobrança duplicada ou indevida",
+    technical_issue: "Dificuldade técnica ou instabilidade",
+    commercial_agreement: "Acordo comercial / Alteração de plano",
+    unsatisfied: "Insatisfação com os recursos",
+    other: "Outro motivo",
+  }
+  const categoryLabel = categoryLabels[payload.reasonCategory] || payload.reasonCategory
+
+  const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+    { name: "📋 Tipo", value: "💰 **Reembolso de Plano (Dudit)**", inline: true },
+    { name: "👤 Solicitante", value: payload.userName ? `${payload.userName} (${maskEmail(payload.userEmail)})` : maskEmail(payload.userEmail), inline: true },
+    { name: "💵 Valor Solicitado", value: `**${formatBRL(payload.amount)}**`, inline: true },
+    { name: "⚖️ CDC (7 dias)", value: payload.isWithin7Days ? "✅ **Dentro do prazo legal (Art. 49)**" : "⚠️ Fora do prazo de 7 dias", inline: true },
+  ]
+
+  if (payload.planName) fields.push({ name: "📦 Plano", value: payload.planName, inline: true })
+  if (payload.partnerName) fields.push({ name: "🏢 Parceiro", value: `${payload.partnerName} (${maskId(payload.partnerId)})`, inline: true })
+  if (payload.storeName) fields.push({ name: "🏪 Loja", value: payload.storeName, inline: true })
+  fields.push({ name: "🏷️ Categoria", value: categoryLabel, inline: true })
+  fields.push({ name: "📝 Motivo Informado", value: truncate(payload.reasonDescription), inline: false })
+
+  return postToDiscord(url, {
+    username: "Dudit Sistema",
+    avatar_url: "https://dudit.com.br/icon-192x192.png",
+    embeds: [{
+      title: "💰 Nova Solicitação de Reembolso - Plano Dudit",
+      color: 0x3b82f6,
+      fields,
+      footer: { text: `Request: ${maskId(payload.refundRequestId)} • ${formatDateTime(payload.createdAt)}` },
+      timestamp: new Date().toISOString(),
+    }],
+  })
+}
+
 // --- Solicitação de Reembolso ---
 
 export async function sendRefundRequested(payload: {
@@ -296,6 +352,7 @@ export async function sendPlanChanged(payload: {
   changeType: "upgrade" | "downgrade" | "cancellation"
   effectiveAt?: string
   createdAt?: string
+  reason?: string
 }): Promise<{ success: boolean; error?: string }> {
   const url = GENERAL_URL()
   if (!isValidUrl(url)) return { success: true }
@@ -309,13 +366,20 @@ export async function sendPlanChanged(payload: {
 
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: "📊 Tipo", value: `${config.emoji} **${config.label}**`, inline: true },
-    { name: "📋 Plano", value: `${payload.previousPlan} → **${payload.newPlan}**`, inline: false },
+    {
+      name: payload.changeType === "cancellation" ? "📋 Plano Cancelado" : "📋 Plano",
+      value: payload.changeType === "cancellation"
+        ? `**${payload.previousPlan}**`
+        : `${payload.previousPlan} → **${payload.newPlan}**`,
+      inline: false,
+    },
     { name: "👤 Usuário", value: payload.userName ? `${payload.userName} (${maskEmail(payload.userEmail)})` : maskEmail(payload.userEmail), inline: true },
   ]
 
   if (payload.partnerName) fields.push({ name: "🏢 Parceiro", value: `${payload.partnerName} (${maskId(payload.partnerId)})`, inline: true })
   if (payload.storeName) fields.push({ name: "🏪 Loja", value: payload.storeName, inline: true })
-  if (payload.effectiveAt) fields.push({ name: "📅 Vigência", value: formatDateTime(payload.effectiveAt), inline: true })
+  if (payload.effectiveAt) fields.push({ name: "📅 Vigência até", value: formatDateTime(payload.effectiveAt), inline: true })
+  if (payload.reason) fields.push({ name: "📝 Motivo do cancelamento", value: truncate(payload.reason), inline: false })
 
   return postToDiscord(url, {
     username: "Dudit Sistema",

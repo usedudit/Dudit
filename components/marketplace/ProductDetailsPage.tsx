@@ -1460,14 +1460,6 @@ export function ProductDetailsPageClient({
                 {product.name}
             </h1>
 
-            {showPrice && activePromo && pricing.hasCampaignDiscount && (
-                <div className="mb-6 flex">
-                    <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
-                        {activePromo.name}
-                    </Badge>
-                </div>
-            )}
-
             {/* Price */}
             <div className="mb-6">
                 {!showPrice ? (
@@ -1491,9 +1483,8 @@ export function ProductDetailsPageClient({
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">
                                         {formatMoney(pricing.original)}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#2968c8]">
-                                        <TagIcon className="w-3 h-3 fill-current shrink-0" />
-                                        <span>Oferta Especial</span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                        {pricing.totalDiscountPercent}% OFF
                                     </span>
                                 </div>
                                 {hasPix ? (
@@ -1532,7 +1523,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ff7a00]">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -1558,7 +1549,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-[#ff7a00]">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>

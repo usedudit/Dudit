@@ -6,7 +6,6 @@ import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import { ReportsSkeleton } from "@/components/erp/reports/ReportsSkeleton"
-import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
 import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { IconPlaceholder } from "@/components/reusable"
@@ -54,9 +53,6 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
     const activeResources = resolveActiveResources(businessInfo)
 
-    const allAccess = await getAllUserPartnerAccess()
-    const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
-
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
     const compare = (searchParams?.compare as CompareMode) || "none"
@@ -65,15 +61,25 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
 
     return (
         <>
-            <ERPPageHeader title={activeStore?.storeName ?? "Dashboard"} />
+            <ERPPageHeader title="Dashboard" />
             <FadeIn className="p-4">
                 <DashboardProvider>
                     <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-                        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                            <div className="hidden xl:block" />
-                            <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                                <GlobalPeriodFilter />
-                            </Suspense>
+                        {/* Desktop: título/subtítulo e filtros na mesma linha */}
+                        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="hidden lg:flex flex-col gap-2 pt-1">
+                                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                    Visão Geral
+                                </h1>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                                    <GlobalPeriodFilter />
+                                </Suspense>
+                            </div>
                         </header>
                         <Suspense fallback={<ReportsSkeleton />}>
                             <GeneralTab partnerId={partnerId} sells={activeResources} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />

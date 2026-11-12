@@ -3087,7 +3087,6 @@ export default function OrderDetailView({
             setSelectedOrderItemForAppointment(null);
           }}
           onSave={handleSaveAppointmentFromOrder}
-          onEnterSelectionMode={() => { }}
         />
       )}
 

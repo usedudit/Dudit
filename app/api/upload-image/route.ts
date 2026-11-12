@@ -204,22 +204,21 @@ async function handleUpload(request: NextRequest) {
     ])
 
     // =============================
-    // Moderação (Camada 1: SHA256 -> Camada 2: Visual pHash -> Camada 3: Sightengine)
+    // Moderação (Camada 1: SHA256 -> Camada 2: Visual pHash para FLAGGED -> Camada 3: Sightengine)
     // =============================
-    // Enforce moderation before accepting the object into R2. A cached hash
-    // may reuse a prior decision; an unavailable provider is review-only for
-    // authenticated uploads and fail-closed for public onboarding logos.
     let cachedModeration = await getImageFromCache(imageHash)
 
-    // Se miss no SHA-256 exato, tenta o cache visual perceptual (Camada 2)
+    // Camada 2 (pHash): Se miss no SHA-256 exato, APENAS reutiliza se bater com imagem FLAGGED conhecida (blacklist)
+    // NUNCA auto-aprova imagem nova desconhecida por similaridade visual dHash para evitar falso-positivo em fundos planos
     if (!cachedModeration && imagePHash) {
       const visualMatch = await findSimilarImageInCache(imagePHash)
-      if (visualMatch) {
+      if (visualMatch && visualMatch.cached.status === "FLAGGED") {
         cachedModeration = visualMatch.cached
       }
     }
 
     let decision: ReturnType<typeof decideImageStatus>
+    let moderationUnavailable = false
 
     if (cachedModeration) {
       // Trata status legado BLOCKED como FLAGGED para nunca bloquear upload
@@ -238,6 +237,8 @@ async function handleUpload(request: NextRequest) {
 
       if (analysis.isUnavailable) {
         // Fallback resiliente: se Sightengine estiver temporariamente indisponível, não bloqueia o lojista
+        // mas NÃO grava no cache do Redis como APPROVED para permitir re-checagem futura
+        moderationUnavailable = true
         decision = {
           status: "APPROVED",
           message: "Imagem enviada.",
@@ -254,7 +255,7 @@ async function handleUpload(request: NextRequest) {
           shouldSaveToR2: true,
         }
 
-        // Cacheia decisão no Redis para evitar chamadas redundantes futuras
+        // Cacheia decisão no Redis apenas quando a moderação de fato foi executada
         await cacheImageModeration(
           imageHash,
           analysis.riskLevel,
@@ -313,10 +314,12 @@ async function handleUpload(request: NextRequest) {
     // =============================
     const isDirect = request.nextUrl.searchParams.get("directUpload") === "true"
 
-    // Registra status da imagem em cache de chave/URL
-    const finalModerationStatus = decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED"
-    await cacheImageUrlStatus(signedUrl.key, finalModerationStatus)
-    if (signedUrl.publicUrl) await cacheImageUrlStatus(signedUrl.publicUrl, finalModerationStatus)
+    // Registra status da imagem em cache de chave/URL (apenas se moderação foi executada com sucesso)
+    if (!moderationUnavailable) {
+      const finalModerationStatus = decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED"
+      await cacheImageUrlStatus(signedUrl.key, finalModerationStatus)
+      if (signedUrl.publicUrl) await cacheImageUrlStatus(signedUrl.publicUrl, finalModerationStatus)
+    }
 
     if (isDirect) {
       // Return the upload URL so the client does the upload directly

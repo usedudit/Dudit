@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { getSubscriptionStatusAction, getSubscriptionPaymentUrlAction } from "./subscriptions"
+import { getSubscriptionStatusAction, getSubscriptionPaymentUrlAction, cancelSubscriptionAction } from "./subscriptions"
 
 // ── Mock do cliente supabase ───────────────────────────────────────────────
 const mockMaybeSingle = vi.fn()
@@ -52,6 +52,10 @@ vi.mock("@/lib/services/discord-general-webhook.service", () => ({
   sendPlanChanged: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock("@/lib/security/require-rate-limit", () => ({
+  requireRateLimit: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock("@/lib/secure-logger", () => ({
   SecureLogger: {
     info: vi.fn(),
@@ -63,14 +67,15 @@ vi.mock("@/lib/secure-logger", () => ({
 // Import mocked modules so we can set their return values.
 import { getPartnerPlan, getPartnerSubscription, getUsageCounters } from "@/lib/services/subscription.service"
 import { computeSubscriptionPeriods } from "@/lib/billing/subscription-period"
-import { getMpSubscriptionStatus } from "@/lib/services/mercadopago/subscriptions"
+import { getMpSubscriptionStatus, cancelMpSubscription } from "@/lib/services/mercadopago/subscriptions"
+import { sendPlanChanged } from "@/lib/services/discord-general-webhook.service"
 
 const PENDING_PURCHASE = {
   id: "purchase-1",
   status: "pending",
   billing_period_start: "2026-10-30T03:00:00.000Z",
   billing_period_end: "2026-11-30T03:00:00.000Z",
-  total_amount: 19.9,
+  total_amount: 29.9,
   billing_invoices: [
     {
       id: "invoice-1",
@@ -380,5 +385,55 @@ describe("getSubscriptionPaymentUrlAction", () => {
 
     expect(res.success).toBe(true)
     expect(res.data.payment_url).toBeNull()
+  })
+})
+
+describe("cancelSubscriptionAction — plan cancellation Discord webhook", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    vi.mocked(getPartnerSubscription).mockResolvedValue({
+      id: "sub-1",
+      partner_id: "partner-1",
+      plan_id: "plan-crescer",
+      status: "active",
+    } as any)
+
+    vi.mocked(getPartnerPlan).mockResolvedValue({
+      id: "plan-crescer",
+      name: "Crescer",
+      slug: "crescer",
+      price: 29.9,
+    } as any)
+
+    vi.mocked(cancelMpSubscription).mockResolvedValue({
+      success: true,
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: "2026-12-01T00:00:00.000Z",
+    })
+
+    mockMaybeSingle.mockResolvedValue({
+      data: { name: "Loja Teste", store_name: "Loja Teste" },
+      error: null,
+    })
+  })
+
+  it("notifies Discord via sendPlanChanged when a Dudit plan is cancelled", async () => {
+    const res: any = await cancelSubscriptionAction({
+      reason: "Muito caro",
+      reasonCategory: "too_expensive",
+    })
+
+    expect(res.success).toBe(true)
+    expect(res.data.cancelAtPeriodEnd).toBe(true)
+    expect(sendPlanChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changeType: "cancellation",
+        previousPlan: "Crescer",
+        newPlan: "Cancelado",
+        reason: "Muito caro",
+        effectiveAt: "2026-12-01T00:00:00.000Z",
+      })
+    )
   })
 })

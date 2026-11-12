@@ -200,3 +200,95 @@ export async function pauseAllMarketplaceSubscriptions(
   }
   return { paused, failed }
 }
+
+/**
+ * Cancela uma assinatura recorrente (e o preapproval do MP, quando houver)
+ * por encerramento de conta do lojista ou ação em lote antes da exclusão.
+ */
+export async function cancelSubscriptionForAccountDeletion(
+  partnerId: string,
+  sub: { id: string; mp_preapproval_id?: string | null },
+  reason = "assinaturas canceladas em lote pelo lojista ao encerrar a conta.",
+): Promise<boolean> {
+  const admin = getAdminClient()
+
+  if (sub.mp_preapproval_id) {
+    try {
+      const { cancelMpPreapproval } = await import("@/lib/services/mercadopago/partner-preapproval")
+      await cancelMpPreapproval(partnerId, String(sub.mp_preapproval_id))
+    } catch (e) {
+      console.error("[RECURRING_LIMITS] Falha ao cancelar preapproval do MP:", e)
+    }
+  }
+
+  const nowIso = new Date().toISOString()
+  const { data: updated, error } = await admin
+    .from("recurring_subscriptions")
+    .update({
+      status: "cancelled",
+      cancelled_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq("id", sub.id)
+    .in("status", NON_TERMINAL_STATUSES)
+    .select("id")
+    .maybeSingle()
+
+  if (error) {
+    console.error("[RECURRING_LIMITS] Falha ao cancelar assinatura:", error.message)
+    return false
+  }
+  if (!updated) return false
+
+  try {
+    await logAuditEvent({
+      partnerId,
+      actorUserId: null,
+      entityType: "recurring_subscription",
+      entityId: sub.id,
+      actionType: "cancelled",
+      changeLines: [`assinatura cancelada automaticamente: ${reason}`],
+      source: "system",
+    })
+  } catch (e) {
+    console.error("[RECURRING_LIMITS] Falha ao registrar auditoria:", e)
+  }
+
+  return true
+}
+
+/**
+ * Cancela em lote todas as assinaturas não terminais de um parceiro.
+ *
+ * Usado pelo modal de exclusão de conta (e no pipeline de exclusão) para
+ * garantir que nenhuma assinatura recorrente continue cobrando clientes.
+ */
+export async function cancelAllMarketplaceSubscriptions(
+  partnerId: string,
+): Promise<{ cancelled: number; failed: number }> {
+  const admin = getAdminClient()
+
+  const { data: subs, error } = await admin
+    .from("recurring_subscriptions")
+    .select("id, mp_preapproval_id")
+    .eq("partner_id", partnerId)
+    .in("status", NON_TERMINAL_STATUSES)
+
+  if (error) {
+    console.error("[RECURRING_LIMITS] Falha ao buscar assinaturas para cancelar:", error.message)
+    return { cancelled: 0, failed: 0 }
+  }
+  if (!subs || subs.length === 0) return { cancelled: 0, failed: 0 }
+
+  let cancelled = 0
+  let failed = 0
+  for (const sub of subs) {
+    const ok = await cancelSubscriptionForAccountDeletion(
+      partnerId,
+      sub as { id: string; mp_preapproval_id?: string | null },
+    )
+    if (ok) cancelled++
+    else failed++
+  }
+  return { cancelled, failed }
+}

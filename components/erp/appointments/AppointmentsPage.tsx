@@ -208,7 +208,7 @@ const AppointmentsPage = ({
     const { planSlug } = usePermissions();
     const { openPlanUpgrade } = usePlanUpgrade();
     const hasEscalarPlan = hasMinimumPlan(planSlug, 'escalar');
-    const { error: notifyError } = useNotification();
+    const { error: notifyError, warning: notifyWarning } = useNotification();
 
     const handleOpenSuggestions = useCallback(() => {
         if (hasEscalarPlan) setShowSuggestions(true);
@@ -628,6 +628,24 @@ const AppointmentsPage = ({
     };
 
     const handleTimeSelection = (time: string, staffId?: string) => {
+        // Do not allow picking a time that has already passed.
+        const targetDay = new Date(currentDate);
+        targetDay.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (targetDay.getTime() < today.getTime()) {
+            notifyWarning("Data indisponível", "Selecione uma data a partir de hoje.");
+            return;
+        }
+        if (targetDay.getTime() === today.getTime()) {
+            const [hour, minute] = time.split(':').map(Number);
+            const now = new Date();
+            if (hour * 60 + minute <= now.getHours() * 60 + now.getMinutes()) {
+                notifyWarning("Horário indisponível", "Selecione um horário a partir de agora.");
+                return;
+            }
+        }
+
         setTempSelectionTime(time);
         if (staffId) {
             setPreSelectedStaffId(staffId);

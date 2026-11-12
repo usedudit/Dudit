@@ -388,6 +388,8 @@ export async function cancelSubscriptionAction(input?: {
       return errorResponse(SUBSCRIPTION_MESSAGES.SUBSCRIPTION_NOT_FOUND)
     }
 
+    const currentPlan = await getPartnerPlan(partner.id)
+
     const reasonText = input?.reason || (input?.feedback ? `Motivo: ${input.feedback}` : undefined)
 
     // Cancelling the plan also discards any unfinished upgrade checkout, so a
@@ -398,6 +400,29 @@ export async function cancelSubscriptionAction(input?: {
 
     if (!result.success) {
       return errorResponse(result.error || "Erro ao cancelar assinatura")
+    }
+
+    // Webhook Discord: notificar cancelamento de plano da Dudit (fail-open)
+    if (currentPlan) {
+      const admin = getAdminClient()
+      const { data: partnerData } = await admin
+        .from("partners")
+        .select("name, store_name")
+        .eq("id", partner.id)
+        .maybeSingle()
+
+      sendPlanChanged({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+        partnerId: partner.id,
+        partnerName: partnerData?.store_name || partnerData?.name,
+        previousPlan: currentPlan.name || currentPlan.slug || "Desconhecido",
+        newPlan: "Cancelado",
+        changeType: "cancellation",
+        effectiveAt: result.currentPeriodEnd || undefined,
+        reason: reasonText,
+      }).catch(err => console.warn("[SUBSCRIPTION] Discord webhook failed (non-blocking):", err))
     }
 
     const message = result.cancelAtPeriodEnd

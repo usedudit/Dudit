@@ -1033,8 +1033,13 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
                                                                     {product?.id && matchingExisting ? (
                                                                         <div className="flex items-center gap-1.5 min-w-[120px]">
-                                                                            <div className="flex-1 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg h-[34px] px-3 flex items-center justify-between text-xs text-brand-dark dark:text-dark-heading font-medium">
-                                                                                {row.stock}
+                                                                            <div className="flex-1 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg h-[34px] px-2.5 flex items-center justify-between text-xs text-brand-dark dark:text-dark-heading font-medium">
+                                                                                <span>{row.stock}</span>
+                                                                                {matchingExisting.stock_reserved > 0 && (
+                                                                                    <span className="text-[10px] text-brand-orange font-semibold" title={`Reservado: ${matchingExisting.stock_reserved}`}>
+                                                                                        ({matchingExisting.stock_reserved} res.)
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                             <Button
                                                                                 type="button"
@@ -1047,6 +1052,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                                         sku: row.sku,
                                                                                         image: typeof activeImage === 'string' ? activeImage : null,
                                                                                         stock: row.stock,
+                                                                                        reservedStock: matchingExisting.stock_reserved || 0,
+                                                                                        availableStock: matchingExisting.stock_available,
                                                                                         rowId: row.id
                                                                                     })
                                                                                 }}
@@ -1163,15 +1170,30 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     name: product.name,
                     sku: product.sku,
                     image: (typeof product.images?.[0] === 'string' ? product.images[0] : (product.image || null)),
-                    stock: Number(product.stock || 0)
+                    stock: Number(product.stock || 0),
+                    unit: product.unit || "UN"
                 }}
-                variant={selectedVariantForAdjustment}
+                variant={selectedVariantForAdjustment ? {
+                    id: selectedVariantForAdjustment.id,
+                    name: selectedVariantForAdjustment.name,
+                    sku: selectedVariantForAdjustment.sku,
+                    image: selectedVariantForAdjustment.image,
+                    stock: Number(selectedVariantForAdjustment.stock || 0),
+                    reservedStock: Number(selectedVariantForAdjustment.reservedStock || 0),
+                    availableStock: selectedVariantForAdjustment.availableStock,
+                    unit: product.unit || "UN"
+                } : null}
                 onClose={() => setSelectedVariantForAdjustment(null)}
-                onSaveSuccess={(newStock) => {
+                onSaveSuccess={(newStock, newReservedStock) => {
                     updateRow(selectedVariantForAdjustment.rowId, "stock", newStock)
                     setExistingVariants(prev => prev.map(ev => {
                         if (ev.id === selectedVariantForAdjustment.id) {
-                            return { ...ev, stock: newStock }
+                            return {
+                                ...ev,
+                                stock: newStock,
+                                stock_reserved: newReservedStock !== undefined ? newReservedStock : ev.stock_reserved,
+                                stock_available: newReservedStock !== undefined ? newStock - newReservedStock : ev.stock_available
+                            }
                         }
                         return ev
                     }))

@@ -64,6 +64,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         show_in_marketplace: product.show_in_marketplace !== false,
         minStock: product.min_stock || 0,
         stock_quantity: product.stock_quantity || 0,
+        stock_reserved: Math.max(0, Number(product.stock_reserved) || 0),
+        stock_available: Number(product.stock_available ?? ((Number(product.stock_quantity) || 0) - (Math.max(0, Number(product.stock_reserved) || 0)))),
         rating: product.rating || 0,
         created_at: product.created_at,
         partner_id: product.partner_id,

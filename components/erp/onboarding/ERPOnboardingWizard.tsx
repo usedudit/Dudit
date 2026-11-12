@@ -261,7 +261,7 @@ export function ERPOnboardingWizard({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[130] flex h-screen w-screen bg-[#022C2B] p-3 md:p-6 items-stretch overflow-hidden font-sans"
+            className="fixed inset-0 z-[130] flex h-screen w-screen bg-brand-dark p-3 md:p-6 items-stretch overflow-hidden font-sans"
             style={{ zIndex }}
           >
             <div className="absolute inset-0 opacity-5 pointer-events-none" />
@@ -273,9 +273,9 @@ export function ERPOnboardingWizard({
                   <img
                     src="https://img.dudit.com.br/static/Logo.png"
                     alt="Dudit"
-                    width={90}
-                    height={28}
-                    className="h-7 w-auto"
+                    width={140}
+                    height={40}
+                    className="h-10 w-auto"
                   />
                 </Link>
                 <button

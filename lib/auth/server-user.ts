@@ -2,7 +2,7 @@ import "server-only"
 import { cache } from "react"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { User } from "@supabase/supabase-js"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 
 // Request-scoped cache used in addition to React cache(). The headers object is
 // unique to a request in the App Router, so this deduplicates auth.getUser()
@@ -26,6 +26,24 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
 
     if (requestCache.has(headerList)) {
         return requestCache.get(headerList) ?? null
+    }
+
+    // FAST-FAIL: If there are no Supabase auth cookies present on the request,
+    // skip network calls to GoTrue auth.getUser().
+    let cookieStore: Awaited<ReturnType<typeof cookies>>
+    try {
+        cookieStore = await cookies()
+    } catch {
+        return null
+    }
+
+    const hasAuthCookie = cookieStore
+        .getAll()
+        .some((c) => c.name.startsWith("sb-") && (c.name.includes("-auth-token") || c.name.endsWith("-token")))
+
+    if (!hasAuthCookie) {
+        requestCache.set(headerList, null)
+        return null
     }
 
     if (process.env.DUDIT_REQUEST_TRACE === "true") {

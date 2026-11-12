@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -42,131 +42,162 @@ export async function requestAccountDeletionCodeAction(
   maskedEmail?: string
   cooldownSeconds?: number
 }> {
-  await requireRateLimit(RateLimitCategory.ACCOUNT_DELETE_REQUEST)
-
-  // Validate CSRF token
   const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
-  const csrfValidation = await requireCSRF(csrf_token)
-  if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
-  }
 
   try {
-    const user = await requireUser()
+    const [, csrfValidation, user, reqHeaders] = await Promise.all([
+      requireRateLimit(RateLimitCategory.ACCOUNT_DELETE_REQUEST),
+      requireCSRF(csrf_token),
+      requireUser(),
+      headers(),
+    ])
+
+    if (!csrfValidation.valid) {
+      return { error: csrfValidation.error || "Token CSRF inválido" }
+    }
+
     const rawEmail = user.email?.trim().toLowerCase()
     if (!rawEmail) {
       return { error: "Usuário não possui um e-mail válido vinculado à conta." }
     }
 
     const admin = getAdminClient()
+    const nowMs = Date.now()
+    const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
 
-    // 1. Pre-validation: Check if user owns an active partner with active MP subscription
-    const { data: partner } = await admin
-      .from("partners")
-      .select("id, user_id")
-      .eq("user_id", user.id)
-      .maybeSingle()
+    // 1. Parallel lookup: partner, active deletion, and recent requests (60s cooldown + 24h quota)
+    const [
+      { data: partner },
+      { data: existingDeletion },
+      { data: recentRequests },
+    ] = await Promise.all([
+      admin
+        .from("partners")
+        .select("id, user_id")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      admin
+        .from("account_deletions")
+        .select("id, status")
+        .eq("user_id", user.id)
+        .not("status", "eq", "completed")
+        .not("status", "eq", "failed")
+        .maybeSingle(),
+      admin
+        .from("account_deletion_requests")
+        .select("created_at")
+        .eq("user_id", user.id)
+        .gt("created_at", twentyFourHoursAgo)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ])
 
     if (partner) {
       if (partner.user_id !== user.id) {
         return { error: "Somente o proprietário principal (OWNER) da conta pode solicitar a exclusão." }
       }
 
-      const { data: activeSub } = await admin
-        .from("subscriptions")
-        .select("id, status, cancel_at_period_end")
-        .eq("partner_id", partner.id)
-        .in("status", ["active", "trialing", "past_due"])
-        .maybeSingle()
+      const { countActiveRecurringSubscriptions } = await import("@/lib/services/recurring/limits")
+      const [{ data: activeSub }, activeRecurringCount] = await Promise.all([
+        admin
+          .from("subscriptions")
+          .select("id, status, cancel_at_period_end")
+          .eq("partner_id", partner.id)
+          .in("status", ["active", "trialing", "past_due"])
+          .maybeSingle(),
+        countActiveRecurringSubscriptions(partner.id),
+      ])
 
       // A subscription already scheduled to cancel at period end is leaving;
       // it shouldn't block account deletion.
       if (activeSub && !activeSub.cancel_at_period_end) {
         return { error: "active_subscription" }
       }
-    }
 
-    // 2. Concurrency check: check if an account deletion is already running
-    const { data: existingDeletion } = await admin
-      .from("account_deletions")
-      .select("id, status")
-      .eq("user_id", user.id)
-      .not("status", "eq", "completed")
-      .not("status", "eq", "failed")
-      .maybeSingle()
+      if (activeRecurringCount > 0) {
+        return {
+          error: `Você possui ${activeRecurringCount} assinatura(s) recorrente(s) ativa(s) no ERP. Cancele todas antes de solicitar a exclusão da conta.`,
+        }
+      }
+    }
 
     if (existingDeletion) {
       return { error: "Uma exclusão de conta já está em andamento para este usuário." }
     }
 
-    // 3. In-database Anti-abuse: 60s cooldown check
-    const sixtySecondsAgo = new Date(Date.now() - 60 * 1000).toISOString()
-    const { data: recentRequest } = await admin
-      .from("account_deletion_requests")
-      .select("created_at")
-      .eq("user_id", user.id)
-      .gt("created_at", sixtySecondsAgo)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (recentRequest) {
-      const elapsedMs = Date.now() - new Date(recentRequest.created_at).getTime()
-      const remainingSec = Math.max(1, Math.ceil((60 * 1000 - elapsedMs) / 1000))
-      return {
-        error: `Aguarde ${remainingSec} segundos antes de solicitar um novo código.`,
-        cooldownSeconds: remainingSec,
+    const latestRequest = recentRequests?.[0]
+    if (latestRequest) {
+      const elapsedMs = nowMs - new Date(latestRequest.created_at).getTime()
+      if (elapsedMs < 60 * 1000) {
+        const remainingSec = Math.max(1, Math.ceil((60 * 1000 - elapsedMs) / 1000))
+        return {
+          error: `Aguarde ${remainingSec} segundos antes de solicitar um novo código.`,
+          cooldownSeconds: remainingSec,
+        }
       }
     }
 
-    // 4. In-database Anti-abuse: Daily quota (max 5 per 24 hours)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { count: dailyCount } = await admin
-      .from("account_deletion_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gt("created_at", twentyFourHoursAgo)
-
-    if ((dailyCount || 0) >= 5) {
+    if ((recentRequests?.length || 0) >= 5) {
       return { error: "Você atingiu o limite de solicitações de código por hoje. Tente novamente mais tarde." }
     }
 
-    // 5. Invalidate any prior pending/unverified requests for this user
-    await admin
-      .from("account_deletion_requests")
-      .update({ expires_at: new Date().toISOString() })
-      .eq("user_id", user.id)
-      .is("verified_at", null)
-
-    // 6. Generate 6-digit numeric OTP and SHA-256 hash
+    // 2. Generate 6-digit numeric OTP and SHA-256 hash
+    const nowIso = new Date(nowMs).toISOString()
     const rawCode = crypto.randomInt(100000, 1000000).toString()
     const codeHash = crypto.createHash("sha256").update(rawCode).digest("hex")
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
+    const expiresAt = new Date(nowMs + 15 * 60 * 1000) // 15 minutes
 
-    const reqHeaders = await headers()
     const userAgent = reqHeaders.get("user-agent")
     const ip = getTrustedClientIP(reqHeaders)
     const country = getTrustedClientCountry(reqHeaders) || "unknown"
+    const templateId = SMTP2GO_TEMPLATE_IDS.accountDeletionCode || undefined
 
-    // 7. Store in account_deletion_requests
-    const { data: requestRow, error: insertError } = await admin
-      .from("account_deletion_requests")
-      .insert({
-        user_id: user.id,
-        email: rawEmail,
-        code_hash: codeHash,
-        expires_at: expiresAt.toISOString(),
-        attempts: 0,
-        max_attempts: 5,
-        request_ip: ip,
-        user_agent: userAgent,
-        metadata: {
-          reason: reason || null,
-          country,
+    // 3. Invalidate prior unverified requests, insert new request, and dispatch email in parallel
+    const [, { data: requestRow, error: insertError }, emailResult] = await Promise.all([
+      admin
+        .from("account_deletion_requests")
+        .update({ expires_at: nowIso })
+        .eq("user_id", user.id)
+        .is("verified_at", null)
+        .lt("created_at", nowIso),
+      admin
+        .from("account_deletion_requests")
+        .insert({
+          user_id: user.id,
+          email: rawEmail,
+          code_hash: codeHash,
+          expires_at: expiresAt.toISOString(),
+          attempts: 0,
+          max_attempts: 5,
+          request_ip: ip,
+          user_agent: userAgent,
+          metadata: {
+            reason: reason || null,
+            country,
+          },
+        })
+        .select("id")
+        .single(),
+      SMTP2GOService.sendEmail({
+        to: [{ email: rawEmail, name: user.user_metadata?.full_name || undefined }],
+        subject: "Confirme a exclusão da sua conta Dudit",
+        template_id: templateId,
+        variables: {
+          code: rawCode,
+          codigo: rawCode,
+          expirationMinutes: "15",
+          expiration_minutes: "15",
+          validade: "15",
+          validade_minutos: "15",
+          full_name: user.user_metadata?.full_name || "",
+          nome: user.user_metadata?.full_name || "",
         },
-      })
-      .select("id")
-      .single()
+        html: templateId ? undefined : getAccountDeletionEmailHtml(rawCode, 15),
+        text: templateId ? undefined : getAccountDeletionEmailText(rawCode, 15),
+        userId: user.id,
+        partnerId: partner?.id || undefined,
+      }),
+    ])
 
     if (insertError || !requestRow) {
       SecureLogger.error("Failed to insert account_deletion_requests record", {
@@ -176,28 +207,6 @@ export async function requestAccountDeletionCodeAction(
       return { error: "Erro ao gerar código de confirmação." }
     }
 
-    // 8. Dispatch email via SMTP2GO using Dashboard Template
-    const templateId = SMTP2GO_TEMPLATE_IDS.accountDeletionCode || undefined
-    const emailResult = await SMTP2GOService.sendEmail({
-      to: [{ email: rawEmail, name: user.user_metadata?.full_name || undefined }],
-      subject: "Confirme a exclusão da sua conta Dudit",
-      template_id: templateId,
-      variables: {
-        code: rawCode,
-        codigo: rawCode,
-        expirationMinutes: "15",
-        expiration_minutes: "15",
-        validade: "15",
-        validade_minutos: "15",
-        full_name: user.user_metadata?.full_name || "",
-        nome: user.user_metadata?.full_name || "",
-      },
-      html: templateId ? undefined : getAccountDeletionEmailHtml(rawCode, 15),
-      text: templateId ? undefined : getAccountDeletionEmailText(rawCode, 15),
-      userId: user.id,
-      partnerId: partner?.id || undefined,
-    })
-
     if (!emailResult.success) {
       SecureLogger.error("Failed to send account deletion verification email", {
         userId: user.id,
@@ -206,8 +215,8 @@ export async function requestAccountDeletionCodeAction(
       return { error: "Não foi possível enviar o e-mail com o código. Verifique sua conexão e tente novamente." }
     }
 
-    // 9. Audit log
-    await auditLog({
+    // 4. Fire-and-forget audit log so the UI receives the response immediately
+    void auditLog({
       action: "account.deletion_code_requested",
       actorUserId: user.id,
       partnerId: partner?.id || null,
@@ -215,7 +224,7 @@ export async function requestAccountDeletionCodeAction(
         requestId: requestRow.id,
         maskedEmail: maskEmail(rawEmail),
       },
-    })
+    }).catch(() => {})
 
     return {
       success: true,
@@ -361,7 +370,25 @@ export async function confirmAccountDeletionAction(input: {
       return { error: result.error || "Erro ao registrar solicitação de exclusão." }
     }
 
-    // 8. Invalidate session cookies immediately
+    // 8. Audit log confirmation before auth user is deleted
+    await auditLog({
+      action: "account.deletion_confirmed",
+      actorUserId: user.id,
+      metadata: {
+        requestId: requestRow.id,
+      },
+    })
+
+    // 9. Execute complete account deletion synchronously so the account is immediately purged
+    if (result.deletionId) {
+      await AccountDeletionService.executeDeletionWorkflow(
+        result.deletionId,
+        user.id,
+        result.partnerId ?? null
+      )
+    }
+
+    // 10. Invalidate session cookies immediately
     const cookieStore = await cookies()
     const allCookies = cookieStore.getAll()
     for (const c of allCookies) {
@@ -370,24 +397,8 @@ export async function confirmAccountDeletionAction(input: {
       }
     }
     cookieStore.delete("active_partner_id")
-
-    // Set fast-fail deletion cookie for middleware
-    cookieStore.set("x-account-deleting", "true", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    })
-
-    // 9. Audit log confirmation
-    await auditLog({
-      action: "account.deletion_confirmed",
-      actorUserId: user.id,
-      metadata: {
-        requestId: requestRow.id,
-      },
-    })
+    cookieStore.delete("active_store_id")
+    cookieStore.delete("x-account-deleting")
 
     // Webhook Discord: notificar exclusão de conta confirmada (fail-open)
     const { sendAccountDeleted } = await import("@/lib/services/discord-general-webhook.service")
@@ -404,6 +415,56 @@ export async function confirmAccountDeletionAction(input: {
   } catch (error: any) {
     SecureLogger.error("Unexpected error in confirmAccountDeletionAction", { error: error?.message })
     return { error: "Ocorreu um erro inesperado ao confirmar a exclusão." }
+  }
+}
+
+/**
+ * Cancela em lote todas as assinaturas recorrentes ativas do parceiro no ERP
+ * antes da exclusão da conta (no banco e no Mercado Pago).
+ */
+export async function cancelAllActiveRecurringSubscriptionsAction(
+  csrf_token?: string
+): Promise<{
+  success?: boolean
+  cancelled?: number
+  failed?: number
+  error?: string
+}> {
+  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+  const csrfValidation = await requireCSRF(csrf_token)
+  if (!csrfValidation.valid) {
+    return { error: csrfValidation.error || "Token CSRF inválido" }
+  }
+
+  try {
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    const { data: partner, error: partnerError } = await admin
+      .from("partners")
+      .select("id, user_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (partnerError || !partner) {
+      return { error: "Parceiro não encontrado para esta conta." }
+    }
+
+    if (partner.user_id !== user.id) {
+      return { error: "Somente o proprietário principal (OWNER) da conta pode cancelar as assinaturas." }
+    }
+
+    const { cancelAllMarketplaceSubscriptions } = await import("@/lib/services/recurring/limits")
+    const { cancelled, failed } = await cancelAllMarketplaceSubscriptions(partner.id)
+
+    revalidatePath("/erp/assinaturas")
+    revalidatePath("/assinaturas")
+    revalidateTag(`partner_recurring_plans_${partner.id}`, { expire: 0 })
+
+    return { success: true, cancelled, failed }
+  } catch (error: any) {
+    SecureLogger.error("Error in cancelAllActiveRecurringSubscriptionsAction", { error: error?.message })
+    return { error: "Não foi possível cancelar as assinaturas recorrentes agora." }
   }
 }
 

@@ -162,7 +162,8 @@ import {
     CollectionsBookmarkIcon,
     PinIcon as PinIcon01,
     ArchiveArrowDownIcon,
-    SettingsError01Icon
+    SettingsError01Icon,
+    CircleUnlock01Icon
 } from "@hugeicons/core-free-icons"
 
 
@@ -302,6 +303,7 @@ export const Users = CreateIcon(UserMultiple02Icon)
 export const IdentityCardIcon = CreateIcon(IdentityCard)
 
 export const LockIcon = CreateIcon(LockPasswordIcon)
+export const UnlockIcon = CreateIcon(CircleUnlock01Icon)
 export const LogoutIcon = CreateIcon(Logout02Icon)
 export const MotorbikeIcon = CreateIcon(Motorbike02Icon)
 export const CrownIcon = CreateIcon(CrownIcon01)

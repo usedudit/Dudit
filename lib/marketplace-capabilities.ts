@@ -50,6 +50,27 @@ export interface MarketplaceCapabilities {
 
 export interface MarketplaceCapabilitiesOptions {
   storeId?: string | null
+  bypassCache?: boolean
+}
+
+interface CacheEntry<T> {
+  data: T
+  expiresAt: number
+}
+
+const CAPABILITIES_CACHE_TTL_MS = 30_000 // 30 seconds
+const capabilitiesCache = new Map<string, CacheEntry<MarketplaceCapabilities>>()
+
+export function invalidateMarketplaceCapabilitiesCache(partnerId?: string): void {
+  if (partnerId) {
+    for (const key of capabilitiesCache.keys()) {
+      if (key.startsWith(`${partnerId}:`)) {
+        capabilitiesCache.delete(key)
+      }
+    }
+  } else {
+    capabilitiesCache.clear()
+  }
 }
 
 function resolveBaseOrderFlow(
@@ -104,8 +125,17 @@ export const resolveMarketplaceCapabilities = cache(
     partnerId: string,
     options?: MarketplaceCapabilitiesOptions,
   ): Promise<MarketplaceCapabilities> => {
-    const admin = getAdminClient()
     const storeId = options?.storeId || null
+    const cacheKey = `${partnerId}:${storeId || "default"}`
+
+    if (!options?.bypassCache) {
+      const cached = capabilitiesCache.get(cacheKey)
+      if (cached && Date.now() <= cached.expiresAt) {
+        return cached.data
+      }
+    }
+
+    const admin = getAdminClient()
 
     const [{ data: partner }, plan] = await Promise.all([
       admin
@@ -207,7 +237,7 @@ export const resolveMarketplaceCapabilities = cache(
       recurringPlansEnabled &&
       recurringSubscriptionsEnabled
 
-    return {
+    const result: MarketplaceCapabilities = {
       partnerId,
       planSlug,
       baseOrderFlow,
@@ -234,6 +264,15 @@ export const resolveMarketplaceCapabilities = cache(
       activeResources,
       reasons,
     }
+
+    if (!options?.bypassCache) {
+      capabilitiesCache.set(cacheKey, {
+        data: result,
+        expiresAt: Date.now() + CAPABILITIES_CACHE_TTL_MS,
+      })
+    }
+
+    return result
   },
 )
 

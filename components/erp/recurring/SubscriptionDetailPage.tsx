@@ -38,7 +38,9 @@ import {
   updateSubscriptionStockShortageResolvedAction,
   scheduleSubscriptionServiceAction,
   createSubscriptionDeliveryOrderAction,
+  advanceRecurringSubscriptionCycleAction,
 } from "@/app/actions/erp/recurring-subscriptions"
+import { usePermissions } from "@/lib/permission-context"
 import { getAvailableTimeSlotsAction } from "@/app/actions/erp/appointments"
 import {
   getRecurringFrequencyLabel,
@@ -67,7 +69,7 @@ import {
 const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
 type DetailTab = "general" | "items" | "credits" | "notes" | "history"
-type SubscriptionAction = "pause" | "resume" | "cancel" | "resolve_stock" | "sync"
+type SubscriptionAction = "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle"
 
 type ConfirmDialog = {
   title: string
@@ -138,6 +140,11 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 }) => {
   const { toast } = useToast()
   const { setHeaderOverride } = useSidebar()
+  const { role, hasSpecific, canRbac } = usePermissions()
+  const canAdvanceCycle =
+    canManage &&
+    (role === "OWNER" || role === "ADMIN") &&
+    (hasSpecific("recurring_subscriptions", "can_advance_cycle") || canRbac("recurring_subscriptions.can_advance_cycle"))
   const router = useRouter()
   const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -229,6 +236,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 
     const rows: MergedCredit[] = []
     const indexByKey = new Map<string, MergedCredit>()
+    const seenItemKey = new Set<string>()
 
     for (const item of detail?.items || []) {
       const isProduct = item.itemType === "product"
@@ -241,7 +249,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         itemType: isProduct ? "product" : "service",
         serviceId,
         productId,
-        quantity: 0,
+        quantity: item.quantity,
         consumed: 0,
         remaining: 0,
         expiresAt: null,
@@ -264,29 +272,47 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           ? `s:${credit.serviceId}`
           : null
       const target = key ? indexByKey.get(key) : undefined
-      const row: MergedCredit = target ?? {
-        id: credit.id,
-        itemName: credit.itemName,
-        itemType: credit.itemType,
-        serviceId: credit.serviceId,
-        productId: credit.productId,
-        quantity: 0,
-        consumed: 0,
-        remaining: 0,
-        expiresAt: null,
-        staffPartnerUserId: null,
-        durationMinutes: credit.durationMinutes ?? null,
-        image: null,
+      const isFirstForThisItem = key ? !seenItemKey.has(key) : false
+      if (key) seenItemKey.add(key)
+
+      if (isFirstForThisItem && target) {
+        // Primeiro registro (mais recente por conta da ordenação created_at DESC)
+        // Representa o ciclo ativo atual
+        target.id = credit.id
+        target.quantity = credit.quantity
+        target.consumed = credit.consumed
+        target.remaining = credit.remaining
+        target.expiresAt = credit.expiresAt
+        if (credit.staffPartnerUserId) target.staffPartnerUserId = credit.staffPartnerUserId
+        if (credit.durationMinutes != null) target.durationMinutes = credit.durationMinutes
+      } else if (target) {
+        // Registro de ciclo anterior para o mesmo item: só acumula se houver saldo remanescente não expirado
+        const isNotExpired = !credit.expiresAt || new Date(credit.expiresAt).getTime() > Date.now()
+        if (credit.remaining > 0 && isNotExpired) {
+          target.remaining += credit.remaining
+          target.quantity += credit.remaining
+        }
+      } else {
+        const row: MergedCredit = {
+          id: credit.id,
+          itemName: credit.itemName,
+          itemType: credit.itemType,
+          serviceId: credit.serviceId,
+          productId: credit.productId,
+          quantity: credit.quantity,
+          consumed: credit.consumed,
+          remaining: credit.remaining,
+          expiresAt: credit.expiresAt,
+          staffPartnerUserId: credit.staffPartnerUserId ?? null,
+          durationMinutes: credit.durationMinutes ?? null,
+          image: null,
+        }
+        rows.push(row)
+        if (key) {
+          indexByKey.set(key, row)
+          seenItemKey.add(key)
+        }
       }
-      if (!target) rows.push(row)
-      row.quantity += credit.quantity
-      row.consumed += credit.consumed
-      row.remaining += credit.remaining
-      if (credit.expiresAt && (!row.expiresAt || credit.expiresAt < row.expiresAt)) {
-        row.expiresAt = credit.expiresAt
-      }
-      if (credit.staffPartnerUserId) row.staffPartnerUserId = credit.staffPartnerUserId
-      if (credit.durationMinutes != null) row.durationMinutes = credit.durationMinutes
     }
 
     return rows
@@ -478,6 +504,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         else if (action === "cancel") res = await cancelRecurringSubscriptionAction(partnerId, subscriptionId)
         else if (action === "resolve_stock")
           res = await updateSubscriptionStockShortageResolvedAction(partnerId, subscriptionId)
+        else if (action === "advance_cycle")
+          res = await advanceRecurringSubscriptionCycleAction(partnerId, subscriptionId)
         else res = await syncSubscriptionWithMpErpAction(partnerId, subscriptionId)
 
         if (!res.success) {
@@ -504,7 +532,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   // Pausar e cancelar pedem confirmação (AlertModal); as demais ações rodam direto.
   const runAction = useCallback(
     (action: SubscriptionAction) => {
-      if (action === "pause" || action === "cancel") {
+      if (action === "pause" || action === "cancel" || action === "advance_cycle") {
         setConfirmDialog(
           action === "pause"
             ? {
@@ -516,15 +544,25 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
               variant: "warning",
               onConfirm: () => executeAction(action),
             }
-            : {
-              title: "Cancelar assinatura?",
-              message:
-                "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
-              confirmText: "Cancelar assinatura",
-              cancelText: "Manter assinatura",
-              isDestructive: true,
-              onConfirm: () => executeAction(action),
-            },
+            : action === "cancel"
+              ? {
+                title: "Cancelar assinatura?",
+                message:
+                  "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
+                confirmText: "Cancelar assinatura",
+                cancelText: "Manter assinatura",
+                isDestructive: true,
+                onConfirm: () => executeAction(action),
+              }
+              : {
+                title: "Antecipar ciclo da assinatura?",
+                message:
+                  "Deseja realmente antecipar o próximo ciclo desta assinatura? Isso irá resetar e renovar os limites e créditos de serviço do cliente imediatamente e avançar a data da próxima execução.",
+                confirmText: "Antecipar ciclo",
+                cancelText: "Voltar",
+                variant: "info",
+                onConfirm: () => executeAction(action),
+              },
         )
         return
       }
@@ -569,10 +607,17 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   const showRestockMenu =
     canManage && status === "awaiting_restock" && primaryAction?.action !== "resolve_stock"
   const showSyncMenu = canSync && primaryAction?.action !== "sync"
-  const hasDropdownContent = canCancel || showPauseMenu || showResumeMenu || showRestockMenu || showSyncMenu
+  const showAdvanceCycleMenu = canAdvanceCycle && status === "active"
+  const hasDropdownContent =
+    canCancel || showPauseMenu || showResumeMenu || showRestockMenu || showSyncMenu || showAdvanceCycleMenu
 
   const sidebarMenuItems = (
     <>
+      {showAdvanceCycleMenu && (
+        <DropdownItem onClick={() => void runAction("advance_cycle")}>
+          <RepeatIcon size={18} /> Antecipar ciclo
+        </DropdownItem>
+      )}
       {showPauseMenu && (
         <DropdownItem onClick={() => void runAction("pause")}>
           <BlockedIcon size={18} /> Pausar assinatura

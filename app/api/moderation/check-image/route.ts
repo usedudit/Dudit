@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     let cached = await getImageFromCache(hash)
     if (!cached && phash) {
       const visualMatch = await findSimilarImageInCache(phash)
-      if (visualMatch) {
+      if (visualMatch && (visualMatch.cached.status === 'FLAGGED' || visualMatch.cached.status === 'BLOCKED')) {
         cached = visualMatch.cached
       }
     }
@@ -58,14 +58,16 @@ export async function POST(req: NextRequest) {
       ? { status: 'APPROVED' as const, message: 'Imagem aprovada.', shouldSaveToR2: true }
       : decideImageStatus(analysis)
 
-    await cacheImageModeration(
-      hash,
-      analysis.riskLevel,
-      analysis.confidence,
-      analysis.categories,
-      decision.status === 'FLAGGED' ? 'FLAGGED' : 'APPROVED',
-      phash,
-    )
+    if (!analysis.isUnavailable) {
+      await cacheImageModeration(
+        hash,
+        analysis.riskLevel,
+        analysis.confidence,
+        analysis.categories,
+        decision.status === 'FLAGGED' ? 'FLAGGED' : 'APPROVED',
+        phash,
+      )
+    }
 
     // Webhook Discord: notificar quando imagem é marcada (fail-open, não bloqueia fluxo)
     if (decision.status === 'FLAGGED' && !analysis.isUnavailable) {

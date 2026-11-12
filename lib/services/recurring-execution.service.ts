@@ -360,10 +360,13 @@ async function grantCreditsForCycle(
   input: { partnerId: string; customerId: string; subscriptionId: string; executionId: string },
 ): Promise<void> {
   try {
-    const { grantSubscriptionCredits } = await import("@/lib/services/credit.service")
-    const res = await grantSubscriptionCredits(supabase, input)
+    const { resetAndGrantSubscriptionCredits } = await import("@/lib/services/credit.service")
+    const res = await resetAndGrantSubscriptionCredits(supabase, {
+      subscriptionId: input.subscriptionId,
+      executionId: input.executionId,
+    })
     if (!res.success) {
-      console.error("[recurring] grant_subscription_credits falhou:", res.error)
+      console.error("[recurring] reset_and_grant_subscription_credits falhou:", res.error)
       return
     }
     if (res.grantedCount > 0) {
@@ -379,7 +382,7 @@ async function grantCreditsForCycle(
       })
     }
   } catch (err) {
-    console.error("[recurring] grant_subscription_credits erro:", err)
+    console.error("[recurring] reset_and_grant_subscription_credits erro:", err)
   }
 }
 

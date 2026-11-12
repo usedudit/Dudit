@@ -16,7 +16,7 @@ const BlobTeal = ({ className }: { className?: string }) => (
 const BlobGreenAccent = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className={className}>
     <path
-      fill="#022C2B"
+      fill="#09211b"
       d="M38.9,-50.2C52.3,-41.3,66.2,-31.3,70.3,-17.9C74.4,-4.5,68.7,12.3,59.8,26.2C50.9,40,38.8,51,24.5,58.3C10.2,65.6,-6.3,69.2,-22.1,65.2C-37.9,61.2,-53,49.6,-61.3,34.5C-69.6,19.4,-71.1,0.8,-66.1,-15.8C-61.1,-32.4,-49.6,-47,-36,-55.9C-22.4,-64.8,-6.7,-68,8.2,-66.8C23.1,-65.6,25.5,-59.1,38.9,-50.2Z"
       transform="translate(100 100)"
     />
@@ -113,12 +113,7 @@ export const ERPOnboardingVisuals = React.memo(({
   }
 
   return (
-    <div className="flex-1 relative hidden lg:flex flex-col justify-center items-center p-8 overflow-hidden bg-[#022C2B] rounded-2xl">
-      {/* Blobs decorativas */}
-      <BlobTeal className="absolute -top-16 -right-16 w-[380px] h-[380px] opacity-80 pointer-events-none" />
-      <BlobGreenAccent className="absolute top-1/3 -left-20 w-[260px] h-[260px] opacity-50 pointer-events-none" />
-      <BlobGreenLight className="absolute -bottom-14 left-1/4 w-[200px] h-[200px] opacity-40 pointer-events-none" />
-
+    <div className="flex-1 relative hidden lg:flex flex-col justify-center items-center p-8 overflow-hidden bg-brand-dark rounded-2xl">
       {/* Conteúdo Principal */}
       <div className="relative z-10 w-full max-w-[420px] flex flex-col items-center">
         {/* Imagem do mascote Dino */}
@@ -170,9 +165,9 @@ export const ERPOnboardingVisuals = React.memo(({
               <div
                 key={s}
                 className={`h-1.5 rounded-full transition-all duration-300 ${s === currentStep
-                  ? "w-8 bg-green-400"
+                  ? "w-8 bg-brand-green"
                   : s < currentStep
-                    ? "w-2 bg-green-600"
+                    ? "w-2 bg-brand-green/50"
                     : "w-2 bg-white/20"
                   }`}
               />

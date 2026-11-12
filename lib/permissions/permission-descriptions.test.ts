@@ -42,6 +42,11 @@ describe("permission-descriptions", () => {
     expect(msg).toBe("Você não possui permissão para faturar ou emitir nota fiscal para ordens de serviço.")
   })
 
+  it("returns specific clean user-facing error message for recurring_subscriptions can_advance_cycle", () => {
+    const msg = getPermissionErrorMessage("recurring_subscriptions", "can_advance_cycle")
+    expect(msg).toBe("Você não possui permissão para antecipar o ciclo de assinaturas. Apenas Proprietários e Administradores podem realizar esta ação.")
+  })
+
   it("returns specific clean user-facing error message for financial can_settle", () => {
     const msg = getPermissionErrorMessage("financial", "can_settle")
     expect(msg).toBe("Você não possui permissão para liquidar ou baixar contas a pagar/receber.")

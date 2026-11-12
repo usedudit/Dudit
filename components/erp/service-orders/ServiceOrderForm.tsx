@@ -41,6 +41,7 @@ import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, getServiceOrder
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectServiceSheet from "./SelectServiceSheet"
 import SelectProductSheet from "./SelectProductSheet"
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -1417,35 +1418,17 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                 <ThreeDotsLoader />
                                                             ) : servicesBucket.filteredResults.length > 0 ? (
                                                                 servicesBucket.filteredResults.map(svc => (
-                                                                    <div
+                                                                    <ProductSearchResultItem
                                                                         key={svc.id}
+                                                                        item={svc}
+                                                                        isService
+                                                                        promotions={activePromotions}
                                                                         onClick={() => {
                                                                             handleAddService(svc)
                                                                             servicesBucket.setSearchQuery("")
                                                                             setIsServiceSearchOpen(false)
                                                                         }}
-                                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                                    >
-                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                            {svc.image ? (
-                                                                                <img
-                                                                                    src={getR2ImageUrl(svc.image, "thumbnail")}
-                                                                                    alt=""
-                                                                                    className="w-full h-full object-cover"
-                                                                                />
-                                                                            ) : (
-                                                                                <div className="w-full h-full flex items-center justify-center">
-                                                                                    <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{svc.name}</div>
-                                                                        </div>
-                                                                        <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(svc.price || 0), (svc as any).promotional_price && Number((svc as any).promotional_price) < Number(svc.price || 0) ? Number((svc as any).promotional_price) : null, activePromotions, { serviceId: svc.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
-                                                                        </div>
-                                                                    </div>
+                                                                    />
                                                                 ))
                                                             ) : (
                                                                 <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum serviço encontrado.</div>
@@ -1742,29 +1725,16 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                 <ThreeDotsLoader />
                                                             ) : productsBucket.filteredResults.length > 0 ? (
                                                                 productsBucket.filteredResults.map(prod => (
-                                                                    <div
+                                                                    <ProductSearchResultItem
                                                                         key={prod.id}
+                                                                        item={prod}
+                                                                        promotions={activePromotions}
                                                                         onClick={() => {
                                                                             handleAddProduct(prod)
                                                                             productsBucket.setSearchQuery("")
                                                                             setIsProductSearchOpen(false)
                                                                         }}
-                                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                                    >
-                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                            <img src={getR2ImageUrl(prod.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={prod.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{prod.name}</div>
-                                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{prod.sku}</div>
-                                                                        </div>
-                                                                        <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(prod.price || 0), (prod as any).promotional_price && Number((prod as any).promotional_price) < Number(prod.price || 0) ? Number((prod as any).promotional_price) : null, activePromotions, { productId: prod.id, categoryId: (prod as any).category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
-                                                                            <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                                {prod.stock} em estoque
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
+                                                                    />
                                                                 ))
                                                             ) : (
                                                                 <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>

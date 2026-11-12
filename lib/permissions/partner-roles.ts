@@ -67,9 +67,10 @@ const fullPdv = {
     view: true, sell: true, open_pdv: true, close_pdv: true, sangria: true, reforco: true, can_apply_discount: true, can_add_delivery: true,
 }
 
-const recurringFull = { view: true, manage: true }
-const recurringViewOnly = { view: true, manage: false }
-const recurringNone = { view: false, manage: false }
+const recurringFull = { view: true, manage: true, can_advance_cycle: true }
+const recurringManager = { view: true, manage: true, can_advance_cycle: false }
+const recurringViewOnly = { view: true, manage: false, can_advance_cycle: false }
+const recurringNone = { view: false, manage: false, can_advance_cycle: false }
 
 const storesFull = { view: true, create: true, edit: true, delete: true, manage_members: true }
 const storesOperational = { view: true, create: true, edit: true, delete: false, manage_members: true }
@@ -166,7 +167,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         dashboard: { view: true },
         delivery: { view: true, create: true, edit: true, update_status: true },
         recurring_plans: recurringFull,
-        recurring_subscriptions: recurringFull,
+        recurring_subscriptions: recurringManager,
         settings: {
             view: true, settings_negocio: true, settings_team: true, settings_plan: false, settings_payments: true, settings_comissions: true,
             settings_returns: true, settings_vitrine: true, settings_os: true, settings_messages: true, settings_delivery: true, settings_integrations: false,

@@ -39,7 +39,7 @@ export type PermissionTemplate = {
   dashboard: { view: boolean }
   delivery: { view: boolean; create: boolean; edit: boolean; update_status: boolean }
   recurring_plans: { view: boolean; manage: boolean }
-  recurring_subscriptions: { view: boolean; manage: boolean }
+  recurring_subscriptions: { view: boolean; manage: boolean; can_advance_cycle: boolean }
   productivity: { view: boolean; goals_view: boolean; goals_manage: boolean; commissions_view: boolean; commissions_manage: boolean }
   community_videos: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   colecoes: { view: boolean; create: boolean; edit: boolean; delete: boolean }

@@ -31,7 +31,7 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 import { resolveActiveResources } from "@/lib/system-resources"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { redirect } from "next/navigation"
-import type { Period } from "@/lib/period-types"
+import type { Period, CompareMode } from "@/lib/period-types"
 
 export const dynamic = "force-dynamic"
 
@@ -56,6 +56,7 @@ export default async function ERPEstatisticasPage(props: {
 
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
+    const compare = (searchParams?.compare as CompareMode) || "none"
     return (
         <>
             <ERPPageHeader title="Estatísticas" />
@@ -86,6 +87,7 @@ export default async function ERPEstatisticasPage(props: {
                                 partnerId={partnerId}
                                 activeResources={activeResources}
                                 period={period}
+                                compare={compare}
                                 planSlug={plan.slug}
                                 permissionContext={context as RbacUserLike}
                                 controls={
@@ -108,6 +110,7 @@ async function ReportsContent({
     partnerId,
     activeResources,
     period,
+    compare,
     planSlug,
     permissionContext,
     controls,
@@ -115,6 +118,7 @@ async function ReportsContent({
     partnerId: string
     activeResources: string[]
     period: Period
+    compare: CompareMode
     planSlug: string
     permissionContext: RbacUserLike
     controls?: ReactNode
@@ -162,6 +166,7 @@ async function ReportsContent({
         <ReportsPage
             activeResources={activeResources}
             period={period}
+            compare={compare}
             planSlug={planSlug}
             productsData={productsData}
             servicesData={servicesData}

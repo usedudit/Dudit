@@ -32,6 +32,7 @@ import { ERPOnboardingFeedbackModal } from "@/components/erp/ERPOnboardingFeedba
 import { ERPOnboardingWizard } from "@/components/erp/onboarding/ERPOnboardingWizard";
 import { StorePlaqueModal } from "@/components/erp/shared/StorePlaqueModal";
 import { usePermissions } from "@/lib/permission-context";
+import { RevenueLimitCard } from "@/components/erp/dashboard/widgets/general/RevenueLimitCard";
 import { MessageSquare } from "lucide-react";
 
 interface QuickModeHomeProps {
@@ -871,6 +872,9 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         </div>
                     )}
                 </header>
+
+                {/* Limite de faturamento (MEI / nano). Oculto quando o perfil não foi informado. */}
+                <RevenueLimitCard />
 
                 {/* Alertas Críticos */}
                 {data.alerts.length > 0 && (

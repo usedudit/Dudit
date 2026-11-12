@@ -10,6 +10,8 @@ import { getERPProductsPageData } from "@/app/actions/erp/products"
 import { fetchCustomersWithStorePriority } from "@/lib/store-queries"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { decryptCpfIfEncrypted } from "@/lib/crypto"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export async function fetchERPOrdersClient() {
   const user = await getCurrentUser()
@@ -79,39 +81,48 @@ export async function fetchERPSuppliersClient() {
  * Used for instant client-side search filtering (no repeated server roundtrips).
  * Pattern inspired by MarketplaceHeader's getSearchSuggestionsBucket.
  */
-export async function fetchPartnerProductsBucket() {
+export async function fetchPartnerProductsBucket(storeIdOverride?: string | null) {
   const user = await getCurrentUser()
   if (!user) throw new Error("Unauthorized")
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
-  const storeId = context.activeStoreId
+  const storeId = storeIdOverride || context.activeStoreId
   const { allowed } = await checkPermission(partnerId, "products", "view")
   if (!allowed) throw new Error("Forbidden")
 
-  const { getAdminClient } = await import("@/lib/supabase/admin")
-  const supabase = getAdminClient()
+  const rows = await getCachedErpPage(
+    ["partner-products-bucket", partnerId, storeId || "all-stores"],
+    [TAGS.products(partnerId), ...(storeId ? [TAGS.storeProducts(partnerId, storeId)] : [])],
+    async () => {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      const supabase = getAdminClient()
 
-  let query = supabase
-    .from("products")
-    .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
-    .eq("partner_id", partnerId)
-    .eq("is_active", true)
+      let query = supabase
+        .from("products")
+        .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, video_thumbnail, fallback_variant_image, moderation_status, moderation_reason, flagged_images, unit, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
 
-  if (storeId) {
-    query = query.eq("store_id", storeId)
-  }
+      if (storeId) {
+        query = query.eq("store_id", storeId)
+      }
 
-  const { data, error } = await query
-    .order("name")
-    .limit(500)
+      const { data, error } = await query
+        .order("name")
+        .limit(500)
 
-  if (error) {
-    console.error("[fetchPartnerProductsBucket] Error:", error)
-    return []
-  }
+      if (error) {
+        console.error("[fetchPartnerProductsBucket] Error:", error)
+        return []
+      }
 
-  return (data || []).map((p: any) => ({
+      return data || []
+    },
+    30,
+  )
+
+  return (rows || []).map((p: any) => ({
     id: p.id,
     name: p.name,
     sku: p.sku || "N/A",
@@ -119,7 +130,7 @@ export async function fetchPartnerProductsBucket() {
     price: p.price || 0,
     promotional_price: p.promotional_price,
     category_id: p.category_id || null,
-    stock: p.stock_available || 0,
+    stock: p.stock_available ?? 0,
     allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
     image: p.images && p.images.length > 0 ? p.images[0] : null,
     has_variants: p.product_variants && p.product_variants.length > 0,
@@ -134,7 +145,7 @@ export async function fetchPartnerProductsBucket() {
       name: variant.variant_name,
       sku: variant.sku || "N/A",
       price: Number(p.price || 0) + Number(variant.price_adjustment || 0),
-      stock: Number(variant.stock_available || 0),
+      stock: Number(variant.stock_available ?? 0),
       image: typeof variant.variant_options === "object" && variant.variant_options
         ? variant.variant_options.image || null
         : null,
@@ -316,29 +327,38 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
   const partnerId = context.partnerId
   const storeId = context.activeStoreId
 
-  const { getAdminClient } = await import("@/lib/supabase/admin")
-  const supabase = getAdminClient()
+  const rows = await getCachedErpPage(
+    ["partner-services-bucket", partnerId, storeId || "all-stores"],
+    [TAGS.services(partnerId)],
+    async () => {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      const supabase = getAdminClient()
 
-  let query = supabase
-    .from("services")
-    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, images")
-    .eq("partner_id", partnerId)
-    .eq("is_active", true)
+      let query = supabase
+        .from("services")
+        .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, images")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
 
-  if (storeId) {
-    query = query.eq("store_id", storeId)
-  }
+      if (storeId) {
+        query = query.eq("store_id", storeId)
+      }
 
-  const { data, error } = await query
-    .order("name")
-    .limit(500)
+      const { data, error } = await query
+        .order("name")
+        .limit(500)
 
-  if (error) {
-    console.error("[fetchPartnerServicesBucket] Error:", error)
-    return []
-  }
+      if (error) {
+        console.error("[fetchPartnerServicesBucket] Error:", error)
+        return []
+      }
 
-  return (data || []).map((s: any) => ({
+      return data || []
+    },
+    30,
+  )
+
+  return (rows || []).map((s: any) => ({
     id: String(s.id),
     name: String(s.name || ""),
     price: Number(s.price || 0),
@@ -350,6 +370,30 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
     billingUnit: String(s.billing_unit || "per_service"),
     image: s.images && s.images.length > 0 ? s.images[0] : null,
   }))
+}
+
+/**
+ * Combined products + services catalog used by sales documents (orders, quotes).
+ * Keeping the mapping in one place guarantees the exact same card data everywhere.
+ */
+export async function fetchPartnerSalesCatalogBucket() {
+  const [products, services] = await Promise.all([
+    fetchPartnerProductsBucket(),
+    fetchPartnerServicesBucket(),
+  ])
+
+  const mappedServices = services.map((service) => ({
+    ...service,
+    sku: "SERVIÇO",
+    gtin: null,
+    stock: 0,
+    allow_sell_without_stock: true,
+    has_variants: false,
+    unit: null,
+    isService: true,
+  }))
+
+  return [...products, ...mappedServices]
 }
 
 /**

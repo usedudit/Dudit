@@ -1863,7 +1863,7 @@ export function ExplorarPageClient({
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) - Hide when completely empty */}
                     {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && !isEmptyListing && (
                         <div className="mb-6 lg:mb-8">
-                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
+                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">Categorias</h2>
                             <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                 {categoryCircles.map((cat) => (
                                     <button

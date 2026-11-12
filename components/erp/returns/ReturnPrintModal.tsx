@@ -11,6 +11,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 import { useStore } from "@/lib/store-context"
 import { getReturnRequestDetailsAction } from "@/app/actions/erp/returns"
+import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { downloadPdf } from "@/lib/pdf/download"
@@ -40,6 +41,8 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
     const [format, setFormat] = useState<Format>("thermal")
     const [isDownloading, setIsDownloading] = useState(false)
     const [returnRequest, setReturnRequest] = useState<any>(null)
+    const [showAcknowledgment, setShowAcknowledgment] = useState(true)
+    const [footerMessage, setFooterMessage] = useState<string | null>(null)
     const [partnerHeader, setPartnerHeader] = useState<SaleReceiptPartnerHeader>({
         fantasyName: "",
         legalName: "",
@@ -65,9 +68,10 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
 
         async function load() {
             setLoading(true)
-            const [returnRes, headerRes] = await Promise.all([
+            const [returnRes, headerRes, policyRes] = await Promise.all([
                 getReturnRequestDetailsAction(partnerId, returnId),
                 getPartnerReceiptHeaderAction(partnerId, storeId),
+                getPartnerReturnPolicyAction(partnerId),
             ])
             if (cancelled) return
 
@@ -76,6 +80,18 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
             }
             if (headerRes.success && headerRes.data) {
                 setPartnerHeader(headerRes.data)
+            }
+            if (policyRes.success && policyRes.data?.policy) {
+                setShowAcknowledgment(policyRes.data.policy.receiptShowAcknowledgment !== false)
+                setFooterMessage(policyRes.data.policy.receiptMessage?.trim() || null)
+            } else {
+                const snapshot = returnRes.success ? (returnRes.data as any)?.policySnapshot : null
+                if (snapshot?.receipt_show_acknowledgment !== undefined) {
+                    setShowAcknowledgment(snapshot.receipt_show_acknowledgment !== false)
+                }
+                if (snapshot?.receipt_message) {
+                    setFooterMessage(String(snapshot.receipt_message).trim() || null)
+                }
             }
             setLoading(false)
         }
@@ -181,7 +197,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                     <ListItem
                                                         icon={PrinterIcon}
                                                         title="Impressora térmica (80mm)"
-                                                        description="Formato em 80mm para comprovante rápido de devolução/troca no balcão."
+                                                        description="Formato em bobina contínua, ideal para impressoras térmicas e comprovante rápido de balcão."
                                                         onClick={() => setFormat("thermal")}
                                                         className="px-4 py-3"
                                                         right={
@@ -211,7 +227,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                     <ListItem
                                                         icon={FileTextIcon}
                                                         title="Documento A4 (PDF)"
-                                                        description="Formato folha A4 com comprovante completo e termo assinado de troca."
+                                                        description="Formato folha inteira A4, ideal para impressão comum, arquivamento e envio em PDF."
                                                         onClick={() => setFormat("a4")}
                                                         className="px-4 py-3"
                                                         right={
@@ -289,6 +305,8 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                         returnRequest={returnRequest}
                                                         partnerHeader={partnerHeader}
                                                         partnerName={partnerName}
+                                                        footerMessage={footerMessage}
+                                                        showAcknowledgment={showAcknowledgment}
                                                         thermalWidth={format === "thermal-58" ? "58mm" : "80mm"}
                                                     />
                                                 ) : (
@@ -298,6 +316,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                             partnerHeader={partnerHeader}
                                                             partnerName={partnerName}
                                                             partnerAvatar={partnerAvatar}
+                                                            showAcknowledgment={showAcknowledgment}
                                                         />
                                                     </div>
                                                 )}

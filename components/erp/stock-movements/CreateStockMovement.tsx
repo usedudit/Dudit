@@ -51,6 +51,7 @@ import SelectProductVariantSheet from "../pdv/SelectProductVariantSheet"
 import { GenericAttachmentsTab } from '@/components/erp/shared/GenericAttachmentsTab'
 
 import { useProductBucket, type ProductBucketItem } from '../hooks'
+import { ProductSearchResultItem } from '@/components/erp/shared/ProductSearchResultItem'
 
 interface MovementItem {
     product: ProductBucketItem;
@@ -679,29 +680,18 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                                                                         productBucket.filteredResults.map(product => {
                                                                             const alreadyAdded = !product.has_variants && items.some(item => item.product.id === product.id);
                                                                             return (
-                                                                                <div
+                                                                                <ProductSearchResultItem
                                                                                     key={product.id}
-                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
+                                                                                    item={product}
+                                                                                    disabled={alreadyAdded}
                                                                                     onClick={() => {
-                                                                                        if (alreadyAdded) return;
                                                                                         if (product.has_variants) {
                                                                                             setSelectedProductForVariants(product);
                                                                                         } else {
                                                                                             addProduct(product);
                                                                                         }
                                                                                     }}
-                                                                                >
-                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                        <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                                                    </div>
-                                                                                    <div className="flex-1 min-w-0">
-                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase">{product.sku}</div>
-                                                                                    </div>
-                                                                                    <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                                        {product.stock} em estoque
-                                                                                    </div>
-                                                                                </div>
+                                                                                />
                                                                             )
                                                                         })
                                                                     ) : (

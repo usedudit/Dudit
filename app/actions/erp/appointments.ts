@@ -29,7 +29,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { applyServiceOrderToGoals } from "@/lib/services/sales-goals.service"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
-import { startOfDay } from "@/lib/date"
+import { startOfDay, getTodayYmd, getDateComponents } from "@/lib/date"
 import { getAdminTimeline } from "@/lib/services/timeline.service"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
@@ -919,8 +919,17 @@ export async function getAvailableTimeSlotsAction(
     const normalized = normalizeOpeningHours(rawOpeningHours)
     const daySchedule = normalized[dayOfWeek]
 
+    const today = getTodayYmd()
+    const { hour: currentHour, minute: currentMinute } = getDateComponents(new Date())
+    const currentMinutes = currentHour * 60 + currentMinute
+
     const slots: string[] = []
     const conflictingSlots: string[] = []
+
+    // Never offer dates that are already in the past.
+    if (date < today) {
+      return { success: true, slots, conflictingSlots }
+    }
 
     if (daySchedule && daySchedule.enabled) {
       const dayStartMin = parseTimeToMinutes(daySchedule.from)
@@ -928,7 +937,12 @@ export async function getAvailableTimeSlotsAction(
       if (dayEndMin <= dayStartMin) dayEndMin += 24 * 60
       const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
 
+      // On the current day, hide slots that have already started.
+      const minSlotStart = date === today ? currentMinutes : -1
+
       for (let slotStart = dayStartMin; slotStart + serviceDurationMinutes <= dayEndMin; slotStart += SLOT_INCREMENT_MINUTES) {
+        if (slotStart <= minSlotStart) continue
+
         const slotEnd = slotStart + totalDurationNeeded
 
         // Check if this slot conflicts with any existing appointment

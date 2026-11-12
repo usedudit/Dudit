@@ -48,6 +48,7 @@ import {
   getSubscriptionForecastAction,
   syncSubscriptionWithMpErpAction,
   getRecurringSubscriptionDetailAction,
+  advanceRecurringSubscriptionCycleAction,
 } from "@/app/actions/erp/recurring-subscriptions"
 import type { RecurringSubscription, RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -382,12 +383,15 @@ export default function RecurringSubscriptionsPage({
   initialNextCursor: string | null
 }) {
   const { toast } = useToast()
-  const { planSlug } = usePermissions()
+  const { planSlug, canEdit, role, hasSpecific, canRbac } = usePermissions()
   const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
   const isMobile = useMediaQuery("(max-width: 767px)")
   const isTablet = useMediaQuery("(max-width: 1024px)")
-  const { canEdit } = usePermissions()
   const canManage = canEdit("recurring_subscriptions")
+  const canAdvanceCycle =
+    canManage &&
+    (role === "OWNER" || role === "ADMIN") &&
+    (hasSpecific("recurring_subscriptions", "can_advance_cycle") || canRbac("recurring_subscriptions.can_advance_cycle"))
   const { selectedStore } = useStore()
   const { setHeaderOverride } = useSidebar()
   const router = useRouter()
@@ -681,8 +685,8 @@ export default function RecurringSubscriptionsPage({
     setPage(1)
   }, [statusFilter, debouncedSearch, listFilters])
 
-  // Action execution: pause, resume, cancel, resolve_stock, sync
-  const runAction = async (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", subscriptionId: string) => {
+  // Action execution: pause, resume, cancel, resolve_stock, sync, advance_cycle
+  const runAction = async (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle", subscriptionId: string) => {
     if (action === "sync") {
       const res = await syncSubscriptionWithMpErpAction(partnerId, subscriptionId)
       if (!res.success) {
@@ -701,6 +705,17 @@ export default function RecurringSubscriptionsPage({
         return
       }
       toast({ title: res.message || "Sucesso" })
+      afterMutation(subscriptionId)
+      return
+    }
+
+    if (action === "advance_cycle") {
+      const res = await advanceRecurringSubscriptionCycleAction(partnerId, subscriptionId)
+      if (!res.success) {
+        toast({ title: "Erro", description: res.error, variant: "destructive" })
+        return
+      }
+      toast({ title: res.message || "Ciclo antecipado com sucesso!" })
       afterMutation(subscriptionId)
       return
     }
@@ -724,7 +739,7 @@ export default function RecurringSubscriptionsPage({
   // Ações disparadas pela seção Demanda & Execuções: além da mutação,
   // recarregam a previsão (uma assinatura pausada/cancelada sai da lista).
   const runForecastAction = async (
-    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle",
     subscriptionId: string,
   ) => {
     await runAction(action, subscriptionId)
@@ -733,7 +748,7 @@ export default function RecurringSubscriptionsPage({
   }
 
   const confirmFirst = (
-    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle",
     then: () => Promise<void>,
   ) => {
     setConfirmDialog(
@@ -747,23 +762,33 @@ export default function RecurringSubscriptionsPage({
           variant: "warning",
           onConfirm: then,
         }
-        : {
-          title: "Cancelar assinatura?",
-          message:
-            "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
-          confirmText: "Cancelar assinatura",
-          cancelText: "Manter assinatura",
-          isDestructive: true,
-          onConfirm: then,
-        },
+        : action === "cancel"
+          ? {
+            title: "Cancelar assinatura?",
+            message:
+              "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
+            confirmText: "Cancelar assinatura",
+            cancelText: "Manter assinatura",
+            isDestructive: true,
+            onConfirm: then,
+          }
+          : {
+            title: "Antecipar ciclo da assinatura?",
+            message:
+              "Deseja realmente antecipar o próximo ciclo desta assinatura? Isso irá resetar e renovar os limites e créditos de serviço do cliente imediatamente e avançar a data da próxima execução.",
+            confirmText: "Antecipar ciclo",
+            cancelText: "Voltar",
+            variant: "info",
+            onConfirm: then,
+          },
     )
   }
 
   const handleAction = (
-    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle",
     subscriptionId: string,
   ) => {
-    if (action === "pause" || action === "cancel") {
+    if (action === "pause" || action === "cancel" || action === "advance_cycle") {
       confirmFirst(action, () => runAction(action, subscriptionId))
       return
     }
@@ -771,10 +796,10 @@ export default function RecurringSubscriptionsPage({
   }
 
   const handleForecastAction = (
-    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle",
     subscriptionId: string,
   ) => {
-    if (action === "pause" || action === "cancel") {
+    if (action === "pause" || action === "cancel" || action === "advance_cycle") {
       confirmFirst(action, () => runForecastAction(action, subscriptionId))
       return
     }
@@ -1123,6 +1148,7 @@ export default function RecurringSubscriptionsPage({
                                 key={sub.id}
                                 sub={sub}
                                 canManage={canManage}
+                                canAdvanceCycle={canAdvanceCycle}
                                 onOpen={openDetail}
                                 onRunAction={handleAction}
                               />
@@ -1157,6 +1183,7 @@ export default function RecurringSubscriptionsPage({
                                       sub={sub}
                                       columns={COLUMNS}
                                       canManage={canManage}
+                                      canAdvanceCycle={canAdvanceCycle}
                                       onOpen={openDetail}
                                       onRunAction={handleAction}
                                     />

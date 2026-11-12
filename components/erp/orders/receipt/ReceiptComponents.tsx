@@ -4,7 +4,10 @@ import { type ReactNode } from "react"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
-import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
+import {
+    DEFAULT_RECEIPT_ACKNOWLEDGMENT,
+    type SaleReceiptPartnerHeader,
+} from "@/lib/sales/sale-receipt"
 
 export const A4_PAGE_WIDTH_MM = 210
 export const A4_PAGE_HEIGHT_MM = 297
@@ -85,16 +88,190 @@ export function DashedLine({ className = "my-1.5" }: { className?: string }) {
     )
 }
 
-export function ReceiptRow({ left, right, bold, className = "" }: { left: string; right: string; bold?: boolean; className?: string }) {
+type ReceiptRowProps = {
+    left: string
+    right: string
+    bold?: boolean
+    className?: string
+    leftClassName?: string
+    rightClassName?: string
+}
+
+export function ReceiptRow({
+    left,
+    right,
+    bold,
+    className = "",
+    leftClassName = "",
+    rightClassName = "",
+}: ReceiptRowProps) {
     return (
         <div
             className={`flex justify-between items-baseline gap-2 text-[10.5px] leading-tight ${bold ? "font-bold" : "font-medium"
                 } ${className}`}
             style={{ color: "#000000" }}
         >
-            <span className="shrink-0">{left}</span>
-            <span className="text-right shrink-0">{right}</span>
+            <span className={`shrink-0 max-w-[55%] break-words ${leftClassName}`.trim()}>{left}</span>
+            <span className={`text-right min-w-0 break-words ${rightClassName}`.trim()}>{right}</span>
         </div>
+    )
+}
+
+/* -------------------------------------------------------------------------- */
+/*                     Componentes padrão de recibo térmico                    */
+/* -------------------------------------------------------------------------- */
+
+type ReceiptThermalShellProps = {
+    children: ReactNode
+    printMode?: boolean
+    thermalWidth?: "80mm" | "58mm"
+    className?: string
+}
+
+/**
+ * Estrutura base de todos os recibos térmicos (80mm / 58mm).
+ * Centraliza largura, fonte, cores e reset de estilos de impressão para que
+ * todos os documentos tenham exatamente o mesmo formato.
+ */
+export function ReceiptThermalShell({
+    children,
+    printMode = false,
+    thermalWidth = "80mm",
+    className = "",
+}: ReceiptThermalShellProps) {
+    return (
+        <div
+            className={`thermal-receipt-root mx-auto break-inside-avoid ${printMode ? "sale-receipt-thermal-print" : ""
+                } ${className}`.trim()}
+            style={{
+                width: printMode ? thermalWidth : (thermalWidth === "58mm" ? "220px" : "320px"),
+                maxWidth: "100%",
+                boxSizing: "border-box",
+                color: "#000000",
+                backgroundColor: "#ffffff",
+                fontFamily: "Consolas, 'Courier New', Monaco, monospace",
+                fontWeight: 500,
+                lineHeight: "1.35",
+                fontSize: "10.5px",
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+            }}
+        >
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
+                        .thermal-receipt-root,
+                        .thermal-receipt-root * {
+                            color: #000000 !important;
+                            border-color: #000000 !important;
+                            -webkit-text-fill-color: #000000 !important;
+                            text-shadow: none !important;
+                            box-sizing: border-box !important;
+                        }
+                    `,
+                }}
+            />
+            <div className="px-3 py-3" style={{ backgroundColor: "#ffffff" }}>
+                {children}
+            </div>
+        </div>
+    )
+}
+
+export function ReceiptThermalTitle({ children }: { children: ReactNode }) {
+    return (
+        <p className="text-[12px] font-bold text-center uppercase tracking-wide mb-1.5" style={{ color: "#000000" }}>
+            {children}
+        </p>
+    )
+}
+
+export function ReceiptThermalSectionTitle({ children }: { children: ReactNode }) {
+    return (
+        <p className="font-bold text-[9.5px] uppercase mb-0.5" style={{ color: "#000000" }}>
+            {children}
+        </p>
+    )
+}
+
+type ReceiptThermalColumn = {
+    label: string
+    align?: "left" | "right"
+}
+
+export function ReceiptThermalItemsHeader({ columns }: { columns: ReceiptThermalColumn[] }) {
+    const template = columns.map((_, index) => (index === 0 ? "minmax(0,1fr)" : "auto")).join(" ")
+    return (
+        <div
+            className="grid gap-x-1.5 text-[9.5px] font-bold uppercase"
+            style={{ gridTemplateColumns: template, color: "#000000" }}
+        >
+            {columns.map((column, index) => (
+                <span
+                    key={`${column.label}-${index}`}
+                    className={column.align === "right" ? "text-right whitespace-nowrap" : "min-w-0"}
+                >
+                    {column.label}
+                </span>
+            ))}
+        </div>
+    )
+}
+
+export function ReceiptThermalNotes({ text }: { text?: string | null }) {
+    if (!text) return null
+    return (
+        <div style={{ color: "#000000" }}>
+            <ReceiptThermalSectionTitle>Observações:</ReceiptThermalSectionTitle>
+            <p className="text-[9.5px] leading-tight whitespace-pre-line mt-0.5 font-medium" style={{ color: "#000000" }}>
+                {text}
+            </p>
+        </div>
+    )
+}
+
+type ReceiptThermalSignatureProps = {
+    show?: boolean
+    acknowledgment?: string
+    label?: string
+}
+
+export function ReceiptThermalSignature({
+    show = true,
+    acknowledgment = DEFAULT_RECEIPT_ACKNOWLEDGMENT,
+    label = "Assinatura do cliente",
+}: ReceiptThermalSignatureProps) {
+    if (!show) return null
+    return (
+        <>
+            <DashedLine className="my-2" />
+            <p className="text-[9.5px] text-center leading-relaxed px-1 font-medium" style={{ color: "#000000" }}>
+                {acknowledgment}
+            </p>
+            <div className="mt-6 border-b border-dashed w-3/4 mx-auto" style={{ borderColor: "#000000" }} />
+            <p className="text-[9.5px] font-bold text-center uppercase tracking-wide mt-1" style={{ color: "#000000" }}>
+                {label}
+            </p>
+        </>
+    )
+}
+
+export function ReceiptThermalFooter({ message }: { message?: string | null }) {
+    return (
+        <>
+            <DashedLine className="my-2" />
+            {message ? (
+                <p className="text-[10.5px] font-bold text-center uppercase tracking-wide" style={{ color: "#000000" }}>
+                    {message}
+                </p>
+            ) : null}
+            <p
+                className={`text-center font-bold uppercase tracking-wide ${message ? "text-[9px] mt-0.5" : "text-[10.5px]"}`}
+                style={{ color: "#000000" }}
+            >
+                Criado via Dudit - dudit.com.br
+            </p>
+        </>
     )
 }
 
@@ -253,11 +430,21 @@ type ReceiptThermalStoreHeaderProps = {
     partnerHeader: SaleReceiptPartnerHeader
     partnerName: string
     printMode?: boolean
+    partnerAvatar?: string
 }
 
-export function ReceiptThermalStoreHeader({ partnerHeader, partnerName, printMode = false }: ReceiptThermalStoreHeaderProps) {
+export function ReceiptThermalStoreHeader({ partnerHeader, partnerName, printMode = false, partnerAvatar }: ReceiptThermalStoreHeaderProps) {
     return (
         <div className="text-center mb-1.5" style={{ color: "#000000" }}>
+            {partnerAvatar ? (
+                <div className="flex justify-center mb-1">
+                    <img
+                        src={partnerAvatar}
+                        alt={partnerHeader.fantasyName || partnerName}
+                        className="w-8 h-8 rounded-full object-cover shrink-0"
+                    />
+                </div>
+            ) : null}
             {partnerHeader.legalName && partnerHeader.legalName !== partnerHeader.fantasyName ? (
                 <p className="text-[9.5px] leading-tight font-medium" style={{ color: "#000000" }}>
                     {partnerHeader.legalName}

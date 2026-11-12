@@ -8,6 +8,7 @@ import {
     QUOTE_PREVIEW_SECONDARY_COLOR,
 } from "@/lib/quotes/quote-preview-theme"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import {
     paginateRows,
     A4_HEADER_HEIGHT,
@@ -61,7 +62,7 @@ const REASON_LABELS: Record<string, string> = {
 }
 
 const OBSERVATIONS_HEIGHT = 80
-const FINANCIAL_BLOCK_HEIGHT = 190
+const FINANCIAL_BLOCK_HEIGHT = 250
 const SIGNATURES_HEIGHT = 130
 
 type ReturnReceiptA4PreviewProps = {
@@ -71,6 +72,7 @@ type ReturnReceiptA4PreviewProps = {
     partnerAvatar?: string
     primaryColor?: string
     secondaryColor?: string
+    showAcknowledgment?: boolean
     printMode?: boolean
 }
 
@@ -81,6 +83,7 @@ export default function ReturnReceiptA4Preview({
     partnerAvatar,
     primaryColor,
     secondaryColor,
+    showAcknowledgment = true,
     printMode = false,
 }: ReturnReceiptA4PreviewProps) {
     const isExchange = returnRequest.desiredResolution === "exchange" || returnRequest.approvedResolution === "exchange"
@@ -91,6 +94,23 @@ export default function ReturnReceiptA4Preview({
         ? stripCep(String(returnRequest.customerAddress))
         : undefined
     const solicitationId = returnRequest.id ? returnRequest.id.slice(0, 8).toUpperCase() : ""
+    const refundFormLabel = (() => {
+        const resolution = returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.requestType
+        if (resolution === "store_credit") return "Vale-compra"
+        if (resolution === "exchange") {
+            return Number(returnRequest.refundValue || 0) > 0 ? "Troca com reembolso" : "Troca"
+        }
+        if (Number(returnRequest.storeCreditValue || 0) > 0 && Number(returnRequest.refundValue || 0) <= 0) return "Vale-compra"
+        return "Reembolso"
+    })()
+    const refundMethodLabel = returnRequest.refundPaymentMethod
+        ? formatPaymentMethodLabel(returnRequest.refundPaymentMethod, null)
+        : null
+    const refundTypeLabel = returnRequest.refundType === "full"
+        ? "Total"
+        : returnRequest.refundType === "partial"
+            ? "Parcial"
+            : null
 
     const items = returnRequest.items || []
 
@@ -224,8 +244,12 @@ export default function ReturnReceiptA4Preview({
                                                     </span>
                                                 </td>
                                                 <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-xs">
-                                                    <p className="text-gray-600 font-medium line-clamp-2">{reasonLabel}</p>
-                                                    <span className="text-[10px] text-gray-400">Estado: {conditionLabel}</span>
+                                                    <p className="text-gray-600 font-medium line-clamp-2">
+                                                        <span className="font-bold text-black">Motivo:</span> {reasonLabel}
+                                                    </p>
+                                                    <span className="text-[10px] text-gray-400">
+                                                        <span className="font-bold text-gray-600">Estado:</span> {conditionLabel}
+                                                    </span>
                                                 </td>
                                             </tr>
                                         )
@@ -274,6 +298,22 @@ export default function ReturnReceiptA4Preview({
                                                 <span className="font-bold text-brand-green">{formatCurrency(returnRequest.exchangeSurplusAmount || 0)}</span>
                                             </div>
                                         )}
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-500 font-medium">Forma de Reembolso</span>
+                                            <span className="font-bold">{refundFormLabel}</span>
+                                        </div>
+                                        {refundTypeLabel && (
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-gray-500 font-medium">Tipo de Reembolso</span>
+                                                <span className="font-bold">{refundTypeLabel}</span>
+                                            </div>
+                                        )}
+                                        {refundMethodLabel && (
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-gray-500 font-medium">Método de Reembolso</span>
+                                                <span className="font-bold">{refundMethodLabel}</span>
+                                            </div>
+                                        )}
                                         <div className="pt-3 border-t border-gray-200 flex justify-between items-center mt-2">
                                             <span className="font-bold text-sm text-[#113833]">Total da Resolução</span>
                                             <span className="font-bold text-lg text-black">
@@ -292,17 +332,19 @@ export default function ReturnReceiptA4Preview({
                                     </div>
                                 </div>
 
-                                {/* Signatures at bottom */}
-                                <div className="px-8 mt-auto py-12 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-xs shrink-0">
-                                    <div className="space-y-1">
-                                        <div className="border-b border-gray-300 w-4/5 mx-auto h-8" />
-                                        <p className="font-semibold text-gray-400">Assinatura do Cliente</p>
+                                {/* Signatures at bottom (apenas quando habilitadas nas configurações) */}
+                                {showAcknowledgment && (
+                                    <div className="px-8 mt-auto py-12 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-xs shrink-0">
+                                        <div className="space-y-1">
+                                            <div className="border-b border-gray-300 w-4/5 mx-auto h-8" />
+                                            <p className="font-semibold text-gray-400">Assinatura do Cliente</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="border-b border-gray-300 w-4/5 mx-auto h-8" />
+                                            <p className="font-semibold text-gray-400">Assinatura do Responsável</p>
+                                        </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <div className="border-b border-gray-300 w-4/5 mx-auto h-8" />
-                                        <p className="font-semibold text-gray-400">Assinatura do Responsável</p>
-                                    </div>
-                                </div>
+                                )}
                             </>
                         )}
 

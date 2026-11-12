@@ -300,6 +300,88 @@ export async function cancelRecurringSubscriptionAction(partnerId: string, subsc
   }
 }
 
+/**
+ * Antecipa o próximo ciclo da assinatura recorrente:
+ * - Restrito estritamente a Proprietários (OWNER) e Administradores (ADMIN).
+ * - Encerra créditos do ciclo atual (conforme a política de expiração).
+ * - Cria a execução concluída e concede novos limites e créditos imediatamente.
+ * - Avança a data da próxima execução para o próximo intervalo.
+ */
+export async function advanceRecurringSubscriptionCycleAction(partnerId: string, subscriptionId: string) {
+  try {
+    await requireRateLimit(RateLimitCategory.API_GENERAL)
+    const auth = await requirePermission(partnerId, "recurring_subscriptions", "can_advance_cycle")
+    const role = String(auth.roleId || "").toLowerCase()
+    if (role !== "owner" && role !== "admin") {
+      return {
+        success: false,
+        error: "Apenas Proprietários e Administradores podem antecipar o ciclo da assinatura.",
+      }
+    }
+
+    const supabase = await getSupabaseServerClient()
+    const { data: sub, error: subErr } = await supabase
+      .from("recurring_subscriptions")
+      .select("id, status, partner_id")
+      .eq("id", subscriptionId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+
+    if (subErr || !sub) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+    if (sub.status !== "active") {
+      return {
+        success: false,
+        error: "Apenas assinaturas ativas podem ter o ciclo antecipado.",
+      }
+    }
+
+    const admin = getAdminClient()
+    const { data: result, error: rpcErr } = await admin.rpc("advance_recurring_subscription_cycle", {
+      p_subscription_id: subscriptionId,
+      p_actor_user_id: auth.userId || null,
+    })
+
+    if (rpcErr) {
+      console.error("[advanceRecurringSubscriptionCycleAction] RPC error:", rpcErr)
+      return { success: false, error: rpcErr.message || "Falha ao antecipar ciclo." }
+    }
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: auth.userId || null,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [
+        "antecipou o ciclo da assinatura recorrente, renovando os limites e créditos de serviço imediatamente.",
+      ],
+      source: "erp",
+      metadata: {
+        advanced_by: auth.userId,
+        role,
+        execution_id: result?.execution_id || null,
+        credits_granted: result?.credits_granted ?? null,
+      },
+    })
+
+    revalidateTag("partner-stats-" + partnerId, "max")
+
+    return {
+      success: true,
+      message: "Ciclo antecipado com sucesso! Os créditos e limites foram renovados.",
+      data: result,
+    }
+  } catch (e: unknown) {
+    console.error("[advanceRecurringSubscriptionCycleAction] Error:", e)
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Erro ao antecipar ciclo da assinatura.",
+    }
+  }
+}
+
 export async function getRecurringSubscriptionExecutionsAction(partnerId: string, subscriptionId: string) {
   try {
     await requirePermission(partnerId, "recurring_subscriptions", "view")
@@ -360,14 +442,14 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
       supabase
         .from("subscription_item_credits")
         .select(`
-          id, service_id, product_id, quantity, consumed, expires_at,
+          id, service_id, product_id, quantity, consumed, expires_at, created_at,
           recurring_subscription_items(staff_partner_user_id, duration_minutes),
           services(name),
           products(name)
         `)
         .eq("partner_id", partnerId)
         .eq("subscription_id", subscriptionId)
-        .order("expires_at", { ascending: true, nullsFirst: false }),
+        .order("created_at", { ascending: false }),
     ])
 
     const { data, error } = mainResult
@@ -436,6 +518,7 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
       durationMinutes: credit.recurring_subscription_items?.duration_minutes != null
         ? Number(credit.recurring_subscription_items.duration_minutes)
         : null,
+      createdAt: credit.created_at != null ? String(credit.created_at) : null,
     }))
 
     const detail: RecurringSubscriptionDetail = {

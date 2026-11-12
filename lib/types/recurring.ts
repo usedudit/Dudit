@@ -191,6 +191,7 @@ export type RecurringSubscriptionDetailCredit = {
   expiresAt: string | null
   staffPartnerUserId?: string | null
   durationMinutes?: number | null
+  createdAt?: string | null
 }
 
 export type RecurringSubscriptionDetail = {

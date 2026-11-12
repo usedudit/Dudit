@@ -17,7 +17,7 @@ const BlobTeal = ({ className }: { className?: string }) => (
 const BlobGreenAccent = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className={className}>
     <path
-      fill="#022C2B"
+      fill="#09211b"
       d="M38.9,-50.2C52.3,-41.3,66.2,-31.3,70.3,-17.9C74.4,-4.5,68.7,12.3,59.8,26.2C50.9,40,38.8,51,24.5,58.3C10.2,65.6,-6.3,69.2,-22.1,65.2C-37.9,61.2,-53,49.6,-61.3,34.5C-69.6,19.4,-71.1,0.8,-66.1,-15.8C-61.1,-32.4,-49.6,-47,-36,-55.9C-22.4,-64.8,-6.7,-68,8.2,-66.8C23.1,-65.6,25.5,-59.1,38.9,-50.2Z"
       transform="translate(100 100)"
     />

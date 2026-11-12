@@ -26,12 +26,14 @@ import {
     AlertModal,
     ActionsDropdown,
     DropdownItem,
+    Combobox,
+    Tooltip,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon, ThreeDotsIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon, StoreIcon, ReturnIcon, ThreeDotsIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
-import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
+import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction, saveReturnEvidenceAction } from "@/app/actions/erp/returns"
 import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
 import { getShippingPayerLabel, type ReturnShippingPayer } from "@/lib/returns/policy"
 import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction, getReturnShippingQuotesAction, printSuperFreteLabelAction } from "@/app/actions/shipping/superfrete"
@@ -41,7 +43,10 @@ import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
 import { getReturnStatusMeta } from "./ReturnListRow"
 import { usePickerBucket, useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
-import { getDeliveryStatusMeta, getDeliveryStatusIcon, getPaymentStatusMeta } from "@/lib/orders/status"
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
+import { getDeliveryStatusIcon, getPaymentStatusMeta } from "@/lib/orders/status"
+import { getOrderDeliveryBadgeMeta } from "@/lib/orders/delivery-badge"
+import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId } from "@/lib/finance-utils"
 import { usePermissions } from "@/lib/permission-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
@@ -50,8 +55,6 @@ import { useR2Upload } from "@/hooks/use-r2-upload"
 import { calculateReturnNetTotal } from "@/lib/returns/calculations"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
-import ImageCropperModal from "@/components/ImageCropperModal"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -63,12 +66,33 @@ const mapPaymentMethodToPt = (method: string): string => {
     const m = String(method || "").toLowerCase().trim();
     if (m === "dinheiro" || m === "cash") return "Dinheiro";
     if (m === "pix") return "Pix";
-    if (m === "credit_card" || m === "cartão de crédito") return "Cartão de Crédito";
-    if (m === "debit_card" || m === "cartão de débito") return "Cartão de Débito";
+    if (m === "credit_card" || m === "cartão de crédito" || m === "cartao de credito") return "Cartão de Crédito";
+    if (m === "debit_card" || m === "cartão de débito" || m === "cartao de debito") return "Cartão de Débito";
     if (m === "tef") return "TEF";
     if (m === "other" || m === "outro") return "Outro";
     if (m === "mercado pago" || m === "mercado_pago") return "Mercado Pago";
     return method;
+}
+
+/** Converte valores legados (ex.: "pix", "credit_card") para os rótulos padrão do financeiro. */
+const normalizeRefundMethod = (method?: string | null): string => {
+    const raw = String(method || "").trim()
+    if (!raw) return ""
+    const resolved = resolveStandardPaymentMethod(raw)
+    if (resolved) return resolved
+    if (/^(other|outro)$/i.test(raw)) return "Outro"
+    if (/^mercado[_\s]?pago$/i.test(raw)) return "Mercado Pago"
+    return raw
+}
+
+/** Ícone do badge de entrega igual ao usado na lista de pedidos do ERP. */
+function getOrderDeliveryBadgeIcon(order: any): React.ReactElement<{ className?: string }> {
+    const meta = getOrderDeliveryBadgeMeta(order)
+    if (meta.isPickup) return <StoreIcon size={12} />
+    if (meta.carrierBrandIcon) {
+        return <img src={meta.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+    }
+    return getDeliveryStatusIcon(order?.delivery_status || order?.deliveryStatus)
 }
 
 type ReturnAdminActionContext = {
@@ -176,7 +200,7 @@ export default function CreateReturnPage({
     const [selectedOrder, setSelectedOrder] = useState<any>(null)
 
     const paymentMeta = useMemo(() => getPaymentStatusMeta(selectedOrder?.status), [selectedOrder?.status])
-    const deliveryMeta = useMemo(() => getDeliveryStatusMeta(selectedOrder?.deliveryStatus), [selectedOrder?.deliveryStatus])
+    const deliveryMeta = useMemo(() => getOrderDeliveryBadgeMeta(selectedOrder), [selectedOrder])
 
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
@@ -277,9 +301,25 @@ export default function CreateReturnPage({
         if (isMercadoPagoOrder) {
             setRefundPaymentMethod("Mercado Pago")
         } else if (selectedOrder && mode === "create") {
-            setRefundPaymentMethod("pix")
+            setRefundPaymentMethod("Pix")
         }
     }, [isMercadoPagoOrder, selectedOrder, mode])
+
+    const refundMethodOptions = useMemo(() => {
+        const options = STANDARD_PAYMENT_METHODS.map((method) => ({ ...method }))
+        if (isMercadoPagoOrder) {
+            const normalized = options.map((option) =>
+                option.value === "Mercado Pago" ? { ...option, label: "Mercado Pago (Automático)" } : { ...option, label: `${option.label} (Manual)` },
+            )
+            return normalized
+        }
+        const current = normalizeRefundMethod(refundPaymentMethod)
+        if (current && !options.some((option) => option.value === current)) {
+            options.unshift({ value: current, label: current })
+        }
+        return options
+    }, [isMercadoPagoOrder, refundPaymentMethod])
+
     const [creditType, setCreditType] = useState<"full" | "partial">("full")
     const [creditValue, setCreditValue] = useState<number>(0)
     const [replacementProduct, setReplacementProduct] = useState("")
@@ -310,28 +350,33 @@ export default function CreateReturnPage({
     }, [partnerId, mode])
 
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const [showImageCropper, setShowImageCropper] = useState(false)
-    const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
-    const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
     const [isUploading, setIsUploading] = useState(false)
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
     const [financeAccountId, setFinanceAccountId] = useState<string>("")
-    const [financeAccounts, setFinanceAccounts] = useState<{ id: string; name: string; type: string }[]>([])
+    const [financeAccounts, setFinanceAccounts] = useState<{ id: string; name: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[]>([])
+
+    const accountOptions = useMemo(
+        () => financeAccounts.map((account) => ({ value: account.id, label: account.name })),
+        [financeAccounts],
+    )
 
     useEffect(() => {
         if (!partnerId || mode === "view") return
+        let cancelled = false
         import("@/app/actions/erp/finance-accounts").then(mod =>
             mod.getFinanceAccountsAction(partnerId).then(res => {
+                if (cancelled) return
                 const accounts = (res as any)?.data?.accounts || (res as any)?.data || []
-                if (Array.isArray(accounts)) {
-                    const banks = accounts.filter((a: any) => a.type === "bank" && a.is_active)
-                    setFinanceAccounts(banks)
-                    const def = banks.find((a: any) => a.is_default) || banks[0]
-                    if (def) setFinanceAccountId(def.id)
-                }
+                if (!Array.isArray(accounts)) return
+                // Caixa, banco e demais carteiras: mostra todas as contas ativas.
+                const active = accounts.filter((a: any) => a.is_active !== false)
+                setFinanceAccounts(active)
+                const defaultId = pickBankThenCashDefaultFinanceAccountId(active)
+                if (defaultId) setFinanceAccountId((current) => current || defaultId)
             }).catch(() => { })
         ).catch(() => { })
+        return () => { cancelled = true }
     }, [partnerId, mode])
 
     const isConsumidorFinal = useMemo(() => {
@@ -345,10 +390,15 @@ export default function CreateReturnPage({
     const hasServices = useMemo(() => returnItems.some(item => item.lineType === "service_booking"), [returnItems])
     const hasOnlyServices = useMemo(() => returnItems.length > 0 && returnItems.every(item => item.lineType === "service_booking"), [returnItems])
 
+    const hasStagedEvidence = useMemo(
+        () => evidenceImages.some((img) => img instanceof File) || evidenceUploads.some((u: any) => u?.file instanceof File),
+        [evidenceImages, evidenceUploads],
+    )
+
     const isDirty = useMemo(() => {
         if (isViewOnly || isSaving || isUploading) return false
         if (mode === "create") {
-            return selectedOrder !== null || observations !== "" || evidenceImages.length > 0 || replacementItems.length > 0
+            return selectedOrder !== null || observations !== "" || evidenceImages.length > 0 || evidenceUploads.length > 0 || replacementItems.length > 0
         }
         if (mode === "edit" && returnRequest) {
             const statusChanged = returnStatus !== returnRequest.status
@@ -361,13 +411,10 @@ export default function CreateReturnPage({
                 return !item.checked || item.quantity !== orig.quantity || item.reason !== mapToLegacyReason(orig.reason || "outro") || item.condition !== mapToLegacyCondition(orig.condition || "aberto")
             })
 
-            const initialImages = returnRequest.evidenceImages || []
-            const imagesChanged = evidenceImages.length !== initialImages.length || evidenceImages.some((img, idx) => img !== initialImages[idx])
-
-            return statusChanged || resolutionTypeChanged || observationsChanged || itemsChanged || imagesChanged
+            return statusChanged || resolutionTypeChanged || observationsChanged || itemsChanged || hasStagedEvidence
         }
         return false
-    }, [mode, isSaving, isUploading, selectedOrder, observations, evidenceImages, replacementItems.length, returnRequest, returnStatus, resolutionType, returnItems])
+    }, [mode, isSaving, isUploading, selectedOrder, observations, evidenceImages, evidenceUploads, replacementItems.length, returnRequest, returnStatus, resolutionType, returnItems, hasStagedEvidence])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
@@ -396,9 +443,6 @@ export default function CreateReturnPage({
                 .then((res: any) => {
                     if (res.success && res.data) {
                         setRawReturnRequestData(res.data)
-                        if (Array.isArray(res.data.evidenceImages)) {
-                            setEvidenceImages(res.data.evidenceImages)
-                        }
                         if (Array.isArray(res.data.evidenceUploads)) {
                             setEvidenceUploads(res.data.evidenceUploads)
                         }
@@ -431,6 +475,9 @@ export default function CreateReturnPage({
                 orderDate: returnRequest.createdAt,
                 status: returnRequest.orderStatus || "paid",
                 deliveryStatus: returnRequest.deliveryStatus || "delivered",
+                delivery_status: returnRequest.deliveryStatus || "delivered",
+                delivery_type: returnRequest.deliveryType || "delivery",
+                situation: returnRequest.orderStatus || "paid",
                 totalAmount: returnRequest.orderTotal || returnRequest.orderPaidAmount || 0,
                 payment_provider: returnRequest.paymentProvider,
                 paymentProvider: returnRequest.paymentProvider,
@@ -510,13 +557,11 @@ export default function CreateReturnPage({
 
             setRefundType(isCancellation ? "full" : (returnRequest.refundType || (isFullRefund ? "full" : (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))))
             setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || loadedRefundValue) : loadedRefundValue)
-            setRefundPaymentMethod(returnRequest.refundPaymentMethod || "")
+            setRefundPaymentMethod(normalizeRefundMethod(returnRequest.refundPaymentMethod))
             setCreditValue(returnRequest.storeCreditValue || (returnRequest.desiredResolution === "store_credit" ? itemsTotal : 0))
             setExchangeStatus(returnRequest.exchangeSubstatus || "pending")
             setExchangeBalanceResolution(returnRequest.exchangeBalanceResolution || "store_credit")
             setReplacementProduct((returnRequest as any).replacementProduct || "")
-            setEvidenceImages(returnRequest.evidenceImages || [])
-            setEvidenceUploads((returnRequest as any).evidenceUploads || (returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
             setObservations(returnRequest.sellerNotes || "")
         }
     }, [mode, returnRequest, productBucket.bucket])
@@ -707,47 +752,6 @@ export default function CreateReturnPage({
         allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
     })
 
-    // Handle local image file uploading
-    const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        e.currentTarget.value = ""
-        if (file) {
-            setSelectedImageForCrop(file)
-            setShowImageCropper(true)
-        }
-    }, [])
-
-    const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {
-        try {
-            const blob = await (await fetch(croppedImageDataUrl)).blob()
-            const extensionMap: Record<string, string> = {
-                "image/jpeg": "jpg",
-                "image/png": "png",
-                "image/webp": "webp",
-            }
-            const extension = extensionMap[blob.type] || "jpg"
-            const file = new File([blob], `evidence-image.${extension}`, { type: blob.type })
-            setEvidenceImages((prev) => [...prev, file])
-        } catch (err) {
-            console.error("Error cropping image:", err)
-        } finally {
-            setShowImageCropper(false)
-            setSelectedImageForCrop(null)
-        }
-    }, [])
-
-    const handleRemoveImage = useCallback((indexToDelete: number) => {
-        setEvidenceImages((prev) => prev.filter((_, i) => i !== indexToDelete))
-    }, [])
-
-    const handleSetPrimaryImage = useCallback((index: number) => {
-        if (!evidenceImages.length) return
-        const images = [...evidenceImages]
-        const [primary] = images.splice(index, 1)
-        images.unshift(primary)
-        setEvidenceImages(images)
-    }, [evidenceImages])
-
     const customerAddress = useMemo(() => {
         if (!selectedOrder) return null
 
@@ -907,7 +911,7 @@ export default function CreateReturnPage({
         if (Number(data.refundValue || 0) !== Number(returnRequest.refundValue || 0)) fields.push("valor do reembolso")
         if (Number(data.storeCreditValue || 0) !== Number(returnRequest.storeCreditValue || 0)) fields.push("vale-compra")
         if ((data.observations || "") !== (returnRequest.sellerNotes || "")) fields.push("observações")
-        if (data.refundPaymentMethod && data.refundPaymentMethod !== (returnRequest.refundPaymentMethod || "")) {
+        if (data.refundPaymentMethod && normalizeRefundMethod(data.refundPaymentMethod) !== normalizeRefundMethod(returnRequest.refundPaymentMethod)) {
             fields.push("método de reembolso")
         }
 
@@ -928,9 +932,8 @@ export default function CreateReturnPage({
             if (itemsChanged) fields.push("itens")
         }
 
-        const originalEvidence = returnRequest.evidenceImages || []
-        const nextEvidence = data.evidenceImages || []
-        if (nextEvidence.length !== originalEvidence.length) fields.push("evidências")
+        // Evidências já existentes são geridas direto na aba; aqui só entram as novas.
+        if ((data.evidence?.length || 0) > 0) fields.push("evidências")
 
         return fields
     }, [returnRequest])
@@ -1032,30 +1035,17 @@ export default function CreateReturnPage({
         try {
             const finalEvidenceUploads: any[] = []
             const finalEvidenceImages: string[] = []
+            const uploadedFiles: { file: File; upload: any }[] = []
 
-            // Find which evidenceImages are Files and which are already uploaded strings
-            const filesToUpload: { file: File; index: number }[] = []
-            evidenceImages.forEach((img, idx) => {
-                if (img instanceof File) {
-                    filesToUpload.push({ file: img, index: idx })
-                } else if (typeof img === "string") {
-                    finalEvidenceImages[idx] = img
-                    const existingUpload = evidenceUploads.find(u => u.file_url === img || u.publicUrl === img)
-                    if (existingUpload) {
-                        finalEvidenceUploads[idx] = existingUpload
-                    } else {
-                        finalEvidenceUploads[idx] = {
-                            file_url: img,
-                            file_name: img.substring(img.lastIndexOf("/") + 1),
-                        }
-                    }
-                }
-            })
+            // Imagens e documentos pendentes são enviados juntos ao salvar.
+            const stagedImageFiles = evidenceImages.filter((img): img is File => img instanceof File)
+            const stagedDocFiles = evidenceUploads
+                .filter((u: any) => u?.file instanceof File)
+                .map((u: any) => u.file as File)
+            const filesToUpload = [...stagedImageFiles, ...stagedDocFiles]
 
             if (filesToUpload.length > 0) {
-                setUploadingImages(new Set(filesToUpload.map(f => f.index)))
-
-                for (const { file, index } of filesToUpload) {
+                for (const file of filesToUpload) {
                     try {
                         const uploaded = await evidenceUploader.uploadFile(file)
                         const uploadObj = {
@@ -1066,19 +1056,55 @@ export default function CreateReturnPage({
                             file_size: file.size,
                             metadata: { originalName: file.name },
                         }
-                        finalEvidenceUploads[index] = uploadObj
-                        finalEvidenceImages[index] = uploaded.publicUrl ?? ""
+                        finalEvidenceUploads.push(uploadObj)
+                        uploadedFiles.push({ file, upload: uploadObj })
+                        if (file.type.startsWith("image/")) {
+                            finalEvidenceImages.push(uploaded.publicUrl ?? "")
+                        }
                     } catch (uploadErr) {
-                        console.error("Error uploading file:", file.name, uploadErr)
-                        notifyError(`Falha ao fazer upload da imagem ${file.name}.`)
-                        throw uploadErr
+                        console.error("Error uploading evidence file:", file.name, uploadErr)
+                        notifyError(`Falha ao enviar "${file.name}". Verifique se o formato é permitido (imagens e PDF).`)
                     }
                 }
-                setUploadingImages(new Set())
             }
 
             const cleanEvidenceImages = finalEvidenceImages.filter(Boolean)
             const cleanEvidenceUploads = finalEvidenceUploads.filter(Boolean)
+
+            // Em edição a evidência já é persistida direto na solicitação existente.
+            if (mode === "edit" && returnRequest?.id) {
+                const persistedFiles = new Set<File>()
+                for (const { file, upload } of uploadedFiles) {
+                    try {
+                        const saved = await saveReturnEvidenceAction(
+                            partnerId,
+                            returnRequest.id,
+                            upload.file_key,
+                            upload.file_name,
+                            upload.file_type,
+                            upload.file_size,
+                        )
+                        if (saved.success) {
+                            persistedFiles.add(file)
+                        } else {
+                            notifyError((saved as any).error || `Erro ao salvar a evidência "${upload.file_name}".`)
+                        }
+                    } catch (saveErr) {
+                        console.error("Error persisting evidence:", upload.file_name, saveErr)
+                        notifyError(`Erro ao salvar a evidência "${upload.file_name}".`)
+                    }
+                }
+
+                // Evita reenviar/duplicar evidências já persistidas em um novo salvamento.
+                if (persistedFiles.size > 0) {
+                    setEvidenceImages((prev) =>
+                        prev.filter((img) => !(img instanceof File && persistedFiles.has(img))),
+                    )
+                    setEvidenceUploads((prev) =>
+                        prev.filter((row: any) => !(row?.file instanceof File && persistedFiles.has(row.file))),
+                    )
+                }
+            }
 
             const payload = {
                 orderId: selectedOrder.id,
@@ -1308,7 +1334,8 @@ export default function CreateReturnPage({
                                                                 >
                                                                     {orderPicker.displayed.map((order) => {
                                                                         const searchPaymentMeta = getPaymentStatusMeta(order.status)
-                                                                        const searchDeliveryMeta = getDeliveryStatusMeta(order.deliveryStatus)
+                                                                        const searchDeliveryMeta = getOrderDeliveryBadgeMeta(order)
+                                                                        const hasReturnHistory = Number(order.returnCount || order.return_count || 0) > 0
 
                                                                         return (
                                                                             <div
@@ -1369,10 +1396,15 @@ export default function CreateReturnPage({
                                                                                         {formatCurrency(order.totalAmount || 0)}
                                                                                     </div>
                                                                                     <div className="flex items-center gap-1">
+                                                                                        {hasReturnHistory && (
+                                                                                            <Tooltip text="Possui histórico de trocas/devoluções">
+                                                                                                <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
+                                                                                            </Tooltip>
+                                                                                        )}
                                                                                         <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
                                                                                             {searchPaymentMeta.label}
                                                                                         </Badge>
-                                                                                        <Badge variant={searchDeliveryMeta.variant} icon={getDeliveryStatusIcon(order.deliveryStatus)} className="scale-90 whitespace-nowrap">
+                                                                                        <Badge variant={searchDeliveryMeta.variant} icon={getOrderDeliveryBadgeIcon(order)} className="scale-90 whitespace-nowrap">
                                                                                             {searchDeliveryMeta.label}
                                                                                         </Badge>
                                                                                     </div>
@@ -1429,7 +1461,7 @@ export default function CreateReturnPage({
                                                                         <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-3">
                                                                             Entrega
                                                                         </p>
-                                                                        <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedOrder?.deliveryStatus)}>{deliveryMeta.label}</Badge>
+                                                                        <Badge variant={deliveryMeta.variant} icon={getOrderDeliveryBadgeIcon(selectedOrder)}>{deliveryMeta.label}</Badge>
                                                                     </div>
 
                                                                     <div className="p-5">
@@ -1968,36 +2000,22 @@ export default function CreateReturnPage({
                                                                         value={refundValue}
                                                                         onChange={(val) => setRefundValue(Math.min(Number(val || 0), calculatedRefundValue))}
                                                                     />
-                                                                    <FormDropdown
+                                                                    <Combobox
                                                                         label="Método de reembolso"
                                                                         disabled={isViewOnly || isMercadoPagoOrder}
-                                                                        value={refundPaymentMethod}
-                                                                        setValue={(val) => setRefundPaymentMethod(val)}
-                                                                        options={
-                                                                            isMercadoPagoOrder
-                                                                                ? [
-                                                                                    { value: "Mercado Pago", label: "Mercado Pago (Automático)" },
-                                                                                    { value: "pix", label: "Pix (Manual)" },
-                                                                                    { value: "credit_card", label: "Cartão de Crédito (Manual)" },
-                                                                                    { value: "other", label: "Outro (Manual)" }
-                                                                                ]
-                                                                                : [
-                                                                                    { value: "pix", label: "Pix" },
-                                                                                    { value: "credit_card", label: "Cartão de Crédito" },
-                                                                                    { value: "other", label: "Outro" }
-                                                                                ]
-                                                                        }
+                                                                        value={normalizeRefundMethod(refundPaymentMethod)}
+                                                                        onChange={(val) => setRefundPaymentMethod(normalizeRefundMethod(val))}
+                                                                        options={refundMethodOptions}
+                                                                        placeholder="Selecione o método"
                                                                     />
                                                                     {financeAccounts.length > 0 && refundPaymentMethod !== "Mercado Pago" && (
-                                                                        <FormDropdown
+                                                                        <Combobox
                                                                             label="Conta de origem"
                                                                             disabled={isViewOnly}
                                                                             value={financeAccountId}
-                                                                            setValue={(val) => setFinanceAccountId(val)}
-                                                                            options={financeAccounts.map(a => ({
-                                                                                value: a.id,
-                                                                                label: a.name,
-                                                                            }))}
+                                                                            onChange={(val) => setFinanceAccountId(val)}
+                                                                            options={accountOptions}
+                                                                            placeholder="Selecione a conta"
                                                                         />
                                                                     )}
                                                                 </>
@@ -2087,44 +2105,17 @@ export default function CreateReturnPage({
                                                                                             )
                                                                                             const displayStock = getReplacementStock(product)
                                                                                             return (
-                                                                                                <div
+                                                                                                <ProductSearchResultItem
                                                                                                     key={product.id}
-                                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
-                                                                                                    onClick={() => !alreadyAdded && addReplacementProduct({
+                                                                                                    item={product}
+                                                                                                    promotions={promotions}
+                                                                                                    displayStock={displayStock}
+                                                                                                    disabled={alreadyAdded}
+                                                                                                    onClick={() => addReplacementProduct({
                                                                                                         ...product,
                                                                                                         price: pr.bestPrice,
                                                                                                     })}
-                                                                                                >
-                                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                                        <img
-                                                                                                            src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                                                            alt={product.name}
-                                                                                                            className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                    <div className="flex-1 min-w-0">
-                                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku || "Sem SKU"}</div>
-                                                                                                    </div>
-                                                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                                                        <div className="flex items-center gap-1.5">
-                                                                                                            {pr.referencePrice && (
-                                                                                                                <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>
-                                                                                                            )}
-                                                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                                                {formatCurrency(pr.bestPrice)}
-                                                                                                            </div>
-                                                                                                            {pr.badgeVariant && (
-                                                                                                                <Badge variant={pr.badgeVariant} icon={null} className="whitespace-nowrap text-[10px] px-1.5 py-0.5">
-                                                                                                                    -{pr.discountPercent}%
-                                                                                                                </Badge>
-                                                                                                            )}
-                                                                                                        </div>
-                                                                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                                                            {displayStock} em estoque
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                </div>
+                                                                                                />
                                                                                             )
                                                                                         })
                                                                                     ) : (
@@ -2287,42 +2278,22 @@ export default function CreateReturnPage({
                                                                                         value={exchangeSurplus}
                                                                                         onChange={() => { }}
                                                                                     />
-                                                                                    <FormDropdown
+                                                                                    <Combobox
                                                                                         label="Método de reembolso"
                                                                                         disabled={isViewOnly || isMercadoPagoOrder}
-                                                                                        value={refundPaymentMethod}
-                                                                                        setValue={(val) => setRefundPaymentMethod(val)}
-                                                                                        options={
-                                                                                            isMercadoPagoOrder
-                                                                                                ? [
-                                                                                                    { value: "Mercado Pago", label: "Mercado Pago (Automático)" },
-                                                                                                    { value: "dinheiro", label: "Dinheiro (Manual)" },
-                                                                                                    { value: "pix", label: "Pix (Manual)" },
-                                                                                                    { value: "credit_card", label: "Cartão de Crédito (Manual)" },
-                                                                                                    { value: "debit_card", label: "Cartão de Débito (Manual)" },
-                                                                                                    { value: "tef", label: "TEF (Manual)" },
-                                                                                                    { value: "other", label: "Outro (Manual)" }
-                                                                                                ]
-                                                                                                : [
-                                                                                                    { value: "dinheiro", label: "Dinheiro" },
-                                                                                                    { value: "pix", label: "Pix" },
-                                                                                                    { value: "credit_card", label: "Cartão de Crédito" },
-                                                                                                    { value: "debit_card", label: "Cartão de Débito" },
-                                                                                                    { value: "tef", label: "TEF" },
-                                                                                                    { value: "other", label: "Outro" }
-                                                                                                ]
-                                                                                        }
+                                                                                        value={normalizeRefundMethod(refundPaymentMethod)}
+                                                                                        onChange={(val) => setRefundPaymentMethod(normalizeRefundMethod(val))}
+                                                                                        options={refundMethodOptions}
+                                                                                        placeholder="Selecione o método"
                                                                                     />
                                                                                     {financeAccounts.length > 0 && refundPaymentMethod !== "Mercado Pago" && (
-                                                                                        <FormDropdown
+                                                                                        <Combobox
                                                                                             label="Conta de origem"
                                                                                             disabled={isViewOnly}
                                                                                             value={financeAccountId}
-                                                                                            setValue={(val) => setFinanceAccountId(val)}
-                                                                                            options={financeAccounts.map(a => ({
-                                                                                                value: a.id,
-                                                                                                label: a.name,
-                                                                                            }))}
+                                                                                            onChange={(val) => setFinanceAccountId(val)}
+                                                                                            options={accountOptions}
+                                                                                            placeholder="Selecione a conta"
                                                                                         />
                                                                                     )}
                                                                                 </>
@@ -2369,25 +2340,14 @@ export default function CreateReturnPage({
 
                                     <TabsContent value="evidence" className="mt-0">
                                         <FadeIn key="evidence" className="space-y-6">
-                                            <FormSection title="Evidências de Retorno">
-                                                <ProductImagesSection
-                                                    images={evidenceImages}
-                                                    onImageUpload={handleImageUpload}
-                                                    onRemoveImage={handleRemoveImage}
-                                                    onSetPrimaryImage={handleSetPrimaryImage}
-                                                    isEditing={!isViewOnly && (!isMarketplaceRequest || adminContext)}
-                                                    uploadingImages={uploadingImages}
-                                                    isSaving={isSaving || isUploading}
-                                                />
-                                            </FormSection>
-
                                             <GenericAttachmentsTab
                                                 entityId={returnRequest?.id}
                                                 partnerId={partnerId}
                                                 entityType="return"
                                                 title="Documentos de Evidência"
-                                                subtitle="Gerencie documentos adicionais anexados como evidência desta devolução."
+                                                subtitle="Gerencie imagens e documentos anexados como evidência desta devolução."
                                                 isNew={mode === "create"}
+                                                isEditing={!isViewOnly && (!isMarketplaceRequest || adminContext)}
                                                 stagedFiles={evidenceUploads.filter(u => u.file instanceof File).map(u => u.file as File)}
                                                 onStagedFilesChange={(files) => {
                                                     const newUploads = files.map(f => ({ file: f, file_url: "", file_name: f.name, file_type: f.type, file_size: f.size }))
@@ -2499,16 +2459,6 @@ export default function CreateReturnPage({
                     </>
                 )}
             </div >
-
-            {showImageCropper && selectedImageForCrop && (
-                <ImageCropperModal
-                    isOpen
-                    imageFile={selectedImageForCrop}
-                    onClose={() => setShowImageCropper(false)}
-                    onCropComplete={handleImageCropComplete}
-                />
-            )
-            }
 
             <DefaultModal
                 isOpen={isReturnShippingOpen}
@@ -2639,9 +2589,9 @@ export default function CreateReturnPage({
                     </p>
 
                     {/* Table-like list of items */}
-                    <div className="border border-brand-border/40 dark:border-dark-border/40 rounded-xl overflow-hidden mt-2">
+                    <div className="rounded-xl overflow-hidden mt-2">
                         {/* Header */}
-                        <div className="bg-brand-gray dark:bg-dark-border/20 px-4 py-3 flex items-center justify-between border-b border-brand-border/40 dark:border-dark-border/40 text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                        <div className="bg-brand-gray dark:bg-dark-border/20 px-4 py-3 flex items-center justify-between border-b border-brand-border/40 dark:border-dark-border/40 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
                             <div className="flex items-center gap-3">
                                 <span>Item</span>
                             </div>
@@ -2655,7 +2605,7 @@ export default function CreateReturnPage({
                                 return (
                                     <div key={item.id} className="px-4 py-3 flex items-center justify-between hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border/40 dark:border-dark-border/40 shrink-0 bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center">
+                                            <div className="w-10 h-10 rounded-full overflow-hidden border border-brand-border dark:border-dark-border shrink-0 bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center">
                                                 <img
                                                     src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                     alt={item.productName}

@@ -159,6 +159,7 @@ export async function runDeferredImageModeration(
   let highestRisk: "low" | "medium" | "high" = "low"
   let highestConfidence = 0
   let flaggedCategoriesList: string[] = []
+  let allExplicitlyClean = true
 
   for (const img of rawImages) {
     // 1. Verifica se já está em cache no Redis pelo caminho/URL
@@ -173,12 +174,12 @@ export async function runDeferredImageModeration(
       continue
     }
 
-    // 2. Não está em cache de URL: consulta Sightengine pela URL pública no R2
-    const cdnUrl = getR2ImageUrl(img)
-    const analysis = await moderateImageWithUrl(cdnUrl)
+    // 2. Não está em cache de URL: consulta Sightengine via buffer direto do R2
+    const analysis = await moderateImageWithUrl(img)
 
     if (analysis.isUnavailable) {
-      // Se a moderação externa falhar, não bloqueia o lojista
+      // Se a moderação externa falhar, não bloqueia o lojista, mas não pode auto-aprovar o item se estava flagged
+      allExplicitlyClean = false
       continue
     }
 
@@ -238,8 +239,8 @@ export async function runDeferredImageModeration(
     return { status: "flagged", flaggedCount: flaggedImages.length }
   }
 
-  // Se antes estava flagged por imagens e agora todas estão limpas (ex: edição removendo a imagem imprópria)
-  if (row.moderation_status === "flagged") {
+  // Se antes estava flagged por imagens e agora TODAS foram expressamente checadas e estão limpas (ex: edição removendo a imagem imprópria)
+  if (row.moderation_status === "flagged" && allExplicitlyClean && flaggedImages.length === 0) {
     await admin
       .from(config.table)
       .update({

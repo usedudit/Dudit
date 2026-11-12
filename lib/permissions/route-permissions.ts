@@ -147,7 +147,10 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
 
     // ── Assinaturas
     recurring_plans: { key: "recurring_plans", path: "/erp/recorrentes/planos", label: "Planos Recorrentes", category: "Assinaturas" },
-    recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recorrentes/assinaturas", label: "Assinaturas", category: "Assinaturas" },
+    recurring_subscriptions: {
+        key: "recurring_subscriptions", path: "/erp/recorrentes/assinaturas", label: "Assinaturas", category: "Assinaturas",
+        specificPermissions: ["can_advance_cycle"],
+    },
 
     // ── Lojas e Filiais
     stores: {
@@ -298,7 +301,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     marketing_promotions: full,
     cadastros_marketing: full,
     recurring_plans: full,
-    recurring_subscriptions: full,
+    recurring_subscriptions: withSpecific(full, { can_advance_cycle: true }),
     community_videos: full,
     colecoes: full,
     // Configurações
@@ -384,7 +387,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     marketing_promotions: full,
     cadastros_marketing: full,
     recurring_plans: full,
-    recurring_subscriptions: full,
+    recurring_subscriptions: withSpecific(full, { can_advance_cycle: true }),
     community_videos: noAccess,
     colecoes: full,
     // Configurações (limitado): pode visualizar; sem assinatura/integrações
@@ -715,6 +718,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         recurring_subscriptions: {
             view: routePerms.recurring_subscriptions?.access ?? false,
             manage: routePerms.recurring_subscriptions?.edit ?? routePerms.recurring_subscriptions?.create ?? false,
+            can_advance_cycle: Boolean(routePerms.recurring_subscriptions?.specific?.can_advance_cycle),
         },
         team: mapRoute("settings_team"),
         dashboard: { view: mapRoute("dashboard").view },
@@ -969,6 +973,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             create: legacy.recurring_subscriptions.manage,
             edit: legacy.recurring_subscriptions.manage,
             delete: legacy.recurring_subscriptions.manage,
+            specific: { can_advance_cycle: Boolean(legacy.recurring_subscriptions.can_advance_cycle) },
         })
     }
     if (legacy.categories) apply("cadastros_produtos", mapLegacy(legacy.categories))

@@ -65,11 +65,16 @@ export default async function PrintTrocaPage({ params, searchParams }: PageProps
     const effectiveStoreId = storeId || returnRequest.store_id || undefined
 
     // Fetch partner metadata, store avatar and address details
-    const [headerRes, storeRes] = await Promise.all([
+    const [headerRes, storeRes, policyRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId, effectiveStoreId),
         effectiveStoreId
             ? supabase.from("stores").select("id, name, logo_url").eq("id", effectiveStoreId).maybeSingle()
-            : supabase.from("stores").select("id, name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle()
+            : supabase.from("stores").select("id, name, logo_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
+        supabase
+            .from("partner_return_policies")
+            .select("receipt_message, receipt_show_acknowledgment")
+            .eq("partner_id", partnerId)
+            .maybeSingle(),
     ])
     const storeData = storeRes.data
     const partnerRes = { data: { store_name: storeData?.name, store_image_url: storeData?.logo_url } }
@@ -89,6 +94,8 @@ export default async function PrintTrocaPage({ params, searchParams }: PageProps
     const isThermal = rawFormat === "thermal" || rawFormat === "thermal-58"
     const format = isThermal ? (rawFormat as "thermal" | "thermal-58") : "a4"
     const thermalWidth: "80mm" | "58mm" = format === "thermal-58" ? "58mm" : "80mm"
+    const footerMessage = policyRes.data?.receipt_message?.trim() || null
+    const showAcknowledgment = policyRes.data?.receipt_show_acknowledgment !== false
 
     return (
         <PrintLayout paperSize={format === "thermal-58" ? "thermal-58" : format === "thermal" ? "thermal" : "a4"}>
@@ -98,6 +105,8 @@ export default async function PrintTrocaPage({ params, searchParams }: PageProps
                         returnRequest={returnRequest}
                         partnerHeader={partnerHeader}
                         partnerName={partnerName}
+                        footerMessage={footerMessage}
+                        showAcknowledgment={showAcknowledgment}
                         printMode={true}
                         thermalWidth={thermalWidth}
                     />
@@ -108,6 +117,7 @@ export default async function PrintTrocaPage({ params, searchParams }: PageProps
                     partnerHeader={partnerHeader}
                     partnerName={partnerName}
                     partnerAvatar={partnerAvatar}
+                    showAcknowledgment={showAcknowledgment}
                     printMode={true}
                 />
             )}

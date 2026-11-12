@@ -27,8 +27,6 @@ const PartnerWizard = dynamic(
 type PageMode = "auth" | "partner"
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
 
-
-
 function RedirectToHome({ next }: { next: string }) {
   useLayoutEffect(() => {
     window.location.replace(getSafeRedirectPath(next))
@@ -173,7 +171,7 @@ function AuthContent() {
 
   if (user && isPartnerMode && canShowPartnerWizardWhenLoggedIn === null) {
     return (
-      <div className="min-h-screen bg-[#022C2B] flex items-center justify-center">
+      <div className="min-h-screen bg-brand-dark flex items-center justify-center">
         <ThreeDotsLoader />
       </div>
     )
@@ -209,7 +207,7 @@ function AuthContent() {
           transition={{ duration: 0.4, ease: "easeInOut" }}
           className="w-full h-full"
         >
-          <div className="flex h-screen w-full bg-[#022C2B] p-4 md:p-6 items-stretch overflow-hidden font-sans relative">
+          <div className="flex h-screen w-full bg-brand-dark p-4 md:p-6 items-stretch overflow-hidden font-sans relative">
             <div className="absolute inset-0 opacity-5 pointer-events-none" />
 
             {/* Esquerda: Formulário / Wizard */}
@@ -219,9 +217,9 @@ function AuthContent() {
                   <img
                     src="https://img.dudit.com.br/static/Logo.png"
                     alt="Dudit"
-                    width={90}
-                    height={28}
-                    className="h-7 w-auto"
+                    width={140}
+                    height={40}
+                    className="h-10 w-auto object-contain"
                   />
                 </Link>
                 <button

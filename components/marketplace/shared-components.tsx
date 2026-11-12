@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
-import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon, ClockIcon, EnergyIcon } from "@/lib/icons"
+import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, ClockIcon, EnergyIcon } from "@/lib/icons"
 import Link from "next/link"
 import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { useRouter } from "next/navigation"
@@ -592,16 +592,8 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-white shadow-sm tracking-wider whitespace-nowrap
-                                ${pricing.badgeVariant === "blue" ? "bg-[#2968c8]" : "bg-[#ff7a00]"}`}>
-                                {pricing.badgeVariant === "blue" ? (
-                                    <>
-                                        <TagIcon className="w-3 h-3 fill-current shrink-0" />
-                                        <span>Oferta Especial</span>
-                                    </>
-                                ) : (
-                                    <span>{pricing.discountPercent}% OFF</span>
-                                )}
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                <span>{pricing.discountPercent}% OFF</span>
                             </div>
                         )}
                         {timeLeft && (

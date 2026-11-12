@@ -167,6 +167,9 @@ const SPECIFIC_PERMISSION_MESSAGES: Record<string, string> = {
   "settings.settings_system": "Você não possui permissão para alterar configurações do sistema.",
   "settings.settings_resources": "Você não possui permissão para gerenciar recursos do sistema.",
   "settings.settings_logs": "Você não possui permissão para visualizar os logs do sistema.",
+
+  // Assinaturas Recorrentes
+  "recurring_subscriptions.can_advance_cycle": "Você não possui permissão para antecipar o ciclo de assinaturas. Apenas Proprietários e Administradores podem realizar esta ação.",
 }
 
 /**

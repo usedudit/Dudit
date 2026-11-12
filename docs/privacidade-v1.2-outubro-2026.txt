@@ -1,200 +1,412 @@
-POLÍTICA DE PRIVACIDADE - PLATAFORMA DUDIT
+# POLÍTICA DE PRIVACIDADE — PLATAFORMA DUDIT
 
-Versão 1.2 - Última atualização: Outubro de 2026
+**Versão 2.0 — Última atualização: Novembro de 2026**
 
-Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018) e o Marco Civil da Internet (Lei 12.965/2014).
+Esta Política de Privacidade descreve como a DUDIT coleta, utiliza, armazena, compartilha e protege os dados pessoais de seus usuários, em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018), o Marco Civil da Internet (Lei nº 12.965/2014) e demais normas aplicáveis.
 
-Controladora: [NOME CIVIL COMPLETO DA OPERADORA], pessoa física. CPF: [INFORMAR CPF OU VALIDAR COM ADVOGADO A FORMA DE DIVULGAÇÃO]. E-mail: [E-MAIL VÁLIDO DE PRIVACIDADE]. Endereço para contato: [ENDEREÇO COMPLETO].
+A DUDIT busca tratar os dados pessoais de forma transparente, adequada e limitada às finalidades necessárias para disponibilizar seus serviços, proteger a plataforma, viabilizar as relações entre Usuários e Parceiros e cumprir suas obrigações legais.
 
-________________________________________
+**Controladora:** [RAZÃO SOCIAL OU NOME CIVIL COMPLETO DA OPERADORA].  
+**CNPJ/CPF:** [INFORMAR DADO CORRETO].  
+**E-mail de privacidade:** [E-MAIL VÁLIDO DE PRIVACIDADE].  
+**Endereço para contato:** [ENDEREÇO COMPLETO].
 
-1. DADOS COLETADOS
-
-1.1. Dados fornecidos pelo Parceiro (Vendedor):
-
-Dado	Finalidade	Base Legal (LGPD)
-
-Nome completo	Identificação e cadastro	Execução de contrato (Art. 7º, V)
-
-CPF/CNPJ	Identificação fiscal e antifraude	Execução de contrato + Obrigação legal
-
-E-mail	Comunicação, notificações, recuperação de senha	Execução de contrato
-
-Telefone	Suporte e notificações via WhatsApp	Execução de contrato
-
-Endereço	Exibição na vitrine e logística	Execução de contrato
-
-Dados bancários/gateway	Processamento de pagamentos (via Mercado Pago)	Execução de contrato
-
-Fotos e vídeos de produtos	Exibição na vitrine digital	Execução de contrato
-
-1.2. Dados fornecidos pelo Usuário (Comprador):
-
-Dado	Finalidade	Base Legal (LGPD)
-
-Nome completo	Identificação do pedido	Execução de contrato
-
-E-mail	Confirmação de pedido e comunicação	Execução de contrato
-
-Telefone	Contato sobre pedido	Execução de contrato
-
-Endereço de entrega	Logística de entrega	Execução de contrato
-
-Histórico de pedidos	Gestão de compras e suporte	Execução de contrato
-
-Avaliações publicadas	Exibição na vitrine digital	Execução de contrato / Legítimo interesse
-
-1.3. Dados coletados automaticamente:
-
-Dado	Finalidade	Base Legal (LGPD)
-
-Eventos e gravação de navegação (PostHog, apenas após aceite)	Métricas e diagnóstico da experiência	Consentimento; revogável nas preferências
-
-IP, data/hora, país aproximado, método, rota, status, user-agent e CF-Ray	Segurança e investigação; rota sem query string	Obrigação legal aplicável e exercício regular de direitos
+A identificação acima deverá corresponder à pessoa física ou jurídica que efetivamente determina as finalidades e os meios dos tratamentos realizados pela DUDIT.
 
 ________________________________________
 
-2. COMO USAMOS OS DADOS
+## 1. DADOS COLETADOS
 
-Os dados coletados são utilizados exclusivamente para as seguintes finalidades:
+A DUDIT poderá coletar diferentes categorias de dados pessoais, conforme o tipo de conta, as funcionalidades utilizadas e a relação estabelecida com a plataforma.
 
-•	Execução do contrato: identificação, autenticação, processamento de pedidos, exibição na vitrine digital, comunicações operacionais e suporte ao Parceiro e ao Usuário.
+A coleta será limitada ao que for necessário para as finalidades informadas, observadas as bases legais previstas na LGPD.
 
-•	Segurança e prevenção de fraudes: verificação de identidade, análise de logs de acesso, detecção automatizada e manual de comportamentos suspeitos, e colaboração com autoridades competentes quando necessário e previsto em lei.
+### 1.1. Dados fornecidos pelo Parceiro (Vendedor/Prestador de Serviços)
 
-•	Logística: repasse de dados de endereço e contato a transportadoras para viabilizar a entrega de pedidos.
+| Dado | Finalidade | Base legal possível |
+|---|---|---|
+| Nome completo | Identificação e cadastro | Execução de contrato e procedimentos preliminares |
+| CPF/CNPJ | Identificação, validação cadastral e prevenção a fraudes | Execução de contrato, obrigação legal ou legítimo interesse, conforme o caso |
+| E-mail | Comunicação, notificações e recuperação de acesso | Execução de contrato |
+| Telefone | Contato, suporte e notificações operacionais | Execução de contrato |
+| Endereço comercial | Exibição na vitrine, identificação e logística | Execução de contrato |
+| Dados de pagamento e integração | Configuração e acompanhamento de pagamentos e assinaturas | Execução de contrato e obrigação legal, conforme o caso |
+| Fotos, logotipos e vídeos | Exibição na vitrine e divulgação do negócio | Execução de contrato |
+| Produtos e serviços cadastrados | Organização de catálogo e apresentação comercial | Execução de contrato |
+| Dados de clientes inseridos no ERP | Gestão comercial e organização do negócio | Definida conforme a finalidade e o papel de cada parte |
+| Dados de funcionários ou colaboradores inseridos no ERP | Organização interna do Parceiro | Definida conforme a finalidade e o papel de cada parte |
+| Registros de pedidos, estoque e movimentações | Gestão e operação do negócio | Execução de contrato e outras bases aplicáveis |
 
-•	Métricas e diagnóstico: eventos e gravação de sessão pelo PostHog somente quando o usuário aceitar. A escolha pode ser revogada nas preferências.
+O Parceiro deverá informar apenas dados necessários às finalidades de gestão e operação do negócio e possuir fundamento legal para inserir dados pessoais de clientes, funcionários ou terceiros na plataforma.
 
-•	Obrigações legais: manutenção de registros de acesso (Marco Civil da Internet) e de transações financeiras (legislação fiscal), pelo prazo exigido por lei.
+### 1.2. Dados fornecidos pelo Usuário (Comprador/Consumidor)
 
-A DUDIT não utiliza dados pessoais para fins publicitários e não vende dados a terceiros.
+| Dado | Finalidade | Base legal possível |
+|---|---|---|
+| Nome completo | Identificação e atendimento | Execução de contrato |
+| E-mail | Confirmação de pedidos e comunicação | Execução de contrato |
+| Telefone | Contato sobre pedidos e entregas | Execução de contrato |
+| Endereço de entrega | Viabilização da entrega | Execução de contrato |
+| Histórico de pedidos | Consulta, atendimento e resolução de ocorrências | Execução de contrato e exercício regular de direitos |
+| Avaliações publicadas | Exibição de opiniões e reputação dos Parceiros | Execução de contrato e legítimo interesse, conforme o caso |
+| Favoritos e coleções | Disponibilização de recursos personalizados | Execução de contrato |
+| Mensagens e solicitações | Atendimento e comunicação com Parceiros | Execução de contrato |
+| Informações relacionadas a pagamentos | Identificação e acompanhamento de transações | Execução de contrato e obrigação legal, conforme o caso |
+| Informações de agendamentos e orçamentos | Organização e acompanhamento das solicitações | Execução de contrato |
 
-________________________________________
+A DUDIT poderá receber informações adicionais quando necessárias à execução de determinada funcionalidade, desde que sejam informadas ao Usuário e possuam fundamento legal adequado.
 
-3. COMPARTILHAMENTO DE DADOS
+### 1.3. Dados coletados automaticamente
 
-O papel da DUDIT depende da finalidade: ela é controladora para cadastro, segurança, faturamento e funcionamento do marketplace. Quando um Parceiro usa o ERP para gerir dados de clientes ou equipe, o Parceiro define as finalidades e a DUDIT trata os dados conforme as instruções e o contrato aplicável. A DUDIT não vende dados pessoais. Os dados podem ser compartilhados com:
+A plataforma poderá registrar informações técnicas relacionadas ao acesso e à utilização dos serviços.
 
-•	Mercado Pago: dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);
+| Dado | Finalidade | Base legal possível |
+|---|---|---|
+| Eventos de navegação e utilização | Métricas e diagnóstico da experiência, quando autorizados | Consentimento |
+| Gravação técnica de sessão pelo PostHog | Análise de usabilidade, quando autorizada | Consentimento |
+| Endereço IP | Segurança, prevenção a fraudes e registros de acesso | Obrigação legal, legítimo interesse ou exercício regular de direitos, conforme a finalidade |
+| Data e horário de acesso | Segurança e registros técnicos | Obrigação legal e legítimo interesse, conforme o caso |
+| Método, rota e status de requisição | Diagnóstico e segurança | Legítimo interesse e exercício regular de direitos |
+| User-agent e identificador técnico de requisição | Diagnóstico e prevenção de incidentes | Legítimo interesse |
+| País aproximado, quando disponível | Segurança e análise técnica | Legítimo interesse |
+| Informações de dispositivo e navegador | Compatibilidade e diagnóstico | Legítimo interesse, conforme a finalidade |
+| Registros de erros | Identificação e correção de falhas | Legítimo interesse |
 
-•	Superfrete / Transportadoras: nome, endereço e telefone do destinatário para geração de etiquetas de envio;
+A DUDIT não deverá registrar senhas, tokens de autenticação, cookies de sessão ou conteúdo desnecessário de formulários em logs técnicos comuns.
 
-•	Cloudflare: dados de tráfego para segurança e proteção contra ataques, e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);
-•	Supabase e hospedagem: autenticação, banco de dados e execução da plataforma; Sentry: diagnóstico de erros; PostHog: métricas e gravação de sessão somente após aceite; SMTP2GO: e-mails operacionais; ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap: consulta de CEP e geocodificação de endereços para obter coordenadas aproximadas;
+### 1.4. Dados de localização e endereço
 
-•	Autoridades competentes, mediante obrigação legal ou ordem judicial: quando exigido por lei, decisão judicial ou outra hipótese autorizada pela LGPD, para apuração de fraudes, ilícitos ou proteção de direitos, conforme item 2.4 dos Termos de Uso.
+Quando o Usuário ou Parceiro informa um CEP ou endereço para cadastro, pedido ou entrega, a DUDIT poderá utilizar serviços como ViaCEP, BrasilAPI, AwesomeAPI ou Nominatim/OpenStreetMap para completar informações de endereço ou obter coordenadas aproximadas.
 
-A DUDIT não compartilha dados cadastrais de Parceiros diretamente com Usuários (ou vice-versa) que aleguem ter sido lesados, exceto quando amparada por obrigação legal, ordem judicial ou outra hipótese prevista na legislação aplicável.
+As coordenadas poderão ser armazenadas junto ao endereço informado e utilizadas para calcular distâncias, organizar resultados e apoiar funcionalidades logísticas.
 
-________________________________________
+Essas coordenadas não representam necessariamente a localização GPS atual do dispositivo do Usuário. A DUDIT não deverá apresentar uma localização aproximada obtida por endereço como se fosse uma localização precisa do aparelho.
 
-4. COOKIES E RASTREAMENTO
+### 1.5. Dados de terceiros inseridos pelo Parceiro
 
-4.1. Cookies técnicos essenciais mantêm a sessão e as funções necessárias da plataforma. Métricas e gravação de sessão do PostHog ficam desativadas até que o usuário escolha aceitá-las no aviso de privacidade.
+Quando o Parceiro utilizar ferramentas de ERP, cadastro de clientes, funcionários, fornecedores ou outros contatos, poderá inserir dados pessoais de terceiros.
 
-4.2. Se aceitos, o PostHog recebe eventos de uso e pode gravar uma reprodução técnica da navegação. Campos de formulário são mascarados; dados identificados como sensíveis na interface devem receber seletor de proteção.
+Nessas situações, o Parceiro deverá possuir fundamento legal para o tratamento, informar os titulares quando necessário e utilizar os dados somente para finalidades legítimas.
 
-4.3. A escolha é guardada por até 6 meses. O usuário pode recusá-la ou alterá-la a qualquer momento. Recusar métricas não impede o uso da plataforma.
+A DUDIT poderá atuar como operadora desses dados quando realizar o tratamento conforme as instruções do Parceiro. Para outras finalidades próprias, como segurança da plataforma, prevenção a fraudes e cumprimento de obrigações legais, poderá atuar como controladora.
 
-________________________________________
+### 1.6. Dados sensíveis
 
-5. LOGS E SEGURANÇA
+A DUDIT não solicita rotineiramente dados pessoais sensíveis para o uso comum da plataforma.
 
-5.1. Os dados são armazenados em servidores seguros (Supabase/Vercel), com criptografia em trânsito (HTTPS/TLS) e em repouso.
+Caso determinada funcionalidade venha a exigir dados sensíveis, o tratamento dependerá de finalidade específica, hipótese legal adequada, medidas de segurança reforçadas e informações específicas ao titular.
 
-5.2. Chaves e tokens sensíveis são armazenados com criptografia adicional, com sistema de rotação de chaves (master key versionada) para garantir que eventual comprometimento não exponha dados históricos.
-
-5.3. Senhas nunca são armazenadas em texto simples - utilizamos hash seguro (bcrypt ou equivalente).
-
-5.4. Tokens de integração com gateways de pagamento são criptografados e nunca expostos em logs ou interfaces.
-
-5.5. A DUDIT adota moderação de conteúdo automatizada para imagens, vídeos e textos, visando proteger a plataforma e seus usuários.
-
-5.6. Armazenamento de Imagens, Vídeos e Arquivos: Imagens, vídeos e arquivos enviados por Parceiros e Usuários são armazenados em infraestrutura de terceiros (Cloudflare R2). Conteúdos públicos (imagens e vídeos de anúncios e da vitrine) passam por processo de moderação, conforme item 5.5 dos Termos de Uso. Arquivos e anexos de caráter privado, trocados entre Parceiro e Usuário, não são monitorados rotineiramente, mas a DUDIT possui acesso técnico a todo o conteúdo armazenado, o qual poderá ser acessado para fins de moderação, suporte, segurança, apuração de denúncias ou cumprimento de obrigação legal, sempre limitado a essas finalidades.
-
-5.7. Registros de acesso: Para segurança e investigação, a aplicação registra data e hora, IP quando fornecido por uma fonte confiável, país aproximado quando disponível, método, rota sem parâmetros de consulta, código de resposta, user-agent e identificador de requisição da Cloudflare quando disponível. Não registra senhas, cookies, cabeçalhos de autorização ou conteúdo dos formulários nesse log. Sem configuração de proxy confiável, o IP pode constar como desconhecido. A localização por IP não identifica endereço ou posição GPS. O log da aplicação não registra a porta lógica de origem; quando necessária para identificação inequívoca, ela deve ser consultada nos registros de borda do provedor, correlacionados pelo identificador de requisição.
-
-5.8. Endereços e coordenadas: Ao informar um CEP ou endereço para cadastro, pedido ou entrega, a DUDIT pode consultar ViaCEP, BrasilAPI, AwesomeAPI ou Nominatim/OpenStreetMap para completar o endereço ou obter coordenadas aproximadas. Coordenadas podem ser armazenadas junto ao endereço informado e usadas para calcular distância e apoiar a logística; não são coordenadas GPS obtidas diretamente do dispositivo.
-
-5.9. Incidentes que possam gerar risco ou dano relevante serão avaliados e comunicados aos titulares e à ANPD nos prazos legais aplicáveis.
-
-________________________________________
-
-6. RETENÇÃO DOS DADOS
-
-Tipo de dado	Prazo de retenção
-
-Dados de cadastro (Parceiro ativo)	Enquanto a conta estiver ativa
-
-Dados operacionais da conta após exclusão	Exclusão ou anonimização em até 30 dias, ressalvados registros justificados abaixo
-
-Logs de acesso (IP e metadados mínimos)	6 meses; prazo maior apenas por obrigação ou preservação legal específica
-
-Prova de aceite e certificado de exclusão	Até 5 anos para exercício regular de direitos; depois expurgo
-Registro de incidente com dados pessoais	Mínimo de 5 anos a partir do registro, mesmo se não houver comunicação à ANPD; prazo maior se necessário por obrigação adicional
-
-Dados de pedidos e registros financeiros	Pelo prazo fiscal ou de defesa aplicável a cada registro; anonimização quando possível, sem prazo genérico único
-
-Backups criptografados	Padrão: 30 diários e 4 semanais (até cerca de 2 meses se mantida a rotina diária); pode variar conforme configuração do ambiente
-
-________________________________________
-
-7. DIREITOS LGPD
-
-Em conformidade com a LGPD, você tem direito a:
-
-•	Acesso: solicitar cópia dos seus dados pessoais armazenados;
-
-•	Correção: solicitar correção de dados incompletos ou incorretos;
-
-•	Exclusão: solicitar a exclusão dos seus dados, respeitados os prazos legais de retenção;
-
-•	Portabilidade: solicitar seus dados em formato estruturado;
-
-•	Revogação do consentimento: onde o tratamento for baseado em consentimento;
-
-•	Oposição: opor-se a tratamentos baseados em legítimo interesse;
-
-•	Informação: ser informado sobre com quem seus dados são compartilhados.
-
-Para exercer esses direitos, use o e-mail [E-MAIL VÁLIDO DE PRIVACIDADE]. As solicitações serão respondidas nos prazos legais. A declaração completa prevista no art. 19, II, da LGPD pode levar até 15 dias.
+Os Usuários e Parceiros não deverão inserir dados sensíveis de terceiros em campos de texto, anexos ou conteúdos da plataforma quando isso não for necessário e autorizado.
 
 ________________________________________
 
-8. EXCLUSÃO E ANONIMIZAÇÃO
+## 2. COMO USAMOS OS DADOS
 
-8.1. O Parceiro pode solicitar a exclusão da conta a qualquer momento através das configurações da plataforma ou pelo canal de suporte.
+Os dados pessoais coletados poderão ser utilizados para as seguintes finalidades:
 
-8.2. A exclusão ocorre por etapas. Os dados operacionais associados são apagados ou anonimizados em até 30 dias, desde que a tarefa de exclusão seja iniciada com sucesso. Se ela não puder ser agendada, a solicitação será marcada como falha e o usuário receberá orientação para tentar novamente ou contatar o suporte.
+**• Execução dos serviços:** criação e manutenção de contas, autenticação, exibição de vitrines, cadastro de produtos e serviços, processamento de solicitações, pedidos, agendamentos e comunicações operacionais.
 
-8.3. A DUDIT pode reter por prazo limitado provas de aceite e exclusão, registros de acesso e dados estritamente necessários a obrigações legais ou ao exercício regular de direitos. O acesso é restrito e os dados são expurgados ao fim do prazo aplicável. Pedidos podem ser preservados de forma anonimizada quando necessário.
+**• Atendimento e suporte:** responder dúvidas, solucionar problemas, acompanhar solicitações e prestar suporte aos Parceiros e Usuários.
 
-8.4. Cópias de segurança são criptografadas; a configuração padrão prevê 30 cópias diárias e 4 semanais (até cerca de 2 meses se a rotina diária for mantida), podendo variar conforme o ambiente. A exclusão da base ativa não remove imediatamente cópias já produzidas.
+**• Segurança e prevenção de fraudes:** análise de logs, verificação de atividades suspeitas, proteção de contas, identificação de comportamentos abusivos, moderação e investigação de incidentes.
 
-________________________________________
+**• Pagamentos:** viabilizar integrações com provedores de pagamento, acompanhar o status das transações e administrar cobranças relativas aos planos e serviços da própria DUDIT.
 
-9. TRANSFERÊNCIA INTERNACIONAL DE DADOS
+**• Logística:** compartilhar os dados estritamente necessários com transportadoras, serviços de envio e entregadores participantes para possibilitar a retirada e entrega de pedidos.
 
-Provedores usados na operação, como Supabase, Cloudflare, PostHog (se houver aceite), Sentry, Mercado Pago, SMTP2GO, ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap (consulta de CEP/geocodificação de endereço) e serviços de hospedagem e mensageria configurados, podem processar dados no exterior. As transferências observarão os mecanismos e garantias previstos na LGPD e nas normas da ANPD aplicáveis.
+**• Gestão empresarial:** permitir que Parceiros organizem seus produtos, serviços, clientes, pedidos, estoque e demais informações inseridas nas ferramentas de gestão.
 
-________________________________________
+**• Avaliações e reputação:** disponibilizar avaliações, comentários e informações relacionadas à experiência dos Usuários, observadas as regras de moderação.
 
-10. CONTATO E ENCARREGADO (DPO)
+**• Métricas e diagnóstico:** analisar eventos de utilização e gravações técnicas de sessão por meio do PostHog, somente quando houver consentimento válido e enquanto ele permanecer autorizado.
 
-Para dúvidas, solicitações ou reclamações sobre privacidade:
+**• Cumprimento de obrigações legais:** manter registros, atender determinações de autoridades competentes e cumprir obrigações legais, regulatórias ou judiciais.
 
-E-mail: [E-MAIL VÁLIDO DE PRIVACIDADE]. Controladora / responsável: [NOME CIVIL COMPLETO DA OPERADORA]. Endereço para contato: [ENDEREÇO COMPLETO].
+**• Exercício regular de direitos:** preservar documentos, registros e informações necessários à defesa de direitos em processos judiciais, administrativos ou arbitrais.
 
-Você também pode registrar reclamações na Autoridade Nacional de Proteção de Dados (ANPD): www.gov.br/anpd
+**• Proteção da plataforma:** identificar tentativas de invasão, uso indevido, manipulação de avaliações, fraudes, violação de direitos e outras atividades que possam prejudicar Usuários, Parceiros ou a DUDIT.
 
-________________________________________
+A DUDIT não vende dados pessoais a terceiros.
 
-11. ALTERAÇÕES DESTA POLÍTICA
-
-Esta Política pode ser atualizada periodicamente. A data da última atualização estará sempre indicada no topo do documento. O uso continuado da plataforma após alterações implica aceitação da nova versão.
+A utilização de dados para publicidade, marketing direto ou comunicações promocionais não está incluída automaticamente nas finalidades operacionais acima. Caso essa finalidade seja implementada, deverá possuir fundamento legal adequado, transparência e mecanismos de oposição ou revogação quando aplicáveis.
 
 ________________________________________
 
-DUDIT - Lucélia/SP - dudit.com.br
+## 3. COMPARTILHAMENTO DE DADOS
 
+A DUDIT poderá compartilhar dados pessoais somente quando necessário às finalidades informadas, mediante fundamento legal adequado e observando os princípios da necessidade, adequação, transparência e segurança.
+
+O papel da DUDIT poderá variar conforme a operação de tratamento:
+
+- **Controladora:** quando determinar as finalidades e os meios do tratamento, como no cadastro de contas, segurança da plataforma, prevenção a fraudes, funcionamento do marketplace e administração de seus próprios serviços.
+- **Operadora:** quando tratar dados pessoais conforme instruções documentadas do Parceiro, por exemplo, em determinadas operações de gestão de clientes ou funcionários realizadas por meio do ERP.
+
+A definição do papel deverá considerar a atividade efetivamente realizada, e não apenas a denominação contratual.
+
+Os dados poderão ser compartilhados com:
+
+**• Mercado Pago:** dados necessários à integração e ao processamento de pagamentos online, conforme a operação, como identificação do pagador, e-mail, CPF quando exigido, valor e informações da transação. O tratamento realizado pelo provedor também estará sujeito às suas próprias políticas e condições.
+
+**• SuperFrete e transportadoras:** dados necessários à cotação, contratação e execução de envios nacionais, como nome, endereço, telefone, informações do pacote e dados necessários à emissão de etiquetas e ao rastreamento.
+
+**• Entregadores participantes:** quando houver solicitação de entrega local aceita ou disponibilizada para execução, poderão ser compartilhadas informações necessárias ao serviço, como nome e contato do destinatário, endereço de retirada e entrega, identificação do pedido, instruções logísticas e informações sobre pagamento ou recebimento quando indispensáveis à execução. O compartilhamento deverá ser limitado ao necessário para a entrega e ocorrer conforme as funcionalidades e permissões do sistema.
+
+**• Cloudflare:** informações de tráfego para segurança, proteção contra ataques, distribuição de conteúdo e armazenamento de imagens, vídeos e arquivos por meio do Cloudflare R2.
+
+**• Supabase e serviços de hospedagem:** autenticação, banco de dados, armazenamento e execução de funcionalidades da plataforma.
+
+**• Vercel ou outros serviços de hospedagem configurados:** disponibilização da aplicação e infraestrutura técnica.
+
+**• Sentry:** diagnóstico, identificação e correção de erros técnicos.
+
+**• PostHog:** métricas e gravação técnica de sessões somente quando o Usuário tiver autorizado essa funcionalidade, conforme as preferências de privacidade e as configurações efetivamente implementadas.
+
+**• SMTP2GO ou serviço de e-mail configurado:** envio de mensagens operacionais, como confirmações, avisos e comunicações relacionadas à conta.
+
+**• ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap:** consulta de CEP, complementação de endereços e geocodificação para obtenção de coordenadas aproximadas, quando utilizadas.
+
+**• Autoridades públicas e órgãos competentes:** mediante obrigação legal, ordem judicial, requisição válida ou outra hipótese autorizada pela legislação, inclusive para investigação de fraudes, ilícitos e proteção de direitos.
+
+**• Prestadores de serviços e fornecedores técnicos:** outros fornecedores poderão ter acesso a dados estritamente necessários para hospedagem, segurança, manutenção, suporte e funcionamento da plataforma, conforme suas funções e obrigações contratuais.
+
+A DUDIT não vende dados pessoais e não compartilha dados indiscriminadamente.
+
+### 3.1. Compartilhamento entre Parceiros e Usuários
+
+Para viabilizar uma compra, contratação, agendamento ou entrega, determinadas informações poderão ser disponibilizadas ao Parceiro ou Usuário envolvido na operação.
+
+O compartilhamento deverá se limitar aos dados necessários à comunicação, execução do pedido, prestação do serviço, pagamento, retirada ou entrega.
+
+A DUDIT não fornece indiscriminadamente dados cadastrais privados de Parceiros ou Usuários a terceiros que aleguem ter sido prejudicados. O fornecimento dependerá de fundamento legal, consentimento válido quando aplicável, obrigação legal, ordem judicial ou outra hipótese autorizada pela LGPD.
+
+### 3.2. Responsabilidade pelo Uso dos Dados Recebidos
+
+O Parceiro que receber dados pessoais de um Usuário deverá utilizá-los exclusivamente para finalidades relacionadas à solicitação ou contratação, atendimento, pagamento, entrega e cumprimento de obrigações legais.
+
+É proibido utilizar os dados recebidos para spam, publicidade não autorizada, comercialização de cadastros, abordagem incompatível com a finalidade original ou compartilhamento indevido.
+
+### 3.3. Fornecedores e Suboperadores
+
+Os fornecedores que participam da operação poderão atuar como operadores, controladores independentes ou agentes de tratamento conforme suas atividades e a legislação aplicável.
+
+A DUDIT buscará utilizar fornecedores compatíveis com as exigências de segurança e proteção de dados e, quando aplicável, estabelecer obrigações contratuais de confidencialidade, segurança e uso limitado das informações.
+
+________________________________________
+
+## 4. COOKIES E RASTREAMENTO
+
+**4.1. Cookies Essenciais:** A DUDIT poderá utilizar cookies e tecnologias semelhantes estritamente necessários para manter sessões, autenticação, segurança, preferências essenciais e funcionamento das funcionalidades solicitadas pelo Usuário.
+
+Esses recursos são utilizados para viabilizar a operação da plataforma e não deverão ser empregados para finalidades incompatíveis com sua função essencial.
+
+**4.2. Métricas e Gravação de Sessão:** A DUDIT poderá utilizar o PostHog para analisar eventos de uso e realizar gravações técnicas de sessões, desde que essa funcionalidade esteja implementada e tenha sido autorizada pelo Usuário por meio do mecanismo de consentimento disponibilizado.
+
+Esses recursos poderão registrar interações com a interface para identificar dificuldades de navegação e melhorar a experiência.
+
+A gravação de sessão deverá ser configurada para excluir ou mascarar campos de formulários, senhas, informações de pagamento, dados pessoais sensíveis e outras informações que não sejam necessárias à finalidade de análise.
+
+A existência de mascaramento não elimina a necessidade de consentimento nem garante, isoladamente, que todos os dados pessoais estarão protegidos. A DUDIT deverá revisar as configurações e evitar a captura de informações desnecessárias.
+
+**4.3. Escolha do Usuário:** O Usuário poderá aceitar ou recusar cookies e tecnologias não essenciais por meio do aviso ou painel de preferências disponibilizado pela plataforma.
+
+A recusa de métricas e gravação de sessão não deverá impedir o acesso às funcionalidades essenciais da DUDIT.
+
+**4.4. Alteração e Revogação:** Quando o tratamento estiver baseado em consentimento, o Usuário poderá revogá-lo a qualquer momento pelas preferências de privacidade, sem prejuízo da licitude do tratamento realizado anteriormente.
+
+**4.5. Prazo das Preferências:** As escolhas de consentimento poderão ser armazenadas pelo período informado no mecanismo de preferências, atualmente previsto em até 6 (seis) meses, caso essa configuração esteja efetivamente implementada. Após esse período, a plataforma poderá solicitar nova escolha.
+
+**4.6. Tecnologias de Terceiros:** Alguns fornecedores poderão utilizar cookies ou tecnologias próprias conforme suas políticas. A DUDIT deverá informar os serviços utilizados e oferecer mecanismos de escolha quando exigidos pela legislação.
+
+________________________________________
+
+## 5. LOGS E SEGURANÇA
+
+A DUDIT adota medidas técnicas e organizacionais destinadas a proteger os dados pessoais contra acessos não autorizados, destruição, perda, alteração, comunicação ou tratamento inadequado ou ilícito.
+
+As medidas poderão incluir:
+
+**5.1. Armazenamento e Comunicação:** Os dados poderão ser armazenados em infraestrutura de fornecedores como Supabase, Vercel e Cloudflare, conforme a arquitetura utilizada. A plataforma utiliza comunicação protegida por HTTPS/TLS e poderá utilizar criptografia em repouso conforme os recursos e configurações dos fornecedores.
+
+**5.2. Proteção de Chaves e Tokens:** Chaves, credenciais e tokens sensíveis de integrações deverão ser armazenados com mecanismos de proteção adequados, incluindo criptografia quando aplicável, controles de acesso e procedimentos de rotação. A implementação efetiva desses mecanismos deverá ser mantida e revisada periodicamente.
+
+**5.3. Senhas:** As senhas dos Usuários não deverão ser armazenadas em texto simples. O armazenamento e a autenticação deverão utilizar mecanismos seguros de hash, como bcrypt ou solução equivalente disponibilizada pelo serviço de autenticação utilizado.
+
+**5.4. Tokens de Integração:** Tokens e credenciais de integração com gateways de pagamento e outros fornecedores deverão possuir armazenamento protegido e não deverão ser expostos em interfaces públicas, respostas indevidas da aplicação ou logs comuns.
+
+**5.5. Moderação de Conteúdo:** A DUDIT poderá utilizar mecanismos automatizados e análises humanas para moderar imagens, vídeos, textos, anúncios, avaliações e outros conteúdos, com o objetivo de identificar materiais ilícitos, fraudulentos, ofensivos ou incompatíveis com as regras da plataforma.
+
+A moderação não representa monitoramento humano individual e contínuo de todo o conteúdo publicado, nem garantia de que todo material irregular será identificado antes de sua visualização por terceiros.
+
+**5.6. Armazenamento de Imagens, Vídeos e Arquivos:** Imagens, vídeos e arquivos enviados por Parceiros e Usuários poderão ser armazenados em infraestrutura de terceiros, como Cloudflare R2.
+
+Conteúdos públicos, como imagens e vídeos de anúncios e vitrines, poderão passar por processos de moderação conforme os Termos de Uso.
+
+Arquivos e anexos privados trocados entre Parceiros e Usuários não são necessariamente submetidos a monitoramento rotineiro individual. A DUDIT poderá ter acesso técnico aos arquivos armazenados e poderá acessá-los quando necessário para suporte, segurança, investigação de denúncias, prevenção a fraudes, cumprimento de obrigação legal ou exercício regular de direitos, observados os controles de acesso, a necessidade e as finalidades informadas.
+
+**5.7. Registros de Acesso:** Para fins de segurança, prevenção a fraudes e cumprimento de obrigações legais, a aplicação poderá registrar data e hora, endereço IP quando disponível por fonte confiável, país aproximado quando disponível, método, rota sem parâmetros de consulta, código de resposta, user-agent e identificador de requisição da Cloudflare quando disponível.
+
+Os logs da aplicação deverão evitar o registro de senhas, cookies de sessão, cabeçalhos de autorização e conteúdo desnecessário de formulários.
+
+Sem configuração adequada de proxy confiável, o IP poderá constar como desconhecido. A localização aproximada por IP não representa endereço residencial nem posição GPS precisa.
+
+O log da aplicação poderá não registrar a porta lógica de origem. Quando necessária para identificação inequívoca, a informação deverá ser obtida nos registros do provedor responsável, quando disponíveis e legalmente acessíveis.
+
+**5.8. Endereços e Coordenadas:** Ao informar um CEP ou endereço para cadastro, pedido ou entrega, a DUDIT poderá consultar serviços como ViaCEP, BrasilAPI, AwesomeAPI ou Nominatim/OpenStreetMap para completar informações ou obter coordenadas aproximadas.
+
+As coordenadas poderão ser armazenadas junto ao endereço informado e utilizadas para cálculo de distância e apoio à logística. Não são, por si só, coordenadas GPS obtidas diretamente do dispositivo.
+
+**5.9. Incidentes de Segurança:** A DUDIT manterá procedimentos para identificar, avaliar, registrar e tratar incidentes envolvendo dados pessoais.
+
+Quando um incidente puder acarretar risco ou dano relevante aos titulares, a DUDIT realizará as comunicações à Autoridade Nacional de Proteção de Dados (ANPD) e aos titulares afetados nos prazos e condições previstos na legislação e na regulamentação aplicável.
+
+**5.10. Limites das Medidas de Segurança:** Nenhum sistema é absolutamente imune a falhas, ataques ou incidentes. A DUDIT buscará adotar medidas razoáveis e proporcionais aos riscos, sem prometer segurança absoluta ou ausência total de incidentes.
+
+**5.11. Acesso Restrito:** O acesso interno aos dados pessoais deverá ser limitado às pessoas e serviços que necessitem dessas informações para desempenhar suas funções, observados controles de autenticação, permissões e confidencialidade.
+
+________________________________________
+
+## 6. RETENÇÃO DOS DADOS
+
+Os dados pessoais serão mantidos pelo período necessário para cumprir as finalidades informadas, atender obrigações legais, preservar direitos e proteger a plataforma.
+
+Os prazos poderão variar conforme a natureza do dado, a finalidade do tratamento e as exigências legais.
+
+| Tipo de dado | Prazo de retenção |
+|---|---|
+| Dados de cadastro de Parceiro ativo | Enquanto a conta permanecer ativa e pelo período adicional necessário a obrigações legais ou exercício de direitos |
+| Dados operacionais após exclusão | Exclusão ou anonimização em até 30 dias após o início bem-sucedido do procedimento, ressalvadas retenções justificadas |
+| Logs de acesso | Prazo legal aplicável, inclusive o período de 6 meses previsto no Marco Civil da Internet para registros de acesso a aplicações, quando aplicável |
+| Provas de aceite e registros de contratação | Pelo período necessário à comprovação da relação contratual e ao exercício regular de direitos, observados os prazos legais aplicáveis |
+| Registros de incidentes | Pelo período necessário à investigação, cumprimento de obrigações legais e exercício de direitos |
+| Dados de pedidos e registros financeiros | Pelo prazo exigido pelas normas fiscais, consumeristas, contábeis e demais regras aplicáveis |
+| Dados inseridos no ERP | Conforme a finalidade do Parceiro, as instruções aplicáveis e os prazos legais de retenção |
+| Backups criptografados | Conforme a política técnica de backup efetivamente configurada, podendo haver retenção temporária após a exclusão da base ativa |
+
+Os prazos específicos deverão ser revisados conforme a configuração real da infraestrutura e as obrigações legais aplicáveis. A DUDIT não manterá dados pessoais por prazo indefinido sem fundamento legítimo.
+
+Quando a finalidade for atingida e não houver hipótese legal de conservação, os dados serão eliminados ou anonimizados, conforme tecnicamente possível.
+
+________________________________________
+
+## 7. DIREITOS DOS TITULARES — LGPD
+
+Em conformidade com a LGPD, o titular dos dados pessoais poderá exercer os direitos previstos na legislação, incluindo:
+
+**• Confirmação e acesso:** saber se a DUDIT realiza tratamento de seus dados pessoais e solicitar acesso às informações.
+
+**• Correção:** solicitar a correção de dados incompletos, inexatos ou desatualizados.
+
+**• Anonimização, bloqueio ou eliminação:** solicitar medidas sobre dados desnecessários, excessivos ou tratados em desconformidade com a legislação, quando cabíveis.
+
+**• Portabilidade:** solicitar a portabilidade dos dados, observadas as regras da ANPD, os segredos comercial e industrial e os direitos de terceiros.
+
+**• Eliminação:** solicitar a eliminação de dados tratados com base no consentimento, ressalvadas as hipóteses legais de conservação.
+
+**• Informação sobre compartilhamento:** obter informações sobre entidades públicas e privadas com as quais os dados tenham sido compartilhados.
+
+**• Informação sobre consentimento:** ser informado sobre a possibilidade de não fornecer consentimento e as consequências da negativa, quando aplicável.
+
+**• Revogação:** revogar o consentimento a qualquer momento, quando o tratamento estiver baseado nessa hipótese legal.
+
+**• Oposição:** opor-se a tratamentos realizados em desconformidade com a LGPD, inclusive quando baseados em legítimo interesse, conforme as condições legais.
+
+**• Revisão de decisões automatizadas:** solicitar revisão de decisões tomadas unicamente com base em tratamento automatizado de dados pessoais que afetem seus interesses, nos termos da legislação.
+
+Para exercer esses direitos, utilize o seguinte canal:
+
+**E-mail:** [E-MAIL VÁLIDO DE PRIVACIDADE].
+
+A DUDIT poderá solicitar informações adicionais razoáveis para confirmar a identidade do solicitante e evitar o fornecimento indevido de dados a terceiros.
+
+As solicitações serão analisadas e respondidas nos prazos previstos na legislação. A declaração completa prevista no artigo 19, inciso II, da LGPD poderá ser fornecida em até 15 (quinze) dias, conforme a lei.
+
+O exercício dos direitos é gratuito, ressalvadas as hipóteses legalmente admitidas.
+
+________________________________________
+
+## 8. EXCLUSÃO E ANONIMIZAÇÃO
+
+**8.1.** O titular poderá solicitar a exclusão de sua conta a qualquer momento por meio das configurações disponíveis na plataforma ou pelos canais de atendimento da DUDIT.
+
+**8.2.** A exclusão poderá ocorrer em etapas, conforme os procedimentos técnicos necessários para remover dados da base ativa, serviços integrados e sistemas de armazenamento.
+
+Quando o procedimento estiver implementado, os dados operacionais associados à conta poderão ser apagados ou anonimizados em até 30 (trinta) dias após o início bem-sucedido da rotina de exclusão, ressalvadas as informações cuja conservação possua fundamento legal.
+
+**8.3.** Caso a solicitação de exclusão não possa ser processada ou a rotina técnica apresente falha, a DUDIT deverá registrar a ocorrência e orientar o titular sobre como acompanhar ou concluir a solicitação. Não será considerada concluída uma exclusão que tenha falhado tecnicamente.
+
+**8.4.** A DUDIT poderá conservar dados estritamente necessários para:
+
+- Cumprimento de obrigação legal ou regulatória;
+- Cumprimento de ordem judicial ou solicitação válida de autoridade;
+- Exercício regular de direitos em processos judiciais, administrativos ou arbitrais;
+- Prevenção e investigação de fraudes;
+- Proteção da segurança da plataforma e dos Usuários;
+- Cumprimento de obrigações contratuais ou consumeristas ainda pendentes.
+
+A retenção deverá ser limitada ao necessário e observar os prazos legais aplicáveis.
+
+**8.5.** Cópias de segurança poderão permanecer armazenadas por período adicional após a exclusão da base ativa, conforme a rotina técnica de backup efetivamente configurada. O acesso a essas cópias será restrito, e os dados deverão deixar de ser utilizados para operações comuns da plataforma.
+
+**8.6.** A exclusão da conta não elimina automaticamente registros de transações, obrigações pendentes, documentos fiscais, provas de contratação ou informações que precisem ser conservadas legalmente.
+
+**8.7.** Quando a exclusão integral não for possível por existir fundamento legal de retenção, a DUDIT poderá restringir o tratamento e conservar somente as informações necessárias à finalidade legal correspondente.
+
+________________________________________
+
+## 9. TRANSFERÊNCIA INTERNACIONAL DE DADOS
+
+A DUDIT poderá utilizar fornecedores de tecnologia e infraestrutura que realizem armazenamento, hospedagem, processamento ou suporte em outros países.
+
+Entre os serviços que poderão estar envolvidos estão Supabase, Cloudflare, PostHog, Sentry, Mercado Pago, SMTP2GO, serviços de hospedagem, serviços de mensageria e ferramentas de consulta de endereço ou geocodificação, conforme a configuração efetiva da plataforma.
+
+A utilização de fornecedores internacionais poderá implicar transferência internacional de dados pessoais ou acesso a informações a partir de outros países.
+
+Quando houver transferência internacional, a DUDIT deverá observar as disposições da LGPD e os mecanismos válidos previstos na regulamentação da ANPD, incluindo, conforme aplicável, cláusulas contratuais específicas, cláusulas-padrão contratuais, decisões de adequação ou outros mecanismos legalmente admitidos.
+
+A DUDIT buscará garantir que as transferências sejam realizadas somente quando necessárias à operação dos serviços e com medidas de proteção compatíveis com a legislação.
+
+As informações sobre fornecedores, países de processamento e mecanismos aplicáveis poderão ser atualizadas conforme a arquitetura e os contratos efetivamente utilizados.
+
+________________________________________
+
+## 10. CONTATO E ENCARREGADO PELO TRATAMENTO DE DADOS
+
+Para dúvidas, solicitações, reclamações ou exercício de direitos relacionados à privacidade e à proteção de dados pessoais, utilize os seguintes canais:
+
+**E-mail de privacidade:** [E-MAIL VÁLIDO DE PRIVACIDADE]
+
+**Controladora:** [RAZÃO SOCIAL OU NOME CIVIL COMPLETO DA OPERADORA]
+
+**CNPJ/CPF:** [INFORMAR DADO CORRETO]
+
+**Endereço para contato:** [ENDEREÇO COMPLETO]
+
+**Encarregado pelo tratamento de dados pessoais:** [NOME DO ENCARREGADO OU INFORMAÇÃO SOBRE O CANAL RESPONSÁVEL, CONFORME A ESTRUTURA ADOTADA]
+
+Quando aplicável, o canal acima também receberá solicitações relacionadas aos direitos dos titulares previstos na LGPD.
+
+O titular também poderá apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD), por meio dos canais oficiais disponíveis em:
+
+https://www.gov.br/anpd
+
+________________________________________
+
+## 11. ALTERAÇÕES DESTA POLÍTICA
+
+**11.1.** Esta Política de Privacidade poderá ser atualizada periodicamente para refletir alterações na legislação, nas funcionalidades da DUDIT, nos fornecedores utilizados, nas práticas de tratamento de dados ou nos procedimentos de segurança.
+
+**11.2.** A versão atualizada será disponibilizada na plataforma, com indicação da data da última atualização.
+
+**11.3.** Quando as alterações forem relevantes e afetarem direitos, finalidades ou condições essenciais de tratamento, a DUDIT poderá comunicar os titulares por meios adequados, como avisos na plataforma ou e-mail cadastrado.
+
+**11.4.** Quando a legislação exigir consentimento específico ou novo aceite, a DUDIT solicitará a manifestação correspondente. A continuidade de uso da plataforma não substituirá consentimento quando este for legalmente necessário.
+
+**11.5.** A DUDIT poderá manter versões anteriores desta Política para fins de transparência, comprovação e exercício regular de direitos.
+
+________________________________________
+
+**DUDIT — Descubra. Anuncie. Organize.**
+
+Lucélia/SP — dudit.com.br
+
+**Esta Política de Privacidade deve ser interpretada em conjunto com os Termos de Uso da DUDIT.**

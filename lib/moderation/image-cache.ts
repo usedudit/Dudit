@@ -13,6 +13,9 @@ export interface ImageCache {
 
 const CACHE_TTL = 60 * 60 * 24 * 30 // 30 dias em segundos
 export const DEFAULT_MAX_HAMMING_DISTANCE = 7 // Tolerância para considerar a mesma imagem visualmente (~89% similaridade, limite do pigeonhole de 8 chunks)
+const IMAGE_CACHE_VERSION = 'v4'
+const PHASH_CACHE_VERSION = 'v2'
+const IMG_STATUS_CACHE_VERSION = 'v2'
 
 /**
  * Calcula hash SHA256 de um buffer de imagem (mais rápido e seguro que MD5)
@@ -82,7 +85,7 @@ export function calculateHammingDistance(hex1: string, hex2: string): number {
  */
 export async function getImageFromCache(hash: string): Promise<ImageCache | null> {
   try {
-    const cacheKey = `moderation:image:v3:${hash}`
+    const cacheKey = `moderation:image:${IMAGE_CACHE_VERSION}:${hash}`
     const cached = await redis.get(cacheKey)
 
     if (cached) {
@@ -111,13 +114,13 @@ export async function findSimilarImageInCache(
   maxDistance: number = DEFAULT_MAX_HAMMING_DISTANCE
 ): Promise<{ cached: ImageCache; distance: number } | null> {
   try {
-    if (!phash || phash.length !== 16) return null
+    if (!phash || phash.length !== 16 || phash === '0000000000000000' || phash === 'ffffffffffffffff') return null
 
     // Consulta os 8 chunks em pipeline no Redis
     const pipeline = redis.pipeline()
     for (let i = 0; i < 8; i++) {
       const chunk = phash.slice(i * 2, i * 2 + 2)
-      pipeline.smembers(`moderation:phash:v1:c${i}:${chunk}`)
+      pipeline.smembers(`moderation:phash:${PHASH_CACHE_VERSION}:c${i}:${chunk}`)
     }
     const results = await pipeline.exec<string[][]>()
 
@@ -183,7 +186,7 @@ export async function cacheImageModeration(
   phash?: string | null,
 ): Promise<void> {
   try {
-    const cacheKey = `moderation:image:v3:${hash}`
+    const cacheKey = `moderation:image:${IMAGE_CACHE_VERSION}:${hash}`
 
     const cacheData: ImageCache = {
       hash,
@@ -197,12 +200,12 @@ export async function cacheImageModeration(
     const pipeline = redis.pipeline()
     pipeline.setex(cacheKey, CACHE_TTL, cacheData)
 
-    // Se temos o pHash, indexamos os 8 chunks no Redis para busca visual
-    if (phash && phash.length === 16) {
+    // Se temos o pHash e não é degenerado (plano/monocromático), indexamos os 8 chunks no Redis
+    if (phash && phash.length === 16 && phash !== '0000000000000000' && phash !== 'ffffffffffffffff') {
       const candidateValue = `${phash}:${hash}`
       for (let i = 0; i < 8; i++) {
         const chunk = phash.slice(i * 2, i * 2 + 2)
-        const chunkKey = `moderation:phash:v1:c${i}:${chunk}`
+        const chunkKey = `moderation:phash:${PHASH_CACHE_VERSION}:c${i}:${chunk}`
         pipeline.sadd(chunkKey, candidateValue)
         pipeline.expire(chunkKey, CACHE_TTL)
       }
@@ -245,7 +248,7 @@ export async function cacheImageUrlStatus(
   const normKey = normalizeImageKey(imageUrlOrKey)
   if (!normKey) return
   try {
-    const key = `moderation:img_status:v1:${normKey}`
+    const key = `moderation:img_status:${IMG_STATUS_CACHE_VERSION}:${normKey}`
     await redis.setex(key, ttlSeconds, status)
   } catch (err) {
     console.warn("[IMAGE CACHE] Failed to cache image URL status in Redis:", err)
@@ -261,7 +264,7 @@ export async function getImageUrlStatus(
   const normKey = normalizeImageKey(imageUrlOrKey)
   if (!normKey) return null
   try {
-    const key = `moderation:img_status:v1:${normKey}`
+    const key = `moderation:img_status:${IMG_STATUS_CACHE_VERSION}:${normKey}`
     const res = await redis.get<string>(key)
     if (res === "APPROVED" || res === "FLAGGED") {
       return res

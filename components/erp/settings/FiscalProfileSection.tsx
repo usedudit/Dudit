@@ -2,6 +2,7 @@
 
 import {
   Badge,
+  DatePicker,
   FormDropdown,
   FormSection,
   InfoCard,
@@ -160,8 +161,7 @@ export function FiscalProfileSection({
               </div>
               {value.taxProfile === "mei" && (
                 <div>
-                  <Input
-                    type="date"
+                  <DatePicker
                     label="Data de abertura do CNPJ"
                     value={value.openingDate}
                     onChange={(e) => onChange({ openingDate: e.target.value })}
@@ -228,7 +228,7 @@ export function FiscalProfileSection({
                 </div>
 
                 {snapshot.projectedBreachDate && (
-                  <p className="text-xs text-orange-600 dark:text-orange-400">
+                  <p className="text-xs text-brand-orange">
                     Mantendo o ritmo atual, o limite é atingido em{" "}
                     {new Date(`${snapshot.projectedBreachDate}T00:00:00`).toLocaleDateString("pt-BR")}.
                   </p>

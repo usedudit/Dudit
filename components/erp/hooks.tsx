@@ -126,20 +126,45 @@ export interface ProductBucketItem {
   }>
 }
 
+export interface ProductBucketOptions {
+  pageSize?: number
+  /** Preloads the bucket on mount so the first search is instant. Defaults to true. */
+  preload?: boolean
+  /** Returns the whole bucket while the query is empty (useful for picker modals). */
+  showAllWhenEmpty?: boolean
+}
+
+function normalizeBucketSearch(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
+function getBucketVariants(item: any): any[] {
+  if (Array.isArray(item?.variants)) return item.variants
+  if (Array.isArray(item?.product_variants)) return item.product_variants
+  return []
+}
+
 /**
- * Hook that loads ALL partner products on first interaction and filters them
- * instantly on the client. Eliminates the slow debounced server roundtrip.
- * 
- * Pattern: loads bucket on first focus → filters with useMemo → instant results
+ * Hook that loads ALL partner products ahead of time and filters them instantly
+ * on the client. Eliminates the slow debounced server roundtrip.
+ *
+ * Pattern: preload on mount → filter with useMemo (name/SKU/GTIN/variant SKU) → instant results
  */
 export function useProductBucket<T extends { name: string; sku?: string; gtin?: string | null }>(
   loadFn: () => Promise<T[]>,
-  options?: { pageSize?: number }
+  options?: ProductBucketOptions
 ) {
   const pageSize = options?.pageSize ?? 10
+  const preload = options?.preload ?? true
+  const showAllWhenEmpty = options?.showAllWhenEmpty ?? false
   const [bucket, setBucket] = useState<T[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [visibleCount, setVisibleCount] = useState(pageSize)
 
@@ -150,23 +175,46 @@ export function useProductBucket<T extends { name: string; sku?: string; gtin?: 
       const data = await loadFn()
       setBucket(data)
       setIsLoaded(true)
+      setHasError(false)
     } catch (err) {
+      setHasError(true)
       console.error("[useProductBucket] Error loading bucket:", err)
     } finally {
       setIsLoading(false)
     }
   }, [loadFn, isLoaded, isLoading])
 
+  useEffect(() => {
+    if (preload && !hasError) void loadBucket()
+  }, [preload, hasError, loadBucket])
+
+  const searchIndex = useMemo(
+    () => bucket.map((item) => {
+      const variants = getBucketVariants(item)
+      const searchable = [
+        item.name,
+        item.sku,
+        item.gtin,
+        ...variants.flatMap((variant: any) => [
+          variant?.name,
+          variant?.variant_name,
+          variant?.sku,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+      return { item, text: normalizeBucketSearch(searchable) }
+    }),
+    [bucket]
+  )
+
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return []
-    const search = searchQuery.toLowerCase().trim()
-    return bucket.filter(
-      (item) =>
-        item.name.toLowerCase().includes(search) ||
-        (item.sku && item.sku.toLowerCase().includes(search)) ||
-        (item.gtin && item.gtin.toLowerCase().includes(search))
-    )
-  }, [bucket, searchQuery])
+    const search = normalizeBucketSearch(searchQuery)
+    if (!search) return showAllWhenEmpty ? bucket : []
+    return searchIndex
+      .filter((entry) => entry.text.includes(search))
+      .map((entry) => entry.item)
+  }, [bucket, searchIndex, searchQuery, showAllWhenEmpty])
 
   useEffect(() => {
     setVisibleCount(pageSize)

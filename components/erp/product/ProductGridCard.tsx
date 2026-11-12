@@ -104,11 +104,15 @@ const ProductGridCard = React.memo(
                                                 />
                                             </Tooltip>
                                             <Tooltip text={product.show_in_marketplace ? "Visível" : "Oculto"}>
-                                                {product.show_in_marketplace ? (
-                                                    <EyeIcon className="w-4 h-4 text-brand-green shrink-0" />
-                                                ) : (
-                                                    <EyeOffIcon className="w-4 h-4 text-brand-inactive-text shrink-0" />
-                                                )}
+                                                <Badge
+                                                    variant={product.show_in_marketplace ? "green" : "gray"}
+                                                    className="whitespace-nowrap scale-90 shrink-0"
+                                                    icon={product.show_in_marketplace ? (
+                                                        <EyeIcon />
+                                                    ) : (
+                                                        <EyeOffIcon />
+                                                    )}
+                                                />
                                             </Tooltip>
                                         </>
                                     )

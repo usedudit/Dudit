@@ -884,7 +884,7 @@ export const BusinessDataSubPage = ({
                                                         </div>
                                                     </div>
 
-                                                    <motion.div initial={false} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                    <motion.div initial={false} animate={{ opacity: 1 }} className="grid">
                                                         <div className="flex flex-col gap-1.5">
                                                             <CpfCnpjInput
                                                                 label={generalInfo.personType === "pj" ? "CNPJ" : "CPF"}

@@ -516,10 +516,10 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
             {availableCategories.map((category) => <TabsTrigger key={category.id} value={category.id} icon={category.icon}>{category.label}</TabsTrigger>)}
           </TabsList>
 
-          {/* Tablet/mobile: filtros abaixo das tabs, ocupando toda a largura */}
+          {/* Tablet/mobile: no hub (sem ?tab=) não há relatório aberto, então o
+              botão de baixar e o filtro de período ficam ocultos. */}
           <div className="w-full space-y-2 lg:hidden">
             {props.stores.length > 1 && <div>{storeFilter}</div>}
-            <GlobalPeriodFilter />
           </div>
 
           {availableCategories.map((category) => (
@@ -537,9 +537,9 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
         </Tabs>
       ) : (
         <>
+          {/* Tablet/mobile: sem relatório aberto não exibir baixar/período */}
           <div className="w-full space-y-2 lg:hidden">
             {props.stores.length > 1 && <div>{storeFilter}</div>}
-            <GlobalPeriodFilter />
           </div>
           <div className="rounded-2xl border border-brand-border bg-white p-8 text-center dark:border-dark-border dark:bg-dark-surface">
             <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum relatório disponível para os recursos ativos desta conta.</p>

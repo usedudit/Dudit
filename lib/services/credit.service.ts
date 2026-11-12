@@ -34,7 +34,18 @@ export async function grantSubscriptionCredits(
     }
 
     const plan = sub.recurring_plans as any
-    const items = (sub.recurring_subscription_items || []) as any[]
+    let items = (sub.recurring_subscription_items || []) as any[]
+
+    if (items.length === 0 && (sub as any).recurring_plan_id) {
+      const { data: planItems } = await supabase
+        .from("recurring_plan_items")
+        .select("id, item_type, service_id, product_id, quantity, unit_price")
+        .eq("plan_id", (sub as any).recurring_plan_id)
+      if (planItems && planItems.length > 0) {
+        items = planItems as any[]
+      }
+    }
+
     const grantableItems = items.filter(item =>
       (item.item_type === 'service' && item.service_id) ||
       (item.item_type === 'product' && item.product_id)
@@ -397,5 +408,24 @@ export async function expireObsoleteCreditsGlobally(
     return { success: true, expiredCount }
   } catch (err: any) {
     return { success: false, expiredCount: 0, error: err?.message || String(err) }
+  }
+}
+
+/**
+ * Atomic helper to reset expired credits and grant fresh credits for a cycle via SQL RPC.
+ */
+export async function resetAndGrantSubscriptionCredits(
+  supabase: SupabaseClient,
+  input: { subscriptionId: string; executionId?: string }
+): Promise<{ success: boolean; grantedCount: number; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc("reset_and_grant_subscription_credits", {
+      p_subscription_id: input.subscriptionId,
+      p_execution_id: input.executionId || null,
+    })
+    if (error) throw error
+    return { success: true, grantedCount: Number(data || 0) }
+  } catch (err: any) {
+    return { success: false, grantedCount: 0, error: err?.message || String(err) }
   }
 }

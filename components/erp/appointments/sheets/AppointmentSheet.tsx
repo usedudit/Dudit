@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, XIcon, SearchIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon, ThreeDotsIcon, Package, AlertCircleIcon } from '@/lib/icons';
 import { formatBrazilPhone } from "@/lib/utils/phone-utils";
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal, Tooltip } from '@/components/reusable';
-import { getAvailableTimeSlotsAction, getAppointmentDetailsDataAction } from '@/app/actions/erp/appointments';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, InfoCard, Badge, Tabs, TabsList, TabsTrigger, TabsContent, QuantitySelector, DefaultModal, Tooltip, RadioButton } from '@/components/reusable';
+import { getAvailableTimeSlotsAction, getAppointmentDetailsDataAction, getAppointmentHistoryAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { fetchProductsByIdsAction } from '@/app/actions/erp/appointment-items';
@@ -29,6 +29,17 @@ import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } 
 import { useCSRFToken } from '@/hooks/use-csrf-token';
 import { normalizeOpeningHours } from '@/lib/utils/opening-hours';
 import { useModalLayer, useMountedModalLayer } from '@/lib/modal-stack';
+
+// Availability is cached across mounts so reopening the sheet (or returning
+// from a background tab) does not flash "Verificando disponibilidade..."
+// again for the same date/staff/services.
+const SLOTS_CACHE_TTL_MS = 30_000;
+type CachedAvailableSlots = {
+    slots: string[];
+    conflictingSlots: string[];
+    fetchedAt: number;
+};
+const availableSlotsCache = new Map<string, CachedAvailableSlots>();
 
 export const AppointmentSheet = ({
     onClose,
@@ -63,8 +74,8 @@ export const AppointmentSheet = ({
     onDelete?: (id: string, notify?: boolean, note?: string) => Promise<boolean>,
     mode: 'create' | 'view',
     appointment?: Appointment | null,
-    onSave: (data: any | any[]) => void,
-    onEnterSelectionMode: (currentData: any) => void,
+    onSave: (data: any | any[]) => void | Promise<void>,
+    onEnterSelectionMode?: (currentData: any) => void,
     selectedDate?: Date,
     initialTimeSlot?: string,
     defaultDate: Date,
@@ -254,6 +265,34 @@ export const AppointmentSheet = ({
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
     const [notes, setNotes] = useState(appointment?.notes || '');
+
+    // Activity log (kept locally so it refreshes right after saving without
+    // remounting/reshuffling the whole sheet).
+    const [activityLog, setActivityLog] = useState<any[]>(appointment?.activityLog || []);
+
+    useEffect(() => {
+        setActivityLog(appointment?.activityLog || []);
+    }, [appointment?.id, appointment?.activityLog]);
+
+    const refreshActivityLog = useCallback(async () => {
+        if (!appointment?.id) return;
+        try {
+            const res = await getAppointmentHistoryAction(appointment.id);
+            if (res.success) {
+                setActivityLog(res.history);
+            }
+        } catch {
+            // History is non-critical: never break the save flow.
+        }
+    }, [appointment?.id]);
+
+    const submitSave = useCallback((data: any | any[]) => {
+        // Availability changed after saving: drop cached slots.
+        availableSlotsCache.clear();
+        Promise.resolve(onSave(data))
+            .then(() => { void refreshActivityLog(); })
+            .catch(() => { });
+    }, [onSave, refreshActivityLog]);
 
     // Time & Date State
     const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(initialTimeSlot || null);
@@ -536,14 +575,29 @@ export const AppointmentSheet = ({
     const [conflictingTimeSlots, setConflictingTimeSlots] = useState<Set<string>>(new Set());
     const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
+    // Request signature: only scalar values, so re-renders with new array
+    // instances (same content) do not trigger a refetch/spinner.
+    const slotsRequestKey = useMemo(() => {
+        const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 60), 0);
+        const maxBuffer = Math.max(0, ...selectedServices.map((s) => Number(s.bufferMinutes) || 0));
+        return [
+            formatDateStr(selectedCalDate),
+            selectedStaffId || '',
+            totalDuration,
+            maxBuffer,
+            storeId || '',
+            appointment?.id || '',
+        ].join('|');
+    }, [selectedServices, selectedCalDate, selectedStaffId, storeId, appointment?.id]);
+
     // Fetch available time slots when the datetime view is shown
     useEffect(() => {
         if (currentView !== 'datetime') return;
         if (!selectedStaffId) return;
 
-        const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 60), 0);
-        const maxBuffer = Math.max(0, ...selectedServices.map((s) => Number(s.bufferMinutes) || 0));
-        const targetDate = formatDateStr(selectedCalDate);
+        const [targetDate, , totalDurationRaw, maxBufferRaw] = slotsRequestKey.split('|');
+        const totalDuration = Number(totalDurationRaw) || 0;
+        const maxBuffer = Number(maxBufferRaw) || 0;
 
         if (needsRangePicker || totalDuration >= 1440) {
             setTimeSlots([]);
@@ -552,16 +606,41 @@ export const AppointmentSheet = ({
             return;
         }
 
+        const cached = availableSlotsCache.get(slotsRequestKey);
+        if (cached) {
+            // Show what we already know while revalidating in the background.
+            setTimeSlots(cached.slots);
+            setConflictingTimeSlots(new Set(cached.conflictingSlots));
+            if (Date.now() - cached.fetchedAt < SLOTS_CACHE_TTL_MS) {
+                setIsLoadingSlots(false);
+                return;
+            }
+        }
+
         let cancelled = false;
-        setIsLoadingSlots(true);
+        setIsLoadingSlots(!cached);
 
         getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer, storeId, appointment?.id)
             .then((res) => {
                 if (cancelled) return;
                 if (res.success) {
-                    setTimeSlots(res.slots);
-                    setConflictingTimeSlots(new Set(res.conflictingSlots || []));
-                } else {
+                    const availableSlots: string[] = res.slots;
+                    const conflictingSlots: string[] = res.conflictingSlots || [];
+                    availableSlotsCache.set(slotsRequestKey, {
+                        slots: availableSlots,
+                        conflictingSlots,
+                        fetchedAt: Date.now(),
+                    });
+                    setTimeSlots(availableSlots);
+                    setConflictingTimeSlots(new Set(conflictingSlots));
+                    // Never keep a slot that is no longer offered (e.g. it already
+                    // passed), but always respect an explicit choice made in the
+                    // calendar / quick-create popover.
+                    if (mode === 'create') {
+                        setSelectedTimeSlot(prev => (prev && prev !== initialTimeSlot && !availableSlots.includes(prev) ? null : prev));
+                        setEditTime(prev => (prev && prev !== initialTimeSlot && !availableSlots.includes(prev) ? '' : prev));
+                    }
+                } else if (!cached) {
                     setTimeSlots([]);
                     setConflictingTimeSlots(new Set());
                 }
@@ -572,7 +651,14 @@ export const AppointmentSheet = ({
             });
 
         return () => { cancelled = true; };
-    }, [currentView, selectedStaffId, selectedServices, selectedCalDate, storeId, appointment?.id]);
+    }, [currentView, slotsRequestKey, needsRangePicker, mode, selectedStaffId, storeId, appointment?.id, initialTimeSlot]);
+
+    // Keep an explicit time coming from the calendar / quick-create popover.
+    useEffect(() => {
+        if (!initialTimeSlot) return;
+        setSelectedTimeSlot(initialTimeSlot);
+        setEditTime(initialTimeSlot);
+    }, [initialTimeSlot]);
 
     // Initial State Setup
     useEffect(() => {
@@ -1054,7 +1140,7 @@ export const AppointmentSheet = ({
                 };
             });
 
-            onSave(rows);
+            submitSave(rows);
         } else {
             // RECURRING APPOINTMENT SERIES
             let repeatCount = 1;
@@ -1114,7 +1200,7 @@ export const AppointmentSheet = ({
                 });
             }
 
-            onSave(payloads);
+            submitSave(payloads);
         }
     };
 
@@ -1238,7 +1324,7 @@ export const AppointmentSheet = ({
                 usage_type: item.usageType,
             })),
         };
-        onSave(updatedApp);
+        submitSave(updatedApp);
     };
 
     const getHeaderTitle = () => {
@@ -1516,7 +1602,7 @@ export const AppointmentSheet = ({
     ] as const;
 
     const statusOptions = mode === 'create'
-        ? VIEW_STATUS_OPTIONS.filter(opt => opt.value !== 'Concluído' && opt.value !== 'Ausência')
+        ? VIEW_STATUS_OPTIONS.filter(opt => opt.value !== 'Concluído' && opt.value !== 'Ausência' && opt.value !== 'Pago')
         : VIEW_STATUS_OPTIONS.filter(opt => opt.value !== 'Pago');
 
     const calendarMonthYear = useMemo(() => {
@@ -1527,10 +1613,19 @@ export const AppointmentSheet = ({
     const dates = useMemo(() => {
         const days = [];
         const currentSelectedDateStr = formatDateStr(selectedCalDate);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
 
-        for (let i = -2; i < 5; i++) {
-            const d = new Date(baseCalDate);
-            d.setDate(baseCalDate.getDate() + i);
+        const windowStart = new Date(baseCalDate);
+        windowStart.setDate(windowStart.getDate() - 2);
+        // Past dates are not selectable when creating a new appointment.
+        if (mode === 'create' && windowStart.getTime() < todayStart.getTime()) {
+            windowStart.setTime(todayStart.getTime());
+        }
+
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(windowStart);
+            d.setDate(windowStart.getDate() + i);
             const dateStr = formatDateStr(d);
             const isSelected = dateStr === currentSelectedDateStr;
             days.push({
@@ -1541,9 +1636,30 @@ export const AppointmentSheet = ({
             });
         }
         return days;
-    }, [baseCalDate, selectedCalDate]);
+    }, [baseCalDate, selectedCalDate, mode]);
+
+    const canNavigateToPreviousDates = useMemo(() => {
+        if (mode !== 'create') return true;
+        const windowStart = new Date(baseCalDate);
+        windowStart.setDate(windowStart.getDate() - 2);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        return windowStart.getTime() > todayStart.getTime();
+    }, [baseCalDate, mode]);
+
+    // Creating an appointment in the past makes no sense: always start from today.
+    useEffect(() => {
+        if (mode !== 'create') return;
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        if (selectedCalDate.getTime() < todayStart.getTime()) {
+            setSelectedCalDate(todayStart);
+            setBaseCalDate(new Date(todayStart));
+        }
+    }, [mode, selectedCalDate]);
 
     const handleDateNav = (dir: 'prev' | 'next') => {
+        if (dir === 'prev' && !canNavigateToPreviousDates) return;
         setBaseCalDate(prev => {
             const d = new Date(prev);
             d.setDate(d.getDate() + (dir === 'next' ? 7 : -7));
@@ -1552,7 +1668,21 @@ export const AppointmentSheet = ({
     }
 
     const handleSelectDay = (date: Date) => {
+        // Availability changes with the day, so a previously picked time can no
+        // longer be trusted.
+        if (formatDateStr(date) !== formatDateStr(selectedCalDate)) {
+            setSelectedTimeSlot(null);
+            setEditTime('');
+        }
         setSelectedCalDate(date);
+    };
+
+    const handleSelectStaff = (staffId: string) => {
+        if (staffId !== selectedStaffId) {
+            setSelectedTimeSlot(null);
+            setEditTime('');
+        }
+        setSelectedStaffId(staffId);
     };
 
     const handleServiceEdit = (index: number) => {
@@ -1586,6 +1716,7 @@ export const AppointmentSheet = ({
     };
 
     const handleEnterSelectionMode = () => {
+        if (!onEnterSelectionMode) return;
         onEnterSelectionMode({
             services: selectedServices,
             client: selectedClient,
@@ -1812,7 +1943,7 @@ export const AppointmentSheet = ({
                                     }
                                 >
                                     {staffSource.map(staff => (
-                                        <DropdownItem key={staff.id} onClick={() => setSelectedStaffId(staff.id)} className="gap-3">
+                                        <DropdownItem key={staff.id} onClick={() => handleSelectStaff(staff.id)} className="gap-3">
                                             <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
                                             <span className="font-medium">{staff.name}</span>
                                         </DropdownItem>
@@ -1884,7 +2015,13 @@ export const AppointmentSheet = ({
                                         <div className="flex justify-between items-center mb-4 px-1">
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">{calendarMonthYear}</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleDateNav('prev')} className="text-brand-inactive-text dark:text-dark-heading"><ChevronLeftIcon size={16} /></button>
+                                                <button
+                                                    onClick={() => handleDateNav('prev')}
+                                                    disabled={!canNavigateToPreviousDates}
+                                                    className={`text-brand-inactive-text dark:text-dark-heading ${!canNavigateToPreviousDates ? 'cursor-not-allowed opacity-30' : ''}`}
+                                                >
+                                                    <ChevronLeftIcon size={16} />
+                                                </button>
                                                 <button onClick={() => handleDateNav('next')} className="text-brand-inactive-text dark:text-dark-heading"><ChevronRightIcon size={16} /></button>
                                             </div>
                                         </div>
@@ -1903,14 +2040,16 @@ export const AppointmentSheet = ({
                                     <div>
                                         <div className="flex justify-between items-center mb-4 px-1">
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</h3>
-                                            <Button
-                                                variant="link"
-                                                className="text-xs"
-                                                leftIcon={<CalendarIcon size={14} className="hidden lg:block" />}
-                                                onClick={handleEnterSelectionMode}
-                                            >
-                                                Escolha no calendário
-                                            </Button>
+                                            {onEnterSelectionMode && (
+                                                <Button
+                                                    variant="link"
+                                                    className="text-xs"
+                                                    leftIcon={<CalendarIcon size={14} className="hidden lg:block" />}
+                                                    onClick={handleEnterSelectionMode}
+                                                >
+                                                    Escolha no calendário
+                                                </Button>
+                                            )}
                                         </div>
                                         <div className="space-y-3">
                                             {isLoadingSlots ? (
@@ -1980,61 +2119,64 @@ export const AppointmentSheet = ({
                                 />
                             </div>
 
-                            <div className="space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar">
+                            <div className="-mx-6">
                                 {filteredClients.length === 0 ? (
-                                    <IconPlaceholder
-                                        icon={UserIcon}
-                                        title="Nenhum cliente encontrado"
-                                        subtitle="Tente outro termo de busca ou cadastre um novo cliente."
-                                    />
+                                    <div className="px-6">
+                                        <IconPlaceholder
+                                            icon={UserIcon}
+                                            title="Nenhum cliente encontrado"
+                                            subtitle="Tente outro termo de busca ou cadastre um novo cliente."
+                                        />
+                                    </div>
                                 ) : (
-                                    filteredClients.map((client) => {
-                                        const isSelected = selectedClient?.id === client.id;
-                                        return (
-                                            <div
-                                                key={client.id}
-                                                onClick={() => {
-                                                    setSelectedClient(client);
-                                                    if (cameFromSummary) {
-                                                        setCurrentView('summary');
-                                                        setCameFromSummary(false);
-                                                    } else if (initialTimeSlot && mode === 'create') {
-                                                        const updatedServices = selectedServices.map(s => {
-                                                            const staff = staffSource.find(sm => sm.id === selectedStaffId);
-                                                            return {
-                                                                ...s,
-                                                                staffId: selectedStaffId,
-                                                                staff: staff ? staff.name : 'Desconhecido'
-                                                            }
-                                                        });
-                                                        setSelectedServices(updatedServices);
-                                                        const resolvedItems = resolveResourcesFromServices(updatedServices);
-                                                        setSelectedItems(resolvedItems);
-                                                        if (resolvedItems.length > 0) {
-                                                            setCurrentView('items');
-                                                        } else {
-                                                            setCurrentView('summary');
+                                    <div className="flex flex-col px-2">
+                                        {filteredClients.map((client) => {
+                                            const isSelected = selectedClient?.id === client.id;
+                                            const selectClient = () => setSelectedClient(client);
+                                            return (
+                                                <div
+                                                    key={client.id}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={selectClient}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault();
+                                                            selectClient();
                                                         }
-                                                    } else {
-                                                        setCurrentView('datetime');
-                                                    }
-                                                }}
-                                                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{client.name}</span>
+                                                    }}
+                                                    className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer ${isSelected
+                                                        ? 'bg-brand-primary/5 dark:bg-brand-primary/10'
+                                                        : 'hover:bg-gray-50 dark:hover:bg-dark-border/40'
+                                                        }`}
+                                                >
+                                                    <UserProfileImage
+                                                        fullName={client.name || "Cliente"}
+                                                        imageUrl={client.avatar_url || client.avatar}
+                                                        className="h-12 w-12 shrink-0 text-lg"
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex min-w-0 items-center gap-2">
+                                                            <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{client.name}</span>
+                                                        </div>
                                                         {client.phone ? (
-                                                            <span className="text-xs text-brand-inactive-text truncate">{formatBrazilPhone(client.phone) || client.phone}</span>
+                                                            <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {formatBrazilPhone(client.phone) || client.phone}
+                                                            </p>
                                                         ) : null}
                                                     </div>
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        <RadioButton
+                                                            name="appointmentClient"
+                                                            value={client.id}
+                                                            checked={isSelected}
+                                                            onChange={selectClient}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                {isSelected && <CheckIcon size={18} className="text-brand-green shrink-0" />}
-                                            </div>
-                                        );
-                                    })
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
                         </motion.div>
@@ -2487,7 +2629,7 @@ export const AppointmentSheet = ({
                     {/* ACTIVITY VIEW */}
                     {currentView === 'activity' && (
                         <motion.div key="activity" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                            <ActivityLog activity={appointment?.activityLog} />
+                            <ActivityLog activity={activityLog} />
                         </motion.div>
                     )}
 
@@ -3006,9 +3148,9 @@ export const AppointmentSheet = ({
                                     className={`flex items-center justify-between p-3.5 cursor-pointer transition-all ${isSelected ? 'rounded-xl border border-brand-green bg-green-50/5' : 'border-b last:border-0 border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
                                         }`}
                                 >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex min-w-0 flex-1 items-center gap-4">
                                         <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="h-12 w-12 shrink-0 text-lg" />
-                                        <div className="flex flex-col min-w-0">
+                                        <div className="flex min-w-0 flex-col">
                                             <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{client.name}</span>
                                             <span className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">{client.email || formatBrazilPhone(client.phone || "") || 'Cliente'}</span>
                                         </div>
@@ -3033,7 +3175,7 @@ export const AppointmentSheet = ({
             </header>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
-                <ActivityLog activity={appointment?.activityLog} />
+                <ActivityLog activity={activityLog} />
             </div>
         </div>
     );
@@ -3118,7 +3260,7 @@ export const AppointmentSheet = ({
                     <div className="p-6 space-y-5">
                         <div className="text-center">
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Cancelar agendamento</h3>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-2">
                                 Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
                             </p>
                         </div>
@@ -3159,7 +3301,7 @@ export const AppointmentSheet = ({
             ) : (
                 <DefaultModal isOpen={isCancelConfirmOpen} onClose={() => setIsCancelConfirmOpen(false)} title="Cancelar agendamento">
                     <div className="text-center sm:text-left">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-2">
                             Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente.
                         </p>
                     </div>

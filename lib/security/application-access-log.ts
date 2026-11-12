@@ -12,8 +12,54 @@ export type ApplicationAccessLogInput = {
   cloudflareRayId: string | null
 }
 
+const SKIP_LOG_PATHS = new Set([
+  "/api/health",
+  "/favicon.ico",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/manifest.webmanifest",
+  "/~offline",
+])
+
+const UPTIME_BOT_PATTERNS = [
+  "sentryuptimebot",
+  "uptimerobot",
+  "better uptime",
+  "betteruptime",
+  "pingdom",
+  "datadog",
+  "statuscake",
+  "healthcheck",
+  "uptime-kuma",
+  "site24x7",
+  "freshping",
+]
+
+/**
+ * Returns true if the request is an automated health/uptime probe or static metadata,
+ * which shouldn't generate noise or consume database writes for application access logs.
+ */
+export function shouldSkipAccessLog(pathname: string, userAgent?: string | null): boolean {
+  if (SKIP_LOG_PATHS.has(pathname) || pathname.startsWith("/api/monitoring")) {
+    return true
+  }
+
+  if (userAgent) {
+    const ua = userAgent.toLowerCase()
+    for (const pattern of UPTIME_BOT_PATTERNS) {
+      if (ua.includes(pattern)) return true
+    }
+  }
+
+  return false
+}
+
 /** Stores a minimal request record without query strings, cookies, or bodies. */
 export async function recordApplicationAccess(input: ApplicationAccessLogInput): Promise<void> {
+  if (shouldSkipAccessLog(input.path, input.userAgent)) {
+    return
+  }
+
   try {
     const { error } = await getAdminClient().from("application_access_logs").insert({
       ip_address: input.ipAddress,

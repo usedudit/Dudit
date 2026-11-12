@@ -26,14 +26,16 @@ interface SubscriptionListRowProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
   columns: ColumnDef[]
   canManage: boolean
+  canAdvanceCycle?: boolean
   onOpen: (id: string, tab?: SubscriptionRowTab) => void
-  onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", id: string) => void
+  onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync" | "advance_cycle", id: string) => void
 }
 
 export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
   sub,
   columns,
   canManage,
+  canAdvanceCycle,
   onOpen,
   onRunAction
 }) => {
@@ -130,6 +132,11 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
               <DropdownItem onClick={() => onOpen(sub.id, "history")}>
                 <ClockIcon size={18} /> Histórico
               </DropdownItem>
+              {canAdvanceCycle && sub.status === "active" && (
+                <DropdownItem onClick={() => onRunAction("advance_cycle", sub.id)}>
+                  <RepeatIcon size={18} /> Antecipar ciclo
+                </DropdownItem>
+              )}
               {canManage && sub.mpPreapprovalId && (
                 <DropdownItem onClick={() => onRunAction("sync", sub.id)}>
                   <RepeatIcon size={18} /> Sincronizar com MP

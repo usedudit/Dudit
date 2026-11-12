@@ -41,6 +41,12 @@ export interface QuotesPermissions extends ResourcePermissions {
 
 export interface AppointmentsPermissions extends ResourcePermissions {}
 
+export interface RecurringSubscriptionsPermissions {
+    view: boolean
+    manage: boolean
+    can_advance_cycle?: boolean
+}
+
 export interface OrdersPermissions {
     view: boolean
     create: boolean
@@ -158,7 +164,7 @@ export interface PartnerPermissions {
     dashboard: { view: boolean }
     delivery: DeliveryPermissions
     recurring_plans: { view: boolean; manage: boolean }
-    recurring_subscriptions: { view: boolean; manage: boolean }
+    recurring_subscriptions: RecurringSubscriptionsPermissions
     settings: SettingsPermissions
     settings_negocio: SettingsNegocioPermissions
     settings_team: SettingsTeamPermissions

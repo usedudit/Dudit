@@ -26,6 +26,7 @@ export interface PreDeleteReport {
   storesCount?: number
   storeNames?: string[]
   membersCount?: number
+  activeRecurringSubscriptionsCount?: number
 }
 
 export interface PostDeleteReport {
@@ -69,7 +70,7 @@ export class AccountDeletionService {
     ip: string,
     userAgent: string | null,
     country: string
-  ): Promise<{ success: boolean; error?: string; currentStatus?: string }> {
+  ): Promise<{ success: boolean; error?: string; currentStatus?: string; deletionId?: string; partnerId?: string | null }> {
     const admin = getAdminClient()
 
     // 1. Get active partner of the user
@@ -118,7 +119,7 @@ export class AccountDeletionService {
       .maybeSingle()
 
     if (existingDeletion) {
-      return { success: true, currentStatus: existingDeletion.status }
+      return { success: true, currentStatus: existingDeletion.status, deletionId: existingDeletion.id, partnerId }
     }
 
     const requestedAt = new Date()
@@ -216,7 +217,7 @@ export class AccountDeletionService {
       metadata: { reason }
     })
 
-    return { success: true }
+    return { success: true, deletionId: deletion.id, partnerId }
   }
 
   /**
@@ -246,6 +247,7 @@ export class AccountDeletionService {
     let storesCount = 0
     let storeNames: string[] = []
     let membersCount = 0
+    let activeRecurringSubscriptionsCount = 0
 
     if (partnerId) {
       const [
@@ -260,7 +262,8 @@ export class AccountDeletionService {
         { count: rr },
         { count: wa },
         { data: stores },
-        { count: members }
+        { count: members },
+        { count: recSubs }
       ] = await Promise.all([
         admin.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
         admin.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
@@ -273,7 +276,8 @@ export class AccountDeletionService {
         admin.from("return_requests").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
         admin.from("partner_whatsapp_connections").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
         admin.from("stores").select("name").eq("partner_id", partnerId),
-        admin.from("partner_users").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
+        admin.from("partner_users").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
+        admin.from("recurring_subscriptions").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).in("status", ["active", "pending", "paused", "awaiting_restock", "awaiting_customer_decision", "past_due", "payment_failed"])
       ])
 
       productsCount = prod || 0
@@ -289,6 +293,7 @@ export class AccountDeletionService {
       storesCount = stores?.length || 0
       storeNames = stores?.map((s: any) => s.name) || []
       membersCount = members || 0
+      activeRecurringSubscriptionsCount = recSubs || 0
     }
 
     const redisKeysCount = partnerId ? (1 + productsCount + servicesCount + 4) : 3
@@ -309,7 +314,8 @@ export class AccountDeletionService {
       whatsappCount,
       storesCount,
       storeNames,
-      membersCount
+      membersCount,
+      activeRecurringSubscriptionsCount
     }
   }
 
@@ -341,72 +347,12 @@ export class AccountDeletionService {
    * Cancel customer preapprovals (subscriptions) linked to the partner.
    */
   static async cancelCustomerSubscriptions(partnerId: string): Promise<number> {
-    const admin = getAdminClient()
-    let cancelledCount = 0
-    let failures = 0
-
-    const { data: subs, error: subsError } = await admin
-      .from("recurring_subscriptions")
-      .select("id, mp_preapproval_id")
-      .eq("partner_id", partnerId)
-      .not("mp_preapproval_id", "is", null)
-
-    if (subsError) {
-      throw new Error(`Failed to load customer subscriptions for deletion: ${subsError.message}`)
+    const { cancelAllMarketplaceSubscriptions } = await import("@/lib/services/recurring/limits")
+    const result = await cancelAllMarketplaceSubscriptions(partnerId)
+    if (result.failed > 0) {
+      throw new Error(`Could not verify cancellation of ${result.failed} recurring customer subscription(s).`)
     }
-    if (!subs || subs.length === 0) return 0
-
-    const { data: integration, error: integrationError } = await admin
-      .from("partner_integrations")
-      .select("access_token_encrypted")
-      .eq("partner_id", partnerId)
-      .eq("provider_slug", MERCADOPAGO_PROVIDER)
-      .maybeSingle()
-
-    if (integrationError) {
-      throw new Error(`Failed to load Mercado Pago integration for deletion: ${integrationError.message}`)
-    }
-    if (!integration?.access_token_encrypted) {
-      throw new Error("Cannot verify cancellation of customer subscriptions: Mercado Pago credentials are unavailable.")
-    }
-
-    const storeAccessToken = decrypt(integration.access_token_encrypted, MERCADOPAGO_PROVIDER)
-    for (const sub of subs) {
-      if (!sub.mp_preapproval_id) continue
-      try {
-        const response = await fetch(
-          `https://api.mercadopago.com/preapproval/${sub.mp_preapproval_id}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${storeAccessToken}`
-            },
-            body: JSON.stringify({ status: "cancelled" })
-          }
-        )
-        if (response.ok || response.status === 404) {
-          cancelledCount++
-        } else {
-          failures++
-          SecureLogger.warn("Failed to cancel customer subscription on MP", {
-            mpPreapprovalId: sub.mp_preapproval_id,
-            status: response.status
-          })
-        }
-      } catch (err) {
-        failures++
-        SecureLogger.error("Network error cancelling customer subscription on MP", {
-          mpPreapprovalId: sub.mp_preapproval_id,
-          error: err
-        })
-      }
-    }
-
-    if (failures > 0) {
-      throw new Error(`Could not verify cancellation of ${failures} Mercado Pago customer subscription(s).`)
-    }
-    return cancelledCount
+    return result.cancelled
   }
 
   /**
@@ -428,8 +374,7 @@ export class AccountDeletionService {
 
     for (const conn of conns || []) {
       if (!conn.instance_name || !conn.api_key_encrypted) {
-        failures++
-        SecureLogger.warn("WhatsApp connection is missing deletion credentials", { connectionId: conn.id })
+        SecureLogger.warn("WhatsApp connection is missing deletion credentials, skipping remote delete", { connectionId: conn.id })
         continue
       }
 
@@ -687,10 +632,8 @@ export class AccountDeletionService {
         .from("orders")
         .update({
           buyer_id: null,
+          customer_id: null,
           customer_name: "[CLIENTE ANONIMIZADO]",
-          customer_email: null,
-          customer_phone: null,
-          customer_cpf: null,
           delivery_address: "[DADOS ANONIMIZADOS - CONTA EXCLUÍDA]",
           notes: null
         })
@@ -705,10 +648,8 @@ export class AccountDeletionService {
       .from("orders")
       .update({
         buyer_id: null,
+        customer_id: null,
         customer_name: "[CLIENTE ANONIMIZADO]",
-        customer_email: null,
-        customer_phone: null,
-        customer_cpf: null,
         delivery_address: "[DADOS ANONIMIZADOS - CONTA EXCLUÍDA]",
         notes: null
       })
@@ -741,25 +682,34 @@ export class AccountDeletionService {
     const workflowVersion = "v3"
     const deletionVersion = "1.0.0"
     const requestedTimestamp = new Date(requestedAt)
+    const userIdHash = crypto.createHash("sha256").update(userId).digest("hex")
 
-    const { error: complianceLogError } = await admin
+    const { data: existingCompliance } = await admin
       .from("compliance_logs")
-      .insert({
-        user_id: userId,
-        user_id_hash: crypto.createHash("sha256").update(userId).digest("hex"),
-        partner_id: partnerId,
-        email_hash: emailHash,
-        mp_subscription_id: mpSubscriptionId,
-        mp_customer_id: mpCustomerId,
-        request_ip: ip,
-        request_country: country,
-        user_agent: userAgent,
-        request_timestamp: requestedTimestamp.toISOString(),
-        requested_at: requestedTimestamp.toISOString(),
-        deletion_version: deletionVersion,
-        workflow_version: workflowVersion,
-        deletion_reason: reason
-      })
+      .select("id")
+      .eq("user_id_hash", userIdHash)
+      .maybeSingle()
+
+    const compliancePayload = {
+      user_id: userId,
+      user_id_hash: userIdHash,
+      partner_id: partnerId,
+      email_hash: emailHash,
+      mp_subscription_id: mpSubscriptionId,
+      mp_customer_id: mpCustomerId,
+      request_ip: ip,
+      request_country: country,
+      user_agent: userAgent,
+      request_timestamp: requestedTimestamp.toISOString(),
+      requested_at: requestedTimestamp.toISOString(),
+      deletion_version: deletionVersion,
+      workflow_version: workflowVersion,
+      deletion_reason: reason
+    }
+
+    const { error: complianceLogError } = existingCompliance?.id
+      ? await admin.from("compliance_logs").update(compliancePayload).eq("id", existingCompliance.id)
+      : await admin.from("compliance_logs").insert(compliancePayload)
 
     if (complianceLogError) {
       throw new Error(`Failed to retain account deletion evidence: ${complianceLogError.message}`)
@@ -774,8 +724,339 @@ export class AccountDeletionService {
   static async deleteAuthUser(userId: string): Promise<void> {
     const admin = getAdminClient()
     const { error } = await admin.auth.admin.deleteUser(userId)
-    if (error) {
+    if (error && !/not found/i.test(error.message || "")) {
       throw new Error(`Failed to delete user from Supabase Auth: ${error.message}`)
+    }
+  }
+
+  /**
+   * Execute the complete account deletion pipeline synchronously/idempotently.
+   * Used both immediately on user confirmation and by the Trigger.dev fallback task.
+   */
+  static async executeDeletionWorkflow(
+    deletionId: string,
+    userId: string,
+    partnerId: string | null
+  ): Promise<void> {
+    const admin = getAdminClient()
+    const startTime = Date.now()
+
+    const { data: deletion, error: fetchError } = await admin
+      .from("account_deletions")
+      .select("*")
+      .eq("id", deletionId)
+      .maybeSingle()
+
+    if (fetchError || !deletion) {
+      SecureLogger.info("Account deletion workflow aborted: Deletion record not found.", { deletionId, userId, partnerId })
+      return
+    }
+
+    if (deletion.status === "completed") {
+      SecureLogger.info("Account deletion workflow skipped: Deletion already completed.", { deletionId, userId, partnerId })
+      return
+    }
+
+    const resolvedPartnerId = partnerId || deletion.partner_id || null
+
+    try {
+      // Step 0: Pre-Delete Volumetry Report
+      let plannedReport = deletion.checkpoints?.planned_report
+      if (!plannedReport) {
+        const report = await this.getPreDeleteReport(resolvedPartnerId, userId)
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", deletionId)
+          .maybeSingle()
+
+        const updatedCheckpoints = {
+          ...(cur?.checkpoints || {}),
+          planned_report: report
+        }
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: updatedCheckpoints })
+          .eq("id", deletionId)
+
+        plannedReport = report
+      }
+
+      // Step 1: Cloudflare R2 Purge (deleting_storage)
+      let filesDeleted = deletion.checkpoints?.step_status?.deleting_storage?.filesDeleted || 0
+      let filesDeferredForDatabaseCleanup = deletion.checkpoints?.step_status?.deleting_storage?.filesDeferredForDatabaseCleanup || 0
+      let unclassifiedFilesPreserved = deletion.checkpoints?.step_status?.deleting_storage?.unclassifiedFilesPreserved || 0
+      const deletingStorageCompleted = deletion.checkpoints?.step_status?.deleting_storage?.completed || false
+
+      if (!deletingStorageCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_storage" })
+          .eq("id", deletionId)
+
+        const storageResult = await this.purgeCloudflareR2(userId)
+        filesDeleted = storageResult.filesDeleted
+        filesDeferredForDatabaseCleanup = storageResult.filesDeferredForDatabaseCleanup
+        unclassifiedFilesPreserved = storageResult.unclassifiedFilesPreserved
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_storage = {
+          completed: true,
+          filesDeleted,
+          filesDeferredForDatabaseCleanup,
+          unclassifiedFilesPreserved,
+        }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", deletionId)
+      }
+
+      // Step 2: Evolution WhatsApp & MP Customer Cancel (deleting_external_services)
+      let whatsappDisconnected = deletion.checkpoints?.step_status?.deleting_external_services?.whatsappDisconnected || 0
+      let customerSubscriptionsCancelled = deletion.checkpoints?.step_status?.deleting_external_services?.customerSubscriptionsCancelled || 0
+      const deletingExtCompleted = deletion.checkpoints?.step_status?.deleting_external_services?.completed || false
+
+      if (!deletingExtCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_external_services" })
+          .eq("id", deletionId)
+
+        if (resolvedPartnerId) {
+          whatsappDisconnected = await this.disconnectWhatsApp(resolvedPartnerId)
+          customerSubscriptionsCancelled = await this.cancelCustomerSubscriptions(resolvedPartnerId)
+        } else {
+          whatsappDisconnected = 0
+          customerSubscriptionsCancelled = 0
+        }
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_external_services = {
+          completed: true,
+          whatsappDisconnected,
+          customerSubscriptionsCancelled
+        }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", deletionId)
+      }
+
+      // Step 3: Clear Redis Caches & Indexers (deleting_marketplace)
+      const deletingMarketplaceCompleted = deletion.checkpoints?.step_status?.deleting_marketplace?.completed || false
+
+      if (!deletingMarketplaceCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_marketplace" })
+          .eq("id", deletionId)
+
+        await this.purgeRedis(resolvedPartnerId, userId)
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_marketplace = { completed: true }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", deletionId)
+      }
+
+      // Step 4: Anonymization & Transactional DB Purge (deleting_database)
+      let dbRowsDeleted = deletion.checkpoints?.step_status?.deleting_database?.dbRowsDeleted || 0
+      let ordersAnonymized = deletion.checkpoints?.step_status?.deleting_database?.ordersAnonymized || 0
+      let r2CleanupDeleted = deletion.checkpoints?.step_status?.deleting_database?.r2CleanupDeleted || 0
+      let r2CleanupFailed = deletion.checkpoints?.step_status?.deleting_database?.r2CleanupFailed || 0
+      const deletingDbCompleted = deletion.checkpoints?.step_status?.deleting_database?.completed || false
+
+      if (!deletingDbCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_database" })
+          .eq("id", deletionId)
+
+        // Anonymize orders and audit logs BEFORE purgeDatabase deletes the partner row
+        ordersAnonymized = await this.anonymizeOrdersAndLogs(
+          userId,
+          resolvedPartnerId,
+          deletion.reason,
+          deletion.request_ip,
+          deletion.user_agent,
+          deletion.request_country,
+          deletion.requested_at
+        )
+
+        dbRowsDeleted = await this.purgeDatabase(resolvedPartnerId, userId)
+
+        const { processR2CleanupBatch } = await import("@/lib/r2/cleanup-queue")
+        for (let batchIndex = 0; batchIndex < 10; batchIndex++) {
+          const batch = await processR2CleanupBatch(100)
+          r2CleanupDeleted += batch.deleted
+          r2CleanupFailed += batch.failed + batch.persistenceErrors
+          if (batch.claimed < 100) break
+        }
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_database = {
+          completed: true,
+          dbRowsDeleted,
+          ordersAnonymized,
+          r2CleanupDeleted,
+          r2CleanupFailed,
+        }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", deletionId)
+      } else {
+        // Ensure any residual rows from an earlier partial run are purged before auth deletion
+        const extraRows = await this.purgeDatabase(resolvedPartnerId, userId)
+        dbRowsDeleted += extraRows
+      }
+      filesDeleted += r2CleanupDeleted
+
+      // Step 5: Delete Supabase Auth User (deleting_auth)
+      const deletingAuthCompleted = deletion.checkpoints?.step_status?.deleting_auth?.completed || false
+
+      if (!deletingAuthCompleted) {
+        await admin
+          .from("account_deletions")
+          .update({ status: "deleting_auth" })
+          .eq("id", deletionId)
+
+        await this.deleteAuthUser(userId)
+
+        const { data: cur } = await admin
+          .from("account_deletions")
+          .select("checkpoints")
+          .eq("id", deletionId)
+          .maybeSingle()
+
+        const stepStatus = cur?.checkpoints?.step_status || {}
+        stepStatus.deleting_auth = { completed: true }
+
+        await admin
+          .from("account_deletions")
+          .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
+          .eq("id", deletionId)
+      }
+
+      // Step 6: Post-Delete Volumetry Report & Success
+      const executionTime = Date.now() - startTime
+
+      const actualReport = {
+        productsDeleted: plannedReport.productsCount,
+        servicesDeleted: plannedReport.servicesCount,
+        ordersAnonymized,
+        filesDeleted,
+        filesDeferredForDatabaseCleanup,
+        unclassifiedFilesPreserved,
+        r2CleanupDeleted,
+        r2CleanupFailed,
+        whatsappDisconnected
+      }
+
+      const { data: currentDel } = await admin
+        .from("account_deletions")
+        .select("checkpoints")
+        .eq("id", deletionId)
+        .maybeSingle()
+
+      const finalCheckpoints = {
+        ...(currentDel?.checkpoints || {}),
+        actual_report: actualReport,
+        discrepancy_report: null
+      }
+
+      await admin
+        .from("account_deletions")
+        .update({
+          status: "completed",
+          error_log: null,
+          checkpoints: finalCheckpoints
+        })
+        .eq("id", deletionId)
+
+      const userIdHash = crypto.createHash("sha256").update(userId).digest("hex")
+      const certificateMetrics = {
+        deletionId,
+        partnerId: resolvedPartnerId,
+        userIdHash,
+        startedAt: deletion.requested_at,
+        finishedAt: new Date().toISOString(),
+        durationMs: executionTime,
+        dbRowsRemoved: dbRowsDeleted,
+        filesRemoved: filesDeleted,
+        redisKeysRemoved: plannedReport.redisKeysCount,
+        filesDeferredForDatabaseCleanup,
+        unclassifiedFilesPreserved,
+        subscriptionsCancelled: customerSubscriptionsCancelled,
+        whatsappInstancesRemoved: whatsappDisconnected,
+        complianceRetained: "Minimized evidence may be retained for up to five years where necessary for legal obligations or the exercise of rights; this is a case-specific retention policy and not a blanket five-year retention rule under the CDC."
+      }
+
+      const sha256Report = crypto
+        .createHash("sha256")
+        .update(JSON.stringify(certificateMetrics))
+        .digest("hex")
+
+      const fullCertificate = {
+        ...certificateMetrics,
+        sha256Report
+      }
+
+      const { error: certificateError } = await admin
+        .from("compliance_logs")
+        .update({
+          execution_time_ms: executionTime,
+          certificate: fullCertificate,
+          user_id: null
+        })
+        .eq("user_id_hash", userIdHash)
+
+      if (certificateError) {
+        throw new Error(`Failed to save account deletion certificate: ${certificateError.message}`)
+      }
+    } catch (err: any) {
+      SecureLogger.error("Failed executing account deletion workflow", { deletionId, error: err.message })
+
+      await admin
+        .from("account_deletions")
+        .update({
+          status: "failed",
+          error_log: err.message || "Unknown error occurred"
+        })
+        .eq("id", deletionId)
+
+      throw err
     }
   }
 }

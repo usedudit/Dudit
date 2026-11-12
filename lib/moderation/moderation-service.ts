@@ -110,7 +110,7 @@ const HARD_TOKENS = new Set([
   "nazista", "neonazista",
   // baixo calão / ofensas graves
   "arrombado", "arrombada", "caralho", "foder", "fuder", "fudido", "fudida",
-  "desgracado", "desgracada", "putaria",
+  "desgracado", "desgracada", "putaria", "buceta", "bucetinha",
   // substâncias e produtos ilícitos
   "cocaina", "maconha", "crack",
 ])

@@ -260,6 +260,11 @@ export async function revalidatePartnerProfile(partnerId: string) {
     await safeRevalidateTag(TAGS.partnerProfile(partnerId))
     await safeRevalidateTag("partner-profile")
     await safeRevalidateTag(TAGS.partner(partnerId))
+
+    try {
+        const { invalidateMarketplaceCapabilitiesCache } = await import("@/lib/marketplace-capabilities")
+        invalidateMarketplaceCapabilitiesCache(partnerId)
+    } catch {}
 }
 
 /**

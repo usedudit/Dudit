@@ -452,7 +452,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                 </div>
 
                                 {/* Tabs Navigation */}
-                                <div className="w-full transition-all duration-500">
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="summary">Resumo</TabsTrigger>
                                         <TabsTrigger value="services">Mão de obra</TabsTrigger>

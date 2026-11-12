@@ -368,7 +368,11 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     <ListItem
                                         icon={Package}
                                         title="Estoque Atual"
-                                        description={`${productData.stock || 0} ${productData.unidade || "UN"}`}
+                                        description={
+                                            (Number(productData.stock_reserved) || 0) > 0
+                                                ? `${productData.stock || 0} ${productData.unidade || "UN"} (${Math.max(0, (Number(productData.stock) || 0) - (Number(productData.stock_reserved) || 0))} disp. · ${productData.stock_reserved} reserv.)`
+                                                : `${productData.stock || 0} ${productData.unidade || "UN"}`
+                                        }
                                         className="p-4 cursor-default"
                                         right={
                                             <Button
@@ -494,11 +498,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         name: productData.name,
                         sku: productData.sku,
                         image: typeof images[0] === 'string' ? images[0] : (productData.images?.[0] || productData.image || null),
-                        stock: Number(productData.stock || 0)
+                        stock: Number(productData.stock || 0),
+                        reservedStock: Number(productData.stock_reserved || 0),
+                        unit: productData.unidade || "UN"
                     }}
                     onClose={() => setIsStockAdjustmentOpen(false)}
-                    onSaveSuccess={(newStock) => {
+                    onSaveSuccess={(newStock, newReservedStock) => {
                         handleInputChange({ target: { name: "stock", value: newStock } })
+                        if (newReservedStock !== undefined) {
+                            handleInputChange({ target: { name: "stock_reserved", value: newReservedStock } })
+                            handleInputChange({ target: { name: "stock_available", value: newStock - newReservedStock } })
+                        }
                         router.refresh()
                     }}
                 />
@@ -686,24 +696,40 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         dataField="stock"
                                     />
                                 ) : (
-                                    <Input
-                                        label="Estoque Atual"
-                                        name="stock"
-                                        type="number"
-                                        value={productData.stock || 0}
-                                        readOnly
-                                        dataField="stock"
-                                        suffix={
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
-                                                onClick={() => setIsStockAdjustmentOpen(true)}
-                                            >
-                                                Ajustar
-                                            </Button>
-                                        }
-                                    />
+                                    <div className="space-y-1">
+                                        <Input
+                                            label="Estoque Atual"
+                                            name="stock"
+                                            type="number"
+                                            value={productData.stock || 0}
+                                            readOnly
+                                            dataField="stock"
+                                            suffix={
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
+                                                    onClick={() => setIsStockAdjustmentOpen(true)}
+                                                >
+                                                    Ajustar
+                                                </Button>
+                                            }
+                                        />
+                                        {(Number(productData.stock_reserved) || 0) > 0 && (
+                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text px-1">
+                                                <span>
+                                                    Disp.: <strong className="text-brand-dark dark:text-dark-heading">{Math.max(0, (Number(productData.stock) || 0) - (Number(productData.stock_reserved) || 0))}</strong> · Reservado: <strong className="text-brand-orange">{productData.stock_reserved}</strong>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsStockAdjustmentOpen(true)}
+                                                    className="text-[11px] font-semibold text-brand-primary hover:underline"
+                                                >
+                                                    Liberar reserva
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 )
                             )}
                         </div>
@@ -761,24 +787,40 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         dataField="stock"
                                     />
                                 ) : (
-                                    <Input
-                                        label="Estoque Atual"
-                                        name="stock"
-                                        type="number"
-                                        value={productData.stock || 0}
-                                        readOnly
-                                        dataField="stock"
-                                        suffix={
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
-                                                onClick={() => setIsStockAdjustmentOpen(true)}
-                                            >
-                                                Ajustar
-                                            </Button>
-                                        }
-                                    />
+                                    <div className="space-y-1">
+                                        <Input
+                                            label="Estoque Atual"
+                                            name="stock"
+                                            type="number"
+                                            value={productData.stock || 0}
+                                            readOnly
+                                            dataField="stock"
+                                            suffix={
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
+                                                    onClick={() => setIsStockAdjustmentOpen(true)}
+                                                >
+                                                    Ajustar
+                                                </Button>
+                                            }
+                                        />
+                                        {(Number(productData.stock_reserved) || 0) > 0 && (
+                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text px-1">
+                                                <span>
+                                                    Disp.: <strong className="text-brand-dark dark:text-dark-heading">{Math.max(0, (Number(productData.stock) || 0) - (Number(productData.stock_reserved) || 0))}</strong> · Reservado: <strong className="text-brand-orange">{productData.stock_reserved}</strong>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsStockAdjustmentOpen(true)}
+                                                    className="text-[11px] font-semibold text-brand-primary hover:underline"
+                                                >
+                                                    Liberar reserva
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 )
                             )}
                             <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
@@ -1183,11 +1225,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     name: productData.name,
                     sku: productData.sku,
                     image: typeof images[0] === 'string' ? images[0] : (productData.images?.[0] || productData.image || null),
-                    stock: Number(productData.stock || 0)
+                    stock: Number(productData.stock || 0),
+                    reservedStock: Number(productData.stock_reserved || 0),
+                    unit: productData.unidade || "UN"
                 }}
                 onClose={() => setIsStockAdjustmentOpen(false)}
-                onSaveSuccess={(newStock) => {
+                onSaveSuccess={(newStock, newReservedStock) => {
                     handleInputChange({ target: { name: "stock", value: newStock } })
+                    if (newReservedStock !== undefined) {
+                        handleInputChange({ target: { name: "stock_reserved", value: newReservedStock } })
+                        handleInputChange({ target: { name: "stock_available", value: newStock - newReservedStock } })
+                    }
                     router.refresh()
                 }}
             />

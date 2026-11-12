@@ -33,7 +33,7 @@ import type {
     ServiceOrderReportData, GoalReportData, SubscriptionReportData,
     AppointmentsReportData,
 } from "@/lib/data/reports"
-import type { Period } from "@/lib/period-types"
+import type { Period, CompareMode } from "@/lib/period-types"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import {
@@ -84,6 +84,7 @@ interface ReportsPageProps {
     sells?: string[]
     activeResources?: string[]
     period: Period
+    compare?: CompareMode
     planSlug: string
     productsData: ProductsDashboardData | null
     servicesData: ServicesDashboardData | null
@@ -241,10 +242,10 @@ export function ReportsPage(props: ReportsPageProps) {
             <TabsContent value="vendas"><SalesSection {...props} productsData={props.productsData} /></TabsContent>
             {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} salesData={props.salesData} /></TabsContent>}
             {props.servicesData && <TabsContent value="servicos"><ServicesSection servicesData={props.servicesData} /></TabsContent>}
-            {props.appointmentsData && <TabsContent value="agendamentos"><AppointmentsSection appointmentsData={props.appointmentsData} /></TabsContent>}
+            {props.appointmentsData && <TabsContent value="agendamentos"><AppointmentsSection appointmentsData={props.appointmentsData} compare={props.compare} /></TabsContent>}
             {props.deliveryData && <TabsContent value="entregas"><DeliveriesSection {...props} /></TabsContent>}
             {props.serviceOrdersData && <TabsContent value="ordens-servico"><ServiceOrdersSection {...props} /></TabsContent>}
-            {props.financialData && <TabsContent value="financeiro"><FinancialSection financialData={props.financialData} /></TabsContent>}
+            {props.financialData && <TabsContent value="financeiro"><FinancialSection financialData={props.financialData} compare={props.compare} /></TabsContent>}
             <TabsContent value="clientes"><CustomersSection {...props} /></TabsContent>
             <TabsContent value="marketing"><MarketingSection {...props} /></TabsContent>
             <TabsContent value="produtividade"><ProductivitySection productivityData={props.productivityData} goalData={props.goalData} /></TabsContent>
@@ -256,9 +257,10 @@ export function ReportsPage(props: ReportsPageProps) {
 // ─────────────────────────────────────────────────────────────
 // 1. ABA DE VENDAS
 // ─────────────────────────────────────────────────────────────
-function SalesSection({ salesData, productsData }: { salesData: SalesReportData | null; productsData?: ProductsDashboardData | null; period: Period }) {
+function SalesSection({ salesData, productsData, compare = "none" }: { salesData: SalesReportData | null; productsData?: ProductsDashboardData | null; period: Period; compare?: CompareMode }) {
     const { setExportHandler } = useDashboard()
     const [channelView, setChannelView] = useState<"pedidos" | "dinheiro">("pedidos")
+    const showComparison = compare !== "none"
 
     const insights = useMemo(() => {
         if (!salesData) return []
@@ -277,12 +279,12 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
     const kpis = useMemo(() => {
         if (!salesData) return []
         return [
-            { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend, icon: MoneyIcon },
-            { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend, icon: CreditCardIcon },
-            { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend, icon: ShoppingCartIcon },
+            { title: "Receita", value: salesData.metrics.revenueFormatted, trend: showComparison ? salesData.metrics.revenueTrend : "", icon: MoneyIcon },
+            { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: showComparison ? salesData.metrics.ticketTrend : "", icon: CreditCardIcon },
+            { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: showComparison ? salesData.metrics.orderTrend : "", icon: ShoppingCartIcon },
             { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "", icon: PackageIcon },
         ]
-    }, [salesData])
+    }, [salesData, showComparison])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!salesData) return
@@ -296,7 +298,11 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
 
     if (!salesData) return <SectionPlaceholder title="Vendas" description="Ative o módulo de produtos para visualizar relatórios de vendas." />
 
-    const evoData = salesData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const evoData = salesData.evolution.map(e => ({
+        label: e.label,
+        value: e.value,
+        ...(showComparison ? { secondary: e.secondary } : {}),
+    }))
     const paymentData = salesData.byPaymentMethod.map(p => ({ label: p.label, value: p.value }))
 
     const channelOptions = [
@@ -326,7 +332,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
             {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-12">
-                    <SummaryCards metrics={kpis} variant="horizontal" />
+                    <SummaryCards metrics={kpis} variant="horizontal" showTrend={showComparison} />
                 </div>
             </div>
 
@@ -337,7 +343,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Evolução de Vendas"
-                            legendItems={[{ label: "Este Período", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Este Período", color: "#79c325" }, ...(showComparison ? [{ label: "Período Anterior", color: "#94a3b8" }] : [])]}
                         />
                         <DashboardLineChart data={evoData} format="currency" />
                     </div>
@@ -756,8 +762,9 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
 // ─────────────────────────────────────────────────────────────
 // 3b. ABA DE AGENDAMENTOS
 // ─────────────────────────────────────────────────────────────
-function AppointmentsSection({ appointmentsData }: { appointmentsData: AppointmentsReportData }) {
+function AppointmentsSection({ appointmentsData, compare = "none" }: { appointmentsData: AppointmentsReportData; compare?: CompareMode }) {
     const { setExportHandler } = useDashboard()
+    const showComparison = compare !== "none"
 
     const parseBrl = (val?: string) => {
         if (!val) return 0
@@ -801,7 +808,14 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
 
-    const evoData = (appointmentsData.dailyEvolution || []).map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const evoData = (appointmentsData.dailyEvolution || []).map(e => ({
+        label: e.label,
+        value: e.value,
+        ...(showComparison ? { secondary: e.secondary } : {}),
+    }))
+    const summaryMetrics = showComparison
+        ? appointmentsData.metrics
+        : appointmentsData.metrics.map(m => ({ ...m, trend: "" }))
     const statusData = (appointmentsData.statusBreakdown || []).map(s => ({ label: s.label, value: s.value }))
     const hourlyData = (appointmentsData.hourlyDistribution || []).map(h => ({ label: h.label, value: h.value }))
     const serviceData = (appointmentsData.servicePopularity || []).map(s => ({ label: s.label, value: s.value }))
@@ -812,7 +826,7 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
 
             {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12"><SummaryCards metrics={appointmentsData.metrics} variant="horizontal" /></div>
+                <div className="lg:col-span-12"><SummaryCards metrics={summaryMetrics} variant="horizontal" showTrend={showComparison} /></div>
             </div>
 
             {/* Row 2: Evolução Diária (8) + Status (4) */}
@@ -822,7 +836,7 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
                         <CardHeader
                             icon={CalendarIcon}
                             title="Evolução de Agendamentos"
-                            legendItems={[{ label: "Este Período", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Este Período", color: "#79c325" }, ...(showComparison ? [{ label: "Período Anterior", color: "#94a3b8" }] : [])]}
                         />
                         <DashboardLineChart data={evoData} />
                     </div>
@@ -902,9 +916,10 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
 // ─────────────────────────────────────────────────────────────
 // 4. ABA DE ENTREGAS
 // ─────────────────────────────────────────────────────────────
-function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData | null }) {
+function DeliveriesSection({ deliveryData, compare = "none" }: { deliveryData: DeliveryReportData | null; compare?: CompareMode }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
+    const showComparison = compare !== "none"
 
     const insights = useMemo(() => {
         if (!deliveryData) return []
@@ -941,7 +956,11 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
 
     if (!deliveryData) return <SectionPlaceholder title="Entregas" description="Sem dados de entregas." />
 
-    const evoData = deliveryData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const evoData = deliveryData.evolution.map(e => ({
+        label: e.label,
+        value: e.value,
+        ...(showComparison ? { secondary: e.secondary } : {}),
+    }))
     const statusData = deliveryData.byStatus.map(s => ({ label: s.label, value: s.value }))
 
     return (
@@ -960,7 +979,7 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Entregas por Período"
-                            legendItems={[{ label: "Este Período", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Este Período", color: "#79c325" }, ...(showComparison ? [{ label: "Período Anterior", color: "#94a3b8" }] : [])]}
                         />
                         <DashboardLineChart data={evoData} />
                     </div>
@@ -1110,9 +1129,10 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
 // ─────────────────────────────────────────────────────────────
 // 5. ABA DE ORDENS DE SERVIÇO
 // ─────────────────────────────────────────────────────────────
-function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: ServiceOrderReportData | null }) {
+function ServiceOrdersSection({ serviceOrdersData, compare = "none" }: { serviceOrdersData: ServiceOrderReportData | null; compare?: CompareMode }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
+    const showComparison = compare !== "none"
 
     const kpis = useMemo(() => {
         if (!serviceOrdersData) return []
@@ -1137,7 +1157,11 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
 
     if (!serviceOrdersData) return <SectionPlaceholder title="Ordens de Serviço" description="Sem dados de ordens de serviço." />
 
-    const evoData = serviceOrdersData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const evoData = serviceOrdersData.evolution.map(e => ({
+        label: e.label,
+        value: e.value,
+        ...(showComparison ? { secondary: e.secondary } : {}),
+    }))
     const statusData = serviceOrdersData.byStatus.map(s => ({ label: s.label, value: s.value }))
 
     return (
@@ -1154,9 +1178,9 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Evolução de Ordens de Serviço"
-                            legendItems={[{ label: "Ordens", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Ordens", color: "#79c325" }, ...(showComparison ? [{ label: "Período Anterior", color: "#94a3b8" }] : [])]}
                         />
-                        <DashboardLineChart data={evoData} legendLabels={{ value: "Ordens", secondary: "Período Anterior" }} />
+                        <DashboardLineChart data={evoData} legendLabels={showComparison ? { value: "Ordens", secondary: "Período Anterior" } : { value: "Ordens" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1304,8 +1328,12 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
 // ─────────────────────────────────────────────────────────────
 // 6. ABA FINANCEIRO
 // ─────────────────────────────────────────────────────────────
-function FinancialSection({ financialData }: { financialData: FinancialDashboardData }) {
+function FinancialSection({ financialData, compare = "none" }: { financialData: FinancialDashboardData; compare?: CompareMode }) {
     const { setExportHandler } = useDashboard()
+    const showComparison = compare !== "none"
+    const summaryMetrics = showComparison
+        ? financialData.metrics
+        : financialData.metrics.map(m => ({ ...m, trend: "" }))
 
     const totalExpenses = useMemo(() => {
         return (financialData.expensesByCategory || []).reduce((acc, e) => acc + Number(e.value), 0)
@@ -1375,7 +1403,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
 
             {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12"><SummaryCards metrics={financialData.metrics} variant="horizontal" /></div>
+                <div className="lg:col-span-12"><SummaryCards metrics={summaryMetrics} variant="horizontal" showTrend={showComparison} /></div>
             </div>
 
             {/* Row 2: Fluxo de Caixa (8) + Saídas por Dia (4) */}

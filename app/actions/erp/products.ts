@@ -1622,6 +1622,8 @@ export async function getProductVariantsAction(productId: string): Promise<Actio
             sku: v.sku,
             price: v.price_adjustment,
             stock: v.stock_quantity,
+            stock_reserved: Math.max(0, Number(v.stock_reserved) || 0),
+            stock_available: Number(v.stock_available ?? ((Number(v.stock_quantity) || 0) - (Math.max(0, Number(v.stock_reserved) || 0)))),
             image: v.variant_options?.image || null,
             status: v.is_active,
             color: v.variant_type === "Cor" ? v.variant_value : null,
@@ -3565,4 +3567,7 @@ export async function searchProductByBarcodeAction(
         return { success: false, error: error.message }
     }
 }
+
+export { releaseReservedStockAction, getProductStockStatusAction } from "./stock-movements"
+
 

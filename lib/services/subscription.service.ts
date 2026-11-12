@@ -156,16 +156,26 @@ interface CacheEntry<T> {
 }
 
 /**
- * Plan cache TTL - kept short (10 seconds) to limit stale access windows.
+ * Plan cache TTL - kept short (30 seconds) to balance freshness with DB load.
  * Webhooks force-invalidate the cache immediately on status changes,
  * so this TTL only matters for the gap between a webhook updating the DB
  * and the next plan resolution call.
  */
-const PARTNER_PLAN_TTL_MS = 10_000     // 10 seconds
+const PARTNER_PLAN_TTL_MS = 30_000     // 30 seconds
 const ALL_PLANS_TTL_MS = 60_000         // 60 seconds
+const USAGE_COUNTERS_TTL_MS = 15_000    // 15 seconds
 
 const partnerPlanCache = new Map<string, CacheEntry<Plan>>()
+const usageCountersCache = new Map<string, CacheEntry<UsageCounters | null>>()
 const allPlansCache: { entry: CacheEntry<Plan[]> | null } = { entry: null }
+
+export function invalidateUsageCountersCache(partnerId?: string): void {
+  if (partnerId) {
+    usageCountersCache.delete(partnerId)
+  } else {
+    usageCountersCache.clear()
+  }
+}
 
 function getCached<T>(cache: CacheEntry<T> | undefined | null): T | null {
   if (!cache) return null
@@ -584,6 +594,11 @@ export async function getLimit(partnerId: string, limitName: string): Promise<nu
  * Returns null if no counters row exists yet.
  */
 export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCounters | null> => {
+  const cached = getCached(usageCountersCache.get(partnerId))
+  if (cached !== null && cached !== undefined) {
+    return cached
+  }
+
   const admin = getAdminClient()
   const { data, error } = await admin
     .from("usage_counters")
@@ -596,7 +611,10 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
     return null
   }
 
-  if (!data) return null
+  if (!data) {
+    usageCountersCache.set(partnerId, { data: null, expiresAt: Date.now() + USAGE_COUNTERS_TTL_MS })
+    return null
+  }
 
   // Safety net: if for any reason DB-side cron reset isn't running,
   // reset monthly counters lazily on-demand (based on *_month_reset timestamps).
@@ -633,6 +651,7 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
       ; (updates as any).xml_imports_month_reset = now.toISOString()
   }
 
+  let finalCounters = counters
   if (Object.keys(updates).length > 0) {
     const { error: updateError } = await admin.from("usage_counters").update(updates).eq("partner_id", partnerId)
     if (updateError) {
@@ -644,11 +663,12 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
         .select("partner_id, products_count, users_count, images_count, services_count, quotes_month_count, quotes_month_reset, orders_month_count, orders_month_reset, appointments_month_count, appointments_month_reset, service_orders_month_count, service_orders_month_reset, xml_imports_month_count, xml_imports_month_reset")
         .eq("partner_id", partnerId)
         .maybeSingle()
-      if (refreshed) return refreshed as UsageCounters
+      if (refreshed) finalCounters = refreshed as UsageCounters
     }
   }
 
-  return counters
+  usageCountersCache.set(partnerId, { data: finalCounters, expiresAt: Date.now() + USAGE_COUNTERS_TTL_MS })
+  return finalCounters
 })
 
 // ─── Counter name → usage_counters column mapping ───────────────────────────
@@ -757,6 +777,10 @@ export async function checkLimit(
  */
 export function invalidatePartnerPlanCache(partnerId: string): void {
   partnerPlanCache.delete(partnerId)
+  usageCountersCache.delete(partnerId)
+  import("@/lib/marketplace-capabilities")
+    .then((m) => m.invalidateMarketplaceCapabilitiesCache?.(partnerId))
+    .catch(() => {})
 }
 
 /**
@@ -765,14 +789,19 @@ export function invalidatePartnerPlanCache(partnerId: string): void {
  */
 export function invalidateAllPlanCaches(): void {
   partnerPlanCache.clear()
+  usageCountersCache.clear()
   allPlansCache.entry = null
   freePlanCache = null
+  import("@/lib/marketplace-capabilities")
+    .then((m) => m.invalidateMarketplaceCapabilitiesCache?.())
+    .catch(() => {})
 }
 
 /**
  * Increment a usage counter via RPC.
  */
 export async function increment_usage_counter(partnerId: string, counterName: string, amount: number = 1) {
+  usageCountersCache.delete(partnerId)
   const admin = getAdminClient()
   const { error } = await admin.rpc("increment_usage_counter", {
     p_partner_id: partnerId,
@@ -787,6 +816,7 @@ export async function increment_usage_counter(partnerId: string, counterName: st
  * Decrement a usage counter via RPC.
  */
 export async function decrement_usage_counter(partnerId: string, counterName: string, amount: number = 1) {
+  usageCountersCache.delete(partnerId)
   const admin = getAdminClient()
   const { error } = await admin.rpc("decrement_usage_counter", {
     p_partner_id: partnerId,
@@ -813,6 +843,7 @@ export async function adjustItemUsageCounter(
 ): Promise<void> {
   if (!partnerId || !Number.isFinite(delta) || delta === 0) return
 
+  usageCountersCache.delete(partnerId)
   const admin = getAdminClient()
   const { data: counters, error } = await admin
     .from("usage_counters")

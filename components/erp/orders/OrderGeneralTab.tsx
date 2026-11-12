@@ -26,8 +26,9 @@ import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit, format
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { getCarrierStatusLabel } from "@/lib/orders/carrier-status"
-import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
+import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { usePermissions } from "@/lib/permission-context"
 
@@ -389,48 +390,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 <ThreeDotsLoader />
                                             ) : searchResults.length > 0 ? (
                                                 searchResults.map(product => (
-                                                    <div
+                                                    <ProductSearchResultItem
                                                         key={product.id}
+                                                        item={product}
+                                                        promotions={searchPromotions}
                                                         onClick={() => {
                                                             addProductToOrder(product);
                                                             setIsProductSearchOpen(false);
                                                         }}
-                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                    >
-                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
-                                                                {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                {(() => {
-                                                                    if (product.variants && product.variants.length > 0) {
-                                                                        const prices = product.variants.map((v: any) => Number(v.price || 0))
-                                                                        const minP = Math.min(...prices)
-                                                                        const maxP = Math.max(...prices)
-                                                                        return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
-                                                                    }
-                                                                    const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined });
-                                                                    return (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
-                                                                            <span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>
-                                                                            {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                            {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                        </div>
-                                                                    )
-                                                                })()}
-                                                            </div>
-                                                            <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                    />
                                                 ))
                                             ) : (
                                                 <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>
@@ -1247,48 +1215,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 <ThreeDotsLoader />
                                             ) : searchResults.length > 0 ? (
                                                 searchResults.map(product => (
-                                                    <div
+                                                    <ProductSearchResultItem
                                                         key={product.id}
+                                                        item={product}
+                                                        promotions={searchPromotions}
                                                         onClick={() => {
                                                             addProductToOrder(product);
                                                             setIsProductSearchOpen(false);
                                                         }}
-                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                    >
-                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0 text-left">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
-                                                                {(product.variants && product.variants.length > 0) ? "Múltiplos SKUs" : (product.sku || "N/A")}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                {(() => {
-                                                                    if (product.variants && product.variants.length > 0) {
-                                                                        const prices = product.variants.map((v: any) => Number(v.price || 0))
-                                                                        const minP = Math.min(...prices)
-                                                                        const maxP = Math.max(...prices)
-                                                                        return minP === maxP ? formatCurrency(minP) : `De: ${formatCurrency(minP)} Até: ${formatCurrency(maxP)}`
-                                                                    }
-                                                                    const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined });
-                                                                    return (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            {pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}
-                                                                            <span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>
-                                                                            {pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                            {pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}
-                                                                        </div>
-                                                                    )
-                                                                })()}
-                                                            </div>
-                                                            <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                {product.isService ? "Serviço" : `${(product.variants && product.variants.length > 0) ? product.variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0) : (product.stock || 0)} em estoque`}
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                    />
                                                 ))
                                             ) : (
                                                 <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>

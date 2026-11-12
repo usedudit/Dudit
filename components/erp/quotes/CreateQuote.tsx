@@ -34,7 +34,7 @@ import {
 import { getQuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
-import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders";
+import { fetchPartnerSalesCatalogBucket } from "@/app/actions/erp/client-loaders";
 import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
@@ -152,29 +152,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     // Search States
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
-    const fetchCombinedBucket = useCallback(async () => {
-        const [products, services] = await Promise.all([
-            fetchPartnerProductsBucket(),
-            fetchPartnerServicesBucket()
-        ]);
-        const mappedServices = services.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            sku: 'SERVIÇO',
-            gtin: null,
-            price: s.price,
-            promotional_price: s.promotional_price,
-            category_id: s.category_id,
-            stock: 0,
-            allow_sell_without_stock: true,
-            image: null,
-            has_variants: false,
-            unit: null,
-            isService: true,
-        }));
-        return [...products, ...mappedServices];
-    }, []);
-    const productBucket = useProductBucket(fetchCombinedBucket, { pageSize: 10 });
+    const productBucket = useProductBucket(fetchPartnerSalesCatalogBucket, { pageSize: 10 });
 
     // Sheet States
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
