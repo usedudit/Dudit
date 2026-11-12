@@ -3568,6 +3568,24 @@ export async function searchProductByBarcodeAction(
     }
 }
 
-export { releaseReservedStockAction, getProductStockStatusAction } from "./stock-movements"
+// Wrapper functions to avoid "Only async functions are allowed to be exported in a 'use server' file" error
+// when re-exporting from another "use server" file
+
+import { getProductStockStatusAction as getProductStockStatusActionImpl } from "./stock-movements"
+import { releaseReservedStockAction as releaseReservedStockActionImpl } from "./stock-movements"
+
+export async function getProductStockStatusAction(productId: string, variantId?: string | null) {
+  return getProductStockStatusActionImpl(productId, variantId)
+}
+
+export async function releaseReservedStockAction(data: {
+  productId: string
+  variantId?: string | null
+  quantity?: number
+  reason: string
+  notes?: string
+}) {
+  return releaseReservedStockActionImpl(data)
+}
 
 

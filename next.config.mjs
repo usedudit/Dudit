@@ -24,7 +24,7 @@ const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   additionalPrecacheEntries: [{ url: "/~offline", revision }],
-  disable: Boolean(process.env.NODE_ENV === "development" || process.env.CI || process.env.BUILD_FOR_RENDER),
+  disable: Boolean(process.env.NODE_ENV === "development" || process.env.DISABLE_PWA === "true" || process.env.BUILD_FOR_RENDER),
   register: false,
   exclude: [
     /\.js$/,
@@ -192,16 +192,16 @@ const nextConfig = {
       ...(isDev
         ? []
         : [
-            {
-              source: '/_next/static/:path*',
-              headers: [
-                {
-                  key: 'Cache-Control',
-                  value: 'public, max-age=31536000, immutable',
-                },
-              ],
-            },
-          ]),
+          {
+            source: '/_next/static/:path*',
+            headers: [
+              {
+                key: 'Cache-Control',
+                value: 'public, max-age=31536000, immutable',
+              },
+            ],
+          },
+        ]),
       {
         source: '/_next/image(.*)',
         headers: [
