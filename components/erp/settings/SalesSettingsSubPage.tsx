@@ -170,233 +170,235 @@ export function SalesSettingsSubPage({
     }
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
-                    {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                            {/* Back button - desktop only */}
-                            <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
 
-                            {/* Title row */}
-                            <div className="hidden md:flex items-start justify-between">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        <span className="truncate">Configurações Gerais de Vendas</span>
-                                    </h1>
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Configurações Gerais de Vendas</span>
+                                        </h1>
 
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                        Defina regras de descontos, estoque, prazos e personalização de recibos.
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Defina regras de descontos, estoque, prazos e personalização de recibos.
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={handleBack} disabled={saving}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleSave} disabled={!anyHasChanges || saving} leftIcon={<SaveIcon size={18} />}>
+                                            {saving ? "Salvando..." : "Salvar"}
+                                        </Button>
                                     </div>
                                 </div>
 
-                                {/* Desktop action buttons */}
-                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <Button variant="outline" onClick={handleBack} disabled={saving}>
-                                        Cancelar
-                                    </Button>
-                                    <Button onClick={handleSave} disabled={!anyHasChanges || saving} leftIcon={<SaveIcon size={18} />}>
-                                        {saving ? "Salvando..." : "Salvar"}
-                                    </Button>
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="general">Geral</TabsTrigger>
+                                        <TabsTrigger value="receipts">
+                                            Recibos e Impressão
+                                        </TabsTrigger>
+                                    </TabsList>
                                 </div>
-                            </div>
-
-                            {/* Tabs */}
-                            <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                    <TabsTrigger value="general">Geral</TabsTrigger>
-                                    <TabsTrigger value="receipts">
-                                        Recibos e Impressão
-                                    </TabsTrigger>
-                                </TabsList>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Content Body */}
-                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        <AnimatePresence mode="wait">
-                            <TabsContent value="general" className="mt-0 focus-visible:outline-none">
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                    <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
-                                        {/* Left Column */}
-                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
-                                            {/* Descontos & Preços */}
-                                            <FormSection title="Descontos e Preços">
-                                                <div className="space-y-4">
-                                                    <div className="col-span-12 sm:col-span-6">
-                                                        <Input
-                                                            label="Desconto máximo permitido nas vendas (%)"
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            value={settings.maxDiscountPercent !== null ? String(settings.maxDiscountPercent) : "100"}
-                                                            onChange={(e) => {
-                                                                const val = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)))
-                                                                updateField("maxDiscountPercent", val)
-                                                            }}
-                                                            placeholder="Ex: 15"
-                                                            suffix={<span className="text-brand-inactive-text text-sm font-medium">%</span>}
-                                                        />
+                        {/* Content Body */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <AnimatePresence mode="wait">
+                                <TabsContent value="general" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                            {/* Left Column */}
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
+                                                {/* Descontos & Preços */}
+                                                <FormSection title="Descontos e Preços">
+                                                    <div className="space-y-4">
+                                                        <div className="col-span-12 sm:col-span-6">
+                                                            <Input
+                                                                label="Desconto máximo permitido nas vendas (%)"
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                value={settings.maxDiscountPercent !== null ? String(settings.maxDiscountPercent) : "100"}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)))
+                                                                    updateField("maxDiscountPercent", val)
+                                                                }}
+                                                                placeholder="Ex: 15"
+                                                                suffix={<span className="text-brand-inactive-text text-sm font-medium">%</span>}
+                                                            />
+                                                        </div>
+
+                                                        <div className="col-span-12 sm:col-span-6">
+                                                            <Input
+                                                                label="Margem padrão de lucro (%)"
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                value={settings.defaultMarginPercent !== null ? String(settings.defaultMarginPercent) : "30"}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)))
+                                                                    updateField("defaultMarginPercent", val)
+                                                                }}
+                                                                placeholder="Ex: 30"
+                                                                suffix={<span className="text-brand-inactive-text text-sm font-medium">%</span>}
+                                                            />
+                                                        </div>
+
+                                                        <div className="pt-2">
+                                                            <Checkbox
+                                                                label="Permitir alteração manual de preço unitário no PDV e Pedidos"
+                                                                checked={settings.allowCustomItemPrice}
+                                                                onCheckedChange={(v) => updateField("allowCustomItemPrice", Boolean(v))}
+                                                            />
+                                                        </div>
                                                     </div>
+                                                </FormSection>
 
-                                                    <div className="col-span-12 sm:col-span-6">
-                                                        <Input
-                                                            label="Margem padrão de lucro (%)"
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            value={settings.defaultMarginPercent !== null ? String(settings.defaultMarginPercent) : "30"}
-                                                            onChange={(e) => {
-                                                                const val = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)))
-                                                                updateField("defaultMarginPercent", val)
-                                                            }}
-                                                            placeholder="Ex: 30"
-                                                            suffix={<span className="text-brand-inactive-text text-sm font-medium">%</span>}
-                                                        />
-                                                    </div>
-
-                                                    <div className="pt-2">
+                                                {/* Controle de Estoque */}
+                                                <FormSection title="Controle de Estoque na Venda" hasSeparator>
+                                                    <div className="space-y-3">
                                                         <Checkbox
-                                                            label="Permitir alteração manual de preço unitário no PDV e Pedidos"
-                                                            checked={settings.allowCustomItemPrice}
-                                                            onCheckedChange={(v) => updateField("allowCustomItemPrice", Boolean(v))}
+                                                            label="Permitir venda com estoque zerado ou negativo por padrão"
+                                                            checked={settings.allowNegativeStock}
+                                                            onCheckedChange={(v) => updateField("allowNegativeStock", Boolean(v))}
                                                         />
                                                     </div>
-                                                </div>
-                                            </FormSection>
+                                                </FormSection>
 
-                                            {/* Controle de Estoque */}
-                                            <FormSection title="Controle de Estoque na Venda" hasSeparator>
-                                                <div className="space-y-3">
-                                                    <Checkbox
-                                                        label="Permitir venda com estoque zerado ou negativo por padrão"
-                                                        checked={settings.allowNegativeStock}
-                                                        onCheckedChange={(v) => updateField("allowNegativeStock", Boolean(v))}
-                                                    />
-                                                </div>
-                                            </FormSection>
+                                                {/* Operação de PDV e Orçamentos */}
+                                                <FormSection title="Operação de Vendas e Orçamentos" hasSeparator>
+                                                    <div className="space-y-6">
+                                                        <div>
+                                                            <Checkbox
+                                                                label="Obrigar seleção de vendedor ao registrar pedidos e vendas"
+                                                                checked={settings.requireSeller}
+                                                                onCheckedChange={(v) => updateField("requireSeller", Boolean(v))}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </FormSection>
+                                            </div>
 
-                                            {/* Operação de PDV e Orçamentos */}
-                                            <FormSection title="Operação de Vendas e Orçamentos" hasSeparator>
-                                                <div className="space-y-6">
+                                            {/* Right Column / Sidebar */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                <SidebarCard hasTopStrip hasSeparator title="Cancelamento Automático e Prazos">
+                                                    <div className="space-y-4">
+                                                        <FormDropdown
+                                                            label="Expiração de Pedidos Manuais / Balcão"
+                                                            value={String(settings.autoCancelManualOrdersHours ?? 0)}
+                                                            setValue={(v) => updateField("autoCancelManualOrdersHours", Number(v))}
+                                                            options={MANUAL_ORDER_EXPIRATION_OPTIONS}
+                                                        />
+                                                        <FormDropdown
+                                                            label="Validade padrão de orçamentos"
+                                                            value={String(settings.quoteValidityDays ?? 15)}
+                                                            setValue={(v) => updateField("quoteValidityDays", Number(v))}
+                                                            options={QUOTE_VALIDITY_OPTIONS}
+                                                        />
+                                                        <div className="flex items-center justify-between">
+                                                            <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                Cancelar pedidos com sinal expirado
+                                                            </p>
+                                                            <Checkbox
+                                                                checked={settings.cancelExpiredDepositOrders ?? false}
+                                                                onChange={(checked: boolean) => updateField("cancelExpiredDepositOrders", Boolean(checked))}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </TabsContent>
+
+                                <TabsContent value="receipts" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                            {/* Left Column - Formulário */}
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
+                                                {/* Mensagem do Recibo */}
+                                                <FormSection title="Mensagem do Recibo">
                                                     <div>
-                                                        <Checkbox
-                                                            label="Obrigar seleção de vendedor ao registrar pedidos e vendas"
-                                                            checked={settings.requireSeller}
-                                                            onCheckedChange={(v) => updateField("requireSeller", Boolean(v))}
+                                                        <FormTextarea
+                                                            name="receiptMessage"
+                                                            label="Mensagem personalizada de rodapé"
+                                                            value={receiptSettings.receiptMessage || ""}
+                                                            onChange={(e) => updateReceiptField("receiptMessage", e.target.value)}
+                                                            rows={3}
+                                                            placeholder="Ex.: Obrigado pela preferência! Siga nosso Instagram @sualoja"
+                                                            maxLength={1000}
+                                                            showCharacterCount
                                                         />
                                                     </div>
-                                                </div>
-                                            </FormSection>
-                                        </div>
+                                                </FormSection>
 
-                                        {/* Right Column / Sidebar */}
-                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                            <SidebarCard hasTopStrip hasSeparator title="Cancelamento Automático e Prazos">
-                                                <div className="space-y-4">
-                                                    <FormDropdown
-                                                        label="Expiração de Pedidos Manuais / Balcão"
-                                                        value={String(settings.autoCancelManualOrdersHours ?? 0)}
-                                                        setValue={(v) => updateField("autoCancelManualOrdersHours", Number(v))}
-                                                        options={MANUAL_ORDER_EXPIRATION_OPTIONS}
-                                                    />
-                                                    <FormDropdown
-                                                        label="Validade padrão de orçamentos"
-                                                        value={String(settings.quoteValidityDays ?? 15)}
-                                                        setValue={(v) => updateField("quoteValidityDays", Number(v))}
-                                                        options={QUOTE_VALIDITY_OPTIONS}
-                                                    />
-                                                    <div className="flex items-center justify-between">
-                                                        <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                            Cancelar pedidos com sinal expirado
-                                                        </p>
+                                                {/* Políticas e Termos */}
+                                                <FormSection title="Políticas e Termos no Recibo" hasSeparator>
+                                                    <div className="space-y-4">
                                                         <Checkbox
-                                                            checked={settings.cancelExpiredDepositOrders ?? false}
-                                                            onChange={(checked: boolean) => updateField("cancelExpiredDepositOrders", Boolean(checked))}
+                                                            label="Exibir resumo da política de trocas e garantia no recibo"
+                                                            checked={receiptSettings.receiptShowPolicyBlock}
+                                                            onCheckedChange={(v) => updateReceiptField("receiptShowPolicyBlock", Boolean(v))}
+                                                        />
+                                                        <Checkbox
+                                                            label="Incluir campo de assinatura e termo de recebimento do cliente"
+                                                            checked={receiptSettings.receiptShowAcknowledgment}
+                                                            onCheckedChange={(v) => updateReceiptField("receiptShowAcknowledgment", Boolean(v))}
                                                         />
                                                     </div>
-                                                </div>
-                                            </SidebarCard>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </TabsContent>
+                                                </FormSection>
+                                            </div>
 
-                            <TabsContent value="receipts" className="mt-0 focus-visible:outline-none">
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                    <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
-                                        {/* Left Column - Formulário */}
-                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
-                                            {/* Mensagem do Recibo */}
-                                            <FormSection title="Mensagem do Recibo">
-                                                <div>
-                                                    <FormTextarea
-                                                        name="receiptMessage"
-                                                        label="Mensagem personalizada de rodapé"
-                                                        value={receiptSettings.receiptMessage || ""}
-                                                        onChange={(e) => updateReceiptField("receiptMessage", e.target.value)}
-                                                        rows={3}
-                                                        placeholder="Ex.: Obrigado pela preferência! Siga nosso Instagram @sualoja"
-                                                        maxLength={1000}
-                                                        showCharacterCount
-                                                    />
-                                                </div>
-                                            </FormSection>
-
-                                            {/* Políticas e Termos */}
-                                            <FormSection title="Políticas e Termos no Recibo" hasSeparator>
-                                                <div className="space-y-4">
-                                                    <Checkbox
-                                                        label="Exibir resumo da política de trocas e garantia no recibo"
-                                                        checked={receiptSettings.receiptShowPolicyBlock}
-                                                        onCheckedChange={(v) => updateReceiptField("receiptShowPolicyBlock", Boolean(v))}
-                                                    />
-                                                    <Checkbox
-                                                        label="Incluir campo de assinatura e termo de recebimento do cliente"
-                                                        checked={receiptSettings.receiptShowAcknowledgment}
-                                                        onCheckedChange={(v) => updateReceiptField("receiptShowAcknowledgment", Boolean(v))}
-                                                    />
-                                                </div>
-                                            </FormSection>
+                                            {/* Right Column - Sidebar */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                <SidebarCard hasTopStrip hasSeparator title="Informações no Cabeçalho">
+                                                    <div className="space-y-4">
+                                                        <Checkbox
+                                                            label="Exibir telefone da loja no recibo"
+                                                            checked={receiptSettings.showStorePhone}
+                                                            onCheckedChange={(v) => updateReceiptField("showStorePhone", Boolean(v))}
+                                                        />
+                                                        <Checkbox
+                                                            label="Exibir endereço completo da loja"
+                                                            checked={receiptSettings.showStoreAddress}
+                                                            onCheckedChange={(v) => updateReceiptField("showStoreAddress", Boolean(v))}
+                                                        />
+                                                        <Checkbox
+                                                            label="Exibir nome do vendedor que realizou a venda"
+                                                            checked={receiptSettings.showSellerName}
+                                                            onCheckedChange={(v) => updateReceiptField("showSellerName", Boolean(v))}
+                                                        />
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
                                         </div>
-
-                                        {/* Right Column - Sidebar */}
-                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                            <SidebarCard hasTopStrip hasSeparator title="Informações no Cabeçalho">
-                                                <div className="space-y-4">
-                                                    <Checkbox
-                                                        label="Exibir telefone da loja no recibo"
-                                                        checked={receiptSettings.showStorePhone}
-                                                        onCheckedChange={(v) => updateReceiptField("showStorePhone", Boolean(v))}
-                                                    />
-                                                    <Checkbox
-                                                        label="Exibir endereço completo da loja"
-                                                        checked={receiptSettings.showStoreAddress}
-                                                        onCheckedChange={(v) => updateReceiptField("showStoreAddress", Boolean(v))}
-                                                    />
-                                                    <Checkbox
-                                                        label="Exibir nome do vendedor que realizou a venda"
-                                                        checked={receiptSettings.showSellerName}
-                                                        onCheckedChange={(v) => updateReceiptField("showSellerName", Boolean(v))}
-                                                    />
-                                                </div>
-                                            </SidebarCard>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </TabsContent>
-                        </AnimatePresence>
+                                    </motion.div>
+                                </TabsContent>
+                            </AnimatePresence>
+                        </div>
                     </div>
-                </div>
-            </Tabs>
+                </Tabs>
+            </div>
 
             {/* Mobile Bottom Action Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex gap-3 z-20">

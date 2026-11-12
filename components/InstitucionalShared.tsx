@@ -301,6 +301,8 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                             <span>•</span>
                             <Link href="/institucional/privacidade" prefetch={false} className="hover:text-gray-300 transition-colors">Privacidade</Link>
                             <span>•</span>
+                            <Link href="/institucional/dpa" prefetch={false} className="hover:text-gray-300 transition-colors">DPA (ERP)</Link>
+                            <span>•</span>
                             <Link href="/mapa-do-site" prefetch={false} className="hover:text-brand-green transition-colors">Mapa do Site</Link>
                         </div>
                     </div>

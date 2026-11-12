@@ -260,6 +260,14 @@ export async function resolveCheckoutCartLines(
           service_id: null,
           recurring_plan_id: null,
           unit_cost: Number(product.cost_price || 0),
+          // Preço nominal (catálogo) para o breakdown de descontos/DRE.
+          original_price: (variantId ? baseUnitPrice : Number(product.price) || 0) + addonsUnitPrice,
+          discount_amount: Math.max(
+            0,
+            Math.round(
+              (((variantId ? baseUnitPrice : Number(product.price) || 0) + addonsUnitPrice) - unitPrice) * qty * 100,
+            ) / 100,
+          ),
         },
         fulfillmentLine,
         requiresStock: true,
@@ -370,6 +378,12 @@ export async function resolveCheckoutCartLines(
           fulfillment_mode: fulfillmentMode,
           recurring_plan_id: null,
           unit_cost: Number(service.cost_price || 0),
+          // Em entrada (depósito) o valor cobrado não é desconto: não gravar
+          // nominal para não inflar receita/dedução no DRE.
+          original_price: payDepositOnly ? null : basePrice,
+          discount_amount: payDepositOnly
+            ? 0
+            : Math.max(0, Math.round((basePrice - unitPrice) * qty * 100) / 100),
         },
         fulfillmentLine,
         requiresStock: false,
@@ -478,6 +492,8 @@ export async function resolveCheckoutCartLines(
           fulfillment_mode: fulfillmentMode,
           service_id: null,
           unit_cost: subscriptionUnitCost,
+          original_price: null,
+          discount_amount: 0,
         },
         fulfillmentLine,
         requiresStock: false,

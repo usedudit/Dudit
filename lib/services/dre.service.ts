@@ -189,7 +189,10 @@ async function computeDrePeriod(
       id, total_amount, discount_amount, final_amount, paid_amount,
       payment_status, status, origin_type, created_at,
       payment_method_fee_amount, payment_method_fixed_fee_amount,
-      sale_items (id, product_id, variant_id, product_name, quantity, unit_price, unit_cost, total_price, subtotal)
+      payment_method_interest_amount, payment_method_discount_amount,
+      sale_items (id, product_id, variant_id, product_name, quantity,
+        unit_price, unit_cost, total_price, subtotal,
+        original_price, is_gift, discount_amount)
     `)
     .eq("partner_id", partnerId)
     .neq("status", "cancelled")
@@ -210,9 +213,15 @@ async function computeDrePeriod(
   let ordersQuery = supabase
     .from("orders")
     .select(`
-      id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at, paid_at, order_source, source_service_order_id,
-       payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_interest_amount, payment_method_discount_amount,
-      order_items (id, product_id, variant_id, product_name, quantity, product_price, unit_cost, subtotal)
+      id, total_amount, discount_amount, discount_value, discount_type,
+      manual_discount_amount, item_discount_amount, campaign_discount_amount,
+      paid_amount, delivery_fee, situation, created_at, paid_at, order_source,
+      source_service_order_id, delivery_payer, subtotal_original,
+       payment_method_fee_amount, payment_method_fixed_fee_amount,
+       payment_method_interest_amount, payment_method_discount_amount,
+       payment_method_extra_amount,
+      order_items (id, product_id, variant_id, product_name, quantity,
+        product_price, unit_cost, subtotal, original_price, is_gift, discount_amount)
     `)
     .eq("partner_id", partnerId)
     .limit(10000)
@@ -351,24 +360,59 @@ async function computeDrePeriod(
   let posDiscounts = 0
   let posFees = 0
 
-  // 1.1 PDV: Receita Bruta = Subtotal nominal (antes de descontos)
+  // 1.1 PDV: Receita Bruta = Subtotal nominal (original_price x qty, excluindo brindes)
+  // Descontos = item_discount_amount (preço promocional/campanha) + manual + cupom + pm discount
+  // CMV = unit_cost x qty (inclui brindes, receita 0)
   for (const s of salesList) {
     // Vendas geradas por baixa de Ordem de Serviço são contabilizadas na OS,
     // não aqui (evita dupla contagem de receita).
     if (isServiceOrderOriginSale(s as any)) continue
-    const discount = Number(s.discount_amount || 0)
-    const nominalGross = Number(s.total_amount || 0) > 0 ? Number(s.total_amount) : Number(s.final_amount || 0) + discount
-    productsRevenue += nominalGross
-    posDiscounts += discount
-    // Taxas de cartão/gateway do PDV (juros de parcelamento não são taxa).
+
+    // Receita bruta nominal por item
+    let saleNominalGross = 0
+    for (const item of (s.sale_items as any[]) || []) {
+      const qty = Number(item.quantity || 0)
+      const chargedPrice = Number(item.unit_price || 0)
+      const nominalPrice = item.original_price != null
+        ? Number(item.original_price)
+        : chargedPrice
+      if (item.is_gift) continue // brinde: receita 0
+      saleNominalGross += nominalPrice * qty
+    }
+    productsRevenue += saleNominalGross
+
+    // Descontos: item_discount (fallback per-item) + manual + coupon + pm discount
+    // PDV não tem coluna item_discount_amount no sale; usamos soma per-item
+    const derivedItemDiscount = (s.sale_items as any[])?.reduce((sum: number, it: any) => {
+      if (it.is_gift) return sum
+      const stored = Number(it.discount_amount || 0)
+      const charged = Number(it.unit_price || 0) * Number(it.quantity || 1)
+      const nominal = (it.original_price != null ? Number(it.original_price) : Number(it.unit_price || 0)) * Number(it.quantity || 1)
+      return sum + (stored > 0 ? stored : Math.max(0, nominal - charged))
+    }, 0) || 0
+
+    const couponDiscount = Number(s.discount_amount || 0) // cupom no PDV
+    const manualDiscount = Math.max(0, Number(s.payment_method_discount_amount || 0)) // PM discount como manual no POS
+    const pmDiscount = Number(s.payment_method_discount_amount || 0)
+
+    // No POS, discount_amount = cupom; payment_method_discount_amount = desconto do meio de pagamento
+    posDiscounts += derivedItemDiscount + couponDiscount + pmDiscount
+
+    // Taxas de cartão/gateway do PDV
     posFees += Number(s.payment_method_fee_amount || 0) + Number(s.payment_method_fixed_fee_amount || 0)
     posSaleCount++
   }
 
-  // 1.2 Pedidos Online: Receita Bruta = Subtotal dos itens (antes de cupom/desconto)
+  // 1.2 Pedidos Online: Receita Bruta nominal (original_price x qty, excluindo brindes)
+  // Descontos = item_discount_amount + manual_discount_amount + discount_amount (cupom) + payment_method_discount_amount
+  // CMV = unit_cost x qty (inclui brindes, receita 0) — calculado no mesmo loop
   let orderCount = 0
   let orderDiscounts = 0
   let orderFees = 0
+  let orderCogsProducts = 0
+  let orderCogsServices = 0
+  let orderCogsSupplies = 0
+  let orderZeroCostItems = 0
 
   // Pedidos vinculados a agendamentos são contabilizados na tabela appointments.
   const appointmentLinkedOrderIds = new Set(
@@ -387,14 +431,23 @@ async function computeDrePeriod(
       : isOrderRevenueRecognized(situation)
     if (!countsInRegime) continue
 
-    const couponDiscount = Number(o.discount_amount || 0)
-    const pmDiscount = Number(o.payment_method_discount_amount || 0)
-    const totalOrderDiscount = couponDiscount + pmDiscount
+    // Descontos: colunas persistidas (imutáveis)
+    const itemDiscount = Math.max(0, Number(o.item_discount_amount || 0))
+    const manualDiscount = Math.max(0, Number(o.manual_discount_amount || 0))
+    const couponDiscount = Math.max(0, Number(o.discount_amount || 0))
+    const pmDiscount = Math.max(0, Number(o.payment_method_discount_amount || 0))
+    const totalOrderDiscount = itemDiscount + manualDiscount + couponDiscount + pmDiscount
 
-    let itemsGrossSum = 0
+    // Receita bruta nominal por item
+    let itemsNominalGross = 0
     for (const item of (o.order_items as any[]) || []) {
-      const itemSubtotal = Number(item.subtotal || 0)
-      itemsGrossSum += itemSubtotal > 0 ? itemSubtotal : Number(item.quantity || 0) * Number(item.product_price || 0)
+      const qty = Number(item.quantity || 0)
+      const chargedPrice = Number(item.product_price || 0)
+      const nominalPrice = item.original_price != null && Number.isFinite(Number(item.original_price))
+        ? Number(item.original_price)
+        : chargedPrice
+      if (item.is_gift) continue // brinde: receita 0
+      itemsNominalGross += nominalPrice * qty
     }
 
     const revenueBucket = getOrderRevenueBucket((o as any).order_source)
@@ -403,20 +456,36 @@ async function computeDrePeriod(
       else productsRevenue += value
     }
 
-    if (itemsGrossSum > 0) {
-      addToRevenue(itemsGrossSum)
+    if (itemsNominalGross > 0) {
+      addToRevenue(itemsNominalGross)
     } else {
-      // Fallback: total_amount + descontos - taxa de entrega
+      // Fallback conservador: total_amount + descontos - delivery
       const deliveryFee = Number(o.delivery_fee || 0)
       const reconstructedGross = Math.max(0, Number(o.total_amount || 0) + totalOrderDiscount - deliveryFee)
       addToRevenue(reconstructedGross)
     }
 
     orderDiscounts += totalOrderDiscount
-    // Taxas de cartão/gateway são despesa financeira do lojista. Juros de
-    // parcelamento cobrados do cliente NÃO são taxa (são receita), por isso
-    // não entram nas deduções.
+
+    // Taxas de cartão/gateway (juros de parcelamento cobrados do cliente NÃO são taxa)
     orderFees += Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
+
+    // CMV dos itens deste pedido (mesmo regime/reconhecimento)
+    for (const item of (o.order_items as any[]) || []) {
+      const qty = Number(item.quantity || 0)
+      const cost = Number(item.unit_cost || 0)
+      if (!item.is_gift && cost <= 0) {
+        orderZeroCostItems++
+      }
+      // Brindes entram no CMV (receita 0, custo real)
+      const isServiceLine = item.service_id || item.line_type === "service_booking"
+      if (isServiceLine) {
+        orderCogsServices += qty * cost
+      } else {
+        orderCogsProducts += qty * cost
+      }
+    }
+
     orderCount++
   }
 
@@ -551,29 +620,25 @@ async function computeDrePeriod(
   let cogsSupplies = 0
   let zeroCostItemsCount = 0
 
-  // 3.1 CMV de itens vendidos no PDV
+  // 3.1 CMV de itens vendidos no PDV (exclui vendas originadas de OS)
+  // Não conta brindes em zeroCostItemsCount (brinde tem receita 0, custo real)
   for (const s of salesList) {
+    if (isServiceOrderOriginSale(s as any)) continue
     for (const item of (s.sale_items as any[]) || []) {
       const qty = Number(item.quantity || 0)
       const cost = Number(item.unit_cost || 0)
-      if (cost <= 0) {
+      if (!item.is_gift && cost <= 0) {
         zeroCostItemsCount++
       }
       cogsProducts += qty * cost
     }
   }
 
-  // 3.2 CMV de itens vendidos online
-  for (const o of ordersList) {
-    for (const item of (o.order_items as any[]) || []) {
-      const qty = Number(item.quantity || 0)
-      const cost = Number(item.unit_cost || 0)
-      if (cost <= 0) {
-        zeroCostItemsCount++
-      }
-      cogsProducts += qty * cost
-    }
-  }
+  // 3.2 CMV de itens vendidos online — já calculado no loop de receita (mesmo regime/reconhecimento)
+  cogsProducts += orderCogsProducts
+  cogsServices += orderCogsServices
+  cogsSupplies += orderCogsSupplies
+  zeroCostItemsCount += orderZeroCostItems
 
   // 3.3 Transações financeiras manuais de Custo Direto / CMV / Peças
   for (const tx of transactionsList) {

@@ -1,8 +1,12 @@
+"use client"
+
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Dropdown, DropdownItem, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
-import { SearchIcon, FilterIcon, PlusIcon, SparklesIcon, Settings2Icon, CalendarIcon } from "@/lib/icons"
+import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
+import { SearchIcon, FilterIcon, PlusIcon, SparklesIcon, Settings2Icon, CalendarIcon, MotorbikeIcon, TruckIcon, BlockedIcon } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter } from "@/lib/utils/filter-date-period"
 
@@ -30,8 +34,7 @@ function BadgeList({ filters, setFilters }: BadgeListProps) {
                     value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
                     icon={<CalendarIcon size={12} />}
                     onRemove={() =>
-                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
-                    }
+                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))}
                 />
             )}
         </AnimatePresence>
@@ -50,6 +53,15 @@ interface DeliveryPageControlsProps {
     filters: { status: string[]; datePeriod: DatePeriodFilterValue }
     setFilters: React.Dispatch<React.SetStateAction<{ status: string[]; datePeriod: DatePeriodFilterValue }>>
     hasActiveFilters: boolean
+    mode: "deliveries" | "carriers" | "failed"
+    setMode: (mode: "deliveries" | "carriers" | "failed") => void
+    tabCounts?: { Delivery: number; Transportadora: number; "Canceladas / Falhas": number }
+}
+
+const TAB_CONFIG: Record<DeliveryPageControlsProps["mode"], { label: string; icon: typeof MotorbikeIcon; variant: "gray" | "green" | "red" | "blue" }> = {
+    deliveries: { label: "Delivery", icon: MotorbikeIcon, variant: "blue" },
+    carriers: { label: "Transportadora", icon: TruckIcon, variant: "green" },
+    failed: { label: "Canceladas / Falhas", icon: BlockedIcon, variant: "red" },
 }
 
 export default function DeliveryPageControls({
@@ -64,6 +76,9 @@ export default function DeliveryPageControls({
     filters,
     setFilters,
     hasActiveFilters,
+    mode,
+    setMode,
+    tabCounts,
 }: DeliveryPageControlsProps) {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -85,6 +100,34 @@ export default function DeliveryPageControls({
 
     return (
         <>
+            {/* --- TABS --- */}
+            <div className="mb-6 px-4 md:px-8">
+                <Tabs
+                    value={mode}
+                    onValueChange={(val) => setMode(val as "deliveries" | "carriers" | "failed")}
+                >
+                    <TabsList className="px-0">
+                        {(
+                            ["deliveries", "carriers", "failed"] as const
+                        ).map((tab) => {
+                            const config = TAB_CONFIG[tab]
+                            const Icon = config.icon
+                            const countKey = tab === "deliveries" ? "Delivery" : tab === "carriers" ? "Transportadora" : "Canceladas / Falhas"
+                            return (
+                                <TabsTrigger
+                                    key={tab}
+                                    value={tab}
+                                    icon={Icon}
+                                    badge={tabCounts && <TabCountBadge count={tabCounts[countKey as keyof typeof tabCounts]} variant={config.variant} />}
+                                >
+                                    {config.label}
+                                </TabsTrigger>
+                            )
+                        })}
+                    </TabsList>
+                </Tabs>
+            </div>
+
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
                 {/* MOBILE CONTROLS */}

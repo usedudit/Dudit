@@ -15,6 +15,7 @@ import { FileTextIcon } from "@/lib/icons"
 const DOCUMENT_LABELS: Record<string, string> = {
   terms: "Termos de Uso",
   privacy: "Política de Privacidade",
+  dpa: "Acordo de Tratamento de Dados (DPA)",
 }
 
 /**

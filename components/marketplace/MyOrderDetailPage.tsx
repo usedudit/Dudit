@@ -6,7 +6,7 @@ import {
     WhatsappIcon, TruckIcon, ReturnIcon, RepeatIcon
 } from '@/lib/icons';
 import { motion } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal, FormTextarea } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -523,6 +523,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnConditions, setReturnConditions] = useState<Record<string, "sealed" | "opened" | "damaged">>({});
     const [returnServiceItems, setReturnServiceItems] = useState<Record<string, boolean>>({});
     const [returnEvidence, setReturnEvidence] = useState<(string | File)[]>([]);
+    const [returnModalTab, setReturnModalTab] = useState<"items" | "evidence">("items");
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [sellerReturnCapabilities, setSellerReturnCapabilities] = useState<{
@@ -2321,7 +2322,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <Button
                                                             variant="outline"
                                                             className="w-full h-12 font-bold"
-                                                            onClick={() => setIsReturnModalOpen(true)}
+                                                            onClick={() => { setReturnModalTab("items"); setIsReturnModalOpen(true); }}
                                                         >
                                                             {returnButtonLabel}
                                                         </Button>
@@ -2419,7 +2420,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 <Button
                                                     variant="outline"
                                                     className="w-full h-12 font-bold"
-                                                    onClick={() => setIsReturnModalOpen(true)}
+                                                    onClick={() => { setReturnModalTab("items"); setIsReturnModalOpen(true); }}
                                                 >
                                                     {returnButtonLabel}
                                                 </Button>
@@ -2673,172 +2674,171 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </div>
                     }
                 >
-                    <div className="space-y-6">
-                        {/* Produtos */}
-                        {order.order_items?.filter((item: any) => !item.service_id && item.line_type !== "service_booking").length > 0 && (
-                            <div className="space-y-3">
-                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
-                                {order.order_items
-                                    ?.filter((item: any) => !item.service_id && item.line_type !== "service_booking")
-                                    .map((item: any) => {
-                                        const itemImage = getPrimaryProductDisplayImage({
-                                            images: item.products?.images || null,
-                                            video_thumbnail: item.products?.video_thumbnail || null,
-                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                        });
-                                        return (
-                                            <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3">
-                                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                    <Checkbox
-                                                        checked={Number(returnItems[item.id] || 0) > 0}
-                                                        disabled={remainingQuantities[item.id] <= 0}
-                                                        onChange={(checked) => {
-                                                            setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
-                                                            if (checked) {
-                                                                setReturnConditions(prev => ({ ...prev, [item.id]: "opened" }));
-                                                            }
-                                                        }}
-                                                    />
-                                                    <img
-                                                        src={itemImage}
-                                                        alt={item.products?.name || item.product_name}
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                        className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
-                                                    />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                            {item.products?.name || item.product_name}
-                                                            {remainingQuantities[item.id] <= 0 && (
-                                                                <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
-                                                            )}
-                                                        </p>
-                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
+                    {sellerReturnCapabilities.hasReturnsModule ? (
+                        <Tabs defaultValue="items" value={returnModalTab} onValueChange={setReturnModalTab}>
+                            <TabsList className="border-b border-brand-border dark:border-dark-border">
+                                <TabsTrigger value="items">Motivo e Itens</TabsTrigger>
+                                <TabsTrigger value="evidence">Evidências</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="items" className="space-y-6 pt-4">
+                                {/* Produtos */}
+                                {order.order_items?.filter((item: any) => !item.service_id && item.line_type !== "service_booking").length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
+                                        {order.order_items
+                                            ?.filter((item: any) => !item.service_id && item.line_type !== "service_booking")
+                                            .map((item: any) => {
+                                                const itemImage = getPrimaryProductDisplayImage({
+                                                    images: item.products?.images || null,
+                                                    video_thumbnail: item.products?.video_thumbnail || null,
+                                                    fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                                });
+                                                return (
+                                                    <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3">
+                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                            <Checkbox
+                                                                checked={Number(returnItems[item.id] || 0) > 0}
+                                                                disabled={remainingQuantities[item.id] <= 0}
+                                                                onChange={(checked) => {
+                                                                    setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
+                                                                    if (checked) {
+                                                                        setReturnConditions(prev => ({ ...prev, [item.id]: "opened" }));
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <img
+                                                                src={itemImage}
+                                                                alt={item.products?.name || item.product_name}
+                                                                loading="lazy"
+                                                                decoding="async"
+                                                                className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                            />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                    {item.products?.name || item.product_name}
+                                                                    {remainingQuantities[item.id] <= 0 && (
+                                                                        <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
+                                                                    )}
+                                                                </p>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
+                                                            <div className="flex flex-col gap-1 w-24">
+                                                                <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
+                                                                <QuantitySelector
+                                                                    value={returnItems[item.id] || 1}
+                                                                    onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
+                                                                    min={1}
+                                                                    max={remainingQuantities[item.id] || 1}
+                                                                    disabled={!returnItems[item.id] || remainingQuantities[item.id] <= 0}
+                                                                    size="sm"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1 w-32">
+                                                                <FormDropdown
+                                                                    label="Condição"
+                                                                    value={returnConditions[item.id] || "opened"}
+                                                                    setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
+                                                                    disabled={!returnItems[item.id]}
+                                                                    options={[
+                                                                        { value: "opened", label: "Aberto" },
+                                                                        { value: "sealed", label: "Lacrado" },
+                                                                        { value: "damaged", label: "Danificado" },
+                                                                    ]}
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
-                                                    <div className="flex flex-col gap-1 w-24">
-                                                        <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
-                                                        <QuantitySelector
-                                                            value={returnItems[item.id] || 1}
-                                                            onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
-                                                            min={1}
-                                                            max={remainingQuantities[item.id] || 1}
-                                                            disabled={!returnItems[item.id] || remainingQuantities[item.id] <= 0}
-                                                            size="sm"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1 w-32">
-                                                        <FormDropdown
-                                                            label="Condição"
-                                                            value={returnConditions[item.id] || "opened"}
-                                                            setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
-                                                            disabled={!returnItems[item.id]}
-                                                            options={[
-                                                                { value: "opened", label: "Aberto" },
-                                                                { value: "sealed", label: "Lacrado" },
-                                                                { value: "damaged", label: "Danificado" },
-                                                            ]}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                            </div>
-                        )}
+                                                )
+                                            })}
+                                    </div>
+                                )}
 
-                        {/* Servicos */}
-                        {order.order_items?.filter((item: any) => item.service_id || item.line_type === "service_booking").length > 0 && (
-                            <div className="space-y-3">
-                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Serviços</h4>
-                                {order.order_items
-                                    ?.filter((item: any) => item.service_id || item.line_type === "service_booking")
-                                    .map((item: any) => {
-                                        const isCancelled = order.situation === "cancelled";
-                                        const serviceImage = item.services?.images?.[0] || item.services?.video_thumbnail || null;
-                                        return (
-                                            <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                                <Checkbox
-                                                    checked={!!returnServiceItems[item.id]}
-                                                    onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
-                                                    disabled={isCancelled || returnResolution === "exchange"}
-                                                />
-                                                {serviceImage ? (
-                                                    <img
-                                                        src={getR2ImageUrl(serviceImage)}
-                                                        alt={item.services?.name || item.product_name}
-                                                        className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
-                                                    />
-                                                ) : (
-                                                    <div className="h-12 w-12 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                                                        <svg className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                    </div>
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
-                                                        {isCancelled && (
-                                                            <Badge variant="red">Cancelado</Badge>
+                                {/* Servicos */}
+                                {order.order_items?.filter((item: any) => item.service_id || item.line_type === "service_booking").length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Serviços</h4>
+                                        {order.order_items
+                                            ?.filter((item: any) => item.service_id || item.line_type === "service_booking")
+                                            .map((item: any) => {
+                                                const isCancelled = order.situation === "cancelled";
+                                                const serviceImage = item.services?.images?.[0] || item.services?.video_thumbnail || null;
+                                                return (
+                                                    <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                        <Checkbox
+                                                            checked={!!returnServiceItems[item.id]}
+                                                            onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
+                                                            disabled={isCancelled || returnResolution === "exchange"}
+                                                        />
+                                                        {serviceImage ? (
+                                                            <img
+                                                                src={getR2ImageUrl(serviceImage)}
+                                                                alt={item.services?.name || item.product_name}
+                                                                className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="h-12 w-12 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                                                                <svg className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                            </div>
                                                         )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
+                                                                {isCancelled && (
+                                                                    <Badge variant="red">Cancelado</Badge>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Serviço</p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Serviço</p>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                            </div>
-                        )}
+                                                )
+                                            })}
+                                    </div>
+                                )}
 
-                        {returnResolution === "exchange" && hasAnyService && (
-                            <InfoCard title="Atenção" message="Serviços não permitem troca. Selecione Reembolso ou Vale-compra." color="orange" />
-                        )}
+                                {returnResolution === "exchange" && hasAnyService && (
+                                    <InfoCard title="Atenção" message="Serviços não permitem troca. Selecione Reembolso ou Vale-compra." color="orange" />
+                                )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormDropdown
-                                label="Motivo"
-                                value={returnReason}
-                                setValue={setReturnReason}
-                                options={[
-                                    { value: "wrong_item", label: "Item errado" },
-                                    { value: "defective", label: "Item com defeito" },
-                                    { value: "damaged", label: "Item danificado" },
-                                    { value: "different_from_description", label: "Diferente da descrição" },
-                                    { value: "missing_parts", label: "Faltam partes" },
-                                    { value: "arrived_late", label: "Chegou atrasado" },
-                                    { value: "changed_mind", label: "Mudou de ideia" },
-                                    { value: "other", label: "Outro" },
-                                ]}
-                            />
-                            <FormDropdown
-                                label="Resolução"
-                                value={returnResolution}
-                                setValue={(val) => setReturnResolution(val as any)}
-                                options={resolutionOptions}
-                            />
-                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormDropdown
+                                        label="Motivo"
+                                        value={returnReason}
+                                        setValue={setReturnReason}
+                                        options={[
+                                            { value: "wrong_item", label: "Item errado" },
+                                            { value: "defective", label: "Item com defeito" },
+                                            { value: "damaged", label: "Item danificado" },
+                                            { value: "different_from_description", label: "Diferente da descrição" },
+                                            { value: "missing_parts", label: "Faltam partes" },
+                                            { value: "arrived_late", label: "Chegou atrasado" },
+                                            { value: "changed_mind", label: "Mudou de ideia" },
+                                            { value: "other", label: "Outro" },
+                                        ]}
+                                    />
+                                    <FormDropdown
+                                        label="Resolução"
+                                        value={returnResolution}
+                                        setValue={(val) => setReturnResolution(val as any)}
+                                        options={resolutionOptions}
+                                    />
+                                </div>
 
-                        <Input
-                            label="Mensagem opcional"
-                            value={returnMessage}
-                            onChange={(e) => setReturnMessage(e.target.value)}
-                            maxLength={500}
-                            multiline
-                            rows={4}
-                            showCharacterCount
-                        />
-
-                        {!sellerReturnCapabilities.hasReturnsModule ? (
-                            <InfoCard
-                                color="blue"
-                                title="Fotos e evidências"
-                                message="Esta loja realiza o atendimento de trocas e devoluções diretamente pelo WhatsApp. Se você possuir fotos ou vídeos do item, poderá enviá-los diretamente na conversa com o vendedor logo após abrir o aplicativo."
-                            />
-                        ) : (
-                            <div className="space-y-3">
+                                <FormTextarea
+                                    label="Mensagem opcional"
+                                    value={returnMessage}
+                                    onChange={(e) => setReturnMessage(e.target.value)}
+                                    maxLength={500}
+                                    rows={3}
+                                    showCharacterCount
+                                    placeholder="Descreva detalhes adicionais sobre o motivo da troca/devolução (opcional)"
+                                />
+                            </TabsContent>
+                            <TabsContent value="evidence" className="space-y-3 pt-4">
                                 <h4 className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Evidências</h4>
                                 <div className="max-w-full overflow-x-auto">
                                     <ProductImagesSection
@@ -2850,9 +2850,174 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     />
                                 </div>
                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{returnEvidence.length}/5 arquivos</p>
+                            </TabsContent>
+                        </Tabs>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Produtos */}
+                            {order.order_items?.filter((item: any) => !item.service_id && item.line_type !== "service_booking").length > 0 && (
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
+                                    {order.order_items
+                                        ?.filter((item: any) => !item.service_id && item.line_type !== "service_booking")
+                                        .map((item: any) => {
+                                            const itemImage = getPrimaryProductDisplayImage({
+                                                images: item.products?.images || null,
+                                                video_thumbnail: item.products?.video_thumbnail || null,
+                                                fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                            });
+                                            return (
+                                                <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3">
+                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <Checkbox
+                                                            checked={Number(returnItems[item.id] || 0) > 0}
+                                                            disabled={remainingQuantities[item.id] <= 0}
+                                                            onChange={(checked) => {
+                                                                setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
+                                                                if (checked) {
+                                                                    setReturnConditions(prev => ({ ...prev, [item.id]: "opened" }));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <img
+                                                            src={itemImage}
+                                                            alt={item.products?.name || item.product_name}
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                            className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                        />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                {item.products?.name || item.product_name}
+                                                                {remainingQuantities[item.id] <= 0 && (
+                                                                    <span className="ml-1.5 text-xs text-red-500 font-bold">(Já devolvido)</span>
+                                                                )}
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
+                                                        <div className="flex flex-col gap-1 w-24">
+                                                            <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
+                                                            <QuantitySelector
+                                                                value={returnItems[item.id] || 1}
+                                                                onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
+                                                                min={1}
+                                                                max={remainingQuantities[item.id] || 1}
+                                                                disabled={!returnItems[item.id] || remainingQuantities[item.id] <= 0}
+                                                                size="sm"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1 w-32">
+                                                            <FormDropdown
+                                                                label="Condição"
+                                                                value={returnConditions[item.id] || "opened"}
+                                                                setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
+                                                                disabled={!returnItems[item.id]}
+                                                                options={[
+                                                                    { value: "opened", label: "Aberto" },
+                                                                    { value: "sealed", label: "Lacrado" },
+                                                                    { value: "damaged", label: "Danificado" },
+                                                                ]}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                </div>
+                            )}
+
+                            {/* Servicos */}
+                            {order.order_items?.filter((item: any) => item.service_id || item.line_type === "service_booking").length > 0 && (
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Serviços</h4>
+                                    {order.order_items
+                                        ?.filter((item: any) => item.service_id || item.line_type === "service_booking")
+                                        .map((item: any) => {
+                                            const isCancelled = order.situation === "cancelled";
+                                            const serviceImage = item.services?.images?.[0] || item.services?.video_thumbnail || null;
+                                            return (
+                                                <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                    <Checkbox
+                                                        checked={!!returnServiceItems[item.id]}
+                                                        onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
+                                                        disabled={isCancelled || returnResolution === "exchange"}
+                                                    />
+                                                    {serviceImage ? (
+                                                        <img
+                                                            src={getR2ImageUrl(serviceImage)}
+                                                            alt={item.services?.name || item.product_name}
+                                                            className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="h-12 w-12 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                                                            <svg className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
+                                                            {isCancelled && (
+                                                                <Badge variant="red">Cancelado</Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Serviço</p>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                </div>
+                            )}
+
+                            {returnResolution === "exchange" && hasAnyService && (
+                                <InfoCard title="Atenção" message="Serviços não permitem troca. Selecione Reembolso ou Vale-compra." color="orange" />
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormDropdown
+                                    label="Motivo"
+                                    value={returnReason}
+                                    setValue={setReturnReason}
+                                    options={[
+                                        { value: "wrong_item", label: "Item errado" },
+                                        { value: "defective", label: "Item com defeito" },
+                                        { value: "damaged", label: "Item danificado" },
+                                        { value: "different_from_description", label: "Diferente da descrição" },
+                                        { value: "missing_parts", label: "Faltam partes" },
+                                        { value: "arrived_late", label: "Chegou atrasado" },
+                                        { value: "changed_mind", label: "Mudou de ideia" },
+                                        { value: "other", label: "Outro" },
+                                    ]}
+                                />
+                                <FormDropdown
+                                    label="Resolução"
+                                    value={returnResolution}
+                                    setValue={(val) => setReturnResolution(val as any)}
+                                    options={resolutionOptions}
+                                />
                             </div>
-                        )}
-                    </div>
+
+                            <FormTextarea
+                                label="Mensagem opcional"
+                                value={returnMessage}
+                                onChange={(e) => setReturnMessage(e.target.value)}
+                                maxLength={500}
+                                rows={3}
+                                showCharacterCount
+                                placeholder="Descreva detalhes adicionais sobre o motivo da troca/devolução (opcional)"
+                            />
+
+                            <InfoCard
+                                color="blue"
+                                title="Fotos e evidências"
+                                message="Esta loja realiza o atendimento de trocas e devoluções diretamente pelo WhatsApp. Se você possuir fotos ou vídeos do item, poderá enviá-los diretamente na conversa com o vendedor logo após abrir o aplicativo."
+                            />
+                        </div>
+                    )}
                 </DefaultModal>
 
                 {activeReturnRequest && (

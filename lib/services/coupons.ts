@@ -11,7 +11,13 @@ export type CouponValidationInput = {
   customerId?: string | null
   subtotal: number
   shippingCost?: number
-  items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
+  items?: Array<{
+    productId?: string | null
+    serviceId?: string | null
+    recurringPlanId?: string | null
+    price?: number | null
+    quantity?: number | null
+  }>
   manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
 }
 
@@ -169,7 +175,7 @@ export async function validateCouponRow(
   let eligibleSubtotal = 0
 
   if (items.length > 0) {
-    const productDetails = new Map<string, { category_id: string | null; isPromo: boolean }>()
+    const productDetails = new Map<string, { category_id: string | null }>()
     const productPrices = new Map<string, number>()
     if (productIds.length > 0) {
       const { data: products } = await supabase
@@ -177,14 +183,14 @@ export async function validateCouponRow(
         .select("id, category_id, price, promotional_price")
         .in("id", productIds)
       for (const p of products || []) {
-        const isPromo = p.promotional_price !== null && p.promotional_price > 0 && p.promotional_price < p.price
-        productDetails.set(p.id, { category_id: p.category_id || null, isPromo })
-        const bestP = isPromo ? p.promotional_price : p.price
+        productDetails.set(p.id, { category_id: p.category_id || null })
+        const bestP = p.promotional_price !== null && p.promotional_price > 0 && p.promotional_price < p.price
+          ? p.promotional_price
+          : p.price
         productPrices.set(p.id, Number(bestP) || 0)
       }
     }
 
-    const serviceDetails = new Map<string, { isPromo: boolean }>()
     const servicePrices = new Map<string, number>()
     if (serviceIds.length > 0) {
       const { data: services } = await supabase
@@ -192,60 +198,11 @@ export async function validateCouponRow(
         .select("id, price, promotional_price")
         .in("id", serviceIds)
       for (const s of services || []) {
-        const isPromo = s.promotional_price !== null && s.promotional_price > 0 && s.promotional_price < s.price
-        serviceDetails.set(s.id, { isPromo })
-        const bestS = isPromo ? s.promotional_price : s.price
+        const bestS = s.promotional_price !== null && s.promotional_price > 0 && s.promotional_price < s.price
+          ? s.promotional_price
+          : s.price
         servicePrices.set(s.id, Number(bestS) || 0)
       }
-    }
-
-    const { data: allActivePromos } = await supabase
-      .from("promotions")
-      .select(`
-        id,
-        allow_coupon_combination,
-        apply_scope
-      `)
-      .eq("partner_id", input.partnerId)
-      .eq("is_active", true)
-      .not("campaign_id", "is", null)
-
-    const promoIds = allActivePromos ? allActivePromos.map((p: any) => p.id) : []
-    const [promoProductsRes, promoServicesRes, promoCategoriesRes] = await Promise.all([
-      productIds.length > 0 && promoIds.length > 0
-        ? supabase.from("promotion_products").select("promotion_id, product_id").in("promotion_id", promoIds).in("product_id", productIds)
-        : Promise.resolve({ data: [] }),
-      serviceIds.length > 0 && promoIds.length > 0
-        ? supabase.from("promotion_services").select("promotion_id, service_id").in("promotion_id", promoIds).in("service_id", serviceIds)
-        : Promise.resolve({ data: [] }),
-      productIds.length > 0 && promoIds.length > 0
-        ? supabase.from("products").select("category_id").in("id", productIds).then(async ({ data: products }: any) => {
-            const catIds = Array.from(new Set((products || []).map((p: any) => p.category_id).filter(Boolean)))
-            if (catIds.length === 0) return { data: [] }
-            return supabase.from("promotion_categories").select("promotion_id, category_id").in("promotion_id", promoIds).in("category_id", catIds)
-          })
-        : Promise.resolve({ data: [] })
-    ])
-
-    const promoProductsData = promoProductsRes.data || []
-    const promoServicesData = promoServicesRes.data || []
-    const promoCategoriesData = promoCategoriesRes.data || []
-
-    const doesPromoApplyToItem = (promo: any, item: any): boolean => {
-      if (promo.apply_scope === "all" || promo.apply_scope === "entire_cart") {
-        return true
-      }
-      if ((promo.apply_scope === "specific_products" || promo.apply_scope === "products") && item.productId) {
-        return promoProductsData.some((pp: any) => pp.promotion_id === promo.id && pp.product_id === item.productId)
-      }
-      if ((promo.apply_scope === "specific_services" || promo.apply_scope === "services") && item.serviceId) {
-        return promoServicesData.some((ps: any) => ps.promotion_id === promo.id && ps.service_id === item.serviceId)
-      }
-      if ((promo.apply_scope === "specific_categories" || promo.apply_scope === "category") && item.productId) {
-        const catId = productDetails.get(item.productId)?.category_id
-        return Boolean(catId && promoCategoriesData.some((pc: any) => pc.promotion_id === promo.id && pc.category_id === catId))
-      }
-      return false
     }
 
     for (const item of items) {
@@ -270,59 +227,31 @@ export async function validateCouponRow(
         continue
       }
 
-      // Check combination
-      const isManualPromo = item.productId
-        ? (productDetails.get(item.productId)?.isPromo ?? false)
-        : item.serviceId
-        ? (serviceDetails.get(item.serviceId)?.isPromo ?? false)
-        : false
-
-      let isCampaignActive = false
-      let isNonCombinableCampaignActive = false
-
-      if (allActivePromos) {
-        for (const promo of allActivePromos) {
-          if (doesPromoApplyToItem(promo, item)) {
-            isCampaignActive = true
-            if (promo.allow_coupon_combination === false) {
-              isNonCombinableCampaignActive = true
-            }
-          }
-        }
-      }
-
-      let itemEligible = true
-      if (coupon.allow_combination === false) {
-        if (isManualPromo || isCampaignActive) {
-          itemEligible = false
-        }
-      } else {
-        if (isNonCombinableCampaignActive) {
-          itemEligible = false
-        }
-      }
-
-      const itemPrice = item.productId
+      eligibleCount++
+      const itemQty = Math.max(1, Number((item as any).quantity || 1))
+      const itemPrice = (item as any).price != null
+        ? Number((item as any).price || 0)
+        : item.productId
         ? (productPrices.get(item.productId) ?? 0)
         : item.serviceId
         ? (servicePrices.get(item.serviceId) ?? 0)
         : 0
-
-      if (itemEligible) {
-        eligibleCount++
-        eligibleSubtotal += itemPrice
-      } else {
-        partialApplicabilityWarning = true
-      }
+      eligibleSubtotal += itemPrice * itemQty
     }
 
     if (eligibleCount === 0) {
       return { valid: false, discountAmount: 0, errorMessage: "Nenhum item da sacola é elegível para este cupom." }
     }
+
+    if (eligibleCount < items.length) {
+      partialApplicabilityWarning = true
+    }
   }
 
   // Calculate estimated discount amount based on eligible subtotal
-  const finalSubtotal = items.length > 0 ? eligibleSubtotal : subtotal
+  const finalSubtotal = (coupon.apply_scope === "all" || items.length === 0)
+    ? subtotal
+    : (eligibleSubtotal > 0 ? eligibleSubtotal : subtotal)
 
   let discountAmount = 0
   if (coupon.discount_type === "percentage") {

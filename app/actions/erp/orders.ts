@@ -100,6 +100,8 @@ export type ERPItemPayload = {
   customName?: string;
   quantity: number;
   unitPrice: number;
+  /** Preço nominal (catálogo, antes de promoção/campanha). */
+  basePrice?: number | null;
   sortOrder: number;
   /** POS: user accepted the "no stock, continue anyway" prompt for this line. */
   allowSellWithoutStock?: boolean | null;
@@ -185,7 +187,10 @@ function isMissingOrdersPaymentMethodDeltaColumnsError(
       message.includes("payment_method_extra_amount") ||
       message.includes("payment_method_interest_amount") ||
       message.includes("payment_method_fee_amount") ||
-      message.includes("payment_method_fixed_fee_amount")) &&
+      message.includes("payment_method_fixed_fee_amount") ||
+      message.includes("item_discount_amount") ||
+      message.includes("campaign_discount_amount") ||
+      message.includes("manual_discount_amount")) &&
     message.includes("orders")
   );
 }
@@ -932,6 +937,10 @@ function sanitizeERPItems(items: ERPItemPayload[]) {
           : undefined,
       quantity: Number(item.quantity || 0),
       unitPrice: Number(item.unitPrice || 0),
+      basePrice:
+        item.basePrice != null && Number.isFinite(Number(item.basePrice))
+          ? Math.max(0, Number(item.basePrice))
+          : null,
       sortOrder: Number(item.sortOrder),
     };
   });
@@ -2553,8 +2562,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   const pricingResult = calculateOrderPricing({
     items: sanitizedItems.map((item) => ({
       productId: item.productId || null,
+      serviceId: item.serviceId || null,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
+      // Preço nominal: evita reaplicar a campanha sobre um preço já promocional.
+      basePrice: item.basePrice ?? item.unitPrice,
     })),
     shippingCost: data.deliveryMethod === "pickup" ? 0 : Number(data.shippingCost || 0),
     additionalCosts: Number(data.additionalCosts || 0),
@@ -2797,6 +2809,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     discount_value: data.discountValue,
     discount_type: data.discountType,
     discount_amount: couponDiscountAmount,
+    item_discount_amount: pricingResult.itemDiscountAmount,
+    campaign_discount_amount: pricingResult.campaignDiscountAmount,
+    manual_discount_amount: pricingResult.manualDiscountAmount,
     payment_method_discount_amount: paymentMethodDiscountAmount,
     payment_method_extra_amount: paymentMethodExtraAmount,
     payment_method_interest_amount: paymentMethodInterestAmount,
@@ -2841,6 +2856,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     delete (fallbackInsertPayload as any).payment_method_interest_amount;
     delete (fallbackInsertPayload as any).payment_method_fee_amount;
     delete (fallbackInsertPayload as any).payment_method_fixed_fee_amount;
+    delete (fallbackInsertPayload as any).item_discount_amount;
+    delete (fallbackInsertPayload as any).campaign_discount_amount;
+    delete (fallbackInsertPayload as any).manual_discount_amount;
     delete (fallbackInsertPayload as any).store_credit_amount;
     delete (fallbackInsertPayload as any).payment_expires_at;
     orderInsertResult = await supabase
@@ -2876,6 +2894,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   const giftItemsToInsert = giftItems.map((item, idx) => ({
     order_id: order.id,
     product_id: item.product_id,
+    service_id: item.service_id ?? null,
     variant_id: null,
     product_name: item.product_name,
     product_price: 0,
@@ -2884,8 +2903,17 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     sort_order: sanitizedItems.length + idx + 1,
     is_gift: true,
     original_price: item.original_price,
+    discount_amount: 0,
     is_promotional: true,
     promotion_id: item.promotion_id,
+    // Brinde: receita 0, custo real no CMV.
+    unit_cost: Number(
+      item.unit_cost ??
+      (item.service_id
+        ? serviceCostMap.get(item.service_id)
+        : productCostMap.get(item.product_id)) ??
+      0,
+    ),
   }));
   const itemsToInsert = [
     ...sanitizedItems.map((item) => {
@@ -2907,7 +2935,16 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         subtotal: item.unitPrice * item.quantity,
         sort_order: item.sortOrder,
         is_gift: false,
-        original_price: null,
+        original_price:
+          item.basePrice != null && item.basePrice > 0 ? item.basePrice : null,
+        discount_amount: Math.max(
+          0,
+          Math.round(
+            ((item.basePrice ?? item.unitPrice) - item.unitPrice) *
+              item.quantity *
+              100,
+          ) / 100,
+        ),
         is_promotional: false,
         promotion_id: null,
         service_id: (item as any).serviceId || null,
@@ -3665,12 +3702,10 @@ export async function getOrderDetailsAction(
 
   const shippingCost = Number(saleDraft?.shipping_fee || 0);
   const otherCosts = Number((saleDraft as any)?.other_costs || 0);
-  const manualDiscount = Number(
-    (saleDraft as any)?.discount_amount || sale.discount_amount || 0,
-  );
-  const couponDiscount = Number(
-    (saleDraft as any)?.coupon_discount_amount || 0,
-  );
+  const draftDiscount = Number((saleDraft as any)?.discount_amount || sale.discount_amount || 0);
+  const couponDiscount = Number((saleDraft as any)?.coupon_discount_amount || 0);
+  // manualDiscount = total discount from draft minus coupon (avoids double-count when draft stores combined)
+  const manualDiscount = Math.max(0, draftDiscount - couponDiscount);
   const subtotalValue = Number(
     (sale.sale_items || []).reduce((acc: number, it: any) => {
       return (
@@ -3740,6 +3775,10 @@ export async function getOrderDetailsAction(
     notes: sanitizeNotes(sale.notes),
     created_at: sale.created_at,
     order_date: sale.created_at,
+    // Breakdown imutável para DRE / lucro líquido por pedido (POS)
+    manual_discount_amount: manualDiscount,
+    item_discount_amount: 0, // POS sale_items não guarda desconto por linha; preenchido no finalize_pos_sale se necessário
+    campaign_discount_amount: 0,
     order_items: (sale.sale_items || []).map((it: any) => ({
       id: it.id,
       product_name: it.product_name,
@@ -3752,6 +3791,11 @@ export async function getOrderDetailsAction(
       image: null,
       product_id: it.product_id,
       variant_id: it.variant_id,
+      // Campos para DRE/CMV: preço nominal, flag de brinde, custo unitário
+      original_price:
+        it.original_price != null ? Number(it.original_price) : null,
+      is_gift: Boolean(it.is_gift),
+      unit_cost: it.unit_cost != null ? Number(it.unit_cost) : null,
     })),
     buyer_id: sale.customer_id,
     customer_name: customers?.name || "Consumidor final",
@@ -4337,8 +4381,10 @@ export async function updateERPOrderAction(
   const updatePricingResult = calculateOrderPricing({
     items: sanitizedItems.map((item) => ({
       productId: item.productId || null,
+      serviceId: item.serviceId || null,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
+      basePrice: item.basePrice ?? item.unitPrice,
     })),
     shippingCost: data.deliveryMethod === "pickup" ? 0 : Number(data.shippingCost || 0),
     additionalCosts: Number(data.additionalCosts || 0),
@@ -4646,6 +4692,9 @@ export async function updateERPOrderAction(
     discount_type: data.discountType,
     coupon_id: couponIdToSave,
     discount_amount: couponDiscountAmount,
+    item_discount_amount: updatePricingResult.itemDiscountAmount,
+    campaign_discount_amount: updatePricingResult.campaignDiscountAmount,
+    manual_discount_amount: updatePricingResult.manualDiscountAmount,
     payment_method_discount_amount: updatePaymentMethodDiscountAmount,
     payment_method_extra_amount: updatePaymentMethodExtraAmount,
     payment_method_interest_amount: updatePaymentMethodInterestAmount,
@@ -4705,6 +4754,9 @@ export async function updateERPOrderAction(
     delete (fallbackUpdatePayload as any).payment_method_interest_amount;
     delete (fallbackUpdatePayload as any).payment_method_fee_amount;
     delete (fallbackUpdatePayload as any).payment_method_fixed_fee_amount;
+    delete (fallbackUpdatePayload as any).item_discount_amount;
+    delete (fallbackUpdatePayload as any).campaign_discount_amount;
+    delete (fallbackUpdatePayload as any).manual_discount_amount;
     orderUpdateResult = await supabase
       .from("orders")
       .update(fallbackUpdatePayload)
@@ -4821,11 +4873,55 @@ export async function updateERPOrderAction(
     .select("id, order_item_id, service_id, service_name")
     .eq("marketplace_order_id", orderId);
 
+  // Snapshot de custo: re-inserir itens sem `unit_cost` zeraria o CMV do DRE.
+  const productIdsForCost = Array.from(
+    new Set(
+      sanitizedItems
+        .filter((item) => item.productId && !item.serviceId)
+        .map((item) => item.productId as string),
+    ),
+  );
+  const serviceIdsForCost = Array.from(
+    new Set(
+      sanitizedItems
+        .filter((item) => item.serviceId)
+        .map((item) => item.serviceId as string),
+    ),
+  );
+  const [{ data: updateProductsCost }, { data: updateServicesCost }] =
+    await Promise.all([
+      productIdsForCost.length > 0
+        ? supabase
+          .from("products")
+          .select("id, cost_price")
+          .in("id", productIdsForCost)
+        : Promise.resolve({ data: [] as Array<{ id: string; cost_price: number | null }> }),
+      serviceIdsForCost.length > 0
+        ? supabase
+          .from("services")
+          .select("id, cost_price")
+          .in("id", serviceIdsForCost)
+        : Promise.resolve({ data: [] as Array<{ id: string; cost_price: number | null }> }),
+    ]);
+  const updateProductCostMap = new Map<string, number>(
+    (updateProductsCost || []).map((p: { id: string; cost_price: number | null }) => [
+      p.id,
+      Number(p.cost_price || 0),
+    ]),
+  );
+  const updateServiceCostMap = new Map<string, number>(
+    (updateServicesCost || []).map((s: { id: string; cost_price: number | null }) => [
+      s.id,
+      Number(s.cost_price || 0),
+    ]),
+  );
+
   await supabase.from("order_items").delete().eq("order_id", orderId);
 
   const giftItemsToInsert = giftItems.map((item, idx) => ({
     order_id: orderId,
     product_id: item.product_id,
+    service_id: item.service_id ?? null,
     variant_id: null,
     product_name: item.product_name,
     product_price: 0,
@@ -4834,8 +4930,17 @@ export async function updateERPOrderAction(
     sort_order: sanitizedItems.length + idx + 1,
     is_gift: true,
     original_price: item.original_price,
+    discount_amount: 0,
     is_promotional: true,
     promotion_id: item.promotion_id,
+    // Brinde: receita 0, custo real no CMV.
+    unit_cost: Number(
+      item.unit_cost ??
+      (item.service_id
+        ? updateServiceCostMap.get(item.service_id)
+        : updateProductCostMap.get(item.product_id)) ??
+      0,
+    ),
   }));
   const itemsToInsert = [
     ...sanitizedItems.map((item) => ({
@@ -4848,12 +4953,26 @@ export async function updateERPOrderAction(
       subtotal: item.unitPrice * item.quantity,
       sort_order: item.sortOrder,
       is_gift: false,
-      original_price: null,
+      original_price:
+        item.basePrice != null && item.basePrice > 0 ? item.basePrice : null,
+      discount_amount: Math.max(
+        0,
+        Math.round(
+          ((item.basePrice ?? item.unitPrice) - item.unitPrice) *
+            item.quantity *
+            100,
+        ) / 100,
+      ),
       is_promotional: false,
       promotion_id: null,
       service_id: (item as any).serviceId || null,
       line_type: (item as any).lineType || "product",
       fulfillment_mode: (item as any).fulfillmentMode || null,
+      unit_cost: (item as any).serviceId
+        ? updateServiceCostMap.get((item as any).serviceId) || 0
+        : item.productId
+          ? updateProductCostMap.get(item.productId) || 0
+          : 0,
     })),
     ...giftItemsToInsert,
   ];

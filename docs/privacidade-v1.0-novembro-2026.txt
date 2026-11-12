@@ -1,6 +1,6 @@
 # POLÍTICA DE PRIVACIDADE — PLATAFORMA DUDIT
 
-**Versão 2.0 — Última atualização: Novembro de 2026**
+**Versão 1.2 — Última atualização: Novembro de 2026**
 
 Esta Política de Privacidade descreve como a DUDIT coleta, utiliza, armazena, compartilha e protege os dados pessoais de seus usuários, em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018), o Marco Civil da Internet (Lei nº 12.965/2014) e demais normas aplicáveis.
 
@@ -88,7 +88,7 @@ Quando o Parceiro utilizar ferramentas de ERP, cadastro de clientes, funcionári
 
 Nessas situações, o Parceiro deverá possuir fundamento legal para o tratamento, informar os titulares quando necessário e utilizar os dados somente para finalidades legítimas.
 
-A DUDIT poderá atuar como operadora desses dados quando realizar o tratamento conforme as instruções do Parceiro. Para outras finalidades próprias, como segurança da plataforma, prevenção a fraudes e cumprimento de obrigações legais, poderá atuar como controladora.
+A DUDIT atua como operadora desses dados quando realizar o tratamento conforme as instruções do Parceiro, sendo essa relação disciplinada de forma complementar pelo Acordo de Tratamento de Dados Pessoais (DPA). Para outras finalidades próprias, como segurança da plataforma, prevenção a fraudes e cumprimento de obrigações legais, atuará como controladora independente.
 
 ### 1.6. Dados sensíveis
 
@@ -149,13 +149,13 @@ Os dados poderão ser compartilhados com:
 
 **• SuperFrete e transportadoras:** dados necessários à cotação, contratação e execução de envios nacionais, como nome, endereço, telefone, informações do pacote e dados necessários à emissão de etiquetas e ao rastreamento.
 
-**• Entregadores participantes:** quando houver solicitação de entrega local aceita ou disponibilizada para execução, poderão ser compartilhadas informações necessárias ao serviço, como nome e contato do destinatário, endereço de retirada e entrega, identificação do pedido, instruções logísticas e informações sobre pagamento ou recebimento quando indispensáveis à execução. O compartilhamento deverá ser limitado ao necessário para a entrega e ocorrer conforme as funcionalidades e permissões do sistema.
+**• Entregadores participantes:** quando houver solicitação de entrega local, as ofertas disponíveis no painel do entregador exibem os dados de rota de forma restrita e mascarada (bairro e cidade/UF), ocultando nome completo, telefone e endereço exato com número. Somente após a aceitação formal da corrida pelo entregador participante é que os dados necessários para a execução (nome do destinatário, telefone de contato e endereço completo de entrega) são revelados ao entregador responsável.
 
 **• Cloudflare:** informações de tráfego para segurança, proteção contra ataques, distribuição de conteúdo e armazenamento de imagens, vídeos e arquivos por meio do Cloudflare R2.
 
-**• Supabase e serviços de hospedagem:** autenticação, banco de dados, armazenamento e execução de funcionalidades da plataforma.
+**• Supabase e serviços de banco de dados:** autenticação de usuários, banco de dados relacional e infraestrutura técnica de armazenamento.
 
-**• Vercel ou outros serviços de hospedagem configurados:** disponibilização da aplicação e infraestrutura técnica.
+**• Railway ou outros serviços de hospedagem em nuvem configurados:** execução do backend da aplicação web, rotinas operacionais e infraestrutura técnica de serviços de mensageria.
 
 **• Sentry:** diagnóstico, identificação e correção de erros técnicos.
 
@@ -225,7 +225,7 @@ A DUDIT adota medidas técnicas e organizacionais destinadas a proteger os dados
 
 As medidas poderão incluir:
 
-**5.1. Armazenamento e Comunicação:** Os dados poderão ser armazenados em infraestrutura de fornecedores como Supabase, Vercel e Cloudflare, conforme a arquitetura utilizada. A plataforma utiliza comunicação protegida por HTTPS/TLS e poderá utilizar criptografia em repouso conforme os recursos e configurações dos fornecedores.
+**5.1. Armazenamento e Comunicação:** Os dados poderão ser armazenados em infraestrutura de fornecedores como Supabase, Railway e Cloudflare, conforme a arquitetura utilizada. A plataforma utiliza comunicação protegida por HTTPS/TLS e poderá utilizar criptografia em repouso conforme os recursos e configurações dos fornecedores.
 
 **5.2. Proteção de Chaves e Tokens:** Chaves, credenciais e tokens sensíveis de integrações deverão ser armazenados com mecanismos de proteção adequados, incluindo criptografia quando aplicável, controles de acesso e procedimentos de rotação. A implementação efetiva desses mecanismos deverá ser mantida e revisada periodicamente.
 

@@ -112,8 +112,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
                     if (!isMounted) {
                         if (html5QrcodeInstance?.isScanning) {
-                            html5QrcodeInstance.stop().catch(() => {}).then(() => {
-                                try { html5QrcodeInstance.clear() } catch {}
+                            html5QrcodeInstance.stop().catch(() => { }).then(() => {
+                                try { html5QrcodeInstance.clear() } catch { }
                             })
                         }
                         return
@@ -182,7 +182,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         .then(() => {
                             try {
                                 html5QrcodeInstance.clear()
-                            } catch {}
+                            } catch { }
                         })
                         .catch((err: any) => {
                             console.error("Error stopping html5-qrcode scanner:", err)
@@ -216,10 +216,6 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             maxWidth="md"
         >
             <div className="flex flex-col items-center justify-center p-2 pt-3 pb-6 space-y-4">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center max-w-sm">
-                    Aponte a câmera para o código de barras do produto. Posicione o código dentro da marcação central.
-                </p>
-
                 <div className="relative w-full aspect-[4/3] max-w-sm rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex items-center justify-center bg-black shadow-inner">
                     {/* Scoped CSS to completely eliminate html5-qrcode's ugly default border shaders and style the video */}
                     <style jsx global>{`
@@ -280,11 +276,10 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         <button
                             type="button"
                             onClick={toggleTorch}
-                            className={`absolute top-3 right-3 z-30 p-2.5 rounded-full backdrop-blur-md transition-all shadow-md ${
-                                torchOn
-                                    ? "bg-amber-400 text-black shadow-amber-400/40 scale-105"
-                                    : "bg-black/55 text-white hover:bg-black/75 hover:scale-105"
-                            }`}
+                            className={`absolute top-3 right-3 z-30 p-2.5 rounded-full backdrop-blur-md transition-all shadow-md ${torchOn
+                                ? "bg-amber-400 text-black shadow-amber-400/40 scale-105"
+                                : "bg-black/55 text-white hover:bg-black/75 hover:scale-105"
+                                }`}
                             title={torchOn ? "Desativar lanterna" : "Ativar lanterna"}
                         >
                             <Zap size={16} className={torchOn ? "fill-current" : ""} />
@@ -296,9 +291,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-20">
                             {/* Frame target box */}
                             <div
-                                className={`relative w-[82%] max-w-[290px] h-[135px] rounded-2xl flex items-center justify-center transition-transform duration-200 ${
-                                    isScannedSuccess ? "scale-105" : ""
-                                }`}
+                                className={`relative w-[82%] max-w-[290px] h-[135px] rounded-2xl flex items-center justify-center transition-transform duration-200 ${isScannedSuccess ? "scale-105" : ""
+                                    }`}
                             >
                                 {/* Darkened vignette backdrop outside the scan window */}
                                 <div className="absolute inset-0 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.50)] pointer-events-none" />
@@ -306,47 +300,37 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                                 {/* 4 Clean, Symmetrical Modern Corner Brackets */}
                                 {/* Top-Left */}
                                 <div
-                                    className={`absolute -top-[1.5px] -left-[1.5px] w-7 h-7 border-t-[3.5px] border-l-[3.5px] rounded-tl-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${
-                                        isScannedSuccess ? "border-emerald-400" : "border-white"
-                                    }`}
+                                    className={`absolute -top-[1.5px] -left-[1.5px] w-7 h-7 border-t-[3.5px] border-l-[3.5px] rounded-tl-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${isScannedSuccess ? "border-emerald-400" : "border-white"
+                                        }`}
                                 />
                                 {/* Top-Right */}
                                 <div
-                                    className={`absolute -top-[1.5px] -right-[1.5px] w-7 h-7 border-t-[3.5px] border-r-[3.5px] rounded-tr-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${
-                                        isScannedSuccess ? "border-emerald-400" : "border-white"
-                                    }`}
+                                    className={`absolute -top-[1.5px] -right-[1.5px] w-7 h-7 border-t-[3.5px] border-r-[3.5px] rounded-tr-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${isScannedSuccess ? "border-emerald-400" : "border-white"
+                                        }`}
                                 />
                                 {/* Bottom-Left */}
                                 <div
-                                    className={`absolute -bottom-[1.5px] -left-[1.5px] w-7 h-7 border-b-[3.5px] border-l-[3.5px] rounded-bl-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${
-                                        isScannedSuccess ? "border-emerald-400" : "border-white"
-                                    }`}
+                                    className={`absolute -bottom-[1.5px] -left-[1.5px] w-7 h-7 border-b-[3.5px] border-l-[3.5px] rounded-bl-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${isScannedSuccess ? "border-emerald-400" : "border-white"
+                                        }`}
                                 />
                                 {/* Bottom-Right */}
                                 <div
-                                    className={`absolute -bottom-[1.5px] -right-[1.5px] w-7 h-7 border-b-[3.5px] border-r-[3.5px] rounded-br-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${
-                                        isScannedSuccess ? "border-emerald-400" : "border-white"
-                                    }`}
+                                    className={`absolute -bottom-[1.5px] -right-[1.5px] w-7 h-7 border-b-[3.5px] border-r-[3.5px] rounded-br-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] transition-colors duration-200 ${isScannedSuccess ? "border-emerald-400" : "border-white"
+                                        }`}
                                 />
 
                                 {/* Centered Red Scanning Laser Line */}
                                 <div
-                                    className={`absolute inset-x-2 top-1/2 -translate-y-1/2 h-[2px] transition-all duration-200 pointer-events-none z-10 ${
-                                        isScannedSuccess
-                                            ? "bg-emerald-400 shadow-[0_0_12px_#34d399,0_0_4px_#34d399]"
-                                            : "bg-red-500 shadow-[0_0_10px_#ef4444,0_0_4px_#ef4444] animate-pulse"
-                                    }`}
+                                    className={`absolute inset-x-2 top-1/2 -translate-y-1/2 h-[2px] transition-all duration-200 pointer-events-none z-10 ${isScannedSuccess
+                                        ? "bg-emerald-400 shadow-[0_0_12px_#34d399,0_0_4px_#34d399]"
+                                        : "bg-red-500 shadow-[0_0_10px_#ef4444,0_0_4px_#ef4444] animate-pulse"
+                                        }`}
                                 />
 
                                 {/* Subtle glowing center sweep effect */}
                                 {!isScannedSuccess && (
                                     <div className="absolute inset-x-2 h-6 top-1/2 -translate-y-1/2 bg-gradient-to-b from-red-500/15 via-red-500/5 to-transparent pointer-events-none" />
                                 )}
-                            </div>
-
-                            {/* Center guidance badge */}
-                            <div className="mt-4 px-3 py-1 rounded-full bg-black/65 backdrop-blur-md text-white/95 text-xs font-medium tracking-wide flex items-center gap-1.5 shadow-md">
-                                <span>{isScannedSuccess ? "Código identificado!" : "Alinhe o código de barras no centro"}</span>
                             </div>
                         </div>
                     )}

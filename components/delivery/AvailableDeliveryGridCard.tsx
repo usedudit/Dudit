@@ -119,10 +119,13 @@ export default function AvailableDeliveryGridCard({
                 <div className="flex justify-between items-start gap-2">
                     <div className="flex flex-col gap-0.5 min-w-0">
                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                            {orderCount > 1 ? "Destinatários" : "Cliente"}
+                            {orderCount > 1 ? `Destino (${orderCount} paradas)` : "Destino da Entrega"}
                         </span>
-                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                            {offer.customer_name || (orderCount > 1 ? `${orderCount} pedidos nesta rota` : "Cliente")}
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={offer.delivery_address || "Região local"}>
+                            {offer.delivery_address || "Região local"}
+                        </span>
+                        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body">
+                            🔒 Rua e número após aceite
                         </span>
                     </div>
                     <div className="flex flex-col gap-0.5 items-end shrink-0">
@@ -161,7 +164,7 @@ export default function AvailableDeliveryGridCard({
                                 <TruckIcon size={16} /> Ver Detalhes da Corrida
                             </DropdownItem>
                             <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
-                                <MapPinIcon size={16} /> Abrir Rota no Maps
+                                <MapPinIcon size={16} /> Ver Região no Maps
                             </DropdownItem>
                         </ActionsDropdown>
                         <Button

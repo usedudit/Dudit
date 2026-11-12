@@ -22,7 +22,7 @@ import type { BusinessMode } from "@/lib/business-info"
 import { getDefaultResourcesForModeAndCategory } from "@/lib/system-resources"
 import { isGifFile } from "@/lib/security/file-validator"
 import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
-import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
+import { CURRENT_PARTNER_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { trackEvent } from "@/lib/analytics"
 
@@ -86,6 +86,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [acceptedDpa, setAcceptedDpa] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
     const turnstileRef = useRef<TurnstileRef>(null)
     const [error, setError] = useState<string | null>(null)
@@ -299,7 +300,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
     const validate = async (): Promise<string | null> => {
         if (step === 1 && !isUserLoggedIn) {
-            if (!email || !password || !acceptedTerms) return "Preencha todos os campos"
+            if (!email || !password || !acceptedTerms || !acceptedDpa) return "Preencha todos os campos e aceite os Termos e o DPA."
             const { calculatePasswordScore } = await import("@/lib/utils")
             if (calculatePasswordScore(password) < 2) return "A senha deve ser média ou forte."
         }
@@ -327,6 +328,11 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                     return "Preencha todo o endereço para continuar"
             }
         }
+
+        if (isUserLoggedIn && step === maxStep && !acceptedDpa) {
+            return "Aceite o Acordo de Tratamento de Dados (DPA) para ativar o ERP."
+        }
+
         return null
     }
 
@@ -395,7 +401,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
                 try {
                     await Promise.all(
-                        CURRENT_LEGAL_DOCUMENTS.map((doc) =>
+                        CURRENT_PARTNER_LEGAL_DOCUMENTS.map((doc) =>
                             recordLegalConsent({ userId, tipo: doc.tipo, versao: doc.versao, origem: "signup" })
                         )
                     )
@@ -404,6 +410,15 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 }
             } else {
                 userId = user!.id
+                try {
+                    await Promise.all(
+                        CURRENT_PARTNER_LEGAL_DOCUMENTS.map((doc) =>
+                            recordLegalConsent({ userId, tipo: doc.tipo, versao: doc.versao, origem: "partner_activation" })
+                        )
+                    )
+                } catch (e) {
+                    console.error("[PARTNER-WIZARD] Falha ao registrar aceite dos documentos legais:", e)
+                }
             }
 
             const { registerPartner } = await import("@/app/actions/marketplace/partners")
@@ -557,11 +572,28 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                     <PasswordInput name="password" label="Senha" value={password} onChange={e => setPassword(e.target.value)} required />
                                     <PasswordStrengthMeter password={password} />
                                 </div>
-                                <div className="pt-1">
-                                    <div className="pt-1 flex items-center gap-2">
+                                <div className="pt-1 space-y-2.5">
+                                    <div className="flex items-start gap-2">
                                         <Checkbox id="termsAgreement" checked={acceptedTerms} onChange={setAcceptedTerms} />
-                                        <label htmlFor="termsAgreement" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">
-                                            Aceito os <Link href="/institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de uso</Link>
+                                        <label htmlFor="termsAgreement" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer leading-tight">
+                                            Aceito os{" "}
+                                            <Link href="/institucional/termos" target="_blank" prefetch={false} className="underline text-brand-dark dark:text-dark-heading font-medium">
+                                                Termos de uso
+                                            </Link>{" "}
+                                            e a{" "}
+                                            <Link href="/institucional/privacidade" target="_blank" prefetch={false} className="underline text-brand-dark dark:text-dark-heading font-medium">
+                                                Política de Privacidade
+                                            </Link>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <Checkbox id="dpaAgreement" checked={acceptedDpa} onChange={setAcceptedDpa} />
+                                        <label htmlFor="dpaAgreement" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer leading-tight">
+                                            Aceito o{" "}
+                                            <Link href="/institucional/dpa" target="_blank" prefetch={false} className="underline text-brand-dark dark:text-dark-heading font-medium">
+                                                Acordo de Tratamento de Dados (DPA)
+                                            </Link>{" "}
+                                            do ERP Dudit
                                         </label>
                                     </div>
                                 </div>
@@ -770,6 +802,21 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                 <div className="grid grid-cols-2 gap-3 items-end">
                                     <Input name="city" label="Cidade" placeholder="Nome da cidade" value={partnerData.address.city} onChange={e => patchAddress({ city: e.target.value })} />
                                     <StateComboBox value={partnerData.address.state} onChange={v => patchAddress({ state: v })} className="w-full" />
+                                </div>
+                            </div>
+                        )}
+
+                        {isUserLoggedIn && step === maxStep && (
+                            <div className="pt-2 pb-1">
+                                <div className="flex items-start gap-2 p-3 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-gray/40 dark:bg-dark-surface/40">
+                                    <Checkbox id="dpaFinalAgreement" checked={acceptedDpa} onChange={setAcceptedDpa} />
+                                    <label htmlFor="dpaFinalAgreement" className="text-xs text-brand-inactive-text dark:text-dark-body cursor-pointer leading-relaxed">
+                                        Declaro que li e aceito o{" "}
+                                        <Link href="/institucional/dpa" target="_blank" prefetch={false} className="underline text-brand-dark dark:text-dark-heading font-medium">
+                                            Acordo de Tratamento de Dados (DPA)
+                                        </Link>{" "}
+                                        que disciplina o tratamento de dados pessoais de clientes e colaboradores sob minha instrução no ERP Dudit.
+                                    </label>
                                 </div>
                             </div>
                         )}

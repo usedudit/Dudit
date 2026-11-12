@@ -7,7 +7,7 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { Button, Checkbox, DefaultModal, FormDropdown, IconPlaceholder, Input, SelectionBanner, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Checkbox, DefaultModal, FormDropdown, IconPlaceholder, Input, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -21,6 +21,7 @@ import ServiceOrderListRow from "./ServiceOrderListRow"
 import ServiceOrderGridCard from "./ServiceOrderGridCard"
 import ServiceOrderForm from "./ServiceOrderForm"
 import ServiceOrderDetail from "./ServiceOrderDetail"
+import ServiceOrderPageControls from "./ServiceOrderPageControls"
 import {
   PlusIcon, WrenchIcon, SearchIcon, FilterIcon, TrashIcon,
   ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon, ExportFileIcon,
@@ -110,7 +111,7 @@ export default function ServiceOrdersPage({
     total: { min: "", max: "" },
     expected_completion_date: { presets: [], from: "", to: "" },
   })
-  const [activeTab, setActiveTab] = useState<string>("all")
+  const [activeTab, setActiveTab] = useState<"all" | "aberta" | "em_andamento" | "concluida" | "cancelada">("all")
   const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
   const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
   const [page, setPage] = useState(1)
@@ -336,6 +337,19 @@ export default function ServiceOrdersPage({
 
   const statusColor = (status: string) => SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.variant || "gray"
   const statusLabel = (status: string) => SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status
+
+  const tabCounts = useMemo(() => {
+    if (!effectiveOrders) return { Todas: 0, Abertas: 0, "Em Andamento": 0, Concluidas: 0, Canceladas: 0 }
+    let Todas = effectiveOrders.length, Abertas = 0, EmAndamento = 0, Concluidas = 0, Canceladas = 0
+    for (const o of effectiveOrders) {
+      const status = o.status
+      if (status === "aberta" || status === "aguardando_aprovacao" || status === "aprovada") Abertas++
+      else if (status === "em_andamento" || status === "aguardando_peca") EmAndamento++
+      else if (status === "concluida" || status === "entregue") Concluidas++
+      else if (status === "cancelada") Canceladas++
+    }
+    return { Todas, Abertas, "Em Andamento": EmAndamento, Concluidas, Canceladas }
+  }, [effectiveOrders])
 
   const handleExport = useCallback(() => {
     void exportData({
@@ -638,147 +652,22 @@ export default function ServiceOrdersPage({
               </div>
             </div>
 
-            {/* Tabs de Status */}
-            <div className="mb-6 px-4 md:px-8">
-              <Tabs
-                value={activeTab}
-                onValueChange={(val) => { setActiveTab(val); setPage(1) }}
-              >
-                <TabsList className="px-0">
-                  <TabsTrigger value="all" icon={WrenchIcon}>
-                    Todas
-                  </TabsTrigger>
-                  <TabsTrigger value="aberta" icon={PlusIcon}>
-                    Abertas
-                  </TabsTrigger>
-                  <TabsTrigger value="em_andamento" icon={ClockIcon}>
-                    Em Andamento
-                  </TabsTrigger>
-                  <TabsTrigger value="concluida" icon={CheckCircleIcon}>
-                    Concluídas
-                  </TabsTrigger>
-                  <TabsTrigger value="cancelada" icon={BlockedIcon}>
-                    Canceladas
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {/* Controls Bar */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
-              {/* MOBILE CONTROLS ROW */}
-              <div className="md:hidden flex items-center gap-2 w-full">
-                <div className="flex-1 min-w-0">
-                  <Input
-                    name="search"
-                    placeholder="Buscar..."
-                    value={search}
-                    onChange={handleSearchChange}
-                    className="h-[42px] w-full"
-                    variant="full-rounded"
-                    prefix={
-                      <SearchIcon
-                        size={18}
-                        className="text-brand-inactive-text shrink-0"
-                      />
-                    }
-                    label=""
-                  />
-                </div>
-                <div className="flex-none flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowFilters(true)}
-                    className="w-[42px] h-[42px] p-0"
-                  >
-                    <FilterIcon className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className="w-[42px] h-[42px] p-0"
-                  >
-                    <ExportFileIcon className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() => openEntity("create")}
-                    className="hidden sm:flex items-center gap-2 h-[42px] px-4"
-                    leftIcon={<PlusIcon size={18} />}
-                  >
-                    Nova OS
-                  </Button>
-                  <Button
-                    onClick={() => openEntity("create")}
-                    className="sm:hidden w-[42px] h-[42px] p-0 flex items-center justify-center animate-pulse-once"
-                    leftIcon={<PlusIcon size={18} />}
-                  />
-                </div>
-              </div>
-
-              {/* DESKTOP CONTROLS */}
-              <div className="hidden md:flex items-center w-full gap-4">
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="w-80">
-                    <Input
-                      name="search"
-                      placeholder="Buscar por nº, título ou cliente..."
-                      value={search}
-                      onChange={handleSearchChange}
-                      className="h-[42px]"
-                      variant="full-rounded"
-                      prefix={
-                        <SearchIcon
-                          size={18}
-                          className="text-brand-inactive-text shrink-0"
-                        />
-                      }
-                      label=""
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowFilters(true)}
-                    leftIcon={<FilterIcon size={18} />}
-                  >
-                    Filtros
-                  </Button>
-                  {hasActiveFilters && (
-                    <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1"></div>
-                  )}
-                </div>
-
-                {/* Scrollable Badges Area (Desktop) */}
-                <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
-                  <div className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full">
-                    <BadgeList />
-                  </div>
-                </div>
-
-                {/* View Toggles */}
-                <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${effectiveViewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                  >
-                    <ListIcon className="w-[18px] h-[18px]" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${effectiveViewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                  >
-                    <GridIcon className="w-[18px] h-[18px]" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* MOBILE CHIPS CAROUSEL */}
-            <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
-              <div className="flex items-center gap-2">
-                <BadgeList />
-              </div>
-            </div>
+            {/* Tabs de Status + Controls Bar */}
+            <ServiceOrderPageControls
+                activeTab={activeTab}
+                setActiveTab={(val) => { setActiveTab(val); setPage(1) }}
+                search={search}
+                onSearchChange={(value) => { setSearch(value); setPage(1); }}
+                onOpenFilter={() => setShowFilters(true)}
+                onExport={handleExport}
+                onAddOrder={() => openEntity("create")}
+                filters={filters}
+                setFilters={setFilters}
+                viewMode={effectiveViewMode}
+                onViewModeChange={setViewMode}
+                hasActiveFilters={hasActiveFilters}
+                tabCounts={tabCounts}
+            />
 
             {selection.size > 0 && (
               <div className="px-4 md:px-8 mb-4">

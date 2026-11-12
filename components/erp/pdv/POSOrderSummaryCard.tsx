@@ -64,15 +64,15 @@ function POSOrderActionsMenu({
             className="inline-block w-auto"
         >
             <DropdownItem onClick={onSaveDraft}>
-                <SaveIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Salvar Pedido
+                <SaveIcon className="h-4 w-4" /> Salvar Pedido
             </DropdownItem>
             {onOpenDiscount && (
                 <DropdownItem onClick={onOpenDiscount}>
-                    <TagIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Aplicar Desconto
+                    <TagIcon className="h-4 w-4" /> Aplicar Desconto
                 </DropdownItem>
             )}
             <DropdownItem onClick={onAddShipping}>
-                <MotorbikeIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> {hasDelivery ? "Editar Entrega" : "Adicionar Entrega"}
+                <MotorbikeIcon className="h-4 w-4" /> {hasDelivery ? "Editar Entrega" : "Adicionar Entrega"}
             </DropdownItem>
             {hasDelivery && onRemoveShipping && (
                 <DropdownItem onClick={onRemoveShipping}>
@@ -80,10 +80,10 @@ function POSOrderActionsMenu({
                 </DropdownItem>
             )}
             <DropdownItem onClick={onOpenCreateProduct}>
-                <PackageIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Criar Produto
+                <PackageIcon className="h-4 w-4" /> Criar Produto
             </DropdownItem>
             <DropdownItem onClick={onOpenNotes}>
-                <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Observação
+                <FileIcon className="h-4 w-4" /> Adicionar Observação
             </DropdownItem>
         </Dropdown>
     )

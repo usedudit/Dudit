@@ -133,7 +133,7 @@ export function NotificationPanel({
 									<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
 										{opt.label}
 										{opt.unread ? (
-											<Badge variant="red" icon={null}>
+											<Badge variant="red" icon={null} className="scale-90 whitespace-nowrap">
 												{opt.unread > 99 ? "99+" : opt.unread}
 											</Badge>
 										) : null}

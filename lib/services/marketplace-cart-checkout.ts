@@ -486,6 +486,7 @@ export function mapOrderItemsForPaymentInsert(
     promotion_id: item.promotion_id ?? null,
     is_gift: item.is_gift ?? false,
     original_price: item.original_price ?? null,
+    discount_amount: item.discount_amount ?? 0,
     unit_cost: item.unit_cost ?? null,
   }))
 }

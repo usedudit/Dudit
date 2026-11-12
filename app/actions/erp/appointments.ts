@@ -1335,6 +1335,8 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
               is_gift: true,
               is_promotional: true,
               promotion_id: item.promotion_id,
+              // Brinde: receita 0, custo real no CMV.
+              unit_cost: Number(item.unit_cost || 0),
             }))
           ]
           await supabase.from("order_items").insert(itemsToInsert)

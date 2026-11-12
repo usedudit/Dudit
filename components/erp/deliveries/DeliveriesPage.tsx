@@ -8,7 +8,7 @@ import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/comp
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, SearchIcon, TruckIcon, MotorbikeIcon, BlockedIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, SearchIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getSmartDeliverySuggestionsAction, getERPCarrierDeliveriesPageAction, type ERPCarrierDeliveryListCursor } from "@/app/actions/erp/deliveries"
@@ -18,7 +18,7 @@ import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
 import CarrierDeliveryBoard from "./CarrierDeliveryBoard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
-import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { formatDistance } from "@/lib/services/location.service"
@@ -378,6 +378,13 @@ export default function DeliveriesPage({
         return list
     }, [mode, items, closedDeliveries, mapDeliveryRows, debouncedSearch, filters, sortConfig])
 
+    const tabCounts = useMemo(() => {
+        const deliveriesCount = items?.filter((d: any) => !["cancelled", "delivery_failed"].includes(d.status)).length || 0
+        const carriersCount = carrierShipments?.length || 0
+        const failedCount = closedDeliveries?.filter((d: any) => ["cancelled", "delivery_failed"].includes(d.status)).length || 0
+        return { Delivery: deliveriesCount, Transportadora: carriersCount, "Canceladas / Falhas": failedCount }
+    }, [items, carrierShipments, closedDeliveries])
+
     const totalPages = Math.ceil(mapped.length / 100) || 1
     const [page, setPage] = useState(1)
 
@@ -551,25 +558,6 @@ export default function DeliveriesPage({
                                 </div>
                             </div>
 
-                            <div className="mb-4 flex-none px-4 md:px-8">
-                                <Tabs
-                                    value={mode}
-                                    onValueChange={(val) => setMode(val as "deliveries" | "carriers" | "failed")}
-                                >
-                                    <TabsList className="px-0">
-                                        <TabsTrigger value="deliveries" icon={MotorbikeIcon}>
-                                            Delivery
-                                        </TabsTrigger>
-                                        <TabsTrigger value="carriers" icon={TruckIcon}>
-                                            Transportadora
-                                        </TabsTrigger>
-                                        <TabsTrigger value="failed" icon={BlockedIcon}>
-                                            Canceladas / Falhas
-                                        </TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
-                            </div>
-
                             {mode === "carriers" ? (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                                     <div className="mb-4">
@@ -609,6 +597,9 @@ export default function DeliveriesPage({
                                 filters={filters}
                                 setFilters={setFilters}
                                 hasActiveFilters={filters.status.length > 0 || isDatePeriodFilterActive(filters.datePeriod)}
+                                mode={mode}
+                                setMode={setMode}
+                                tabCounts={tabCounts}
                             />
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">

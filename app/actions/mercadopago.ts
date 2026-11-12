@@ -323,7 +323,17 @@ export async function checkMercadoPagoPaymentStatusAction(paymentId: string) {
   const supabase = await getSupabaseServerClient()
   const ctx = await getCurrentPartnerContext()
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
-  await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
+
+  const { checkPartnerPermission } = await import("@/lib/auth/authorization")
+  const [ordersPerm, pdvPerm, settingsPerm] = await Promise.all([
+    checkPartnerPermission(ctx.partnerId, "orders", "view"),
+    checkPartnerPermission(ctx.partnerId, "pdv", "sell"),
+    checkPartnerPermission(ctx.partnerId, "settings", "settings_integrations"),
+  ])
+
+  if (!ordersPerm.allowed && !pdvPerm.allowed && !settingsPerm.allowed) {
+    return { error: "Acesso negado para consultar status do pagamento" }
+  }
 
   if (!/^\d+$/.test(paymentId)) {
     return { error: "ID de pagamento inválido" }

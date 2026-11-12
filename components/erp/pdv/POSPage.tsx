@@ -1180,6 +1180,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             return
         }
 
+        directCheckoutIdRef.current ||= crypto.randomUUID()
         setIsMobileSummarySheetOpen(false)
         setIsMobileItemsSheetOpen(false)
         setIsPaymentModalOpen(true)
@@ -1237,6 +1238,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 amount: Number(entry.amount || 0),
                 paymentMethodId: entry.paymentMethodId || null,
                 installmentNumber: Math.max(1, Math.floor(Number((entry as { installmentNumber?: number }).installmentNumber || 1))),
+                provider: (entry as any).provider || paymentData.paymentProvider || undefined,
+                mpPaymentId: (entry as any).mpPaymentId || paymentData.mpPaymentId || undefined,
             }))
 
             const result = await finalizePreSaleAction({
@@ -1673,7 +1676,12 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     customerId: selectedCustomerId || null,
                     subtotal,
                     shippingCost: shippingFee,
-                    items: cart.map((item) => ({ productId: item.productId || null, serviceId: item.serviceId || null })),
+                    items: cart.map((item) => ({
+                        productId: item.productId || null,
+                        serviceId: item.serviceId || null,
+                        price: item.price ?? null,
+                        quantity: item.qty ?? 1,
+                    })),
                 })
                 : await validateCouponAction({
                     partnerId,
@@ -1681,7 +1689,12 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     customerId: selectedCustomerId || null,
                     subtotal,
                     shippingCost: shippingFee,
-                    items: cart.map((item) => ({ productId: item.productId || null, serviceId: item.serviceId || null })),
+                    items: cart.map((item) => ({
+                        productId: item.productId || null,
+                        serviceId: item.serviceId || null,
+                        price: item.price ?? null,
+                        quantity: item.qty ?? 1,
+                    })),
                 })
 
             if (!(res as any)?.valid && !(res as any)?.success) {
@@ -1850,7 +1863,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                     >
                                         <IconPlaceholder
                                             placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                             imageAlt="Ops"
                                             title="Ops! Nenhum produto encontrado"
                                             subtitle="Tente ajustar a busca ou selecione outra categoria para encontrar o que procura."
@@ -1903,7 +1916,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                     : null
 
                                                 return (
-                                                    <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface flex h-full flex-col">
+                                                    <div key={product.id} className="rounded-xl border border-brand-border bg-white p-2 text-left transition-all dark:bg-dark-surface flex h-full flex-col">
                                                         <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
                                                             <img
                                                                 src={getPrimaryProductDisplayImage(product, "thumbnail")}
@@ -2281,6 +2294,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009}
                                 depositChargeAmount={depositChargeAmount}
                                 depositPercentage={depositSettings.depositPercentage}
+                                orderId={directCheckoutIdRef.current || undefined}
                             />
                         )}
                     </AnimatePresence>

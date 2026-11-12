@@ -11,6 +11,7 @@
 export const LEGAL_DOCUMENT_TYPES = {
   terms: "terms",
   privacy: "privacy",
+  dpa: "dpa",
 } as const
 
 export type LegalDocumentType = keyof typeof LEGAL_DOCUMENT_TYPES
@@ -20,6 +21,7 @@ export const LEGAL_CONSENT_ORIGINS = {
   oauth: "oauth",
   reconsent: "reconsent",
   migration: "migration",
+  partner_activation: "partner_activation",
 } as const
 
 export type LegalConsentOrigin = keyof typeof LEGAL_CONSENT_ORIGINS
@@ -31,12 +33,18 @@ export interface LegalDocumentReference {
 }
 
 export const CURRENT_LEGAL_DOCUMENTS: LegalDocumentReference[] = [
-  { tipo: "terms", versao: "1.1", url: "/institucional/termos" },
-  { tipo: "privacy", versao: "1.2", url: "/institucional/privacidade" },
+  { tipo: "terms", versao: "1.0", url: "/institucional/termos" },
+  { tipo: "privacy", versao: "1.0", url: "/institucional/privacidade" },
+]
+
+export const CURRENT_PARTNER_LEGAL_DOCUMENTS: LegalDocumentReference[] = [
+  { tipo: "terms", versao: "1.0", url: "/institucional/termos" },
+  { tipo: "privacy", versao: "1.0", url: "/institucional/privacidade" },
+  { tipo: "dpa", versao: "1.0", url: "/institucional/dpa" },
 ]
 
 export const CURRENT_LEGAL_DOCUMENTS_BY_TYPE = Object.fromEntries(
-  CURRENT_LEGAL_DOCUMENTS.map((doc) => [doc.tipo, doc])
+  CURRENT_PARTNER_LEGAL_DOCUMENTS.map((doc) => [doc.tipo, doc])
 ) as Record<LegalDocumentType, LegalDocumentReference>
 
 export const TERMS_EFFECTIVE_DELAY_DAYS = 10

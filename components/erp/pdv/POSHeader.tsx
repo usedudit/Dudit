@@ -128,7 +128,7 @@ const POSHeader = memo(function POSHeader({
                     <Input
                         ref={inputRef}
                         label=""
-                        placeholder="Buscar produtos..."
+                        placeholder="Buscar itens..."
                         value={search}
                         variant="full-rounded"
                         onChange={(e: any) => onSearchChange(e.target.value)}
@@ -142,13 +142,6 @@ const POSHeader = memo(function POSHeader({
                 <div className="flex-none flex items-center gap-2">
                     {isMobile ? (
                         <>
-                            <Button
-                                variant="outline"
-                                onClick={onOpenCamera}
-                                className="w-[42px] h-[42px] p-0"
-                            >
-                                <CameraIcon className="w-4 h-4" />
-                            </Button>
                             <Button
                                 variant="outline"
                                 onClick={onOpenCustomerSheet}

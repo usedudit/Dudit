@@ -133,109 +133,8 @@ function formatCurrentLocalTime(date = new Date()) {
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 }
 
-export function parseAddressString(addressStr: string) {
-    if (!addressStr) return null;
-
-    let zipCode = "";
-    const zipMatch = addressStr.match(/\d{5}-?\d{3}/);
-    if (zipMatch) {
-        zipCode = zipMatch[0];
-        addressStr = addressStr.replace(zipCode, "");
-    }
-
-    // clean up separators at ends
-    addressStr = addressStr.trim().replace(/(^[,\-\s]+)|([,\-\s]+$)/g, "");
-
-    const parts = addressStr.split(',').map(p => p.trim()).filter(Boolean);
-    if (parts.length === 0) return null;
-
-    const street = parts[0] || "";
-    let number = "";
-    let complement = "";
-    let neighborhood = "";
-    let city = "";
-    let state = "SP";
-
-    // Identify city - state (usually the last part of parts)
-    let cityStateIndex = -1;
-    for (let i = parts.length - 1; i >= 1; i--) {
-        if (parts[i].includes("-")) {
-            const dashParts = parts[i].split("-").map(p => p.trim());
-            // Check if second part looks like a state (2 letters)
-            if (dashParts[dashParts.length - 1].length === 2) {
-                state = dashParts[dashParts.length - 1].toUpperCase();
-                city = dashParts.slice(0, -1).join("-").trim();
-                cityStateIndex = i;
-                break;
-            }
-        }
-    }
-
-    if (cityStateIndex === -1 && parts.length >= 2) {
-        city = parts[parts.length - 1];
-        cityStateIndex = parts.length - 1;
-    }
-
-    const middleParts = parts.slice(1, cityStateIndex > -1 ? cityStateIndex : undefined);
-
-    if (middleParts.length === 1) {
-        const part = middleParts[0];
-        const parenMatch = part.match(/\(([^)]+)\)/);
-        if (parenMatch) {
-            complement = parenMatch[1].trim();
-            number = part.replace(/\([^)]+\)/, "").trim();
-        } else if (part.includes("-")) {
-            const dashParts = part.split("-").map(p => p.trim());
-            number = dashParts[0];
-            neighborhood = dashParts.slice(1).join("-").trim();
-        } else {
-            // Check if part looks like house number (digits, S/N, km, etc.)
-            const isNumberLike = /^\d+|^s\/n|^sn/i.test(part);
-            if (isNumberLike) {
-                number = part;
-            } else {
-                neighborhood = part;
-                number = "S/N";
-            }
-        }
-    } else if (middleParts.length >= 2) {
-        const numPart = middleParts[0];
-        const parenMatch = numPart.match(/\(([^)]+)\)/);
-        if (parenMatch) {
-            complement = parenMatch[1].trim();
-            number = numPart.replace(/\([^)]+\)/, "").trim();
-        } else {
-            number = numPart;
-        }
-
-        const neighborhoodPart = middleParts[1];
-        if (neighborhoodPart.includes("-")) {
-            const dashParts = neighborhoodPart.split("-").map(p => p.trim());
-            if (!complement) {
-                complement = dashParts[0];
-                neighborhood = dashParts.slice(1).join("-").trim();
-            } else {
-                neighborhood = neighborhoodPart;
-            }
-        } else {
-            neighborhood = neighborhoodPart;
-        }
-    }
-
-    if (!number || number.trim() === "" || number.toLowerCase() === neighborhood.toLowerCase()) {
-        number = "S/N";
-    }
-
-    return {
-        street,
-        number,
-        complement,
-        neighborhood,
-        city,
-        state,
-        zipCode
-    };
-}
+import { parseAddressString } from "@/lib/utils/address";
+export { parseAddressString };
 
 export default function CreateOrder({
     onBack,
@@ -463,6 +362,10 @@ export default function CreateOrder({
             serviceId: null,
             unitPrice: Number(item.unitPrice || 0),
             quantity: Number(item.quantity || 0),
+            basePrice: Math.max(
+                Number(item.originalPrice ?? 0),
+                Number(item.unitPrice ?? 0),
+            ),
         })),
         shippingCost: deliveryMethod === "pickup" ? 0 : parseFloat(shippingFee || "0"),
         additionalCosts: parseFloat(otherCosts || "0"),
@@ -1566,6 +1469,10 @@ export default function CreateOrder({
                 customName: item.name,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
+                basePrice: Math.max(
+                    Number(item.originalPrice ?? 0),
+                    Number(item.unitPrice ?? 0),
+                ),
                 sortOrder: idx,
                 serviceId: item.serviceId || (item.isService ? item.productId : null),
                 lineType: item.isService || item.serviceId ? 'service_booking' : (item.lineType || 'product'),
@@ -1629,7 +1536,12 @@ export default function CreateOrder({
             customerId: selectedCustomer?.id || null,
             subtotal,
             shippingCost: deliveryMethod === "pickup" ? 0 : parseFloat(shippingFee || "0"),
-            items: items.map((item) => ({ productId: item.productId || null })),
+            items: items.map((item) => ({
+                productId: item.productId || null,
+                serviceId: item.serviceId || null,
+                price: item.unitPrice ?? item.price ?? null,
+                quantity: item.quantity ?? 1,
+            })),
         })
         try {
             if (!result.valid) {
@@ -2755,7 +2667,7 @@ export default function CreateOrder({
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
                             existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
                             lockPaymentCompletion={isAlreadyPaid}
-                            orderId={editOrderId || undefined}
+                            orderId={orderId || undefined}
                             isMarketplaceOrder={isMarketplaceOrder}
                             role={role}
                             originalPaymentMethod={originalPaymentMethod}

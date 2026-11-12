@@ -1596,7 +1596,8 @@ const PaymentModal = ({
         }
     };
 
-    const handleMpConfirmPix = () => {
+    const handleMpConfirmPix = (overrideMpPaymentId?: string | null) => {
+        const resolvedMpPaymentId = overrideMpPaymentId || mpPaymentId;
         const existingLegs = existingPaymentBreakdown?.filter((e: any) => e?.method && (Number(e?.amount || 0) > 0.009 || Number(e?.amountReceived || 0) > 0.009)) || [];
         const mpLeg = {
             method: "Pix (Mercado Pago)",
@@ -1605,6 +1606,7 @@ const PaymentModal = ({
             paymentMethodId: null,
             installmentNumber: 1,
             provider: "Mercado Pago",
+            mpPaymentId: resolvedMpPaymentId || null,
             interestAmount: 0,
             feeAmount: 0,
             fixedFeeAmount: 0,
@@ -1613,7 +1615,7 @@ const PaymentModal = ({
         handleStartProcessing({
             paymentMethod: "Pix (Mercado Pago)",
             paymentProvider: "Mercado Pago",
-            mpPaymentId: mpPaymentId,
+            mpPaymentId: resolvedMpPaymentId || null,
             paymentStatus: "paid",
             paidAmount: existingPaidAmount + chargeTarget,
             paymentBreakdown: [...existingLegs, mpLeg],
@@ -1630,12 +1632,12 @@ const PaymentModal = ({
             if (res && 'success' in res && res.success) {
                 if (res.status === "approved") {
                     toast({ title: "Pix Pago!", description: "O pagamento foi confirmado." });
+                    const confirmedPaymentId = mpPaymentId;
                     setShowMpPixModal(false);
                     setMpPixData(null);
                     setMpStep("brick");
-                    setMpPaymentId(null);
                     invalidate();
-                    handleMpConfirmPix();
+                    handleMpConfirmPix(confirmedPaymentId);
                 } else {
                     const isExpired = (res.status === "cancelled" || res.status === "expired" || res.status === "failed") ||
                         (mpPixGeneratedAt !== null && (Date.now() - mpPixGeneratedAt > PIX_EXPIRATION_MS));
@@ -1661,14 +1663,46 @@ const PaymentModal = ({
         }
     };
 
+    // Polling automático: verifica se o Pix foi pago enquanto o modal do QR code estiver aberto
+    useEffect(() => {
+        if (!showMpPixModal || !mpPaymentId || paymentStatus === 'processing' || paymentStatus === 'success') {
+            return;
+        }
+
+        let isCancelled = false;
+        const intervalId = setInterval(async () => {
+            if (isCancelled || isCheckingMpPixStatus) return;
+            try {
+                const res = await checkMercadoPagoPaymentStatusAction(mpPaymentId);
+                if (isCancelled) return;
+                if (res && 'success' in res && res.success && res.status === "approved") {
+                    toast({ title: "Pix Pago!", description: "O pagamento foi confirmado." });
+                    const confirmedPaymentId = mpPaymentId;
+                    setShowMpPixModal(false);
+                    setMpPixData(null);
+                    setMpStep("brick");
+                    invalidate();
+                    handleMpConfirmPix(confirmedPaymentId);
+                }
+            } catch {
+                // Silencioso em caso de erro temporário de rede
+            }
+        }, 4000);
+
+        return () => {
+            isCancelled = true;
+            clearInterval(intervalId);
+        };
+    }, [showMpPixModal, mpPaymentId, isCheckingMpPixStatus, paymentStatus]);
+
     const handleSendMpPixWhatsApp = () => {
         if (!mpPixData || !customer?.phone) return;
         const formattedAmount = formatCurrency(chargeTarget);
         const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
-        const messageText = `Olá, *${customerName || "Cliente"}*! 🌟\n\n` +
+        const messageText = `Olá, *${customerName || "Cliente"}*! \u{1F31F}\n\n` +  // 🌟
             `Aqui está o código Pix Copia e Cola para o pagamento do seu pedido no valor de *${formattedAmount}*:\n\n` +
             `\`${mpPixData.qrCode}\`\n\n` +
-            `Assim que realizar o pagamento, nosso sistema irá confirmar de forma automática! 😉`;
+            `Assim que realizar o pagamento, nosso sistema irá confirmar de forma automática! \u{1F609}`;  // 😉
         const encodedMsg = encodeURIComponent(messageText);
         const phone = String(customer.phone).replace(/\D/g, "");
         window.open(`https://wa.me/55${phone}?text=${encodedMsg}`, "_blank");
@@ -4595,8 +4629,9 @@ const PaymentModal = ({
                     payload={mpPixData.qrCode}
                     amount={chargeTarget}
                     onConfirmPayment={() => {
+                        const confirmedPaymentId = mpPaymentId;
                         setShowMpPixModal(false);
-                        handleMpConfirmPix();
+                        handleMpConfirmPix(confirmedPaymentId);
                     }}
                     onVerifyPayment={handleVerifyMpPixPayment}
                     isVerifying={isCheckingMpPixStatus}

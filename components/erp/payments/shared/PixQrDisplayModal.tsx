@@ -51,7 +51,7 @@ export function PixQrDisplayModal({
             isOpen={isOpen}
             onClose={onClose}
             hideHeader
-            maxWidth="md"
+            maxWidth="lg"
         >
             <div className="relative flex flex-col items-center justify-start pt-6 pb-2 w-full text-center">
                 {/* Pix Logo Icon */}
@@ -105,6 +105,7 @@ export function PixQrDisplayModal({
                     <Input
                         readOnly
                         value={payload}
+                        variant="full-rounded"
                     />
                     <Button
                         variant="outline"

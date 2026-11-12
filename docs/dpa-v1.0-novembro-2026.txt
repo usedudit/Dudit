@@ -1,0 +1,252 @@
+# ACORDO DE TRATAMENTO DE DADOS PESSOAIS (DPA) — PLATAFORMA DUDIT
+**Versão 1.1 — Última atualização: Novembro de 2026**
+
+Este Acordo de Tratamento de Dados Pessoais ("DPA" ou "Acordo") é celebrado entre:
+
+• **DUDIT:** [RAZÃO SOCIAL OU NOME CIVIL COMPLETO DA OPERADORA], pessoa jurídica/física inscrita no [CNPJ ou CPF, conforme a estrutura jurídica aplicável], com sede/endereço para contato em [ENDEREÇO COMPLETO] e e-mail de contato de privacidade [E-MAIL VÁLIDO DE PRIVACIDADE], doravante denominada simplesmente **"DUDIT"**; e
+
+• **PARCEIRO:** A pessoa física ou jurídica devidamente cadastrada na plataforma como Vendedor ou Prestador de Serviços que utiliza os recursos de gestão empresarial (ERP), doravante denominada simplesmente **"PARCEIRO"**.
+
+A DUDIT e o PARCEIRO são doravante referidos individualmente como "Parte" e conjuntamente como "Partes".
+
+---
+
+### PREÂMBULO
+
+CONSIDERANDO QUE:
+(I) O PARCEIRO utiliza as soluções tecnológicas disponibilizadas pela DUDIT, incluindo módulos de gestão empresarial (ERP), catálogo e vitrine digital;
+(II) Na utilização dos módulos de ERP e gestão, o PARCEIRO insere, armazena e processa dados pessoais de titulares a ele vinculados, incluindo seus clientes, colaboradores, funcionários, prestadores e fornecedores;
+(III) As Partes buscam estabelecer de forma transparente, técnica e segura as regras, limites, salvaguardas e responsabilidades relativas ao tratamento de dados pessoais, em estrita observância à Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018), ao Marco Civil da Internet (Lei nº 12.965/2014) e às regulamentações emitidas pela Autoridade Nacional de Proteção de Dados (ANPD);
+
+Resolvem as Partes firmar o presente Acordo de Tratamento de Dados Pessoais, que integra e complementa os Termos de Uso e a Política de Privacidade da DUDIT, mediante as seguintes cláusulas:
+
+---
+
+### CLÁUSULA 1 — OBJETO E SEPARAÇÃO DOS PAPÉIS LEGAIS (LGPD)
+
+1.1. **Objeto:** Este DPA disciplina as condições e salvaguardas em que a DUDIT realiza operações de tratamento de dados pessoais inseridos, integrados ou disponibilizados pelo PARCEIRO nas ferramentas de gestão (ERP) da plataforma.
+
+1.2. **DUDIT como OPERADORA:** No âmbito estrito dos módulos de gestão (ERP) disponibilizados ao PARCEIRO — abrangendo o cadastro de clientes próprios, gestão de equipe de funcionários e colaboradores, controle interno de pedidos, estoque, agenda de atendimentos, movimentações financeiras internas e orçamentos —, a DUDIT atua na qualidade de **OPERADORA** de dados pessoais (art. 5º, VII, da LGPD). Nessa condição, a DUDIT realiza o tratamento em nome do PARCEIRO e em observância às instruções legítimas por ele transmitidas por meio das funcionalidades da plataforma.
+
+1.3. **PARCEIRO como CONTROLADOR:** O PARCEIRO atua na qualidade de **CONTROLADOR** (art. 5º, VI, da LGPD) dos dados pessoais de seus clientes, compradores, equipe, colaboradores e fornecedores cadastrados nas ferramentas de gestão, cabendo ao PARCEIRO a tomada de decisões relativas ao tratamento, a determinação de suas finalidades e a definição de suas respectivas bases legais, nos limites de suas atividades.
+
+1.4. **DUDIT como CONTROLADORA INDEPENDENTE:** A qualificação da DUDIT como Operadora restringe-se às operações de processamento realizadas no ERP sob instruções do Parceiro. A DUDIT atua como **CONTROLADORA INDEPENDENTE** em suas operações próprias, autônomas e regulamentares, tais como:
+  a) Criação, validação, manutenção e autenticação de contas de acesso à plataforma;
+  b) Administração dos planos de assinatura, faturamento e contratos da própria DUDIT;
+  c) Segurança cibernética da infraestrutura, integridade de sistemas e auditoria técnica de acessos;
+  d) Prevenção a fraudes, monitoramento de abusos e moderação de conteúdos ilícitos;
+  e) Cumprimento de obrigações legais e regulatórias próprias que lhe sejam diretamente exigíveis pela legislação brasileira;
+  f) Funcionamento do canal público de vitrine e marketplace da DUDIT, no tocante à aproximação comercial entre compradores e vendedores, viabilização da visualização de produtos/serviços e gestão das contas de usuários do marketplace, esclarecendo-se que a DUDIT não atua como instituição de pagamento nem recebe ou custodia os valores das transações comerciais realizadas entre as partes.
+
+1.5. A definição de papéis descrita nesta Cláusula reflete as operações efetivas de tratamento de dados e não afasta as obrigações e prerrogativas que a legislação atribua a cada uma das Partes.
+
+---
+
+### CLÁUSULA 2 — INSTRUÇÕES DE TRATAMENTO E LIMITAÇÃO DE FINALIDADE
+
+2.1. A DUDIT processará os dados pessoais submetidos pelo PARCEIRO ao ERP estritamente para as seguintes finalidades operacionais:
+  a) Armazenar, indexar, organizar e exibir os registros no painel administrativo do PARCEIRO;
+  b) Executar as rotinas tecnológicas de cálculo, processamento de pedidos, controle de estoque e agendamentos solicitadas pelo PARCEIRO;
+  c) Viabilizar as integrações tecnológicas expressamente configuradas pelo PARCEIRO (tais como gateways de pagamento, serviços de logística e canais de mensageria);
+  d) Assegurar a continuidade, disponibilidade, segurança e recuperação de serviços em nuvem contratados;
+  e) Cumprir determinações judiciais ou ordens fundamentadas de autoridades públicas competentes.
+
+2.2. **Vedação de Uso Próprio:** A DUDIT não comercializa, não vende, não aluga e não compartilha dados pessoais mantidos no ERP do PARCEIRO para finalidades publicitárias próprias, marketing de terceiros ou prospecção comercial.
+
+2.3. **Instruções Ilícitas:** Caso a DUDIT identifique que determinada instrução fornecida pelo PARCEIRO viola expressamente a LGPD, regulamentação da ANPD ou normas vigentes, a DUDIT informará o PARCEIRO no prazo técnico cabível e poderá suspender a execução da funcionalidade correspondente até que a situação seja regularizada.
+
+---
+
+### CLÁUSULA 3 — OBRIGAÇÕES E DECLARAÇÕES DO CONTROLADOR (PARCEIRO)
+
+3.1. O PARCEIRO declara e garante que:
+  a) Todos os dados pessoais inseridos ou importados nas ferramentas de ERP foram obtidos em conformidade com a LGPD e a legislação aplicável;
+  b) Possui fundamento legal válido e documentado (artigos 7º e/ou 11 da LGPD), tais como execução de contrato com o titular, cumprimento de obrigação legal ou regulatória, legítimo interesse ou consentimento livre e informado, quando exigível;
+  c) Disponibilizou aviso ou política de privacidade aos seus clientes e colaboradores, informando a utilização de sistemas em nuvem para viabilizar as rotinas de gestão;
+  d) Não inserirá na plataforma dados pessoais desnecessários, excessivos ou dados sensíveis em desconformidade com a legislação e com o disposto no Anexo I deste Acordo;
+  e) É responsável pela atualização, exatidão, retenção e descarte das informações de seus clientes e equipe registradas no sistema.
+
+3.2. **Responsabilidade do Parceiro:** Cada Parte responderá perante os titulares, a ANPD e terceiros na extensão de suas condutas, decisões, instruções e participação nas operações de tratamento de dados pessoais. O PARCEIRO responderá pelos danos decorrentes de decisões ilícitas, omissão de deveres de transparência perante seus clientes e colaboradores, instruções contrárias à lei transmitidas à DUDIT ou gestão inadequada de suas credenciais de acesso.
+
+---
+
+### CLÁUSULA 4 — OBRIGAÇÕES, MEDIDAS DE SEGURANÇA E RESPONSABILIDADE DA OPERADORA (DUDIT)
+
+4.1. A DUDIT compromete-se a tratar os dados pessoais sob sua custódia técnica com padrão de segurança compatível com a natureza das informações e o porte da operação, adotando medidas técnicas e organizacionais proporcionais destinadas a proteger os dados contra destruição acidental ou ilícita, perda, alteração, acesso não autorizado ou qualquer forma de tratamento inadequado.
+
+4.2. **Controles Técnicos Auditados e Descrição de Implementação:** O ambiente da plataforma DUDIT adota os seguintes controles técnicos:
+  a) **Criptografia em Trânsito:** Comunicação entre navegadores, dispositivos móveis e servidores protegida por protocolos criptográficos seguros (HTTPS sobre TLS 1.3/TLS 1.2 com cabeçalhos HSTS configurados na camada de borda);
+  b) **Criptografia em Repouso:** Dados estruturados e arquivos armazenados em infraestrutura de nuvem gerenciada (Supabase/PostgreSQL e Cloudflare R2) dotados de criptografia em repouso padrão de mercado provida pelos fornecedores de infraestrutura;
+  c) **Criptografia em Nível de Aplicação:** Mecanismo de cifragem simétrica (AES-256-GCM) com chaves derivadas por HKDF por contexto funcional implementado na biblioteca interna (`lib/cryptoService.ts`) para credenciais de pagamento e tokens de integração externos (WhatsApp, SuperFrete, Mercado Pago), condicionado ao provisionamento e ativação de chaves mestras no ambiente operacional;
+  d) **Armazenamento de Senhas:** Senhas de usuários gerenciadas em formato de hash criptográfico irreversível (algoritmo bcrypt provido pela camada de autenticação do Supabase Auth), complementadas por limitação de taxa de requisições (`lib/rate-limiter.ts`) para mitigação de ataques de força bruta;
+  e) **Isolamento Lógico Multi-tenant:** Segregação de dados entre diferentes Parceiros mediante associação obrigatória ao identificador de parceiro (`partner_id`), regras de controle de acesso em nível de linha (Row Level Security - RLS) na camada de dados e verificação programática nas ações de backend (`lib/services/authorized-customer-access.ts`);
+  f) **Controle de Permissões de Equipe (RBAC):** Módulo de controle de acessos da equipe interna do Parceiro permitindo restringir privilégios por loja, tela e operação (proprietário, administrador, gestor, operador e entregador em `lib/permissions/`);
+  g) **Mecanismo de Backups Criptografados:** Mecanismo técnico e utilitários de decodificação e restauração de dumps PostgreSQL criptografados em fluxo com algoritmo AES-256-GCM (`scripts/decrypt-database-backup.mjs` e `scripts/restore-database.mjs`), ressalvando-se que a frequência, execução de rotina contínua e ciclo de expurgo de cópias em produção dependem de parametrização e auditoria da infraestrutura do ambiente produtivo `[CONTROLE EM FASE DE CONFIGURAÇÃO / PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]`;
+  h) **Sanitização de Registros Técnicos:** Rotinas de mascaramento preventivo em código (`lib/secure-logger.ts`) para substituição de dados confidenciais (senhas, tokens, chaves e dados bancários) pelo marcador `[REDACTED]` nos logs tratados pela aplicação;
+  i) **Proteção de Borda e Perímetro:** Uso de rede de distribuição de conteúdo (CDN) e proteção contra ataques DDoS via Cloudflare, com desafios anti-bot no frontend por meio do Cloudflare Turnstile.
+  *(Nota técnica: A plataforma não possui e não promete funcionalidade de autenticação em dois fatores - 2FA no presente momento).*
+
+4.3. **Regime de Responsabilidade da DUDIT:** Sem prejuízo das salvaguardas técnicas adotadas, a responsabilidade civil da DUDIT e as hipóteses de reparação por eventuais danos causados a titulares de dados ou terceiros em decorrência do tratamento observarão estritamente o regime legal estabelecido na LGPD, em especial o art. 42 e seus parágrafos, bem como as causas de exclusão de responsabilidade previstas no art. 43 da referida Lei, não se limitando esta responsabilidade à comprovação exclusiva de culpa caso configurada a responsabilidade legal objetiva ou solidária nos termos da legislação aplicável.
+
+---
+
+### CLÁUSULA 5 — CONFIDENCIALIDADE E REQUISITOS DE PESSOAL
+
+5.1. A DUDIT assegura que todas as pessoas sob sua subordinação autorizadas a acessar dados pessoais no âmbito do suporte técnico, infraestrutura ou manutenção estão vinculadas a obrigações formais de sigilo e confidencialidade, as quais subsistem mesmo após o término de suas funções.
+
+5.2. O acesso interno aos dados do ERP do PARCEIRO é restrito aos colaboradores que justificadamente necessitem de tais informações para prestar suporte solicitado, corrigir falhas técnicas, apurar incidentes ou cumprir determinação legal.
+
+---
+
+### CLÁUSULA 6 — FORNECEDORES E SUBOPERADORES
+
+6.1. **Autorização Geral:** O PARCEIRO expressamente autoriza a DUDIT a contratar fornecedores terceirizados de infraestrutura, hospedagem, tecnologia e serviços especializados estritamente necessários para a execução e disponibilização das ferramentas contratadas.
+
+6.2. **Lista de Suboperadores Efetivos (Processamento sob instruções da DUDIT):** Em atendimento ao dever de transparência, a DUDIT informa os fornecedores técnicos que atuam na qualidade de Suboperadores, seus papéis operacionais e status contratual:
+
+| Fornecedor | Função / Escopo no Sistema | Dados Pessoais Acessados | País de Processamento | Instrumento Contratual de Privacidade |
+|---|---|---|---|---|
+| **Supabase (Supabase Inc. / AWS)** | Banco de dados relacional (PostgreSQL) e serviço de autenticação | Dados cadastrais, pedidos, registros de ERP e logs de acesso | EUA / Servidores AWS na América do Sul | Termos de Serviço / DPA Online de Adesão `[PENDENTE DE FORMALIZAÇÃO BILATERAL ANPD]` |
+| **Cloudflare (Cloudflare Inc.)** | CDN, proteção perimetral (WAF/DDoS), Turnstile e armazenamento R2 | Imagens de catálogo, documentos anexos, tráfego de rede e IPs | EUA / Global (rede Anycast) | Cloudflare Data Processing Addendum (DPA Online) |
+| **Railway (Railway Corp.)** | Hospedagem da aplicação web, execução do backend/API e instância de mensageria | Tráfego de requisições web, metadados de execução transitórios | EUA | Railway Terms of Service / DPA Online de Adesão |
+| **SMTP2GO (Sandev Limited)** | Disparo de e-mails transacionais (ativações, redefinições de senha) | E-mail do destinatário, nome e conteúdo da mensagem | Nova Zelândia / EUA / UE | Termos de Serviço e Política de Privacidade do Fornecedor |
+| **Trigger.dev (Trigger.dev Inc.)** | Orquestração de tarefas assíncronas em segundo plano (jobs operacionais) | Identificadores técnicos de tarefas e metadados transitórios | EUA | Termos de Serviço / DPA Online de Adesão |
+| **Sightengine (Sightengine SAS)** | Moderação automatizada de imagens de produtos/serviços contra ilícitos | Buffers/URLs transitórias de imagens submetidas ao catálogo | França / União Europeia | Termos de Serviço sob legislação GDPR / DPA Online |
+| **Sentry (Functional Software Inc.)** | Diagnóstico de falhas de código e monitoramento de desempenho | Registros técnicos de exceções de código e metadados sanitizados | EUA | Sentry Data Processing Addendum (DPA Online) |
+| **PostHog (PostHog Inc.)** | Telemetria e métricas agregadas de interface (somente mediante consentimento) | Eventos agregados de navegação e comportamento de interface | EUA | PostHog Data Processing Addendum (DPA Online) |
+| **Gateway WhatsApp (Evolution API hospedado no Railway)** | Disparo de notificações operacionais de pedidos | Telefone de destino e texto da mensagem de notificação | EUA / Infraestrutura Railway | Executado em infraestrutura própria sob gestão no Railway |
+
+6.3. **Fornecedores que Atuam como Controladores Independentes ou Prestadores Autônomos:**
+  a) **Mercado Pago (Mercado Pago Instituição de Pagamento Ltda.):** Atua na qualidade de **Controlador Independente**. Como instituição de pagamento regulada pelo Banco Central do Brasil (Bacen), o Mercado Pago determina autonomamente os meios e finalidades relativos à liquidação financeira, prevenção a fraudes, compliance bancário e combate à lavagem de dinheiro (AML), possuindo política de privacidade própria e obrigações regulatórias autônomas;
+  b) **SuperFrete (SuperFrete Tecnologia Ltda.) e Transportadoras Integradas:** Atuam na qualidade de **Controladores Independentes** no tocante à cotação, emissão de Conhecimento de Transporte Eletrônico (CT-e), despacho e transporte físico de mercadorias, determinando os dados indispensáveis para o cumprimento das normas postais e regulatórias da ANTT;
+  c) **Serviços Públicos de Apoio e Geocodificação (ViaCEP, BrasilAPI, OpenStreetMap):** Serviços utilitários abertos de localização que recebem consultas pontuais de CEP ou coordenadas geográficas. A DUDIT não controla o armazenamento técnico de logs HTTP nos servidores desses prestadores, sendo suas práticas regidas por suas respectivas políticas operacionais `[PENDENTE DE VALIDAÇÃO DOCUMENTAL]`.
+
+6.4. **Alterações e Direito de Objeção:** A DUDIT manterá a lista de Suboperadores atualizada na plataforma e notificará o PARCEIRO sobre inclusões ou substituições relevantes de Suboperadores com antecedência razoável de até 10 (dez) dias corridos. O PARCEIRO poderá apresentar objeção técnica justificada no prazo de até 5 (cinco) dias corridos após o aviso, exclusivamente com base em riscos objetivos à proteção de dados pessoais. Caso a DUDIT não possa acomodar a objeção e mantenha o Suboperador, o PARCEIRO terá o direito de rescindir a contratação do módulo de ERP sem multa rescisória, permanecendo responsável pelos valores referentes aos serviços até então usufruídos.
+
+---
+
+### CLÁUSULA 7 — TRANSFERÊNCIA INTERNACIONAL DE DADOS E RESOLUÇÃO CD/ANPD Nº 19/2024
+
+7.1. **Fluxos Internacionais Reais:** Tendo em vista a utilização de serviços de infraestrutura em nuvem globais descritos na Cláusula 6, os dados tratados no ERP poderão ser transferidos para armazenamento ou processamento em servidores localizados fora do território brasileiro. Nesse fluxo:
+  a) **Exportadora:** DUDIT (e os Parceiros cujos dados trafegam pela infraestrutura no Brasil);
+  b) **Importadores:** Os fornecedores de tecnologia internacionais contratados, notadamente Supabase Inc. (EUA), Cloudflare Inc. (EUA), Railway Corp. (EUA), Sandev Limited / SMTP2GO (Nova Zelândia/EUA/UE), Functional Software Inc. / Sentry (EUA), Trigger.dev Inc. (EUA) e Sightengine SAS (França/UE).
+
+7.2. **Mecanismos Jurídicos Utilizados e Status Contratual:**
+  a) O tratamento internacional de dados decorre da contratação necessária de infraestrutura em nuvem para a disponibilização do serviço SaaS solicitado pelo Parceiro (art. 33, IX, da LGPD);
+  b) No âmbito operacional, os fornecedores internacionais disponibilizam aditivos de processamento de dados (DPAs online) e termos de serviço padrão de mercado que preveem medidas técnicas de segurança da informação e confidencialidade;
+  c) **Adequação à Resolução CD/ANPD nº 19/2024:** Tendo em vista que o prazo regulamentar transitório da referida Resolução já se encerrou, a DUDIT declara que a celebração formal de contratos bilaterais específicos com fornecedores estrangeiros contendo o texto das Cláusulas-Padrão Contratuais da ANPD encontra-se em fase de avaliação jurídica e operacional `[PENDENTE DE FORMALIZAÇÃO BILATERAL DE CLÁUSULAS-PADRÃO DA ANPD COM FORNECEDORES ESTRANGEIROS]`;
+  d) **Compromisso de Integralidade:** Fica expressamente estipulado que, sempre que for adotado formalmente o mecanismo de Cláusulas-Padrão Contratuais aprovado pela ANPD entre as Partes ou com os suboperadores, será incorporado o **texto oficial integral e sem alterações**, conforme publicado no Anexo da Resolução CD/ANPD nº 19/2024.
+
+---
+
+### CLÁUSULA 8 — GESTÃO E NOTIFICAÇÃO DE INCIDENTES DE SEGURANÇA
+
+8.1. **Comunicação Contratual em até 24 Horas:** Caso a DUDIT tome conhecimento e confirme a ocorrência de qualquer incidente de segurança da informação (como acessos não autorizados, vazamento, alteração indevida ou destruição) que envolva dados pessoais tratados no ERP em nome do PARCEIRO, a DUDIT comunicará o PARCEIRO em até **24 (vinte e quatro) horas** contadas da ciência do evento.
+
+8.2. **Natureza Estritamente Contratual do Prazo:** O prazo de até 24 (vinte e quatro) horas previsto no item 8.1 constitui obrigação estritamente contratual entre a DUDIT e o PARCEIRO destinada a viabilizar a cooperação técnica célere entre as Partes, **não se confundindo com o prazo regulatório da ANPD**, o qual impõe ao Controlador o dever de comunicar a autoridade e os titulares no prazo estabelecido na regulamentação aplicável (Resolução CD/ANPD nº 15/2024, que fixa o prazo de 3 dias úteis para comunicação de incidentes relevantes).
+
+8.3. **Fluxo de Notificação e Atualização:** A comunicação inicial será encaminhada ao e-mail cadastrado pelo PARCEIRO, mesmo que as apurações técnicas ainda estejam em curso, contendo:
+  a) A descrição geral da natureza do incidente;
+  b) As categorias de dados e titulares potencialmente impactados até então identificados;
+  c) As medidas de contenção técnica adotadas ou recomendadas;
+  d) Canal de contato direto para acompanhamento.
+A DUDIT fornecerá relatórios e informações complementares conforme forem apurados, cooperando com o PARCEIRO para o atendimento de seus deveres perante a ANPD e os titulares.
+
+8.4. A notificação de um incidente pela DUDIT ao PARCEIRO não configura, por si só, assunção de culpa ou responsabilidade exclusiva pelo evento.
+
+---
+
+### CLÁUSULA 9 — ATENDIMENTO AOS DIREITOS DOS TITULARES DE DADOS
+
+9.1. **Regra Geral:** Em relação aos dados tratados no âmbito do ERP, cabe ao PARCEIRO, na condição de Controlador, analisar, deliberar e responder diretamente às solicitações de exercício de direitos dos titulares (confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação ou revogação de consentimento).
+
+9.2. **Demandas Recebidas pela DUDIT:** Caso um cliente, colaborador ou terceiro encaminhe solicitação diretamente aos canais da DUDIT referente a dados tratados no ERP de determinado PARCEIRO:
+  a) A DUDIT receberá a solicitação e identificará a qual PARCEIRO o registro pertence;
+  b) A DUDIT encaminhará formalmente e de forma segura a demanda ao PARCEIRO responsável no prazo operacionalmente viável de **até 2 (dois) dias úteis**, sempre que possível, com **encaminhamento imediato** em situações de urgência manifesta;
+  c) A DUDIT informará ao solicitante que o pedido foi direcionado ao Controlador responsável para resposta direta.
+
+9.3. **Assistência Técnica da DUDIT:** A DUDIT disponibiliza funcionalidades operacionais no painel do ERP para que o PARCEIRO possa realizar consultas cadastrais, retificações, exportações de dados e exclusão/anonimização de registros de clientes e equipe sob sua gestão.
+
+9.4. **Solicitações sobre Tratamentos Próprios da DUDIT:** Quando a solicitação disser respeito a operações nas quais a DUDIT atua como Controladora Independente (como cadastro da conta geral ou logs de acesso próprios), a própria DUDIT processará e responderá ao titular nos termos da LGPD.
+
+---
+
+### CLÁUSULA 10 — COOPERAÇÃO, AUDITORIAS E PRESERVAÇÃO DOS PODERES DA ANPD
+
+10.1. A DUDIT prestará cooperação razoável e juridicamente cabível ao PARCEIRO para que este cumpra suas obrigações legais perante a ANPD e os titulares de dados, incluindo o fornecimento de informações técnicas sobre a arquitetura dos sistemas para elaboração de Relatórios de Impacto à Proteção de Dados Pessoais (RIPD/DPIA), respeitados os segredos comercial e industrial da plataforma.
+
+10.2. **Auditorias e Verificações:** A verificação de conformidade da DUDIT poderá ser realizada mediante o fornecimento de declarações técnicas, relatórios de segurança e respostas a questionários de privacidade razoáveis. Caso auditoria adicional seja expressamente exigida por autoridade competente ou legalmente cabível, as Partes acordarão previamente cronograma, escopo e salvaguardas de confidencialidade, de modo a preservar a segurança e o sigilo de dados de outros clientes e parceiros da plataforma.
+
+10.3. **Poderes de Fiscalização da ANPD:** Nenhuma disposição deste Acordo restringe, limita ou prejudica os poderes legais de fiscalização, requisição de informações, auditoria, monitoramento e aplicação de sanções administrativas atribuídos à Autoridade Nacional de Proteção de Dados (ANPD) nos termos da LGPD e de suas regulamentações, comprometendo-se as Partes a cumprir prontamente as determinações e solicitações expedidas pela autoridade.
+
+---
+
+### CLÁUSULA 11 — ENCERRAMENTO, EXPORTAÇÃO E DESCARTE DE DADOS
+
+11.1. **Exportação Prévia:** Antes de requerer o encerramento de sua conta ou do módulo de ERP, o PARCEIRO poderá exportar os dados operacionais de seus clientes, pedidos e produtos por meio dos recursos disponíveis na plataforma.
+
+11.2. **Procedimentos de Descarte na Base Ativa:** Após a solicitação definitiva de encerramento da conta pelo PARCEIRO:
+  a) A DUDIT iniciará os procedimentos técnicos para a exclusão lógica e anonimização dos registros operacionais da base ativa do ERP no prazo razoável estimado em até 30 (trinta) dias úteis `[PENDENTE DE VALIDAÇÃO DE CRONOGRAMA EM PRODUÇÃO]`;
+  b) Eventuais pendências financeiras ou comerciais entre as Partes não autorizam a retenção indiscriminada de dados pessoais do ERP. A retenção pela DUDIT limitar-se-á estritamente aos documentos cadastrais e registros fiscais indispensáveis à cobrança legal ou ao cumprimento de obrigações tributárias e contábeis próprias (art. 16, I e II, da LGPD);
+  c) Registros transacionais e de pedidos poderão ter seus dados pessoais anonimizados, preservando-se apenas valores contábeis e fiscais exigidos pela legislação.
+
+11.3. **Retenções Legalmente Justificadas:** A DUDIT conservará os dados e registros estritamente necessários para:
+  a) O cumprimento de deveres legais de guarda de registros previstos na legislação brasileira, inclusive a retenção de registros de acesso a aplicações de internet quando e na medida em que o art. 15 da Lei nº 12.965/2014 for legalmente exigível da DUDIT `[PENDENTE DE VALIDAÇÃO JURÍDICA QUANTO AO ENQUADRAMENTO DA OPERADORA]`, não se aplicando essa retenção aos cadastros gerais do ERP;
+  b) O exercício regular de direitos em processos judiciais, administrativos ou arbitrais;
+  c) O cumprimento de ordens emanadas de autoridades competentes.
+
+11.4. **Cópias de Segurança (Backups Residuais):** O PARCEIRO reconhece que cópias de segurança geradas para fins de integridade e recuperação de desastres não são passíveis de expurgo individualizado imediato devido à natureza compactada e criptografada dos snapshots globais do banco de dados. Tais cópias permanecem isoladas, seguras e inacessíveis para o uso operacional corrente, sendo descontinuadas e sobrescritas de forma automatizada ao longo do ciclo técnico regular de rotação de backups adotado pela infraestrutura `[PRAZO EXATO DE RETENÇÃO TÉCNICA DE BACKUPS: PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]`.
+
+---
+
+### CLÁUSULA 12 — RESPONSABILIDADES E INDENIZAÇÃO
+
+12.1. A responsabilidade civil das Partes por danos patrimoniais, morais, individuais ou coletivos causados em virtude do tratamento de dados pessoais observará integralmente os artigos 42 e 43 da LGPD:
+  a) A DUDIT, na qualidade de Operadora nas rotinas do ERP, responde solidariamente pelos danos causados pelo tratamento quando descumprir as obrigações da legislação de proteção de dados pessoais ou quando não tiver seguido as instruções lícitas do PARCEIRO, ressalvadas as hipóteses de exclusão de responsabilidade previstas no art. 43 da LGPD;
+  b) O PARCEIRO, na qualidade de Controlador, responde pelos danos resultantes do tratamento de dados pessoais decorrentes de suas próprias decisões, instruções ilícitas ou descumprimento da legislação aplicável;
+  c) A Parte que comprovar a ocorrência de quaisquer das hipóteses do art. 43 da LGPD (não realização do tratamento atribuído, ausência de violação à legislação ou fato exclusivo do titular ou de terceiro) não será responsabilizada;
+  d) À Parte que reparar o dano ao titular assiste o direito de regresso contra a outra Parte na medida em que esta tenha dado causa ao evento danoso, nos termos do art. 42, § 4º, da LGPD.
+
+12.2. O PARCEIRO obriga-se a defender, indenizar e manter a DUDIT indene contra quaisquer condenações, perdas comprovadas, acordos judiciais, custas processuais, honorários advocatícios e penalidades administrativas aplicadas pela ANPD decorrentes diretamente de:
+  a) Inserção ou tratamento de dados pessoais no ERP sem fundamento legal idôneo pelo PARCEIRO;
+  b) Prática de comunicações não autorizadas, assédio ou spam pelo PARCEIRO;
+  c) Instruções contrárias à lei emitidas pelo PARCEIRO.
+
+12.3. A DUDIT responderá perante o PARCEIRO pelas perdas e danos comprovados que der causa em decorrência do descumprimento de suas obrigações contratuais ou da legislação de proteção de dados pessoais, observados os critérios de nexo de causalidade e as hipóteses de exclusão legalmente previstas.
+
+12.4. Nenhuma disposição deste Acordo tem por objetivo excluir ou limitar responsabilidades legais cuja exclusão ou limitação seja vedada pela legislação brasileira.
+
+---
+
+### CLÁUSULA 13 — DISPOSIÇÕES GERAIS, VIGÊNCIA E ACEITE ELETRÔNICO
+
+13.1. **Vigência:** Este DPA entra em vigor na data de seu aceite eletrônico pelo PARCEIRO e permanecerá válido enquanto a conta do PARCEIRO estiver ativa e a DUDIT mantiver a custódia técnica de dados pessoais em nome do PARCEIRO.
+
+13.2. **Prevalência:** Em caso de divergência entre este DPA e os Termos de Uso no tocante ao tratamento de dados pessoais de terceiros no ERP, prevalecerão as disposições deste DPA.
+
+13.3. **Comprovação do Aceite e Critérios de Retenção:** O aceite deste DPA é registrado de forma eletrônica mediante manifestação de concordância no momento do cadastro ou ativação do ERP. Os registros de aceite serão conservados durante a vigência da relação contratual entre a DUDIT e o PARCEIRO e, após seu encerramento, pelo período necessário e legalmente justificado para o cumprimento de obrigações regulatórias e fiscais ou para o exercício regular de direitos em processos judiciais, administrativos ou arbitrais, respeitados os prazos prescricionais ou decadenciais especificamente aplicáveis a cada relação jurídica (em conformidade com o art. 16 da LGPD e a legislação civil/tributária). O sistema registrará e armazenará:
+  a) Identificador único da conta e do usuário autenticado;
+  b) Versão exata do DPA aceita e identificador de documento;
+  c) Hash criptográfico (SHA-256) do texto vigente no momento do aceite;
+  d) Data, hora e endereço IP do solicitante.
+
+13.4. **Foro:** Fica eleito o Foro da Comarca de Lucélia/SP para dirimir quaisquer dúvidas ou litígios oriundos deste Acordo, respeitadas as regras de competência legalmente aplicáveis.
+
+---
+
+### ANEXO I — QUADRO DE ESCOPO DO TRATAMENTO DE DADOS PESSOAIS NO ERP
+
+| Parâmetro | Detalhamento Técnico e Operacional |
+|---|---|
+| **Papel do PARCEIRO** | **Controlador de Dados Pessoais** |
+| **Papel da DUDIT** | **Operadora de Dados Pessoais** (provedora de infraestrutura de software SaaS) |
+| **Categorias de Titulares** | • Clientes e compradores do Parceiro<br>• Colaboradores, funcionários e equipe interna do Parceiro (`partner_users`)<br>• Fornecedores, parceiros comerciais e prestadores de serviços do Parceiro<br>• Destinatários finais de pedidos e entregas |
+| **Classificação Legal dos Dados Tratados** | **A) DADOS PESSOAIS COMUNS (art. 5º, I, LGPD):**<br>• **Identificação e Contato:** Nome completo, CPF, CNPJ, e-mail, telefone/WhatsApp, endereço residencial ou de entrega.<br>• **Pedidos e Consumo:** Histórico de compras, produtos e serviços contratados, quantidades, valores, forma de pagamento, status de preparo e entrega.<br>• **Colaboradores e Equipe:** Nome, e-mail comercial, telefone, cargo/função, loja associada, permissões de acesso atribuídas e registros de auditoria interna (`audit_logs`).<br>• **Agendamentos e Serviços:** Data, horário, profissional responsável, especificações do serviço e observações operacionais do atendimento.<br>• **Financeiro no ERP:** Registros de contas a pagar/receber, conciliações, despesas e fluxo de caixa interno.<br>*(Nota jurídica: Nenhum dos dados acima é classificado como dado pessoal sensível pela LGPD, devendo receber o tratamento e proteção cabíveis aos dados pessoais comuns).*<br><br>**B) DADOS PESSOAIS SENSÍVEIS (art. 5º, II, LGPD) — RESTRIÇÃO E VEDAÇÃO:**<br>• O ERP da DUDIT é destinado à gestão comercial e empresarial geral.<br>• É **expressamente vedado** ao PARCEIRO cadastrar dados pessoais sensíveis (tais como dados de saúde, convicção religiosa, dados biométricos, opiniões políticas ou vida sexual) nas ferramentas padrão do ERP, salvo se houver funcionalidade expressamente desenhada e homologada para essa finalidade (como ficha de anamnese para estabelecimentos de saúde/estética, se aplicável), estrita necessidade comprovada e fundamentação em uma das bases legais específicas do art. 11 da LGPD, assumindo o PARCEIRO a exclusiva responsabilidade por essa inserção. |
+| **Operações de Tratamento Realizadas** | Coleta (via inserção pelo Parceiro ou integração de pedido), registro, armazenamento em nuvem, organização, estruturação, consulta no painel, processamento de cálculos, transmissão criptografada com suboperadores autorizados, anonimização e eliminação |
+| **Finalidades do Tratamento** | • Gestão operacional de pedidos, vendas e orçamentos<br>• Controle de estoque de produtos e catálogo de serviços<br>• Agendamento de atendimentos e compromissos<br>• Gestão interna de equipe e controle de acessos do estabelecimento<br>• Organização financeira e comercial interna do negócio<br>• Apoio à logística e emissão de comprovantes operacionais de entrega |
+| **Duração do Tratamento** | Durante a vigência da conta e contratação do ERP pelo Parceiro, acrescida do prazo técnico de exclusão da base ativa e dos períodos de retenção legalmente justificados |
+| **Instruções do Controlador** | Os dados pessoais devem ser tratados unicamente para disponibilizar e manter as funcionalidades do software de gestão conforme os comandos, cadastros e parametrizações configurados pelo Parceiro na interface da DUDIT |
+
+---
+**DUDIT — Plataforma Tecnológica**  
+Lucélia/SP — dudit.com.br

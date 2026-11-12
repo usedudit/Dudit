@@ -37,7 +37,7 @@ export default function PrivacyPage() {
                                 Política de Privacidade
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
-                                Versão 1.2 - Última atualização: Outubro de 2026
+                                Versão 1.2 - Última atualização: Novembro de 2026
                             </p>
                         </motion.div>
                     </div>
@@ -60,7 +60,7 @@ export default function PrivacyPage() {
                         </div>
 
                         <p className="rounded-xl border border-brand-border p-5 text-brand-inactive-text">
-                            O papel da DUDIT depende da finalidade de cada operação. A DUDIT atua como controladora dos dados de cadastro, segurança, faturamento e funcionamento do marketplace. Quando um Parceiro usa o ERP para gerir dados de seus clientes ou equipe, o Parceiro define as finalidades desse uso e a DUDIT pode atuar como operadora, conforme as instruções e o contrato aplicável.
+                            O papel da DUDIT depende da finalidade de cada operação. A DUDIT atua como controladora dos dados de cadastro, segurança, faturamento e funcionamento do marketplace. Quando um Parceiro usa o ERP para gerir dados de seus clientes ou equipe, o Parceiro define as finalidades desse uso e a DUDIT atua como operadora desses dados sob instruções do Parceiro, sendo essa relação disciplinada de forma complementar pelo <a href="/institucional/dpa" className="text-brand-green font-medium underline">Acordo de Tratamento de Dados (DPA)</a>. Para outras finalidades próprias (como segurança da plataforma, prevenção a fraudes e cumprimento de obrigações legais), a DUDIT atua como controladora independente.
                         </p>
 
                         <hr className="border-brand-border" />
@@ -203,8 +203,9 @@ export default function PrivacyPage() {
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
                                     <li><strong className="text-brand-dark">Mercado Pago:</strong> dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);</li>
                                     <li><strong className="text-brand-dark">Superfrete / Transportadoras:</strong> nome, endereço e telefone do destinatário para geração de etiquetas de envio;</li>
+                                    <li><strong className="text-brand-dark">Entregadores participantes:</strong> quando houver solicitação de entrega local, as ofertas disponíveis no painel do entregador exibem os dados de rota de forma restrita e mascarada (bairro e cidade/UF), ocultando nome completo, telefone e endereço exato com número. Somente após a aceitação formal da corrida pelo entregador participante é que os dados necessários para a execução (nome do destinatário, telefone de contato e endereço completo de entrega) são revelados ao entregador responsável;</li>
                                     <li><strong className="text-brand-dark">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques, incluindo o serviço <strong>Turnstile</strong>, e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);</li>
-                                    <li><strong className="text-brand-dark">Supabase e hospedagem:</strong> autenticação, banco de dados e execução da plataforma; <strong>Sentry:</strong> diagnóstico de erros; <strong>PostHog:</strong> métricas e gravação de sessão somente após aceite; <strong>SMTP2GO:</strong> e-mails operacionais; <strong>ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap:</strong> consulta de CEP e geocodificação de endereços para obter coordenadas aproximadas.</li>
+                                    <li><strong className="text-brand-dark">Supabase e hospedagem (Railway):</strong> autenticação, banco de dados e execução da plataforma; <strong>Sentry:</strong> diagnóstico de erros; <strong>PostHog:</strong> métricas e gravação de sessão somente após aceite; <strong>SMTP2GO:</strong> e-mails operacionais; <strong>ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap:</strong> consulta de CEP e geocodificação de endereços para obter coordenadas aproximadas.</li>
                                     <li><strong className="text-brand-dark">Autoridades competentes, mediante obrigação legal ou ordem judicial:</strong> quando exigido por lei, decisão judicial ou outra hipótese autorizada pela LGPD, para apuração de fraudes, ilícitos ou proteção de direitos, conforme item 2.4 dos Termos de Uso.</li>
                                 </ul>
                                 <p className="mt-4"><strong>3.1. Cloudflare Turnstile:</strong> utilizamos o Cloudflare Turnstile para proteger nossos formulários e o processo de autenticação contra acessos automatizados (bots). Ao utilizar esses recursos, a Cloudflare pode coletar e processar dados técnicos e de uso para operar e aprimorar o serviço, conforme o <a href="https://www.cloudflare.com/pt-br/turnstile-privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-brand-green font-medium underline underline-offset-4">Adendo de Privacidade do Turnstile da Cloudflare</a>, que é incorporado a esta Política de Privacidade e aplica-se especificamente ao serviço Turnstile.</p>
@@ -230,7 +231,7 @@ export default function PrivacyPage() {
                                 LOGS E SEGURANÇA
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
-                                <p><strong>5.1.</strong> Os dados são armazenados em servidores seguros (Supabase/Vercel), com criptografia em trânsito (HTTPS/TLS) e em repouso.</p>
+                                <p><strong>5.1.</strong> Os dados são armazenados em servidores seguros (Supabase/Railway), com criptografia em trânsito (HTTPS/TLS) e em repouso.</p>
                                 <p><strong>5.2.</strong> Chaves e tokens sensíveis são armazenados com criptografia adicional, com sistema de rotação de chaves (master key versionada) para garantir que eventual comprometimento não exponha dados históricos.</p>
                                 <p><strong>5.3.</strong> Senhas nunca são armazenadas em texto simples - utilizamos hash seguro (bcrypt ou equivalente).</p>
                                 <p><strong>5.4.</strong> Tokens de integração com gateways de pagamento são criptografados e nunca expostos em logs ou interfaces.</p>

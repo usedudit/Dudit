@@ -1,17 +1,6 @@
-Aaaah, agora entendi certinho kkk. Você quer que eu use o seu texto original como base e vá devolvendo ele já corrigido, seção por seção, mantendo o mesmo padrão de títulos, numeração e divisórias.
+# TERMOS DE USO — PLATAFORMA DUDIT
 
-Vou fazer assim:
-
-- Preservar a estrutura e a organização que você já usa.
-- Reescrever cláusulas que possam deixar a Dudit vulnerável ou que tentem excluir responsabilidades que a lei não permite excluir.
-- Acrescentar o que estiver faltando, sem transformar tudo em um documento com outro formato.
-- Manter os detalhes reais do funcionamento da Dudit, sem inventar funcionalidades ou procedimentos.
-
-Vou começar do início e seguir a numeração do seu documento. Você poderá copiar e substituir diretamente.
-
-# TERMOS DE USO E POLÍTICA DE PRIVACIDADE — PLATAFORMA DUDIT
-
-Versão 2.0 — Última atualização: Novembro de 2026
+**Versão 1.1 — Última atualização: Novembro de 2026**
 
 Estes Termos de Uso (“Termos”) regem o acesso e a utilização da plataforma DUDIT, operada por [RAZÃO SOCIAL OU NOME CIVIL COMPLETO DA OPERADORA], inscrita no [CNPJ ou CPF, conforme a estrutura jurídica aplicável], com endereço para contato em [ENDEREÇO COMPLETO] e e-mail [E-MAIL OFICIAL DE CONTATO], doravante denominada “DUDIT”.
 
@@ -20,8 +9,6 @@ Ao utilizar a DUDIT, seja como PARCEIRO (Vendedor/Prestador de Serviços), USUÁ
 A utilização de determinadas funcionalidades poderá exigir aceites específicos, autorizações ou condições complementares, apresentados no momento de sua contratação ou utilização.
 
 Uso por menores de idade: O cadastro como Parceiro, para exercer atividade comercial ou assumir obrigações contratuais, deverá observar os requisitos de capacidade civil e representação previstos na legislação brasileira. O acesso de crianças e adolescentes deverá respeitar o Estatuto da Criança e do Adolescente, a Lei Geral de Proteção de Dados (LGPD) e as normas aplicáveis aos serviços digitais, inclusive o ECA Digital. A DUDIT poderá aplicar restrições de idade e de funcionalidades quando necessárias à proteção dos menores e ao cumprimento da legislação. Pais e responsáveis devem acompanhar a utilização da plataforma por crianças e adolescentes, sem prejuízo das responsabilidades legais próprias da DUDIT e dos demais participantes.
-
-# TERMOS DE USO
 
 ## 1. DEFINIÇÕES
 
@@ -93,6 +80,8 @@ Para fins destes Termos, os seguintes termos têm o significado indicado abaixo:
 3.10. Uso Opcional das Ferramentas de Gestão: As ferramentas de ERP, cadastro de clientes, estoque, pedidos e organização financeira são disponibilizadas como recursos de apoio à gestão do Parceiro. O Parceiro permanece responsável por conferir os registros, validar informações e manter os controles necessários ao seu negócio. A DUDIT não substitui serviços contábeis, jurídicos, fiscais ou profissionais especializados.
 
 3.11. Documentos Fiscais: A DUDIT não substitui os sistemas fiscais do Parceiro e não emite, por meio de simples recibos, comprovantes ou cupons não fiscais, documentos fiscais que sejam legalmente exigidos. O Parceiro deverá emitir notas fiscais e demais documentos fiscais quando obrigado pela legislação aplicável à sua atividade.
+
+3.12. Tratamento de Dados no Módulo de Gestão (ERP) e Acordo de Tratamento de Dados (DPA): Quando o Parceiro utiliza as ferramentas de gestão empresarial (ERP) da DUDIT para armazenar e processar dados de seus próprios clientes, colaboradores ou fornecedores, o Parceiro atua como Controlador e a DUDIT atua como Operadora desses dados, nos termos da Lei Geral de Proteção de Dados (LGPD). As obrigações e salvaguardas técnicas e jurídicas aplicáveis a esse tratamento são disciplinadas no Acordo de Tratamento de Dados (DPA) da DUDIT, disponível em /institucional/dpa, o qual complementa estes Termos de Uso e integra o vínculo contratual entre as partes.
 
 ## 4. POLÍTICA DE CONTEÚDO
 
@@ -234,6 +223,8 @@ Para fins destes Termos, os seguintes termos têm o significado indicado abaixo:
 
 9.3. Entregas e Logística Local: A DUDIT poderá disponibilizar recursos para que Parceiros solicitem entregas locais a entregadores previamente convidados ou habilitados. O entregador poderá aceitar ou recusar cada solicitação, não existindo garantia de disponibilidade, cobertura ou conclusão de entrega. Quando a solicitação for aceita, as partes envolvidas deverão observar as informações e condições apresentadas, incluindo retirada, destino, valores, forma de pagamento e instruções necessárias.
 
+Para fins de privacidade e segurança dos titulares (consumidores e destinatários), a plataforma adota mecanismos de minimização de dados no módulo de entregas: antes do aceite da corrida pelo entregador, são exibidos apenas dados aproximados e estritamente necessários para a tomada de decisão (como bairro, cidade, distância estimada, taxa de entrega e modalidade de pagamento), mantendo-se mascarados o endereço completo (número e complemento), o nome completo e o telefone de contato. Somente após a confirmação do aceite pelo entregador responsável, os dados necessários à execução da entrega e ao contato indispensável são revelados. Concluída a entrega, o acesso aos dados é restrito ao histórico estritamente necessário à prestação de contas.
+
 A execução material da entrega será realizada pelo entregador que aceitar a solicitação, conforme as condições acordadas e a legislação aplicável. O Parceiro deverá preparar e disponibilizar corretamente o produto, enquanto o Usuário deverá fornecer informações adequadas de recebimento. A DUDIT atua na disponibilização da ferramenta tecnológica e na organização das solicitações, sem garantir a disponibilidade de entregadores ou o resultado de cada entrega. Essa delimitação não afasta eventual responsabilidade legal da DUDIT por falhas próprias de seus serviços ou por obrigações que a legislação lhe atribua.
 
 9.4. Envios Nacionais: Os envios para outras regiões do Brasil poderão ocorrer por meio de integrações com serviços de logística, como SuperFrete, quando disponíveis. Essas operações são distintas das solicitações de entregas locais. As condições de transporte, coleta, postagem, rastreamento, prazos e tratamento de ocorrências dependerão do serviço contratado e da transportadora responsável, sem prejuízo das obrigações legais do vendedor perante o consumidor.
@@ -297,17 +288,3 @@ A execução material da entrega será realizada pelo entregador que aceitar a s
 14.3. Caso alguma disposição destes Termos seja considerada inválida ou inexigível, as demais disposições permanecerão em vigor na medida permitida pela legislação.
 
 14.4. A eventual tolerância da DUDIT quanto ao descumprimento de alguma disposição não representará renúncia de direito, alteração contratual ou impedimento de exigir seu cumprimento posteriormente.
-
-# OBSERVAÇÕES IMPORTANTES PARA A PUBLICAÇÃO
-
-1. Preencher corretamente a razão social ou nome civil da operadora, CPF/CNPJ, endereço e e-mail oficial.
-2. Confirmar se a pessoa ou empresa indicada no início é efetivamente a responsável pela operação da Dudit e se os dados estão coerentes com o rodapé e demais páginas institucionais.
-3. Conferir se as regras de downgrade, arquivamento, cancelamento e exportação descritas correspondem exatamente ao funcionamento do sistema.
-4. Confirmar as funcionalidades reais de pagamento, Mercado Pago, SuperFrete e entregas locais.
-5. Implementar ou conferir o registro de versão dos Termos e dos aceites dos usuários.
-6. Publicar a Política de Privacidade em documento próprio, com informações completas sobre dados pessoais, finalidades, bases legais, compartilhamentos, retenção, direitos dos titulares e canais de contato.
-7. Submeter a versão final à revisão de advogado com experiência em tecnologia, direito do consumidor e proteção de dados.
-
-Importante: o documento acima revisa a parte de Termos de Uso do texto que você enviou. O arquivo original termina na seção 14 e não contém o texto completo da Política de Privacidade, apesar de mencioná-la no título. Por isso, não misturei uma política de privacidade genérica aqui. Ela precisa ser revisada e publicada separadamente, de forma coerente com estes Termos e com o tratamento de dados que realmente acontece na Dudit.
-
-Também deixei alguns pontos como dependentes de confirmação porque não seria correto prometer uma funcionalidade, procedimento de segurança ou garantia que talvez ainda não esteja implementada. A próxima etapa é revisar a Política de Privacidade no mesmo padrão do seu documento.

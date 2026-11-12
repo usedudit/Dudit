@@ -434,7 +434,9 @@ export function CheckoutFulfillmentPanel({
           </AnimatePresence>
 
           {/* Entrega própria (frete do vendedor) */}
-          {!isPickup && canShowLocalDelivery && (
+          {/* Não mostrar "Entrega pelo vendedor" quando há opções de transportadora,
+             pois isso indica que o endereço está fora do raio de entrega do vendedor */}
+          {!isPickup && canShowLocalDelivery && carrierOptions.length === 0 && !carrierQuoteLoading && (
             <div className="space-y-4 mt-4">
               <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
                 Entrega pelo vendedor

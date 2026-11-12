@@ -436,6 +436,19 @@ export default function QuotesPage({
         debouncedSearch.length > 0
     const hasQuotes = (currentQuotes?.length || 0) > 0
 
+    const tabCounts = useMemo(() => {
+        if (!currentQuotes) return { Todos: 0, Enviados: 0, Aprovados: 0, Rejeitados: 0, Expirados: 0 }
+        let Todos = currentQuotes.length, Enviados = 0, Aprovados = 0, Rejeitados = 0, Expirados = 0
+        for (const q of currentQuotes) {
+            const status = q.status
+            if (status === "sent" || status === "pending_client" || status === "viewed") Enviados++
+            else if (status === "approved") Aprovados++
+            else if (status === "rejected") Rejeitados++
+            else if (status === "expired") Expirados++
+        }
+        return { Todos, Enviados, Aprovados, Rejeitados, Expirados }
+    }, [currentQuotes])
+
     const handleExport = useCallback(() => {
         void exportData(
             {
@@ -663,6 +676,7 @@ export default function QuotesPage({
                                     viewMode={viewMode}
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
+                                    tabCounts={tabCounts}
                                 />
                             )}
 

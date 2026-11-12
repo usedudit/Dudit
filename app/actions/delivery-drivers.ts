@@ -8,6 +8,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { DeliveryBucket } from "@/lib/delivery/types"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { decryptCPF } from "@/lib/crypto"
+import { getMaskedDeliveryLocation } from "@/lib/utils/address"
 
 function hashInviteToken(token: string) {
   return createHash("sha256").update(token).digest("hex")
@@ -375,7 +376,29 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
     }
   }
 
-  const items = Array.from(groupedMap.values())
+  const items = Array.from(groupedMap.values()).map((offer) => {
+    const rawDeliveryAddress = offer.delivery_address
+    const maskedDeliveryAddress = getMaskedDeliveryLocation(rawDeliveryAddress)
+    const isMulti = (offer.orders?.length || 0) > 1
+
+    const sanitizedOrders = (offer.orders || []).map((ord: any, idx: number) => ({
+      ...ord,
+      customer_name: isMulti ? `Destinatário (Parada ${idx + 1})` : "Destinatário",
+      customer_phone: "",
+      customer_email: "",
+      delivery_address: getMaskedDeliveryLocation(ord.delivery_address),
+    }))
+
+    return {
+      ...offer,
+      customer_name: isMulti ? `${offer.order_count || sanitizedOrders.length} destinatários` : "Destinatário",
+      customer_phone: "",
+      customer_email: "",
+      delivery_address: maskedDeliveryAddress,
+      orders: sanitizedOrders,
+    }
+  })
+
   return { success: true as const, items }
 }
 

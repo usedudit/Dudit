@@ -547,6 +547,12 @@ export function CheckoutPageClient() {
     const [serviceAvailLoading, setServiceAvailLoading] = useState(false)
 
     const displayableCoupons = useMemo(() => availableCoupons.filter((c) => !c.blocked), [availableCoupons])
+    const sortedAvailableCoupons = useMemo(() => {
+        return [...availableCoupons].sort((a, b) => {
+            if (a.blocked !== b.blocked) return a.blocked ? 1 : -1
+            return 0
+        })
+    }, [availableCoupons])
 
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
@@ -2346,21 +2352,29 @@ export function CheckoutPageClient() {
                 )}
             </div>
 
-            {couponsEnabled && (displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+            {couponsEnabled && (availableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                 <div className="mb-4 space-y-2">
                     <ListItem
                         icon={TagIcon}
                         title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
                         titleClassName="text-sm"
-                        description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(displayableCoupons.length))}
+                        description={
+                            appliedCoupon
+                                ? "Cupom aplicado"
+                                : couponListLoading
+                                    ? "Verificando cupons disponíveis..."
+                                    : displayableCoupons.length > 0
+                                        ? getCouponCountLabel(displayableCoupons.length)
+                                        : (availableCoupons.length === 1 ? "1 cupom disponível" : `${availableCoupons.length} cupons disponíveis`)
+                        }
                         className="px-0 py-4 gap-4 border-y border-x-0 border-brand-border dark:border-dark-border !bg-transparent !rounded-none shadow-none hover:border-brand-border dark:hover:border-dark-border"
                         onClick={() => {
-                            if (!couponListLoading && displayableCoupons.length > 0) {
+                            if (!couponListLoading && availableCoupons.length > 0) {
                                 setSelectedCouponId(appliedCoupon?.id || "")
                                 setShowCouponModal(true)
                             }
                         }}
-                        showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
+                        showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
                         right={
                             appliedCoupon ? (
                                 <button
@@ -2562,7 +2576,9 @@ export function CheckoutPageClient() {
     }
 
     const loadApplicableCoupons = async () => {
-        if (!partnerId || !userId || !couponsEnabled) {
+        const effectivePartnerId = partnerId || checkoutContext?.partner?.id
+        const effectiveUserId = userId || user?.id
+        if (!effectivePartnerId || !effectiveUserId || !couponsEnabled) {
             setAvailableCoupons([])
             return
         }
@@ -2572,8 +2588,8 @@ export function CheckoutPageClient() {
 
         try {
             const result = await listApplicableMarketplaceCouponsAction({
-                partnerId,
-                customerId: userId,
+                partnerId: effectivePartnerId,
+                customerId: effectiveUserId,
                 subtotal: totalAmount,
                 items: couponItems,
             })
@@ -2611,7 +2627,7 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         void loadApplicableCoupons()
-    }, [partnerId, userId, totalAmount, couponItemsKey, couponsEnabled])
+    }, [partnerId, checkoutContext?.partner?.id, userId, user?.id, totalAmount, couponItemsKey, couponsEnabled])
 
     // Cupons desativados: limpa qualquer código aplicado para não enviá-lo ao
     // checkout nem exibi-lo no resumo/WhatsApp.
@@ -4459,20 +4475,28 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Coupon Selector */}
-                                {couponsEnabled && (displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+                                {couponsEnabled && (availableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                                     <FormSection title="Cupom de Desconto" hasSeparator>
                                         <ListItem
                                             icon={TagIcon}
                                             title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
-                                            description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(displayableCoupons.length))}
+                                            description={
+                                                appliedCoupon
+                                                    ? "Cupom aplicado"
+                                                    : couponListLoading
+                                                        ? "Verificando cupons disponíveis..."
+                                                        : displayableCoupons.length > 0
+                                                            ? getCouponCountLabel(displayableCoupons.length)
+                                                            : (availableCoupons.length === 1 ? "1 cupom disponível" : `${availableCoupons.length} cupons disponíveis`)
+                                            }
                                             className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                             onClick={() => {
-                                                if (!couponListLoading && displayableCoupons.length > 0) {
+                                                if (!couponListLoading && availableCoupons.length > 0) {
                                                     setSelectedCouponId(appliedCoupon?.id || "")
                                                     setShowCouponModal(true)
                                                 }
                                             }}
-                                            showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
+                                            showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
                                             right={
                                                 appliedCoupon ? (
                                                     <button
@@ -4773,15 +4797,15 @@ export function CheckoutPageClient() {
                 }
             >
                 <div className="space-y-3">
-                    {displayableCoupons.length > 0 ? (
-                        displayableCoupons.map((coupon) => (
+                    {sortedAvailableCoupons.length > 0 ? (
+                        sortedAvailableCoupons.map((coupon) => (
                             <ListItem
                                 icon={TagIcon}
                                 key={coupon.id}
                                 title={getCouponTitle(coupon)}
                                 description={
                                     coupon.blocked
-                                        ? "Não aplicável aos itens atuais do pedido."
+                                        ? (coupon.errorMessage || "Não aplicável aos itens atuais do pedido.")
                                         : `${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " • Válido apenas para alguns itens do pedido." : " • Aplicável a todo o pedido."}`
                                 }
                                 className={`px-4 py-3 gap-4 border rounded-xl ${coupon.blocked

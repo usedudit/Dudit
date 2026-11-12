@@ -484,6 +484,18 @@ async function handler(request: NextRequest) {
       } catch (revalErr: any) {
         console.error("[process-erp-payment] Error revalidating history:", revalErr)
       }
+    } else if (orderId) {
+      // Pedido regular no ERP: vincula imediatamente o mp_payment_id ao pedido existente
+      await adminClient
+        .from("orders")
+        .update({
+          mp_payment_id: mpPaymentId.toString(),
+          payment_provider: "Mercado Pago",
+          payment_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
     }
 
     // Extrair dados de Pix

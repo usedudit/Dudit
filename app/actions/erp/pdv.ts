@@ -170,6 +170,8 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     installmentNumber?: number;
     wantsChange?: boolean;
     payWithAmount?: number;
+    provider?: string;
+    mpPaymentId?: string | null;
   }>;
 }): Promise<PosPaymentResolveResult | null> {
   let baseTotal: number;
@@ -1657,12 +1659,19 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     installmentNumber?: number;
     wantsChange?: boolean;
     payWithAmount?: number;
+    provider?: string;
+    mpPaymentId?: string | null;
   }> = [];
   for (const entry of input.paymentBreakdown || []) {
     const amount = safeMoney(Number(entry.amount || 0));
     if (amount <= 0) continue;
+    const isMercadoPago =
+      input.paymentProvider === "Mercado Pago" ||
+      String((entry as any).provider || "").toLowerCase().includes("mercado pago") ||
+      String(entry.method || "").toLowerCase().includes("mercado pago");
+
     const paymentMethodId = entry.paymentMethodId || null;
-    if (!paymentMethodId) {
+    if (!paymentMethodId && !isMercadoPago) {
       return {
         success: false as const,
         error: `Método de pagamento inválido no PDV (${String(entry.method || "não informado")}). Selecione um método ativo e tente novamente.`,
@@ -1693,6 +1702,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         1,
         Math.floor(Number(entry.installmentNumber || 1)),
       ),
+      provider: (entry as any).provider || (isMercadoPago ? "Mercado Pago" : undefined),
+      mpPaymentId: (entry as any).mpPaymentId || (isMercadoPago ? input.mpPaymentId : undefined),
     });
   }
 
@@ -1769,6 +1780,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             source.payWithAmount != null
               ? Number(source.payWithAmount)
               : undefined,
+          provider: (source as any).provider || undefined,
+          mpPaymentId: (source as any).mpPaymentId || undefined,
         };
       },
     );
@@ -1886,7 +1899,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
   const { createERPOrderAction } = await import("./orders");
   const orderResult = await createERPOrderAction({
-    id: !input.preSaleId ? input.checkoutId || undefined : undefined,
+    id: input.checkoutId || (!input.preSaleId ? input.checkoutId || undefined : undefined),
     partnerId: input.partnerId,
     storeId: input.storeId || undefined,
     customerId: preSaleDraft.customer_id || undefined,
@@ -1917,6 +1930,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     sellerPartnerUserId: input.sellerId || null,
     skipPostPaymentSellerSideEffects: true,
     skipPostCreateRevalidation: true,
+    paymentProvider: input.paymentProvider,
+    mpPaymentId: input.mpPaymentId,
   });
 
   if (orderResult.error || !orderResult.orderId) {

@@ -28,14 +28,37 @@ export function calculateOrderFinancialBreakdown(order: any, itemsInput?: any[])
   const serviceItems = orderItems.filter((item: any) => item.service_id || item.line_type === "service_booking")
 
   // ── Revenue ──
-  const productsValue = round2(productItems.reduce((sum: number, item: any) => {
-    if (item.is_gift) return sum
-    return sum + Number(item.subtotal || item.product_price * item.quantity || 0)
-  }, 0))
+  // Receita bruta é sempre NOMINAL (preço de catálogo x quantidade). Os
+  // descontos (item/campanha/manual/cupom/método) entram como deduções.
+  // Sem `original_price` (histórico/depósito), nominal = valor cobrado.
+  const nominalItemValue = (item: any) => {
+    if (item.is_gift) return 0
+    const qty = Number(item.quantity || 1)
+    const charged = Number(
+      item.subtotal != null
+        ? item.subtotal
+        : Number(item.product_price || 0) * qty,
+    )
+    const nominalUnit =
+      item.original_price != null && Number.isFinite(Number(item.original_price))
+        ? Number(item.original_price)
+        : null
+    if (nominalUnit == null) return charged
+    return nominalUnit * qty
+  }
 
-  const servicesValue = round2(serviceItems.reduce((sum: number, item: any) => {
-    return sum + Number(item.subtotal || item.product_price * item.quantity || 0)
-  }, 0))
+  const chargedItemValue = (item: any) => {
+    if (item.is_gift) return 0
+    const qty = Number(item.quantity || 1)
+    return Number(
+      item.subtotal != null
+        ? item.subtotal
+        : Number(item.product_price || 0) * qty,
+    )
+  }
+
+  const productsValue = round2(productItems.reduce((sum: number, item: any) => sum + nominalItemValue(item), 0))
+  const servicesValue = round2(serviceItems.reduce((sum: number, item: any) => sum + nominalItemValue(item), 0))
 
   const deliveryFee = Math.max(0, Number(order.delivery_fee || 0))
 
@@ -54,14 +77,34 @@ export function calculateOrderFinancialBreakdown(order: any, itemsInput?: any[])
     return sum + (unitCost * Number(item.quantity || 1))
   }, 0))
 
-  // ── Discounts (same calculation as getOrderDetailsAction) ──
-  const itemsSubtotal = round2(orderItems.reduce((sum: number, item: any) => {
-    return sum + Number(item.subtotal || item.product_price * item.quantity || 0)
-  }, 0))
-  const manualDiscount = Math.max(0, Number(order.discount_value || 0))
+  // ── Descontos ──
+  // `item_discount_amount` já é o desconto embutido nas linhas (preço
+  // promocional/campanha). `campaign_discount_amount` é um subconjunto
+  // informativo: nunca é somado separadamente.
+  // Não derivamos do diff nominal-charged para não confundir com desconto manual.
+  const storedItemDiscount = Math.max(0, Number(order.item_discount_amount || 0))
+  const itemDiscount = round2(storedItemDiscount)
+
   const couponDiscount = Math.max(0, Number(order.discount_amount || order.coupon_discount_amount || 0))
-  const shippingCost = Math.max(0, Number(order.delivery_fee || order.shipping_cost || 0))
-  const additionalCosts = Math.max(0, Number(order.additional_costs || 0))
+
+  // Desconto manual: usa a coluna em reais. Pedidos antigos guardam o valor
+  // cru em `discount_value` (fixo ou percentual) — convertemos aqui.
+  const nominalSubtotal = round2(productsValue + servicesValue)
+  const storedManualDiscount = Math.max(0, Number(order.manual_discount_amount || 0))
+  const rawDiscountValue = Math.max(0, Number(order.discount_value || 0))
+  const discountType = String(order.discount_type || "fixed").toLowerCase()
+  let manualDiscount = storedManualDiscount
+  if (manualDiscount === 0 && rawDiscountValue > 0) {
+    if (discountType === "percentage") {
+      const pct = Math.min(100, rawDiscountValue)
+      manualDiscount = round2((nominalSubtotal * pct) / 100)
+    } else if (discountType !== "coupon") {
+      // Legado: em alguns fluxos de PDV `discount_value` carregava o cupom.
+      const looksLikeCoupon =
+        couponDiscount > 0 && Math.abs(rawDiscountValue - couponDiscount) < 0.01
+      manualDiscount = looksLikeCoupon ? 0 : round2(rawDiscountValue)
+    }
+  }
 
   // Use stored order columns (separated by our fix) instead of residual calculation
   const storedMethodDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
@@ -196,10 +239,11 @@ export function calculateOrderFinancialBreakdown(order: any, itemsInput?: any[])
 
   // ── Build discounts section ──
   const discountLines: FinancialBreakdownLine[] = []
-  if (couponDiscount > 0) discountLines.push({ label: "Desconto de cupom", value: -couponDiscount })
+  if (itemDiscount > 0) discountLines.push({ label: "Desconto em itens", value: -itemDiscount })
   if (manualDiscount > 0) discountLines.push({ label: "Desconto manual", value: -manualDiscount })
+  if (couponDiscount > 0) discountLines.push({ label: "Desconto de cupom", value: -couponDiscount })
   if (finalMethodDiscount > 0) discountLines.push({ label: "Desconto do método", value: -finalMethodDiscount })
-  const totalDiscounts = round2(-(couponDiscount + manualDiscount + finalMethodDiscount))
+  const totalDiscounts = round2(-(itemDiscount + manualDiscount + couponDiscount + finalMethodDiscount))
 
   // ── Build costs section ──
   const costLines: FinancialBreakdownLine[] = []

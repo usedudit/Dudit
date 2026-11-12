@@ -321,7 +321,7 @@ BEGIN
 
     PERFORM cron.schedule(
       'dudit-process-due-recurring-subscriptions',
-      '*/5 * * * *',
+      '0 * * * *',
       'SELECT public.cron_process_due_recurring_subscriptions(50);'
     );
   END IF;

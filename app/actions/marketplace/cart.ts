@@ -1837,6 +1837,10 @@ export async function checkoutCartAction(
       discount_amount: persistedCouponDiscount,
       payment_method_discount_amount: persistedPaymentMethodDiscount,
       payment_method_extra_amount: persistedPaymentMethodExtra,
+      // Breakdown contábil imutável (DRE / lucro líquido por pedido).
+      item_discount_amount: pricingResult.itemDiscountAmount,
+      campaign_discount_amount: pricingResult.campaignDiscountAmount,
+      manual_discount_amount: pricingResult.manualDiscountAmount,
       store_credit_amount: appliedStoreCredit,
       promotions_applied: promotionsAppliedSnapshot,
       checkout_fulfillment: fulfillmentPayload,
@@ -1895,6 +1899,8 @@ export async function checkoutCartAction(
     promotion_id: item.promotion_id ?? null,
     is_gift: item.is_gift ?? false,
     original_price: item.original_price ?? null,
+    discount_amount: item.discount_amount ?? 0,
+    unit_cost: item.unit_cost ?? null,
   }))
 
   const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)

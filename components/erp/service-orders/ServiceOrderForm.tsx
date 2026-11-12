@@ -2112,6 +2112,10 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                             code: coupon.code.trim().toUpperCase(),
                             subtotal,
                             customerId: customerId || null,
+                            items: [
+                                ...services.map((s) => ({ serviceId: s.service_id || s.id || null, price: s.service_price ?? s.price ?? null, quantity: s.quantity || 1 })),
+                                ...products.map((p) => ({ productId: p.product_id || p.id || null, price: p.unit_price ?? p.price ?? null, quantity: p.quantity || 1 })),
+                            ],
                         })
                         if (res.valid && res.pricingCoupon) {
                             const c = res.pricingCoupon

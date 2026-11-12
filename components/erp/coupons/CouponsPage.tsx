@@ -779,6 +779,17 @@ export default function CouponsPage({
         filters.automaticOnly ||
         debouncedSearch.length > 0
 
+    const tabCounts = useMemo(() => {
+        if (!coupons) return { Todos: 0, Ativos: 0, Inativos: 0, Automaticos: 0 }
+        let Todos = coupons.length, Ativos = 0, Inativos = 0, Automaticos = 0
+        for (const c of coupons) {
+            if (c.is_active) Ativos++
+            else Inativos++
+            if (c.is_automatic) Automaticos++
+        }
+        return { Todos, Ativos, Inativos, Automaticos }
+    }, [coupons])
+
     return (
         <>
             <AnimatePresence mode="wait">
@@ -866,6 +877,7 @@ export default function CouponsPage({
                                     hasActiveFilters={hasActiveFilters}
                                     onAddCoupon={canCreateCoupons && !planGate ? openCreate : undefined}
                                     onExport={handleExport}
+                                    tabCounts={tabCounts}
                                 />
 
                                 <SelectionBanner

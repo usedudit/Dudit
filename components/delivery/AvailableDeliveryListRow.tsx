@@ -132,11 +132,12 @@ export default function AvailableDeliveryListRow({
             {/* DESTINO DA ENTREGA */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border w-[300px]">
                 <div className="flex flex-col min-w-0">
-                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[260px]">
-                        {offer.customer_name || (orderCount > 1 ? `${orderCount} destinatários` : "Cliente")}
+                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[260px]" title={offer.delivery_address || "Região local"}>
+                        {offer.delivery_address || "Região local"}
                     </span>
-                    <span className="text-xs text-brand-dark/90 dark:text-dark-body line-clamp-1 max-w-[260px]">
-                        {offer.delivery_address || "Endereço a consultar"}
+                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1 mt-0.5">
+                        <span>🔒 Rua e nº após aceite</span>
+                        {orderCount > 1 && <span>• {orderCount} paradas</span>}
                     </span>
                 </div>
             </td>

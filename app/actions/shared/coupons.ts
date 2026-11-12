@@ -376,12 +376,15 @@ export async function listApplicableMarketplaceCouponsAction(input: {
     const applicableCoupons = []
 
     for (const { coupon, result } of validationResults) {
-        const isBlocked = !result.valid && (
-            result.errorMessage === "Nenhum item da sacola é elegível para este cupom." ||
-            result.errorMessage === "Cupom não aplicável aos itens da sacola."
+        const isGloballyUnavailable = !result.valid && (
+            result.errorMessage === "Cupom expirado." ||
+            result.errorMessage === "Cupom ainda não está disponível." ||
+            result.errorMessage === "Limite de uso do cupom atingido."
         )
 
-        if (!result.valid && !isBlocked) continue
+        if (isGloballyUnavailable) continue
+
+        const isBlocked = !result.valid
 
         applicableCoupons.push({
             id: coupon.id,

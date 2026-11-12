@@ -1,7 +1,29 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal, Pagination, ThreeDotsLoader, SidebarCard, SavingStatusModal } from "@/components/reusable"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+    Button,
+    Input,
+    FormDropdown,
+    DefaultModal,
+    MoneyInput,
+    IconPlaceholder,
+    TimePicker,
+    FormSection,
+    Accordion,
+    Checkbox,
+    ActionsDropdown,
+    AlertModal,
+    Pagination,
+    ThreeDotsLoader,
+    SidebarCard,
+    SavingStatusModal,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+} from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -60,6 +82,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
     const [chargeByDistance, setChargeByDistance] = useState(false)
     const [editingRule, setEditingRule] = useState<any | null>(null)
     const [ruleToDelete, setRuleToDelete] = useState<any | null>(null)
+    const [activeTab, setActiveTab] = useState<"delivery" | "service">("delivery")
     const [settings, setSettings] = useState({
         baseFee: "0",
         includedKm: "0",
@@ -161,360 +184,339 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
     </div>
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
-                {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                        {/* Back button - desktop only */}
-                        <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            </Button>
-                        </div>
-
-                        {/* Title row */}
-                        <div className="hidden md:flex items-start justify-between mb-4">
-                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    <span className="truncate">Configurações de Entrega</span>
-                                </h1>
-
-                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    Gerencie taxas e regras de entrega
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
                                 </div>
-                            </div>
 
-                            {/* Desktop action buttons */}
-                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                <Button variant="outline" onClick={handleBack} disabled={saving}>
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    disabled={saving || isFree}
-                                    onClick={async () => {
-                                        if (!settings.isDeliveryEnabled && !settings.isPickupEnabled) {
-                                            notifyError("Erro de validação", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
-                                            return
-                                        }
-                                        setSaving(true)
-                                        const res = await upsertPartnerDeliveryConfigAction({
-                                            partnerId,
-                                            storeId,
-                                            settings: {
-                                                storeId,
-                                                baseFee: Number(settings.baseFee || 0),
-                                                includedKm: Number(settings.includedKm || 0),
-                                                extraKmPrice: chargeByDistance ? Number(settings.extraKmPrice || 0) : 0,
-                                                maxDeliveryKm: chargeByDistance && settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
-                                                isDeliveryEnabled: settings.isDeliveryEnabled,
-                                                isPickupEnabled: settings.isPickupEnabled,
-                                                freeDeliveryThreshold: settings.freeDeliveryThreshold ? Number(settings.freeDeliveryThreshold) : null,
-                                                deliveryPayer: settings.deliveryPayer,
-                                            },
-                                        })
-                                        if (res.success) {
-                                            notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
-                                        } else {
-                                            notifyError("Erro ao salvar", res.error || "Ocorreu um erro ao salvar as configurações.")
-                                        }
-                                        const svcRes = await upsertServiceAttendanceSettingsAction({
-                                            partnerId,
-                                            storeId,
-                                            settings: {
-                                                maxServiceKm: serviceSettings.maxServiceKm ? Number(serviceSettings.maxServiceKm) : null,
-                                                travelFeeMode: serviceSettings.travelFeeMode,
-                                                freeTravelKm: Number(serviceSettings.freeTravelKm || 0),
-                                                travelFlatFee: Number(serviceSettings.travelFlatFee || 0),
-                                                travelPerKm: Number(serviceSettings.travelPerKm || 0),
-                                                enforceServiceArea: serviceSettings.enforceServiceArea,
-                                            },
-                                        })
-                                        if (!svcRes.success) {
-                                            notifyError("Erro ao salvar atendimento", svcRes.error || "Não foi possível salvar as configurações de atendimento de serviços.")
-                                        }
-                                        await reload()
-                                        setSaving(false)
-                                    }}
-                                    leftIcon={<SaveIcon size={18} />}
-                                >
-                                    {saving ? "Salvando..." : "Salvar"}
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Configurações de Entrega</span>
+                                        </h1>
 
-                {/* Content Body */}
-                <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                    <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
-                        {/* Main Content */}
-                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-4">
-                            {/* Geral */}
-                            <FormSection title="Configurações Gerais">
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Entrega ativa</span>
-                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes selecionem entrega no checkout</span>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Gerencie taxas, regras de entrega e atendimento a domicílio
                                         </div>
-                                        <Switch
-                                            checked={settings.isDeliveryEnabled}
-                                            onCheckedChange={(checked) => {
-                                                if (!checked && !settings.isPickupEnabled) {
-                                                    notifyError("Ação não permitida", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
-                                                    return
-                                                }
-                                                setSettings(s => ({ ...s, isDeliveryEnabled: checked }))
-                                            }}
-                                            className={isFree ? "opacity-50 pointer-events-none" : ""}
-                                        />
                                     </div>
 
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Retirada ativa</span>
-                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes retirem o pedido no local</span>
-                                        </div>
-                                        <Switch
-                                            checked={settings.isPickupEnabled}
-                                            onCheckedChange={(checked) => {
-                                                if (!checked && !settings.isDeliveryEnabled) {
-                                                    notifyError("Ação não permitida", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={handleBack} disabled={saving}>
+                                            Cancelar
+                                        </Button>
+                                        <Button
+                                            disabled={saving}
+                                            onClick={async () => {
+                                                if (!settings.isDeliveryEnabled && !settings.isPickupEnabled) {
+                                                    notifyError("Erro de validação", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
                                                     return
                                                 }
-                                                setSettings(s => ({ ...s, isPickupEnabled: checked }))
+                                                setSaving(true)
+                                                const res = await upsertPartnerDeliveryConfigAction({
+                                                    partnerId,
+                                                    storeId,
+                                                    settings: {
+                                                        storeId,
+                                                        baseFee: Number(settings.baseFee || 0),
+                                                        includedKm: Number(settings.includedKm || 0),
+                                                        extraKmPrice: chargeByDistance ? Number(settings.extraKmPrice || 0) : 0,
+                                                        maxDeliveryKm: chargeByDistance && settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
+                                                        isDeliveryEnabled: settings.isDeliveryEnabled,
+                                                        isPickupEnabled: settings.isPickupEnabled,
+                                                        freeDeliveryThreshold: settings.freeDeliveryThreshold ? Number(settings.freeDeliveryThreshold) : null,
+                                                        deliveryPayer: settings.deliveryPayer,
+                                                    },
+                                                })
+                                                if (res.success) {
+                                                    notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
+                                                } else {
+                                                    notifyError("Erro ao salvar", res.error || "Ocorreu um erro ao salvar as configurações.")
+                                                }
+                                                const svcRes = await upsertServiceAttendanceSettingsAction({
+                                                    partnerId,
+                                                    storeId,
+                                                    settings: {
+                                                        maxServiceKm: serviceSettings.maxServiceKm ? Number(serviceSettings.maxServiceKm) : null,
+                                                        travelFeeMode: serviceSettings.travelFeeMode,
+                                                        freeTravelKm: Number(serviceSettings.freeTravelKm || 0),
+                                                        travelFlatFee: Number(serviceSettings.travelFlatFee || 0),
+                                                        travelPerKm: Number(serviceSettings.travelPerKm || 0),
+                                                        enforceServiceArea: serviceSettings.enforceServiceArea,
+                                                    },
+                                                })
+                                                if (!svcRes.success) {
+                                                    notifyError("Erro ao salvar atendimento", svcRes.error || "Não foi possível salvar as configurações de atendimento de serviços.")
+                                                }
+                                                await reload()
+                                                setSaving(false)
                                             }}
-                                            className={isFree ? "opacity-50 pointer-events-none" : ""}
-                                        />
+                                            leftIcon={<SaveIcon size={18} />}
+                                        >
+                                            {saving ? "Salvando..." : "Salvar"}
+                                        </Button>
                                     </div>
-
                                 </div>
-                            </FormSection>
 
-                            {/* Distância */}
-                            {settings.isDeliveryEnabled && (
-                                <div className="mt-8">
-                                    <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
-                                    <Accordion
-                                        title={
-                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
-                                                Distância e Entrega
-                                                {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
-                                            </span>
-                                        }
-                                        defaultOpen={true}
-                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
-                                    >
-                                        <div className="space-y-6 pb-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                <MoneyInput
-                                                    label="Taxa base"
-                                                    value={settings.baseFee}
-                                                    onChange={(val) => setSettings((s) => ({ ...s, baseFee: String(val) }))}
-                                                />
-                                                <MoneyInput
-                                                    label="Entrega grátis a partir de"
-                                                    value={settings.freeDeliveryThreshold}
-                                                    onChange={(val) => setSettings((s) => ({ ...s, freeDeliveryThreshold: val ? String(val) : "" }))}
-                                                    placeholder="R$ 0,00"
-                                                />
-                                                <Input
-                                                    label="KM incluído"
-                                                    value={settings.includedKm}
-                                                    onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}
-                                                    suffix="km"
-                                                />
-                                            </div>
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                                        <TabsTrigger value="service">Atendimento a domicílio</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                            </div>
+                        </div>
 
-                                            <div className="pt-2">
-                                                <Checkbox
-                                                    label="Cobrar por quilometragem adicional"
-                                                    checked={chargeByDistance}
-                                                    onChange={(checked) => {
-                                                        if (!advancedEnabled) {
-                                                            openPlanUpgrade("escalar")
-                                                            return
-                                                        }
-                                                        setChargeByDistance(Boolean(checked))
-                                                    }}
-                                                />
-                                                {!advancedEnabled && (
-                                                    <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
-                                                )}
-                                            </div>
+                        {/* Content Body */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <AnimatePresence mode="wait">
+                                {/* Tab: Entrega */}
+                                <TabsContent value="delivery" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                            {/* Main Content - Left Column */}
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-4">
+                                                {/* Configurações Gerais */}
+                                                <FormSection title="Configurações Gerais">
+                                                    <div className="space-y-6">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Entrega ativa</span>
+                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes selecionem entrega no checkout</span>
+                                                            </div>
+                                                            <Switch
+                                                                checked={settings.isDeliveryEnabled}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (!checked && !settings.isPickupEnabled) {
+                                                                        notifyError("Ação não permitida", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
+                                                                        return
+                                                                    }
+                                                                    setSettings(s => ({ ...s, isDeliveryEnabled: checked }))
+                                                                }}
+                                                                className={isFree ? "opacity-50 pointer-events-none" : ""}
+                                                            />
+                                                        </div>
 
-                                            {chargeByDistance && (
-                                                <FadeIn>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                                        <Input
-                                                            disabled={!advancedEnabled}
-                                                            label="Distância máxima"
-                                                            value={settings.maxDeliveryKm}
-                                                            onChange={(e) => setSettings((s) => ({ ...s, maxDeliveryKm: e.target.value }))}
-                                                            suffix="km"
-                                                        />
-                                                        <MoneyInput
-                                                            disabled={!advancedEnabled}
-                                                            label="Preço por KM extra"
-                                                            value={settings.extraKmPrice}
-                                                            onChange={(val) => setSettings((s) => ({ ...s, extraKmPrice: String(val) }))}
-                                                        />
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Retirada ativa</span>
+                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes retirem o pedido no local</span>
+                                                            </div>
+                                                            <Switch
+                                                                checked={settings.isPickupEnabled}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (!checked && !settings.isDeliveryEnabled) {
+                                                                        notifyError("Ação não permitida", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
+                                                                        return
+                                                                    }
+                                                                    setSettings(s => ({ ...s, isPickupEnabled: checked }))
+                                                                }}
+                                                                className={isFree ? "opacity-50 pointer-events-none" : ""}
+                                                            />
+                                                        </div>
+
                                                     </div>
-                                                </FadeIn>
-                                            )}
-                                        </div>
-                                    </Accordion>
-                                </div>
-                            )}
+                                                </FormSection>
 
-                            {/* Atendimento de serviços (raio + taxa de deslocamento) */}
-                            <div className="mt-8">
-                                <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
-                                <Accordion
-                                    title={
-                                        <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
-                                            Atendimento a domicílio de serviços
-                                            {!serviceSettings.hasOverride && (
-                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">(padrão da loja)</span>
-                                            )}
-                                        </span>
-                                    }
-                                    defaultOpen={false}
-                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
-                                >
-                                    <div className="space-y-6 pb-4">
-                                            <Input
-                                            label="Distância máxima de atendimento"
-                                            value={serviceSettings.maxServiceKm}
-                                            onChange={(e) => setServiceSettings((s) => ({ ...s, maxServiceKm: e.target.value }))}
-                                            suffix="km"
-                                            placeholder="Ilimitado"
-                                        />
-                                        <FormDropdown
-                                            label="Taxa de deslocamento"
-                                            value={serviceSettings.travelFeeMode}
-                                            setValue={(value) => setServiceSettings((s) => ({ ...s, travelFeeMode: (value as any) || "free" }))}
-                                            options={[
-                                                { value: "free", label: "Gratuito" },
-                                                { value: "flat", label: "Valor fixo" },
-                                                { value: "per_km", label: "Por km cobrado" },
-                                                { value: "tiered", label: "Por faixa de km" },
-                                            ]}
-                                        />
-                                        <Input
-                                            label="KM gratuito de deslocamento"
-                                            value={serviceSettings.freeTravelKm}
-                                            onChange={(e) => setServiceSettings((s) => ({ ...s, freeTravelKm: e.target.value }))}
-                                            suffix="km"
-                                            type="number"
-                                            min={0}
-                                        />
-                                        {serviceSettings.travelFeeMode === "flat" && (
-                                            <MoneyInput
-                                                label="Taxa fixa de deslocamento"
-                                                value={serviceSettings.travelFlatFee}
-                                                onChange={(val) => setServiceSettings((s) => ({ ...s, travelFlatFee: String(val) }))}
-                                            />
-                                        )}
-                                        {serviceSettings.travelFeeMode === "per_km" && (
-                                            <MoneyInput
-                                                label="Preço por km cobrado"
-                                                value={serviceSettings.travelPerKm}
-                                                onChange={(val) => setServiceSettings((s) => ({ ...s, travelPerKm: String(val) }))}
-                                            />
-                                        )}
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Bloquear agendamento fora do raio</span>
-                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Impedir que clientes agendem quando o endereço estiver fora do raio.</span>
-                                            </div>
-                                            <Switch
-                                                checked={serviceSettings.enforceServiceArea}
-                                                onCheckedChange={(checked) => setServiceSettings((s) => ({ ...s, enforceServiceArea: checked }))}
-                                            />
-                                        </div>
-                                    </div>
-                                </Accordion>
-                            </div>
+                                                {/* Distância */}
+                                                {settings.isDeliveryEnabled && (
+                                                    <div className="mt-8">
+                                                        <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
+                                                        <Accordion
+                                                            title={
+                                                                <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
+                                                                    Distância e Entrega
+                                                                    {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
+                                                                </span>
+                                                            }
+                                                            defaultOpen={true}
+                                                            triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
+                                                        >
+                                                            <div className="space-y-6 pb-4">
+                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                                    <MoneyInput
+                                                                        label="Taxa base"
+                                                                        value={settings.baseFee}
+                                                                        onChange={(val) => setSettings((s) => ({ ...s, baseFee: String(val) }))}
+                                                                    />
+                                                                    <MoneyInput
+                                                                        label="Entrega grátis a partir de"
+                                                                        value={settings.freeDeliveryThreshold}
+                                                                        onChange={(val) => setSettings((s) => ({ ...s, freeDeliveryThreshold: val ? String(val) : "" }))}
+                                                                        placeholder="R$ 0,00"
+                                                                    />
+                                                                    <Input
+                                                                        label="KM incluído"
+                                                                        value={settings.includedKm}
+                                                                        onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}
+                                                                        suffix="km"
+                                                                    />
+                                                                </div>
 
-                            {/* Regras por horário */}
-                            {settings.isDeliveryEnabled && (
-                                <div className="mt-8">
-                                    <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
-                                    <Accordion
-                                        title={
-                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
-                                                Regras por Horário
-                                                {!advancedEnabled && (
-                                                    <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                                <div className="pt-2">
+                                                                    <Checkbox
+                                                                        label="Cobrar por quilometragem adicional"
+                                                                        checked={chargeByDistance}
+                                                                        onChange={(checked) => {
+                                                                            if (!advancedEnabled) {
+                                                                                openPlanUpgrade("escalar")
+                                                                                return
+                                                                            }
+                                                                            setChargeByDistance(Boolean(checked))
+                                                                        }}
+                                                                    />
+                                                                    {!advancedEnabled && (
+                                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                                    )}
+                                                                </div>
+
+                                                                {chargeByDistance && (
+                                                                    <FadeIn>
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                                                            <Input
+                                                                                disabled={!advancedEnabled}
+                                                                                label="Distância máxima"
+                                                                                value={settings.maxDeliveryKm}
+                                                                                onChange={(e) => setSettings((s) => ({ ...s, maxDeliveryKm: e.target.value }))}
+                                                                                suffix="km"
+                                                                            />
+                                                                            <MoneyInput
+                                                                                disabled={!advancedEnabled}
+                                                                                label="Preço por KM extra"
+                                                                                value={settings.extraKmPrice}
+                                                                                onChange={(val) => setSettings((s) => ({ ...s, extraKmPrice: String(val) }))}
+                                                                            />
+                                                                        </div>
+                                                                    </FadeIn>
+                                                                )}
+                                                            </div>
+                                                        </Accordion>
+                                                    </div>
                                                 )}
-                                            </span>
-                                        }
-                                        defaultOpen={false}
-                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
-                                        onToggle={(isOpen) => {
-                                            if (isOpen && !advancedEnabled) {
-                                                openPlanUpgrade("escalar")
-                                                return false
-                                            }
-                                        }}
-                                    >
-                                        <div className="space-y-6 pb-4">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>
-                                                <Button
-                                                    variant="link"
-                                                    disabled={!advancedEnabled}
-                                                    onClick={() => setIsRuleModalOpen(true)}
-                                                    leftIcon={<PlusIcon className="w-4 h-4" />}
-                                                >
-                                                    Adicionar regra
-                                                </Button>
-                                            </div>
 
-                                            {rules.length === 0 ? (
-                                                <IconPlaceholder
-                                                    icon={ClockIcon}
-                                                    title="Nenhuma regra cadastrada"
-                                                    subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
-                                                />
-                                            ) : (
-                                                <>
-                                                    {/* Desktop Table */}
-                                                    <div className="hidden md:block w-full overflow-hidden bg-white dark:bg-dark-background">
-                                                        <div className="overflow-x-auto">
-                                                            <table className="w-full border-separate border-spacing-0">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
-                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
-                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
-                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
-                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedRules.map((rule) => {
-                                                                        const baseFeeNum = Number(settings.baseFee || 0);
-                                                                        const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
-                                                                        return (
-                                                                            <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.startTime}</td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.endTime}</td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">
-                                                                                    {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
-                                                                                </td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading text-left">
-                                                                                    <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
-                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
-                                                                                        Taxa final = {formatCurrency(finalFee)}
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
-                                                                                    <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                                {/* Regras por horário */}
+                                                {settings.isDeliveryEnabled && (
+                                                    <div className="mt-8">
+                                                        <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
+                                                        <Accordion
+                                                            title={
+                                                                <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
+                                                                    Regras por Horário
+                                                                    {!advancedEnabled && (
+                                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                                    )}
+                                                                </span>
+                                                            }
+                                                            defaultOpen={false}
+                                                            triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
+                                                            onToggle={(isOpen) => {
+                                                                if (isOpen && !advancedEnabled) {
+                                                                    openPlanUpgrade("escalar")
+                                                                    return false
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="space-y-6 pb-4">
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>
+                                                                    <Button
+                                                                        variant="link"
+                                                                        disabled={!advancedEnabled}
+                                                                        onClick={() => setIsRuleModalOpen(true)}
+                                                                        leftIcon={<PlusIcon className="w-4 h-4" />}
+                                                                    >
+                                                                        Adicionar regra
+                                                                    </Button>
+                                                                </div>
+
+                                                                {rules.length === 0 ? (
+                                                                    <IconPlaceholder
+                                                                        icon={ClockIcon}
+                                                                        title="Nenhuma regra cadastrada"
+                                                                        subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
+                                                                    />
+                                                                ) : (
+                                                                    <>
+                                                                    {/* Desktop Table */}
+                                                                    <div className="hidden md:block w-full overflow-hidden bg-white dark:bg-dark-background">
+                                                                        <div className="overflow-x-auto">
+                                                                            <table className="w-full border-separate border-spacing-0">
+                                                                                <thead>
+                                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
+                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
+                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
+                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
+                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody>
+                                                                                    {paginatedRules.map((rule) => {
+                                                                                        const baseFeeNum = Number(settings.baseFee || 0);
+                                                                                        const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
+                                                                                        return (
+                                                                                            <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
+                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.startTime}</td>
+                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.endTime}</td>
+                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">
+                                                                                                    {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
+                                                                                                </td>
+                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading text-left">
+                                                                                                    <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
+                                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
+                                                                                                        Taxa final = {formatCurrency(finalFee)}
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                                    <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                                                                                        <ActionsDropdown
+                                                                                                            onEdit={() => {
+                                                                                                                setEditingRule(rule)
+                                                                                                                setNewRule({
+                                                                                                                    startTime: rule.startTime,
+                                                                                                                    endTime: rule.endTime,
+                                                                                                                    type: rule.type,
+                                                                                                                    value: String(rule.value),
+                                                                                                                })
+                                                                                                                setIsRuleModalOpen(true)
+                                                                                                            }}
+                                                                                                            onDelete={() => setRuleToDelete(rule)}
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        )
+                                                                                    })}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Mobile Grid Cards */}
+                                                                    <div className="md:hidden grid grid-cols-1 gap-4">
+                                                                        {paginatedRules.map((rule) => {
+                                                                            const baseFeeNum = Number(settings.baseFee || 0);
+                                                                            const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
+                                                                            return (
+                                                                                <div key={rule.id} className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                                    <div className="flex items-center justify-between mb-3">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <ClockIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.startTime} - {rule.endTime}</span>
+                                                                                        </div>
                                                                                         <ActionsDropdown
                                                                                             onEdit={() => {
                                                                                                 setEditingRule(rule)
@@ -529,150 +531,263 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                                                             onDelete={() => setRuleToDelete(rule)}
                                                                                         />
                                                                                     </div>
-                                                                                </td>
-                                                                            </tr>
-                                                                        )
-                                                                    })}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
+                                                                                    <div className="flex items-center justify-between">
+                                                                                        <div className="flex flex-col">
+                                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}</span>
+                                                                                        </div>
+                                                                                        <div className="flex flex-col text-right">
+                                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
+                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Taxa final: <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(finalFee)}</span></span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )
+                                                                        })}
+                                                                    </div>
 
-                                                    {/* Mobile Grid Cards */}
-                                                    <div className="md:hidden grid grid-cols-1 gap-4">
-                                                        {paginatedRules.map((rule) => {
-                                                            const baseFeeNum = Number(settings.baseFee || 0);
-                                                            const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
-                                                            return (
-                                                                <div key={rule.id} className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                                                    <div className="flex items-center justify-between mb-3">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <ClockIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.startTime} - {rule.endTime}</span>
+                                                                    {totalRulePages > 1 && (
+                                                                        <div className="mt-4">
+                                                                            <Pagination
+                                                                                currentPage={rulePage}
+                                                                                totalPages={totalRulePages}
+                                                                                onPageChange={setRulePage}
+                                                                            />
                                                                         </div>
-                                                                        <ActionsDropdown
-                                                                            onEdit={() => {
-                                                                                setEditingRule(rule)
-                                                                                setNewRule({
-                                                                                    startTime: rule.startTime,
-                                                                                    endTime: rule.endTime,
-                                                                                    type: rule.type,
-                                                                                    value: String(rule.value),
-                                                                                })
-                                                                                setIsRuleModalOpen(true)
-                                                                            }}
-                                                                            onDelete={() => setRuleToDelete(rule)}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between">
-                                                                        <div className="flex flex-col">
-                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}</span>
-                                                                        </div>
-                                                                        <div className="flex flex-col text-right">
-                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
-                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Taxa final: <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(finalFee)}</span></span>
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        })}
+                                                                    )}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </Accordion>
                                                     </div>
+                                                )}
 
-                                                    {totalRulePages > 1 && (
-                                                        <div className="mt-4">
-                                                            <Pagination
-                                                                currentPage={rulePage}
-                                                                totalPages={totalRulePages}
-                                                                onPageChange={setRulePage}
-                                                            />
+                                                {/* Mobile/Tablet - Quem paga a entrega como FormSection */}
+                                                <div className="lg:hidden">
+                                                    <FormSection title={
+                                                        <span className="inline-flex items-center gap-2">
+                                                            Quem paga a entrega
+                                                            {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
+                                                        </span>
+                                                    }>
+                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body -mt-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handlePayerSelect("customer")}
+                                                                className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
+                                                                    ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                                    : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                                    } ${isFree ? "opacity-50" : ""}`}
+                                                            >
+                                                                Cliente
+                                                                <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handlePayerSelect("seller")}
+                                                                className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
+                                                                    ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                                    : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                                    } ${isFree ? "opacity-50" : ""}`}
+                                                            >
+                                                                Vendedor
+                                                                <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
+                                                            </button>
                                                         </div>
-                                                    )}
-                                                </>
-                                            )}
+                                                    </FormSection>
+                                                </div>
+                                            </div>
+
+                                            {/* Right Column / Sidebar - Entrega tab */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                <SidebarCard hasTopStrip hasSeparator title={
+                                                    <span className="inline-flex items-center gap-2">
+                                                        Quem paga a entrega
+                                                        {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
+                                                    </span>
+                                                }>
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePayerSelect("customer")}
+                                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
+                                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                                } ${isFree ? "opacity-50" : ""}`}
+                                                        >
+                                                            Cliente
+                                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePayerSelect("seller")}
+                                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
+                                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
+                                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                                } ${isFree ? "opacity-50" : ""}`}
+                                                        >
+                                                            Vendedor
+                                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
+                                                        </button>
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
                                         </div>
-                                    </Accordion>
-                                </div>
-                            )}
+                                    </motion.div>
+                                </TabsContent>
 
-                            {/* Mobile/Tablet - Quem paga a entrega como FormSection */}
-                            <div className="lg:hidden">
-                                <FormSection title={
-                                    <span className="inline-flex items-center gap-2">
-                                        Quem paga a entrega
-                                        {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
-                                    </span>
-                                }>
-                                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body -mt-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => handlePayerSelect("customer")}
-                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
-                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                                } ${isFree ? "opacity-50" : ""}`}
-                                        >
-                                            Cliente
-                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handlePayerSelect("seller")}
-                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
-                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                                } ${isFree ? "opacity-50" : ""}`}
-                                        >
-                                            Vendedor
-                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
-                                        </button>
-                                    </div>
-                                </FormSection>
-                            </div>
-                        </div>
+                                {/* Tab: Atendimento a domicílio */}
+                                <TabsContent value="service" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                            {/* Main Content - Left Column */}
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-4">
+                                                {/* Atendimento de serviços (raio + taxa de deslocamento) */}
+                                                <div className="mt-8">
+                                                    <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
+                                                    <Accordion
+                                                        title={
+                                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
+                                                                Atendimento a domicílio de serviços
+                                                                {!serviceSettings.hasOverride && (
+                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">(padrão da loja)</span>
+                                                                )}
+                                                            </span>
+                                                        }
+                                                        defaultOpen={true}
+                                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
+                                                    >
+                                                        <div className="space-y-6 pb-4">
+                                                            <Input
+                                                                label="Distância máxima de atendimento"
+                                                                value={serviceSettings.maxServiceKm}
+                                                                onChange={(e) => setServiceSettings((s) => ({ ...s, maxServiceKm: e.target.value }))}
+                                                                suffix="km"
+                                                                placeholder="Ilimitado"
+                                                            />
+                                                            <FormDropdown
+                                                                label="Taxa de deslocamento"
+                                                                value={serviceSettings.travelFeeMode}
+                                                                setValue={(value) => setServiceSettings((s) => ({ ...s, travelFeeMode: (value as any) || "free" }))}
+                                                                options={[
+                                                                    { value: "free", label: "Gratuito" },
+                                                                    { value: "flat", label: "Valor fixo" },
+                                                                    { value: "per_km", label: "Por km cobrado" },
+                                                                    { value: "tiered", label: "Por faixa de km" },
+                                                                ]}
+                                                            />
+                                                            <Input
+                                                                label="KM gratuito de deslocamento"
+                                                                value={serviceSettings.freeTravelKm}
+                                                                onChange={(e) => setServiceSettings((s) => ({ ...s, freeTravelKm: e.target.value }))}
+                                                                suffix="km"
+                                                                type="number"
+                                                                min={0}
+                                                            />
+                                                            {serviceSettings.travelFeeMode === "flat" && (
+                                                                <MoneyInput
+                                                                    label="Taxa fixa de deslocamento"
+                                                                    value={serviceSettings.travelFlatFee}
+                                                                    onChange={(val) => setServiceSettings((s) => ({ ...s, travelFlatFee: String(val) }))}
+                                                                />
+                                                            )}
+                                                            {serviceSettings.travelFeeMode === "per_km" && (
+                                                                <MoneyInput
+                                                                    label="Preço por km cobrado"
+                                                                    value={serviceSettings.travelPerKm}
+                                                                    onChange={(val) => setServiceSettings((s) => ({ ...s, travelPerKm: String(val) }))}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </Accordion>
+                                                </div>
+                                            </div>
 
-                        {/* Right Column / Sidebar */}
-                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                        <SidebarCard hasTopStrip hasSeparator title={
-                            <span className="inline-flex items-center gap-2">
-                                Quem paga a entrega
-                                {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
-                            </span>
-                        }>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
-                            <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handlePayerSelect("customer")}
-                                    className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
-                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                        : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                        } ${isFree ? "opacity-50" : ""}`}
-                                >
-                                    Cliente
-                                    <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handlePayerSelect("seller")}
-                                    className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
-                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                        : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
-                                        } ${isFree ? "opacity-50" : ""}`}
-                                >
-                                    Vendedor
-                                    <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
-                                </button>
-                            </div>
-                        </SidebarCard>
+                                            {/* Right Column / Sidebar - Service tab */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                <SidebarCard hasTopStrip hasSeparator title="Bloquear agendamento fora do raio">
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Impedir que clientes agendem quando o endereço estiver fora do raio de atendimento configurado.</p>
+                                                    <div className="flex items-center justify-between">
+                                                        <Switch
+                                                            checked={serviceSettings.enforceServiceArea}
+                                                            onCheckedChange={(checked) => setServiceSettings((s) => ({ ...s, enforceServiceArea: checked }))}
+                                                        />
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </TabsContent>
+                            </AnimatePresence>
                         </div>
                     </div>
+                </Tabs>
+
+                {/* Mobile Bottom Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex gap-3 z-20">
+                    <Button variant="outline" onClick={handleBack} className="flex-1" disabled={saving}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={async () => {
+                            if (!settings.isDeliveryEnabled && !settings.isPickupEnabled) {
+                                notifyError("Erro de validação", "Pelo menos um método de entrega (Entrega ou Retirada) deve estar ativo.")
+                                return
+                            }
+                            setSaving(true)
+                            const res = await upsertPartnerDeliveryConfigAction({
+                                partnerId,
+                                storeId,
+                                settings: {
+                                    storeId,
+                                    baseFee: Number(settings.baseFee || 0),
+                                    includedKm: Number(settings.includedKm || 0),
+                                    extraKmPrice: chargeByDistance ? Number(settings.extraKmPrice || 0) : 0,
+                                    maxDeliveryKm: chargeByDistance && settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
+                                    isDeliveryEnabled: settings.isDeliveryEnabled,
+                                    isPickupEnabled: settings.isPickupEnabled,
+                                    freeDeliveryThreshold: settings.freeDeliveryThreshold ? Number(settings.freeDeliveryThreshold) : null,
+                                    deliveryPayer: settings.deliveryPayer,
+                                },
+                            })
+                            if (res.success) {
+                                notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
+                            } else {
+                                notifyError("Erro ao salvar", res.error || "Ocorreu um erro ao salvar as configurações.")
+                            }
+                            const svcRes = await upsertServiceAttendanceSettingsAction({
+                                partnerId,
+                                storeId,
+                                settings: {
+                                    maxServiceKm: serviceSettings.maxServiceKm ? Number(serviceSettings.maxServiceKm) : null,
+                                    travelFeeMode: serviceSettings.travelFeeMode,
+                                    freeTravelKm: Number(serviceSettings.freeTravelKm || 0),
+                                    travelFlatFee: Number(serviceSettings.travelFlatFee || 0),
+                                    travelPerKm: Number(serviceSettings.travelPerKm || 0),
+                                    enforceServiceArea: serviceSettings.enforceServiceArea,
+                                },
+                            })
+                            if (!svcRes.success) {
+                                notifyError("Erro ao salvar atendimento", svcRes.error || "Não foi possível salvar as configurações de atendimento de serviços.")
+                            }
+                            await reload()
+                            setSaving(false)
+                        }}
+                        className="flex-1"
+                        disabled={saving}
+                        leftIcon={<SaveIcon size={18} />}
+                    >
+                        {saving ? "Salvando..." : "Salvar"}
+                    </Button>
                 </div>
-            </div >
+
+                <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
+            </div>
 
             <DefaultModal
                 isOpen={isRuleModalOpen}
@@ -708,77 +823,72 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                         id: editingRule?.id,
                                         startTime: newRule.startTime,
                                         endTime: newRule.endTime,
-                                        type: newRule.type as "fixed" | "multiplier",
-                                        value: Number(newRule.value || 0),
-                                        isActive: true,
+                                        type: newRule.type,
+                                        value: Number(newRule.value),
                                     },
                                 })
-                                setNewRule({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
-                                setEditingRule(null)
                                 await reload()
                                 setIsRuleModalOpen(false)
+                                setEditingRule(null)
+                                setNewRule({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
                             }}
+                            leftIcon={<SaveIcon size={18} />}
                         >
-                            {editingRule ? "Salvar" : "Adicionar"}
+                            {editingRule ? "Salvar alterações" : "Criar regra"}
                         </Button>
                     </>
                 }
             >
-                <div className="flex flex-col gap-4">
+                <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <TimePicker label="Início" value={newRule.startTime} onChange={(time) => setNewRule((r) => ({ ...r, startTime: time }))} />
-                        <TimePicker label="Fim" value={newRule.endTime} onChange={(time) => setNewRule((r) => ({ ...r, endTime: time }))} />
+                        <TimePicker
+                            label="Hora de início"
+                            value={newRule.startTime}
+                            onChange={(val) => setNewRule((prev) => ({ ...prev, startTime: val }))}
+                        />
+                        <TimePicker
+                            label="Hora de fim"
+                            value={newRule.endTime}
+                            onChange={(val) => setNewRule((prev) => ({ ...prev, endTime: val }))}
+                        />
                     </div>
-                    <FormDropdown
-                        label="Tipo de Taxa"
-                        value={newRule.type}
-                        setValue={(value) => setNewRule((r) => ({ ...r, type: value }))}
-                        options={[{ value: "fixed", label: "Acréscimo na taxa base" }, { value: "multiplier", label: "Multiplicar a taxa base" }]}
-                    />
-                    {newRule.type === "fixed" ? (
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormDropdown
+                            label="Tipo de regra"
+                            value={newRule.type}
+                            setValue={(value) => setNewRule((prev) => ({ ...prev, type: value as "fixed" | "multiplier" }))}
+                            options={[
+                                { value: "fixed", label: "Acréscimo fixo (R$)" },
+                                { value: "multiplier", label: "Multiplicador (x)" },
+                            ]}
+                        />
                         <MoneyInput
-                            label="Valor"
+                            label={newRule.type === "fixed" ? "Valor do acréscimo" : "Multiplicador"}
                             value={newRule.value}
-                            onChange={(val) => setNewRule((r) => ({ ...r, value: String(val) }))}
+                            onChange={(val) => setNewRule((prev) => ({ ...prev, value: String(val) }))}
+                            placeholder={newRule.type === "fixed" ? "R$ 0,00" : "Ex: 1.5"}
+                            min={0}
+                            step={newRule.type === "fixed" ? 0.01 : 0.1}
                         />
-                    ) : (
-                        <Input
-                            label="Valor"
-                            type="number"
-                            step="0.1"
-                            value={newRule.value}
-                            onChange={(e) => setNewRule((r) => ({ ...r, value: e.target.value }))}
-                            placeholder="1.5"
-                        />
-                    )}
-                    <div className="text-sm font-semibold text-brand-dark dark:text-dark-heading mt-2">
-                        Taxa final estimada = {formatCurrency(
-                            newRule.type === "fixed"
-                                ? (Number(settings.baseFee || 0) + Number(newRule.value || 0))
-                                : (Number(settings.baseFee || 0) * Number(newRule.value || 0))
-                        )}
                     </div>
                 </div>
             </DefaultModal>
 
-            <AlertModal
-                isOpen={ruleToDelete !== null}
-                onClose={() => setRuleToDelete(null)}
-                title="Excluir regra por horário"
-                description={`Tem certeza que deseja excluir a regra de horário das ${ruleToDelete?.startTime} às ${ruleToDelete?.endTime}?`}
-                onConfirm={async () => {
-                    if (ruleToDelete) {
-                        await deleteDeliveryFeeRuleAction(partnerId, ruleToDelete.id);
-                        await reload();
-                    }
-                    setRuleToDelete(null);
-                }}
-                confirmText="Excluir"
-                cancelText="Cancelar"
-                isDestructive={true}
-            />
-
-            <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
+            {ruleToDelete && (
+                <AlertModal
+                    isOpen={true}
+                    onClose={() => setRuleToDelete(null)}
+                    title="Excluir regra"
+                    message={`Tem certeza que deseja excluir a regra das ${ruleToDelete.startTime} às ${ruleToDelete.endTime}?`}
+                    confirmText="Excluir"
+                    variant="destructive"
+                    onConfirm={async () => {
+                        await deleteDeliveryFeeRuleAction(partnerId, ruleToDelete.id)
+                        await reload()
+                        setRuleToDelete(null)
+                    }}
+                />
+            )}
         </FadeIn>
     )
 }

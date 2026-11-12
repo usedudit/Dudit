@@ -46,17 +46,18 @@ loadEnv()
 const DEFAULT_URLS = {
   terms: "/institucional/termos",
   privacy: "/institucional/privacidade",
+  dpa: "/institucional/dpa",
 }
 
 async function main() {
   const [tipo, versao, txtPath, url] = process.argv.slice(2)
 
   if (!tipo || !versao || !txtPath) {
-    console.error("Uso: npm run seed:legal -- <terms|privacy> <versao> <arquivo.txt> [url]")
+    console.error("Uso: npm run seed:legal -- <terms|privacy|dpa> <versao> <arquivo.txt> [url]")
     process.exit(1)
   }
-  if (!["terms", "privacy"].includes(tipo)) {
-    console.error("tipo deve ser 'terms' ou 'privacy'")
+  if (!["terms", "privacy", "dpa"].includes(tipo)) {
+    console.error("tipo deve ser 'terms', 'privacy' ou 'dpa'")
     process.exit(1)
   }
 

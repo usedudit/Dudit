@@ -1595,12 +1595,12 @@ export async function buildGiftOrderItems(
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price, is_active, stock_available")
+    .select("id, name, price, is_active, stock_available, cost_price")
     .in("id", giftIds)
 
   const { data: services } = await supabase
     .from("services")
-    .select("id, name, price, is_active")
+    .select("id, name, price, is_active, cost_price")
     .in("id", giftIds)
 
   const items: any[] = []
@@ -1626,6 +1626,8 @@ export async function buildGiftOrderItems(
         is_gift: true,
         is_promotional: true,
         promotion_id: promo.id,
+        // Brinde não gera receita, mas o custo real entra no CMV/DRE.
+        unit_cost: Number(prod.cost_price || 0),
       })
     } else {
       const serv = (services || []).find((s: any) => s.id === giftId)
@@ -1643,6 +1645,8 @@ export async function buildGiftOrderItems(
           is_gift: true,
           is_promotional: true,
           promotion_id: promo.id,
+          // Brinde de serviço: custo real entra no CMV, receita 0.
+          unit_cost: Number(serv.cost_price || 0),
         })
       }
     }

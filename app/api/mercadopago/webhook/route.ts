@@ -805,7 +805,30 @@ async function processWebhookWithRetry(
         }
       }
 
+      // Fallback por metadata: dudit_order_id
+      if (!order && paymentInfo?.metadata?.dudit_order_id && isUuid(paymentInfo.metadata.dudit_order_id)) {
+        const { data: orderMeta } = await supabase
+          .from("orders")
+          .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment, updated_at")
+          .eq("id", paymentInfo.metadata.dudit_order_id)
+          .limit(1)
+          .maybeSingle()
+
+        if (orderMeta) {
+          order = orderMeta
+          console.log(`[WEBHOOK] Order ${order.id} found via metadata.dudit_order_id fallback`)
+        }
+      }
+
       if (!order) {
+        // Se o pagamento no Mercado Pago ainda está pendente ou em processo (ex: QR Code Pix recém-gerado no ERP):
+        // É esperado que o pedido ainda esteja sendo finalizado na tela do vendedor ou aguardando o comprador escanear.
+        // NÃO lançar erro fatal aqui para não poluir os logs de erro nem quebrar retentativas.
+        if (paymentInfo.status === "pending" || paymentInfo.status === "in_process") {
+          console.log(`[WEBHOOK] Pagamento ${paymentId} está ${paymentInfo.status} e o pedido ${paymentInfo?.external_reference || ""} ainda não foi encontrado no banco. Retornando 200 (sem erro).`)
+          return
+        }
+
         console.error("[WEBHOOK] Order not found in database:", orderError?.message)
         if (attempt < MAX_RETRIES - 1) {
           await new Promise((resolve) => setTimeout(resolve, 2000))

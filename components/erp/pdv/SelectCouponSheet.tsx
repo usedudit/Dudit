@@ -92,11 +92,6 @@ const SelectCouponSheet = ({
       return "Cupom não cumulativo. Itens do pedido já possuem desconto."
     }
 
-    const applyScope = String(coupon.apply_scope || "all")
-    if (applyScope !== "all") {
-      return "Cupom com regras de categoria/produto/serviço não pode ser usado nesta venda."
-    }
-
     const minCartValue = Number(coupon.min_cart_value || 0)
     if (minCartValue > 0 && Number(subtotal || 0) < minCartValue) {
       return `Disponível apenas para vendas acima de ${formatCurrency(minCartValue)}.`
@@ -188,6 +183,11 @@ const SelectCouponSheet = ({
                       {coupon.is_automatic && (
                         <span className="shrink-0 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-1.5 py-0.5 rounded-full">
                           AUTO
+                        </span>
+                      )}
+                      {coupon.apply_scope && coupon.apply_scope !== "all" && (
+                        <span className="shrink-0 text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase">
+                          {coupon.apply_scope === "products" ? "PRODUTOS" : coupon.apply_scope === "categories" ? "CATEGORIAS" : coupon.apply_scope === "services" ? "SERVIÇOS" : coupon.apply_scope}
                         </span>
                       )}
                       {isBlocked && blockedReason && (

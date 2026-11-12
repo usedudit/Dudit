@@ -36,6 +36,76 @@ import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 const isDev = process.env.NODE_ENV === "development"
 
+/**
+ * Garante snapshot de custo e preço nominal nos itens do pedido antes do insert.
+ * Itens de carrinho já chegam completos; o fluxo legado (compra direta) não.
+ * Sem isso o CMV do DRE fica zerado e a receita bruta é subestimada.
+ */
+async function enrichOrderItemsCostSnapshot(
+  adminClient: ReturnType<typeof createAdminClient>,
+  items: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  if (!items || items.length === 0) return items
+
+  const productIds = Array.from(
+    new Set(items.map((item) => item.product_id as string).filter(Boolean)),
+  )
+  const serviceIds = Array.from(
+    new Set(items.map((item) => item.service_id as string).filter(Boolean)),
+  )
+
+  const [{ data: products }, { data: services }] = await Promise.all([
+    productIds.length > 0
+      ? adminClient.from("products").select("id, price, cost_price").in("id", productIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; price: number | null; cost_price: number | null }> }),
+    serviceIds.length > 0
+      ? adminClient.from("services").select("id, price, cost_price").in("id", serviceIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; price: number | null; cost_price: number | null }> }),
+  ])
+
+  const productMap = new Map<string, { price: number; cost: number }>(
+    (products || []).map((p: any) => [
+      p.id as string,
+      { price: Number(p.price || 0), cost: Number(p.cost_price || 0) },
+    ]),
+  )
+  const serviceMap = new Map<string, { price: number; cost: number }>(
+    (services || []).map((s: any) => [
+      s.id as string,
+      { price: Number(s.price || 0), cost: Number(s.cost_price || 0) },
+    ]),
+  )
+
+  return items.map((item) => {
+    const qty = Number(item.quantity || 0)
+    const unitPrice = Number(item.product_price || 0)
+    const isGift = Boolean(item.is_gift)
+    const catalog: { price: number; cost: number } | undefined = item.service_id
+      ? serviceMap.get(item.service_id as string)
+      : productMap.get(item.product_id as string)
+
+    const cost =
+      item.unit_cost != null ? Number(item.unit_cost) : Number(catalog?.cost || 0)
+    const nominal =
+      item.original_price != null
+        ? Number(item.original_price)
+        : Math.max(unitPrice, Number(catalog?.price || 0))
+    const discount = isGift
+      ? 0
+      : item.discount_amount != null
+        ? Number(item.discount_amount)
+        : Math.max(0, Math.round((nominal - unitPrice) * qty * 100) / 100)
+
+    return {
+      ...item,
+      unit_cost: cost,
+      original_price: nominal > 0 ? nominal : null,
+      discount_amount: discount,
+    }
+  })
+}
+
+
 interface ProcessPaymentRequest {
   paymentFormData: any
   items: Array<{ id: string; name: string; price: number; quantity: number; variant_id?: string; service_id?: string; itemType?: string | null; fulfillmentMode?: string | null }>
@@ -449,6 +519,9 @@ async function handler(request: NextRequest) {
     let resolvedOrderDeliveryAddress = deliveryAddress || null
     let paymentMethodDiscountAmount = 0
     let paymentMethodExtraAmount = 0
+    let itemDiscountAmount = 0
+    let campaignDiscountAmount = 0
+    let manualDiscountAmount = 0
     const validatedItems: Array<{
       product_id: string | null
       service_id?: string | null
@@ -472,6 +545,9 @@ async function handler(request: NextRequest) {
       couponDiscountAmount = Number(existingOrder.discount_amount || 0)
       paymentMethodDiscountAmount = Number(existingOrder.payment_method_discount_amount || 0)
       paymentMethodExtraAmount = Number(existingOrder.payment_method_extra_amount || 0)
+      itemDiscountAmount = Number(existingOrder.item_discount_amount || 0)
+      campaignDiscountAmount = Number(existingOrder.campaign_discount_amount || 0)
+      manualDiscountAmount = Number(existingOrder.manual_discount_amount || 0)
       resolvedOrderDeliveryType = (existingOrder.delivery_type === "delivery" ? "delivery" : "pickup") as "delivery" | "pickup"
       resolvedOrderDeliveryAddress = existingOrder.delivery_address || deliveryAddress || null
       checkoutFulfillment = (existingOrder.checkout_fulfillment as Record<string, unknown>) || null
@@ -562,6 +638,9 @@ async function handler(request: NextRequest) {
       couponDiscountAmount = priced.data.couponDiscountAmount
       paymentMethodDiscountAmount = priced.data.pricingResult.paymentMethodDiscountAmount
       paymentMethodExtraAmount = priced.data.pricingResult.paymentMethodInterestAmount + priced.data.pricingResult.paymentMethodFeeAmount
+      itemDiscountAmount = priced.data.pricingResult.itemDiscountAmount
+      campaignDiscountAmount = priced.data.pricingResult.campaignDiscountAmount
+      manualDiscountAmount = priced.data.pricingResult.manualDiscountAmount
       checkoutFulfillment = priced.data.fulfillmentPayload as unknown as Record<string, unknown>
       resolvedOrderDeliveryType =
         priced.data.fulfillmentPayload.deliveryType === "delivery" ? "delivery" : "pickup"
@@ -921,6 +1000,9 @@ async function handler(request: NextRequest) {
       couponDiscountAmount = pricingResult.couponDiscountAmount
       paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
       paymentMethodExtraAmount = pricingResult.paymentMethodInterestAmount + pricingResult.paymentMethodFeeAmount
+      itemDiscountAmount = pricingResult.itemDiscountAmount
+      campaignDiscountAmount = pricingResult.campaignDiscountAmount
+      manualDiscountAmount = pricingResult.manualDiscountAmount
 
       orderItemsForInsert = validatedItems.map((item) => ({
         product_id: item.product_id,
@@ -1453,6 +1535,9 @@ async function handler(request: NextRequest) {
           mp_payment_id: mpPaymentId ? mpPaymentId.toString() : null,
           coupon_id: couponIdToSave,
           discount_amount: couponDiscountAmount,
+          item_discount_amount: itemDiscountAmount,
+          campaign_discount_amount: campaignDiscountAmount,
+          manual_discount_amount: manualDiscountAmount,
           payment_method_discount_amount: paymentMethodDiscountAmount,
           payment_method_extra_amount: paymentMethodExtraAmount,
           delivery_fee: deliveryFee,
@@ -1524,6 +1609,9 @@ async function handler(request: NextRequest) {
     if (isDev) console.log(existingOrderId ? "Order updated successfully:" : "Order created successfully:", newOrder.id)
 
     if (!existingOrderId) {
+      // Snapshot de custo/preço nominal (fluxo legado não traz esses campos).
+      orderItemsForInsert = await enrichOrderItemsCostSnapshot(adminClient, orderItemsForInsert)
+
       const itemsWithSubtotal = mapOrderItemsForPaymentInsert(newOrder.id, orderItemsForInsert)
 
       const { error: itemsError } = await adminClient.from("order_items").insert(itemsWithSubtotal)

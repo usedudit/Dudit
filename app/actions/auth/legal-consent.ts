@@ -22,7 +22,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
 const recordConsentSchema = z.object({
-  tipo: z.enum(["terms", "privacy"]),
+  tipo: z.enum(["terms", "privacy", "dpa"]),
   versao: z.string().min(1).max(50),
   origem: z.enum(Object.values(LEGAL_CONSENT_ORIGINS) as [LegalConsentOrigin, ...LegalConsentOrigin[]]).default("signup"),
   userId: z.string().uuid().optional(),
@@ -155,6 +155,14 @@ export async function getPendingLegalConsents(): Promise<PendingLegalConsent[]> 
 
   if (!documents || documents.length === 0) return []
 
+  const { data: partner } = await admin
+    .from("partners")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  const applicableDocs = partner ? documents : documents.filter((d) => d.tipo !== "dpa")
+
   const { data: consents } = (await admin
     .from("user_legal_consents")
     .select("tipo, documento_id, versao, aceito_em")
@@ -164,7 +172,7 @@ export async function getPendingLegalConsents(): Promise<PendingLegalConsent[]> 
     error: unknown
   }
 
-  return computePendingLegalConsents(documents, consents ?? [])
+  return computePendingLegalConsents(applicableDocs, consents ?? [])
 }
 
 /**
@@ -196,6 +204,14 @@ export async function ensureLegalConsents(
     return { success: false }
   }
 
+  const { data: partner } = await admin
+    .from("partners")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  const applicableDocs = partner ? documents : documents.filter((d) => d.tipo !== "dpa")
+
   const { data: consents } = (await admin
     .from("user_legal_consents")
     .select("tipo, documento_id, versao, aceito_em")
@@ -205,7 +221,7 @@ export async function ensureLegalConsents(
     error: unknown
   }
 
-  const pending = computePendingLegalConsents(documents, consents ?? [])
+  const pending = computePendingLegalConsents(applicableDocs, consents ?? [])
   if (pending.length === 0) return { success: true }
 
   const docByKey = new Map((documents ?? []).map((d) => [`${d.tipo}:${d.versao}`, d]))

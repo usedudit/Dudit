@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
@@ -13,7 +13,6 @@ import {
     DropdownItem,
     Pagination,
     IconPlaceholder,
-    CustomerCard,
     Accordion,
     SidebarCard,
 } from "@/components/reusable"
@@ -374,17 +373,12 @@ export default function AvailableDeliveryDetail({
 
                                                 {/* Paradas de Entrega */}
                                                 {ordersList.map((order: any, idx: number) => {
-                                                    const cleanCustPhone = (order.customer_phone || "").replace(/\D/g, "")
                                                     const custMaps = order.delivery_address
                                                         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
                                                         : null
-                                                    const custWaze = order.delivery_address
-                                                        ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
-                                                        : null
-                                                    const custWhatsapp = cleanCustPhone ? `https://wa.me/55${cleanCustPhone}` : null
                                                     const stopTitle = ordersList.length > 1
-                                                        ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
-                                                        : "Local de Entrega (Cliente)"
+                                                        ? `Parada ${idx + 1} de ${ordersList.length} — Destino da Entrega (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
+                                                        : "Destino da Entrega"
 
                                                     return (
                                                         <FormSection key={order.order_id || idx} title={stopTitle} hasSeparator>
@@ -394,15 +388,17 @@ export default function AvailableDeliveryDetail({
                                                             >
                                                                 <div className="space-y-1 min-w-0">
                                                                     <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2 flex-wrap">
-                                                                        <span>{order.customer_name || "Cliente"}</span>
+                                                                        <span>{order.delivery_address || "Região local"}</span>
                                                                         {order.total_amount && (
                                                                             <span className="text-xs font-normal text-brand-inactive-text">
                                                                                 ({formatCurrency(order.total_amount)})
                                                                             </span>
                                                                         )}
                                                                     </h3>
-                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                        <span>{order.delivery_address || "Endereço não informado"}</span>
+                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5 mt-0.5">
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading">
+                                                                            🔒 Rua, número e contato liberados após aceite
+                                                                        </span>
                                                                     </p>
                                                                     {order.notes && (
                                                                         <p className="text-xs text-brand-orange mt-1">
@@ -417,26 +413,11 @@ export default function AvailableDeliveryDetail({
                                                                         }
                                                                     >
                                                                         <DropdownItem onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}>
-                                                                            <EyeIcon size={16} /> Ver Detalhes do Pedido
+                                                                            <EyeIcon size={16} /> Ver Resumo do Pedido
                                                                         </DropdownItem>
                                                                         {custMaps && (
                                                                             <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
-                                                                                <MapPinIcon size={16} /> Abrir Rota no Maps
-                                                                            </DropdownItem>
-                                                                        )}
-                                                                        {custWaze && (
-                                                                            <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
-                                                                                <TruckIcon size={16} /> Abrir no Waze
-                                                                            </DropdownItem>
-                                                                        )}
-                                                                        {cleanCustPhone && (
-                                                                            <DropdownItem onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")}>
-                                                                                <PhoneIcon size={16} /> Ligar para o Cliente
-                                                                            </DropdownItem>
-                                                                        )}
-                                                                        {custWhatsapp && (
-                                                                            <DropdownItem onClick={() => window.open(custWhatsapp, "_blank")}>
-                                                                                <WhatsappIcon size={16} /> WhatsApp
+                                                                                <MapPinIcon size={16} /> Ver Região no Maps
                                                                             </DropdownItem>
                                                                         )}
                                                                     </ActionsDropdown>
@@ -749,7 +730,7 @@ export default function AvailableDeliveryDetail({
                                             </div>
                                             {order.delivery_address && (
                                                 <div className="flex justify-between items-start text-sm gap-4">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Região de Entrega</span>
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
                                                         <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
                                                         {order.delivery_address}
@@ -760,16 +741,14 @@ export default function AvailableDeliveryDetail({
 
                                         <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
-                                        <CustomerCard
-                                            customer={{
-                                                name: order.customer_name || "Cliente",
-                                                phone: order.customer_phone || "",
-                                                email: order.customer_email || "",
-                                            }}
-                                            address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
-                                            showMap={true}
-                                            chrome="minimal"
-                                        />
+                                        <div className="rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/20 p-4 space-y-2">
+                                            <div className="flex items-center gap-2 text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                <span>🔒 Proteção de Dados do Comprador</span>
+                                            </div>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                Por segurança e privacidade (LGPD), o nome completo, contato direto (telefone/WhatsApp) e o endereço exato com número e complemento são liberados na sua tela imediatamente após você aceitar a entrega.
+                                            </p>
+                                        </div>
 
                                         {order.notes && (
                                             <div>
