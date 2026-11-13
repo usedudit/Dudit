@@ -2132,7 +2132,7 @@ export function ExplorarPageClient({
                                     {/* Itens e Lojas distantes - listados direto, respondendo aos filtros/ordenação da página */}
                                     {!!query && (moreDistantSellers.length > 0 || filteredDistant.length > 0) && (
                                         <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
-                                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Um pouco mais distantes do seu raio de busca</h2>
+                                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Um pouco mais distante do seu raio de busca</h2>
 
                                             {moreDistantSellers.length > 0 && (currentType === 'tudo' || currentType === 'vitrines' || currentType === 'negocios') && (
                                                 <>

@@ -168,10 +168,11 @@ export async function getMarketplaceCheckoutContextAction(input: {
       let query = admin
         .from("payment_methods")
         .select(
-          "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type, store_id"
+          "id, type, payment_type, is_active, is_default, is_online_default, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type, store_id"
         )
         .eq("partner_id", resolved.partnerId)
         .eq("is_active", true)
+        .order("is_online_default", { ascending: false })
         .order("is_default", { ascending: false })
         .order("priority", { ascending: false })
         .order("discount_percent", { ascending: false })

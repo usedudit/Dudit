@@ -124,6 +124,12 @@ export interface ProductBucketItem {
     stock: number
     image?: string | null
   }>
+  product_type?: string
+  isService?: boolean
+  is_service?: boolean
+  promotional_price?: number | null
+  category_id?: string | null
+  fallback_variant_image?: string | null
 }
 
 export interface ProductBucketOptions {

@@ -128,21 +128,36 @@ export default async function VendorPage({
           }
         }
         computedPrice += qty * itemPrice
-        if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
-          const imgs = planItem.products.images
-          if (Array.isArray(imgs) && imgs.length > 0) {
-            firstImage = imgs[0]
+        if (!firstImage) {
+          if (planItem.item_type === 'product' && planItem.products?.images) {
+            const imgs = planItem.products.images
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              firstImage = imgs[0]
+            }
+          } else if (planItem.item_type === 'service' && planItem.services?.images) {
+            const imgs = planItem.services.images
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              firstImage = imgs[0]
+            }
           }
         }
       }
     }
-    const image = firstImage || store.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+
+    // Prioriza a imagem do próprio plano recorrente; fallback para primeiro item ou logo da loja
+    const ownImages = (Array.isArray(item.images) ? item.images : [])
+      .filter((img: any): img is string => typeof img === "string" && img.trim().length > 0)
+    const fallbackImage = firstImage || store.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const finalImages = ownImages.length > 0 ? ownImages : [fallbackImage]
+
     return {
       id: item.id,
       name: item.name,
       description: item.description,
       price: computedPrice,
-      images: [image],
+      images: finalImages,
+      moderation_status: item.moderation_status || null,
+      moderation_reason: item.moderation_reason || null,
       itemType: 'plano',
       partners: partner,
       frequency_type: item.frequency_type,

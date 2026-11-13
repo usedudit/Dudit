@@ -1,3 +1,4 @@
+import FormData from "form-data"
 import { safeFetch, validateImageUrl, SSRFError } from "@/lib/security/ssrf-guard"
 
 export interface SightengineResult {
@@ -154,29 +155,25 @@ export async function moderateImageWithBase64(
       }
     }
 
-    // 1. Criar o FormData
-    const formData = new FormData()
-    formData.append('models', MODELS.join(','))
-    formData.append('api_user', apiUser)
-    formData.append('api_secret', apiSecret)
+    // 1. Criar o FormData compatível com Node.js e Nginx da Sightengine (multipart com boundary explícito)
+    const form = new FormData()
+    form.append('models', MODELS.join(','))
+    form.append('api_user', apiUser)
+    form.append('api_secret', apiSecret)
 
-    // 2. Converter Base64 para Blob para simular um arquivo real
-    // Remove o cabeçalho "data:image/png;base64," se existir
+    // 2. Extrair bytes do Base64
     const base64Data = base64Image.includes(',')
       ? base64Image.split(',')[1]
       : base64Image
 
-    // Converte para Buffer e depois para Blob
     const buffer = Buffer.from(base64Data, 'base64')
-    const blob = new Blob([buffer], { type: 'image/jpeg' })
+    form.append('media', buffer, { filename: 'image.jpg', contentType: 'image/jpeg' })
 
-    // Anexa como se fosse um arquivo chamado 'image.jpg'
-    formData.append('media', blob, 'image.jpg')
-
-    // 3. O Fetch gerencia o Content-Type automaticamente (boundary)
+    // 3. Enviar buffer e headers explícitos gerados pelo form-data (evita falha com chunked encoding do Node)
     const response = await safeFetch('https://api.sightengine.com/1.0/check.json', {
       method: 'POST',
-      body: formData,
+      body: form.getBuffer() as BodyInit,
+      headers: form.getHeaders(),
       timeoutMs: 15_000,
       maxResponseBytes: 1 * 1024 * 1024, // 1 MB - API response is JSON
     })

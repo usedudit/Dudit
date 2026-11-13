@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import {
@@ -22,6 +22,7 @@ import {
     SidebarCard,
     ThreeDotsLoader,
     ActionsDropdown,
+    MoneyInput,
 } from "@/components/reusable"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, SearchIcon } from "@/lib/icons"
@@ -381,6 +382,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 else finalImages[idx] = img
             })
 
+            let hasFlaggedUploads = false
+
             if (filesToUpload.length > 0) {
                 setUploadingImages(new Set(filesToUpload.map((f) => f.index)))
 
@@ -399,6 +402,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
 
                 let hasErrors = false
                 let errorMessage = "Falha na validação de algumas imagens. Tente novamente."
+                hasFlaggedUploads = uploadResults.some(({ result }) => result.moderation?.status === "FLAGGED")
 
                 uploadResults.forEach(({ result, file, index }) => {
                     if (result.success && result.key) {
@@ -427,6 +431,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 description: description || null,
                 status,
                 frequencyType,
+                requiresManualModeration: hasFlaggedUploads || (plan as any)?.moderation_status === "pending_moderation" || (plan as any)?.moderation_status === "flagged",
                 frequencyInterval,
                 startDate: `${startDate}T12:00:00.000Z`,
                 endDate: endDate ? `${endDate}T23:59:59.000Z` : null,
@@ -662,7 +667,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         uploadingImages={uploadingImages}
                                                         blockedImages={blockedImages}
                                                         isSaving={isSaving}
-                                                        moderationStatus="approved"
+                                                        moderationStatus={(plan as any)?.moderation_status || "approved"}
                                                     />
                                                 </div>
 
@@ -781,11 +786,6 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         options={billingModeOptions}
                                                         disabled
                                                     />
-                                                    <p className="text-xs text-brand-muted dark:text-dark-muted leading-relaxed">
-                                                        {billingMode === "auto_mercado_pago"
-                                                            ? "Renovações cobradas automaticamente via Mercado Pago."
-                                                            : "Plano legado: renovações cobradas manualmente (A combinar)."}
-                                                    </p>
 
                                                     <FormDropdown
                                                         label="Validade dos Créditos"
@@ -827,13 +827,12 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                             />
 
                                                             {shippingMode === "flat" && (
-                                                                <Input
-                                                                    type="number"
+                                                                <MoneyInput
                                                                     label="Valor do frete"
                                                                     placeholder="Ex: 12,90"
                                                                     value={shippingFlatAmount}
-                                                                    onChange={(e) => {
-                                                                        setShippingFlatAmount(e.target.value)
+                                                                    onChange={(val) => {
+                                                                        setShippingFlatAmount(String(val))
                                                                         setFieldErrors((prev) => {
                                                                             const next = new Set(prev)
                                                                             next.delete("shippingFlatAmount")
@@ -841,7 +840,6 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                         })
                                                                     }}
                                                                     required
-                                                                    min={0}
                                                                     error={fieldErrors.has("shippingFlatAmount")}
                                                                     errorMessage={fieldErrors.has("shippingFlatAmount") ? "Informe o valor do frete" : undefined}
                                                                     dataField="shippingFlatAmount"

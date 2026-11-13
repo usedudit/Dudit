@@ -143,8 +143,8 @@ export const ActivityLog = ({ activity }: { activity?: any[] }) => {
         <div className="pt-2">
             <HistoryTimeline
                 entries={entries}
-                title="Atividade de agendamento"
                 emptyMessage="Não foram encontrados eventos para este agendamento."
+                disableDuditHighlight
             />
         </div>
     )

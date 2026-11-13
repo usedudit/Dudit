@@ -187,7 +187,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                         fullWidth={false}
                     >
                         <div className="w-56 p-1.5 space-y-1">
-                            <div className="text-[10px] font-bold text-brand-inactive-text px-3 py-1 uppercase tracking-wider">
+                            <div className="text-sm font-medium text-brand-inactive-text px-3 py-1">
                                 Modo
                             </div>
                             <button
@@ -205,7 +205,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                                 {viewMode === "list" && <span className="text-brand-green">✓</span>}
                             </button>
                             <div className="border-t border-brand-border dark:border-dark-border my-1.5"></div>
-                            <div className="text-[10px] font-bold text-brand-inactive-text px-3 py-1 uppercase tracking-wider">
+                            <div className="text-sm font-medium text-brand-inactive-text px-3 py-1">
                                 Visualização
                             </div>
                             <button

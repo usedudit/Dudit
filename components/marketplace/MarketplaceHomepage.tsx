@@ -177,6 +177,7 @@ export default function MarketplaceHome({
         state: "",
         addressType: "casa",
         noNumber: false,
+        isDefault: false,
         latitude: null as number | null,
         longitude: null as number | null,
     })
@@ -318,7 +319,7 @@ export default function MarketplaceHome({
     }
 
     const handleSaveAddress = async () => {
-        const { zipCode, street, number, neighborhood, city, state, addressType, noNumber } = form
+        const { zipCode, street, number, neighborhood, city, state, addressType, noNumber, isDefault } = form
         const finalNumber = noNumber ? "S/N" : number
         if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
             setAddressError("Preencha todos os campos obrigatórios")
@@ -342,7 +343,7 @@ export default function MarketplaceHome({
                 neighborhood,
                 city,
                 state,
-                isDefault: true,
+                isDefault,
                 addressType,
                 latitude: form.latitude ?? null,
                 longitude: form.longitude ?? null,
@@ -459,6 +460,16 @@ export default function MarketplaceHome({
                     {addressError && (
                         <p className="text-red-500 text-sm font-semibold">{addressError}</p>
                     )}
+
+                    <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
+                        <input
+                            type="checkbox"
+                            checked={form.isDefault}
+                            onChange={(e) => setForm(f => ({ ...f, isDefault: e.target.checked }))}
+                            className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
+                        />
+                        <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
+                    </label>
 
                     <div className="flex gap-2 pt-2">
                         <Button

@@ -1236,8 +1236,12 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             const paymentBreakdown = (paymentData.paymentBreakdown || []).map((entry) => ({
                 method: String(entry.method || "").trim(),
                 amount: Number(entry.amount || 0),
+                amountReceived: entry.amountReceived != null ? Number(entry.amountReceived) : undefined,
                 paymentMethodId: entry.paymentMethodId || null,
                 installmentNumber: Math.max(1, Math.floor(Number((entry as { installmentNumber?: number }).installmentNumber || 1))),
+                wantsChange: (entry as any).wantsChange || undefined,
+                payWithAmount: (entry as any).payWithAmount != null ? Number((entry as any).payWithAmount) : undefined,
+                changeAmount: (entry as any).changeAmount != null ? Number((entry as any).changeAmount) : undefined,
                 provider: (entry as any).provider || paymentData.paymentProvider || undefined,
                 mpPaymentId: (entry as any).mpPaymentId || paymentData.mpPaymentId || undefined,
             }))
@@ -2294,7 +2298,6 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009}
                                 depositChargeAmount={depositChargeAmount}
                                 depositPercentage={depositSettings.depositPercentage}
-                                orderId={directCheckoutIdRef.current || undefined}
                             />
                         )}
                     </AnimatePresence>

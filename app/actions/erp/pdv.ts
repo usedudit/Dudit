@@ -37,7 +37,10 @@ import {
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation";
 import { createCommissionExpenseForEntity } from "@/lib/services/commission-ledger.service";
 import { applySaleToGoals } from "@/lib/services/sales-goals.service";
-import { formatPaymentMethodLabel } from "@/lib/payments/payment-method";
+import {
+  formatPaymentMethodLabel,
+  isStoreCreditMethod,
+} from "@/lib/payments/payment-method";
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery";
 import { resolvePaymentMethodsForStore } from "@/lib/data/payment-methods";
 import { listStoreProducts } from "@/lib/store-products";
@@ -103,6 +106,7 @@ type FinalizePaymentEntry = {
   installmentNumber?: number;
   wantsChange?: boolean;
   payWithAmount?: number;
+  changeAmount?: number;
 };
 
 type FinalizePreSaleInput = {
@@ -170,6 +174,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     installmentNumber?: number;
     wantsChange?: boolean;
     payWithAmount?: number;
+    changeAmount?: number;
     provider?: string;
     mpPaymentId?: string | null;
   }>;
@@ -1659,6 +1664,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     installmentNumber?: number;
     wantsChange?: boolean;
     payWithAmount?: number;
+    changeAmount?: number;
     provider?: string;
     mpPaymentId?: string | null;
   }> = [];
@@ -1669,9 +1675,10 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
       input.paymentProvider === "Mercado Pago" ||
       String((entry as any).provider || "").toLowerCase().includes("mercado pago") ||
       String(entry.method || "").toLowerCase().includes("mercado pago");
+    const isStoreCredit = isStoreCreditMethod(entry.method);
 
     const paymentMethodId = entry.paymentMethodId || null;
-    if (!paymentMethodId && !isMercadoPago) {
+    if (!paymentMethodId && !isMercadoPago && !isStoreCredit) {
       return {
         success: false as const,
         error: `Método de pagamento inválido no PDV (${String(entry.method || "não informado")}). Selecione um método ativo e tente novamente.`,
@@ -1695,6 +1702,10 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
       payWithAmount:
         entry.payWithAmount != null
           ? safeMoney(Number(entry.payWithAmount))
+          : undefined,
+      changeAmount:
+        entry.changeAmount != null
+          ? safeMoney(Number(entry.changeAmount))
           : undefined,
       paymentMethodId,
       payment_method_id: paymentMethodId,
@@ -1780,6 +1791,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             source.payWithAmount != null
               ? Number(source.payWithAmount)
               : undefined,
+          changeAmount:
+            source.changeAmount != null ? Number(source.changeAmount) : undefined,
           provider: (source as any).provider || undefined,
           mpPaymentId: (source as any).mpPaymentId || undefined,
         };
@@ -1790,9 +1803,11 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   const totalPaidAmount =
     breakdownForOrder.length > 0
       ? safeMoney(
+          // `amount` is the charged value per leg. `amountReceived` is the
+          // pre-adjustment base and must not inflate paid totals (cash change
+          // and customer fees/interest are handled separately).
           breakdownForOrder.reduce(
-            (acc, row) =>
-              acc + Number((row as any).amountReceived ?? row.amount ?? 0),
+            (acc, row) => acc + Number((row as any).amount ?? 0),
             0,
           ),
         )
@@ -1961,12 +1976,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   // These post-sale side effects are independent after the order exists.
   // Start them together so the slowest one, rather than their sum, determines
   // the remaining time shown by the PDV.
+  // Store credit is not money entering the drawer, so it must not appear in
+  // the cash session movements even though it is part of the sale.
+  const cashMovementEntries = breakdownForOrder.filter(
+    (entry) => !isStoreCreditMethod(entry.method),
+  );
   const cashMovementsPromise =
     capabilities.hasFinancial &&
     activeSessionResult.data?.id &&
-    breakdownForOrder.length > 0
+    cashMovementEntries.length > 0
       ? supabase.from("cash_movements").insert(
-          breakdownForOrder.map((entry) => ({
+          cashMovementEntries.map((entry) => ({
             partner_id: input.partnerId,
             store_id: input.storeId || null,
             cash_session_id: activeSessionResult.data!.id,

@@ -16,10 +16,16 @@ export const getPartnerSuppliersCached = cache(async (partnerId: string, storeId
         cachedFn = unstable_cache(
             async () => {
                 const supabase = getAdminClient()
-                const { data } = await supabase
+                let query = supabase
                     .from("suppliers")
                     .select("*")
                     .eq("partner_id", partnerId)
+                
+                if (storeId) {
+                    query = query.eq("store_id", storeId)
+                }
+                
+                const { data } = await query
                     .order("created_at", { ascending: false })
 
                 return data

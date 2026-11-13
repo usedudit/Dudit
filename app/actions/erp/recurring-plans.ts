@@ -10,6 +10,9 @@ import type { RecurringListCursor, RecurringPlanItem, RecurringPlanStatus, Recur
 import { mapPlanRow } from "@/lib/types/recurring"
 import { invalidateRecurringPlanCache } from "@/lib/cache/invalidation"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
+import { moderateProductContent } from "@/lib/moderation/product-moderation"
+import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
+import { scheduleDeferredImageModeration } from "@/lib/moderation/deferred-image-moderation"
 import {
   validatePlanInput,
   normalizeShippingInput,
@@ -136,6 +139,7 @@ export async function createRecurringPlanAction(input: {
   shippingFlatAmount?: number
   fulfillmentModes?: FulfillmentMode[]
   storeId?: string
+  requiresManualModeration?: boolean
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -143,6 +147,17 @@ export async function createRecurringPlanAction(input: {
 
     await requirePermission(input.partnerId, "recurring_plans", "manage")
     await requireMinimumPlan(input.partnerId, "escalar")
+
+    // Moderação de texto (nome + descrição) antes de gravar
+    const moderation = await moderateProductContent({
+      name: input.name,
+      description: input.description ?? undefined,
+      userId: input.partnerId,
+    })
+    if (!moderation.valid) {
+      return { success: false, error: moderation.error || "Conteúdo não aprovado pela moderação" }
+    }
+    const moderationDeferred = !!moderation.infraFailure
 
     // Limite de planos recorrentes ativos (0 fora do Escalar)
     const { checkRecurringPlanCreateLimit } = await import("@/lib/services/recurring/limits")
@@ -206,6 +221,7 @@ export async function createRecurringPlanAction(input: {
         shipping_mode: shipping.mode,
         shipping_flat_amount: shipping.flatAmount,
         fulfillment_modes: fulfillmentModes,
+        moderation_status: input.requiresManualModeration ? "flagged" : "approved",
       })
       .select("*")
       .single()
@@ -217,6 +233,25 @@ export async function createRecurringPlanAction(input: {
     if (itemsError) {
       await supabase.from("recurring_plans").delete().eq("id", plan.id)
       throw itemsError
+    }
+
+    if (moderationDeferred) {
+      await scheduleDeferredTextModeration({
+        entityType: "recurring_plan",
+        entityId: plan.id,
+        partnerId: input.partnerId,
+        autoApprove: !input.requiresManualModeration,
+        texts: [input.name, input.description],
+      })
+    }
+
+    if (input.images && input.images.length > 0) {
+      await scheduleDeferredImageModeration({
+        entityType: "recurring_plan",
+        entityId: plan.id,
+        partnerId: input.partnerId,
+        images: input.images,
+      })
     }
 
     if (input.images && input.images.length > 0) {
@@ -276,6 +311,7 @@ export async function updateRecurringPlanAction(input: {
   shippingMode?: RecurringShippingMode
   shippingFlatAmount?: number
   fulfillmentModes?: FulfillmentMode[]
+  requiresManualModeration?: boolean
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -295,13 +331,32 @@ export async function updateRecurringPlanAction(input: {
 
     const supabase = await getSupabaseServerClient()
 
-    // Get old plan for images comparison
+    // Get old plan for comparisons
     const { data: oldPlan } = await supabase
       .from("recurring_plans")
-      .select("images")
+      .select("images, name, description, moderation_status")
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
       .maybeSingle()
+
+    // Moderação apenas dos campos de texto alterados
+    const currentName = typeof oldPlan?.name === "string" ? oldPlan.name.trim() : ""
+    const currentDescription = typeof oldPlan?.description === "string" ? oldPlan.description.trim() : ""
+    const nameChanged = input.name !== undefined && String(input.name ?? "").trim() !== currentName
+    const descriptionChanged = input.description !== undefined && String(input.description ?? "").trim() !== currentDescription
+
+    let moderationDeferred = false
+    if (nameChanged || descriptionChanged) {
+      const moderation = await moderateProductContent({
+        name: nameChanged ? input.name : undefined,
+        description: descriptionChanged ? (input.description ?? undefined) : undefined,
+        userId: input.partnerId,
+      })
+      if (!moderation.valid) {
+        return { success: false, error: moderation.error || "Conteúdo não aprovado pela moderação" }
+      }
+      moderationDeferred = !!moderation.infraFailure
+    }
 
     const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (input.name != null) updatePayload.name = String(input.name).trim()
@@ -336,6 +391,9 @@ export async function updateRecurringPlanAction(input: {
       updatePayload.shipping_mode = shipping.mode
       updatePayload.shipping_flat_amount = shipping.flatAmount
     }
+    if (input.requiresManualModeration) {
+      updatePayload.moderation_status = "flagged"
+    }
 
     const { data: plan, error } = await supabase
       .from("recurring_plans")
@@ -346,6 +404,25 @@ export async function updateRecurringPlanAction(input: {
       .single()
 
     if (error) throw error
+
+    if (moderationDeferred) {
+      await scheduleDeferredTextModeration({
+        entityType: "recurring_plan",
+        entityId: input.planId,
+        partnerId: input.partnerId,
+        autoApprove: oldPlan?.moderation_status === "approved" && !input.requiresManualModeration,
+        texts: [input.name, input.description],
+      })
+    }
+
+    if (input.images !== undefined) {
+      await scheduleDeferredImageModeration({
+        entityType: "recurring_plan",
+        entityId: input.planId,
+        partnerId: input.partnerId,
+        images: input.images || [],
+      })
+    }
 
     if (input.items) {
       validatePlanInput({

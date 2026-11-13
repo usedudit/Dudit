@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon, ClockIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, FormDropdown, Tabs, TabsList, TabsTrigger, MoneyInput } from "@/components/reusable"
+import { Button, Input, IconPlaceholder, FormDropdown, Tabs, TabsList, TabsTrigger, MoneyInput, DatePicker } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -217,8 +217,7 @@ export default function PlanItemFormSheet({
                                 options={formData.staff.map(s => ({ value: s.id, label: s.display_name }))}
                                 placeholder="Selecione o profissional"
                             />
-                            <Input
-                                type="time"
+                            <DatePicker
                                 label="Horário Preferencial (Opcional)"
                                 value={preferredTime}
                                 onChange={(e) => setPreferredTime(e.target.value)}

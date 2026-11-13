@@ -58,9 +58,7 @@ const TransactionListItem = React.memo(
                                     {transaction.description}
                                 </span>
                                 {transaction.installmentGroupId && (
-                                    <Badge variant="orange" icon={<InstallmentIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0">
-                                        Parcelado
-                                    </Badge>
+                                    <Badge variant="orange" icon={<InstallmentIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0"></Badge>
                                 )}
                                 {!transaction.isInstallmentGroup && transaction.installmentNumber && transaction.installmentTotalCount && (
                                     <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
@@ -68,9 +66,7 @@ const TransactionListItem = React.memo(
                                     </Badge>
                                 )}
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
-                                    <Badge variant="purple" icon={<RepeatIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0">
-                                        Recorrente
-                                    </Badge>
+                                    <Badge variant="purple" icon={<RepeatIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0"></Badge>
                                 )}
                             </div>
                             <div className="mt-1 flex items-center">

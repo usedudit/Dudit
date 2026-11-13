@@ -2,7 +2,7 @@ import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { createNotification, buildIdempotencyKey } from "./notification.service"
-import { resolveNotificationOrigin } from "./notification-origin.service"
+import { buildNotificationContent } from "@/lib/notifications/templates"
 
 const ABANDONMENT_THRESHOLD_MINUTES = 4 * 60
 const NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -71,7 +71,11 @@ export async function sweepAbandonedCarts(
   }
 
   const cartsByUser = groupCartItemsByUser(cartItems as any[])
-  const cooldowns = await fetchCooldowns(client, Object.keys(cartsByUser))
+  const userIds = Object.keys(cartsByUser)
+  const [cooldowns, profiles] = await Promise.all([
+    fetchCooldowns(client, userIds),
+    fetchUserProfiles(client, userIds),
+  ])
 
   const entries = Object.entries(cartsByUser)
   for (const [userId, items] of entries) {
@@ -84,11 +88,23 @@ export async function sweepAbandonedCarts(
 
     const firstItem = items[0]
     const partnerId = firstItem.partner_id
+    const storeId = firstItem.store_id ? String(firstItem.store_id) : null
     const storeName = await resolveStoreName(client, partnerId, firstItem.store_id)
 
     const productNames = buildProductNames(items)
     const itemCount = items.length
     const totalQuantity = items.reduce((sum, i) => sum + (i.quantity || 1), 0)
+
+    const profile = profiles.get(userId)
+    const customerName = profile?.fullName?.trim() || undefined
+    const phone = profile?.phone?.trim() || undefined
+
+    const { title, message } = buildNotificationContent("cart_abandoned", "customer", {
+      storeName,
+      itemCount,
+      productNames,
+      customerName,
+    })
 
     const idempotencyKey = buildIdempotencyKey(
       "cart_abandoned",
@@ -102,15 +118,19 @@ export async function sweepAbandonedCarts(
       await createNotification({
         userId,
         type: "cart_abandoned",
-        title: "🛒 Carrinho te esperando!",
-        message: "",
+        title,
+        message,
         entityType: "cart",
         entityId: null,
         data: {
           itemCount,
           totalQuantity,
           storeName,
+          store_id: storeId,
           productNames,
+          customerName,
+          customer_name: customerName,
+          phone,
           partner_id: partnerId,
           audience: "customer",
         },
@@ -139,6 +159,9 @@ function groupCartItemsByUser(cartItems: any[]): Record<string, CartItemAgg[]> {
       result[userId] = []
     }
 
+    const product = Array.isArray(item.products) ? item.products[0] : item.products
+    const service = Array.isArray(item.services) ? item.services[0] : item.services
+
     const agg: CartItemAgg = {
       user_id: userId,
       partner_id: String(item.partner_id),
@@ -148,7 +171,7 @@ function groupCartItemsByUser(cartItems: any[]): Record<string, CartItemAgg[]> {
       product_id: item.product_id || null,
       service_id: item.service_id || null,
       variant_id: item.variant_id || null,
-      productName: item.products?.name || item.services?.name || null,
+      productName: product?.name || service?.name || null,
     }
     result[userId].push(agg)
   }
@@ -215,4 +238,33 @@ async function fetchCooldowns(
   }
 
   return new Set((data || []).map((row: { user_id: string }) => row.user_id))
+}
+
+async function fetchUserProfiles(
+  client: ReturnType<typeof getAdminClient>,
+  userIds: string[],
+): Promise<Map<string, { fullName: string | null; phone: string | null }>> {
+  if (userIds.length === 0) return new Map()
+
+  try {
+    const { data, error } = await client
+      .from("user_profiles")
+      .select("user_id, full_name, phone")
+      .in("user_id", userIds)
+
+    if (error) {
+      console.error("[cart-abandonment] Error fetching user profiles:", error.message)
+      return new Map()
+    }
+
+    return new Map(
+      (data || []).map((row: { user_id: string; full_name: string | null; phone: string | null }) => [
+        row.user_id,
+        { fullName: row.full_name, phone: row.phone },
+      ]),
+    )
+  } catch (err) {
+    console.error("[cart-abandonment] Unexpected error fetching user profiles:", err)
+    return new Map()
+  }
 }

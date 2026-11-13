@@ -89,11 +89,6 @@ const OrderListRow = React.memo((
                                         <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
                                     </Tooltip>
                                 )}
-                                {hasRefund && (
-                                    <Tooltip text="Possui histórico de reembolso">
-                                        <Badge variant="red" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
-                                    </Tooltip>
-                                )}
                             </div>
                             <div className="mt-1 flex items-center">
                                 <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} provider={order.payment_provider} simplify compact />

@@ -248,6 +248,7 @@ export async function executeImport(
         if (missingSuppliers.length > 0) {
           const toInsertSuppliers = missingSuppliers.map((name) => ({
             partner_id: partnerId,
+            store_id: storeId,
             name,
             is_active: true,
           }))

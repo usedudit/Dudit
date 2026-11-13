@@ -206,7 +206,7 @@ export function ERPOnboardingFeedbackModal({
       ) : (
         <div className="space-y-5 pt-1">
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-            Você está usando a Dudit há alguns dias. Queremos saber como está sendo sua experiência para continuarmos melhorando:
+            Queremos saber como está sendo sua experiência para continuarmos melhorando:
           </p>
 
           {/* Opções de Sentimento */}

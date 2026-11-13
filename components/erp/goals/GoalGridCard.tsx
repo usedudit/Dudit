@@ -63,9 +63,7 @@ const GoalGridCard = React.memo(function GoalGridCard({
               <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={goal.name}>
                 {goal.name}
               </h3>
-              <Badge variant={statusVariant(goal.status)} className="whitespace-nowrap scale-90 shrink-0">
-                {goal.status}
-              </Badge>
+              <Badge variant={statusVariant(goal.status)} className="whitespace-nowrap scale-90 shrink-0"></Badge>
             </div>
             <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
               {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {formatDate(goal.start_date)} até {formatDate(goal.end_date)}

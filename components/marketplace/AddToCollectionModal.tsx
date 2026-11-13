@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, DefaultModal, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, DefaultModal, IconPlaceholder, ThreeDotsLoader, ListItem } from "@/components/reusable"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabase } from "@/providers/supabase-provider"
 import { getUserCollections, addItemToCollection, getItemCollectionIds, removeItemFromCollection } from "@/app/actions/marketplace/collections"
-import { CollectionsIcon, PlusIcon, TrashIcon } from "@/lib/icons"
+import { CollectionsIcon, TrashIcon } from "@/lib/icons"
 
 interface Collection {
     id: string
@@ -111,30 +111,27 @@ export function AddToCollectionModal({ isOpen, onClose, itemType, itemId }: AddT
                 ) : (
                     collections.map((collection) => {
                         const alreadyIn = isInCollection(collection.id)
+                        const isLoading = actionId === collection.id
                         return (
-                            <button
+                            <ListItem
                                 key={collection.id}
-                                onClick={() => alreadyIn ? handleRemove(collection.id) : handleAdd(collection.id)}
-                                disabled={actionId === collection.id}
-                                className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-dark-border hover:border-brand-green hover:bg-brand-green/5 transition-colors disabled:opacity-50"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium text-brand-dark dark:text-dark-heading">{collection.name}</p>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">{collection.items_count} itens</p>
-                                    </div>
-                                    {actionId === collection.id ? (
+                                title={collection.name}
+                                description={`${collection.items_count} itens`}
+                                onClick={!isLoading ? () => alreadyIn ? handleRemove(collection.id) : handleAdd(collection.id) : undefined}
+                                disabled={isLoading}
+                                right={
+                                    isLoading ? (
                                         <div className="w-5 h-5 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
                                     ) : alreadyIn ? (
-                                        <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50">
+                                        <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleRemove(collection.id); }}>
                                             <TrashIcon className="w-3.5 h-3.5 mr-1" />
                                             Remover
                                         </Button>
                                     ) : (
-                                        <Button variant="outline" size="sm">Adicionar</Button>
-                                    )}
-                                </div>
-                            </button>
+                                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleAdd(collection.id); }}>Adicionar</Button>
+                                    )
+                                }
+                            />
                         )
                     })
                 )}

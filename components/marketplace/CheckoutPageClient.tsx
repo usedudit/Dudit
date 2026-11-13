@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon, LockIcon, CrownIcon, TruckIcon, PackageIcon, WhatsappIcon } from "@/lib/icons"
-import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
+import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea, Checkbox } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { getAddressesAction, createAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
@@ -281,17 +281,27 @@ export function CheckoutPageClient() {
     const [useStoreCredit, setUseStoreCredit] = useState<boolean>(false)
 
     useEffect(() => {
+        let cancelled = false
         const fetchStoreCredit = async () => {
             const pId = sessionData?.partnerId
-            if (!user?.id || !pId) return
+            if (!user?.id || !pId) {
+                setAvailableStoreCredit(0)
+                setUseStoreCredit(false)
+                return
+            }
             const { getMarketplaceCustomerStoreCreditAction } = await import("@/app/actions/marketplace/cart")
             const res = await getMarketplaceCustomerStoreCreditAction(pId)
-            if (res.success && res.availableCredit > 0) {
-                setAvailableStoreCredit(res.availableCredit)
-                setUseStoreCredit(true)
-            }
+            if (cancelled) return
+            // Reset on store change: credit belongs to the partner/store being
+            // checked out, so a previous balance must not leak into another one.
+            const credit = res.success ? Math.max(0, Number(res.availableCredit || 0)) : 0
+            setAvailableStoreCredit(credit)
+            setUseStoreCredit(credit > 0)
         }
         void fetchStoreCredit()
+        return () => {
+            cancelled = true
+        }
     }, [user?.id, sessionData?.partnerId])
 
     useEffect(() => {
@@ -421,6 +431,11 @@ export function CheckoutPageClient() {
     })
 
     const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
+    const hasSubscription = Boolean(
+        requirements?.hasSubscriptionLines ||
+        checkoutContext?.lines?.some((l) => l.lineKind === "subscription") ||
+        sessionData?.cartItems?.some((i) => i.itemType === "subscription")
+    )
 
     // ── Gate do plano ────────────────────────────────────────────────────────
     // `mercadoPagoEnabled` é a feature paga do plano. Sem ela o checkout só
@@ -526,7 +541,7 @@ export function CheckoutPageClient() {
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
         zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
-        isDefault: false,
+        addressType: "casa", isDefault: false,
         latitude: null as number | null, longitude: null as number | null
     })
 
@@ -547,12 +562,6 @@ export function CheckoutPageClient() {
     const [serviceAvailLoading, setServiceAvailLoading] = useState(false)
 
     const displayableCoupons = useMemo(() => availableCoupons.filter((c) => !c.blocked), [availableCoupons])
-    const sortedAvailableCoupons = useMemo(() => {
-        return [...availableCoupons].sort((a, b) => {
-            if (a.blocked !== b.blocked) return a.blocked ? 1 : -1
-            return 0
-        })
-    }, [availableCoupons])
 
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
@@ -1175,7 +1184,7 @@ export function CheckoutPageClient() {
 
     const handleSaveNewAddress = async () => {
         if (!userId) return
-        const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+        const { zipCode, street, number, neighborhood, city, state, noNumber, addressType } = newAddressData
         const finalNumber = noNumber ? "S/N" : number
         if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
             setAddressFormError("Preencha todos os campos obrigatórios do endereço.")
@@ -1196,6 +1205,7 @@ export function CheckoutPageClient() {
                 state,
                 zipCode,
                 isDefault: newAddressData.isDefault || userAddresses.length === 0,
+                addressType,
                 latitude: newAddressData.latitude ?? null,
                 longitude: newAddressData.longitude ?? null,
                 csrf_token: token,
@@ -1219,7 +1229,7 @@ export function CheckoutPageClient() {
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(savedAddr) }))
 
                 setShowAddressForm(false)
-                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, isDefault: false, latitude: null, longitude: null })
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, addressType: "casa", isDefault: false, latitude: null, longitude: null })
                 setDeliveryError(null)
                 setAddressFormError(null)
 
@@ -1660,7 +1670,7 @@ export function CheckoutPageClient() {
                 <div className="text-xs">
                     {wantsChange ? (
                         <p className="text-brand-dark dark:text-dark-heading font-medium">
-                            Troco para <strong className="font-bold">{formatCurrency(payWithAmount || 0)}</strong> (Troco: <span className="text-brand-green font-bold">{formatCurrency(Math.max(0, (payWithAmount || 0) - checkoutTotalToCharge))}</span>)
+                            Troco para <strong className="font-bold">{formatCurrency(payWithAmount || 0)}</strong> (Troco: <span className="text-brand-green font-bold">{formatCurrency(Math.max(0, (payWithAmount || 0) - remainingBalanceToCharge))}</span>)
                         </p>
                     ) : wantsChange === false ? (
                         <p className="text-brand-inactive-text dark:text-dark-body">Não precisa de troco (valor exato)</p>
@@ -2352,7 +2362,7 @@ export function CheckoutPageClient() {
                 )}
             </div>
 
-            {couponsEnabled && (availableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+            {!hasSubscription && couponsEnabled && (displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                 <div className="mb-4 space-y-2">
                     <ListItem
                         icon={TagIcon}
@@ -2363,18 +2373,16 @@ export function CheckoutPageClient() {
                                 ? "Cupom aplicado"
                                 : couponListLoading
                                     ? "Verificando cupons disponíveis..."
-                                    : displayableCoupons.length > 0
-                                        ? getCouponCountLabel(displayableCoupons.length)
-                                        : (availableCoupons.length === 1 ? "1 cupom disponível" : `${availableCoupons.length} cupons disponíveis`)
+                                    : getCouponCountLabel(displayableCoupons.length)
                         }
                         className="px-0 py-4 gap-4 border-y border-x-0 border-brand-border dark:border-dark-border !bg-transparent !rounded-none shadow-none hover:border-brand-border dark:hover:border-dark-border"
                         onClick={() => {
-                            if (!couponListLoading && availableCoupons.length > 0) {
+                            if (!couponListLoading && displayableCoupons.length > 0) {
                                 setSelectedCouponId(appliedCoupon?.id || "")
                                 setShowCouponModal(true)
                             }
                         }}
-                        showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                        showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
                         right={
                             appliedCoupon ? (
                                 <button
@@ -2578,7 +2586,7 @@ export function CheckoutPageClient() {
     const loadApplicableCoupons = async () => {
         const effectivePartnerId = partnerId || checkoutContext?.partner?.id
         const effectiveUserId = userId || user?.id
-        if (!effectivePartnerId || !effectiveUserId || !couponsEnabled) {
+        if (!effectivePartnerId || !effectiveUserId || !couponsEnabled || hasSubscription) {
             setAvailableCoupons([])
             return
         }
@@ -2603,7 +2611,7 @@ export function CheckoutPageClient() {
             setAvailableCoupons(result.coupons)
 
             if (couponCode) {
-                const stillApplicable = result.coupons.find((coupon) => coupon.code === couponCode)
+                const stillApplicable = result.coupons.find((coupon) => coupon.code === couponCode && !coupon.blocked)
 
                 if (stillApplicable) {
                     setCouponDiscount(stillApplicable.discountAmount)
@@ -2627,12 +2635,12 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         void loadApplicableCoupons()
-    }, [partnerId, checkoutContext?.partner?.id, userId, user?.id, totalAmount, couponItemsKey, couponsEnabled])
+    }, [partnerId, checkoutContext?.partner?.id, userId, user?.id, totalAmount, couponItemsKey, couponsEnabled, hasSubscription])
 
-    // Cupons desativados: limpa qualquer código aplicado para não enviá-lo ao
-    // checkout nem exibi-lo no resumo/WhatsApp.
+    // Pedido de assinatura / plano recorrente ou cupons desativados: limpa qualquer código
+    // aplicado para não enviá-lo ao checkout nem exibi-lo no resumo/WhatsApp.
     useEffect(() => {
-        if (couponsEnabled) return
+        if (couponsEnabled && !hasSubscription) return
         setAvailableCoupons([])
         setCouponCode("")
         setCouponDiscount(0)
@@ -2640,7 +2648,7 @@ export function CheckoutPageClient() {
         setCouponError(null)
         setCouponPartialWarning(false)
         setShowCouponModal(false)
-    }, [couponsEnabled])
+    }, [couponsEnabled, hasSubscription])
 
     const refreshCouponPartialWarning = async (code: string) => {
         if (!partnerId || !code.trim()) {
@@ -2659,9 +2667,9 @@ export function CheckoutPageClient() {
     }
 
     const handleApplySelectedCoupon = () => {
-        const selectedCoupon = availableCoupons.find((coupon) => coupon.id === selectedCouponId)
+        const selectedCoupon = displayableCoupons.find((coupon) => coupon.id === selectedCouponId)
 
-        if (!selectedCoupon) {
+        if (!selectedCoupon || selectedCoupon.blocked) {
             setCouponCode("")
             setCouponDiscount(0)
             setCouponError(null)
@@ -2885,8 +2893,8 @@ export function CheckoutPageClient() {
                 setIsLoading(false)
                 return
             }
-            if (wantsChange && (!payWithAmount || payWithAmount < checkoutTotalToCharge)) {
-                setPaymentError("O valor pago não pode ser menor que o total do pedido.")
+            if (wantsChange && (!payWithAmount || payWithAmount < remainingBalanceToCharge)) {
+                setPaymentError("O valor pago não pode ser menor que o saldo restante do pedido.")
                 setTempWantsChange(true)
                 setTempPayWithAmount(payWithAmount ? String(payWithAmount) : "")
                 setShowChangeModal(true)
@@ -3305,7 +3313,7 @@ export function CheckoutPageClient() {
                     setPixPaymentData({
                         orderId: (result as any).orderId,
                         orderNumber: (result as any).orderNumber,
-                        amount: checkoutTotalToCharge,
+                        amount: Math.max(0, Number((result as any).amountDue ?? remainingBalanceToCharge)),
                         orderDetails: {
                             items: buildOrderDetailsItems(),
                             deliveryType: formData.deliveryType,
@@ -3346,6 +3354,7 @@ export function CheckoutPageClient() {
                         wantsChange: wantsChange || false,
                         payWithAmount: payWithAmount || undefined,
                         checkoutPricingSnapshot,
+                        useStoreCredit: useStoreCredit && availableStoreCredit > 0,
                     })
                     if ('error' in result && result.error) {
                         if ((result as any).whatsappFallback && await redirectToSellerWhatsApp(fallbackReason(result))) return
@@ -3368,7 +3377,7 @@ export function CheckoutPageClient() {
                     setPixPaymentData({
                         orderId: successResult.orderId,
                         orderNumber: successResult.orderNumber,
-                        amount: checkoutTotalToCharge,
+                        amount: Math.max(0, Number(successResult.amountDue ?? remainingBalanceToCharge)),
                         orderDetails: {
                             items: buildOrderDetailsItems(),
                             deliveryType: formData.deliveryType,
@@ -4475,7 +4484,7 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Coupon Selector */}
-                                {couponsEnabled && (availableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+                                {!hasSubscription && couponsEnabled && (displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                                     <FormSection title="Cupom de Desconto" hasSeparator>
                                         <ListItem
                                             icon={TagIcon}
@@ -4485,18 +4494,16 @@ export function CheckoutPageClient() {
                                                     ? "Cupom aplicado"
                                                     : couponListLoading
                                                         ? "Verificando cupons disponíveis..."
-                                                        : displayableCoupons.length > 0
-                                                            ? getCouponCountLabel(displayableCoupons.length)
-                                                            : (availableCoupons.length === 1 ? "1 cupom disponível" : `${availableCoupons.length} cupons disponíveis`)
+                                                        : getCouponCountLabel(displayableCoupons.length)
                                             }
                                             className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                             onClick={() => {
-                                                if (!couponListLoading && availableCoupons.length > 0) {
+                                                if (!couponListLoading && displayableCoupons.length > 0) {
                                                     setSelectedCouponId(appliedCoupon?.id || "")
                                                     setShowCouponModal(true)
                                                 }
                                             }}
-                                            showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                                            showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
                                             right={
                                                 appliedCoupon ? (
                                                     <button
@@ -4789,7 +4796,7 @@ export function CheckoutPageClient() {
                         </Button>
                         <Button
                             onClick={handleApplySelectedCoupon}
-                            disabled={!selectedCouponId || availableCoupons.find(c => c.id === selectedCouponId)?.blocked}
+                            disabled={!selectedCouponId || !displayableCoupons.some(c => c.id === selectedCouponId)}
                         >
                             Aplicar
                         </Button>
@@ -4797,41 +4804,30 @@ export function CheckoutPageClient() {
                 }
             >
                 <div className="space-y-3">
-                    {sortedAvailableCoupons.length > 0 ? (
-                        sortedAvailableCoupons.map((coupon) => (
+                    {displayableCoupons.length > 0 ? (
+                        displayableCoupons.map((coupon) => (
                             <ListItem
                                 icon={TagIcon}
                                 key={coupon.id}
                                 title={getCouponTitle(coupon)}
-                                description={
-                                    coupon.blocked
-                                        ? (coupon.errorMessage || "Não aplicável aos itens atuais do pedido.")
-                                        : `${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " • Válido apenas para alguns itens do pedido." : " • Aplicável a todo o pedido."}`
-                                }
-                                className={`px-4 py-3 gap-4 border rounded-xl ${coupon.blocked
-                                    ? "opacity-50 cursor-not-allowed border-brand-border dark:border-dark-border"
-                                    : selectedCouponId === coupon.id
-                                        ? "border-brand-green bg-green-50/30 dark:bg-green-900/10 cursor-pointer"
-                                        : "border-brand-border dark:border-dark-border cursor-pointer"
-                                    }`}
+                                description={`${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " • Válido apenas para alguns itens do pedido." : " • Aplicável a todo o pedido."}`}
+                                className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${
+                                    selectedCouponId === coupon.id
+                                        ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                        : "border-brand-border dark:border-dark-border"
+                                }`}
                                 onClick={() => {
-                                    if (!coupon.blocked) {
-                                        setSelectedCouponId(coupon.id)
-                                    }
+                                    setSelectedCouponId(coupon.id)
                                 }}
                                 right={
-                                    coupon.blocked ? (
-                                        <LockIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body mr-1" />
-                                    ) : (
-                                        <RadioButton
-                                            name="marketplace-coupon"
-                                            value={coupon.id}
-                                            checked={selectedCouponId === coupon.id}
-                                            onChange={() => {
-                                                setSelectedCouponId(coupon.id)
-                                            }}
-                                        />
-                                    )
+                                    <RadioButton
+                                        name="marketplace-coupon"
+                                        value={coupon.id}
+                                        checked={selectedCouponId === coupon.id}
+                                        onChange={() => {
+                                            setSelectedCouponId(coupon.id)
+                                        }}
+                                    />
                                 }
                             />
                         ))
@@ -4876,6 +4872,25 @@ export function CheckoutPageClient() {
                             }}
                             onLoadingChange={setLoadingCep}
                         />
+                    </div>
+                    <div className="flex items-center gap-3 mb-2">
+                        {[
+                            { value: "casa", label: "Casa" },
+                            { value: "trabalho", label: "Trabalho" },
+                            { value: "outro", label: "Outro" },
+                        ].map(opt => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setNewAddressData(prev => ({ ...prev, addressType: opt.value }))}
+                                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${newAddressData.addressType === opt.value
+                                    ? "bg-brand-green text-white border-brand-green"
+                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
+                                    }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
                     </div>
                     <div>
                         <Input
@@ -4931,14 +4946,12 @@ export function CheckoutPageClient() {
                     </div>
 
                     <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
-                        <input
-                            type="checkbox"
+                        <Checkbox
+                            label="Definir como endereço padrão"
                             checked={newAddressData.isDefault || userAddresses.length === 0}
                             disabled={userAddresses.length === 0}
-                            onChange={(e) => setNewAddressData(prev => ({ ...prev, isDefault: e.target.checked }))}
-                            className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
+                            onChange={(checked) => setNewAddressData(prev => ({ ...prev, isDefault: checked }))}
                         />
-                        <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
                     </label>
 
                     <Button
@@ -5448,7 +5461,7 @@ export function CheckoutPageClient() {
                                 }
                                 setShowChangeModal(false)
                             }}
-                            disabled={tempWantsChange === null || (tempWantsChange === true && (!tempPayWithAmount || Number(tempPayWithAmount) < checkoutTotalToCharge || isNaN(Number(tempPayWithAmount))))}
+                            disabled={tempWantsChange === null || (tempWantsChange === true && (!tempPayWithAmount || Number(tempPayWithAmount) < remainingBalanceToCharge || isNaN(Number(tempPayWithAmount))))}
                         >
                             Confirmar
                         </Button>
@@ -5498,13 +5511,13 @@ export function CheckoutPageClient() {
                             />
                             {tempPayWithAmount && !isNaN(Number(tempPayWithAmount)) && (
                                 <div className="text-xs space-y-1">
-                                    {Number(tempPayWithAmount) >= checkoutTotalToCharge ? (
+                                    {Number(tempPayWithAmount) >= remainingBalanceToCharge ? (
                                         <p className="text-brand-inactive-text dark:text-dark-body">
-                                            Troco estimado: <span className="text-brand-green font-bold">{formatCurrency(Number(tempPayWithAmount) - checkoutTotalToCharge)}</span>
+                                            Troco estimado: <span className="text-brand-green font-bold">{formatCurrency(Number(tempPayWithAmount) - remainingBalanceToCharge)}</span>
                                         </p>
                                     ) : (
                                         <p className="text-red-500 font-semibold">
-                                            O valor pago não pode ser menor que o total do pedido ({formatCurrency(checkoutTotalToCharge)})
+                                            O valor pago não pode ser menor que o saldo restante do pedido ({formatCurrency(remainingBalanceToCharge)})
                                         </p>
                                     )}
                                 </div>

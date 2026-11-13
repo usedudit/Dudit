@@ -592,7 +592,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] text-white font-semibold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                 <span>{pricing.discountPercent}% OFF</span>
                             </div>
                         )}

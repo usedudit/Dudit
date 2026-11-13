@@ -29,6 +29,7 @@ function distributeInstallments(total: number, installments: number): number[] {
 type MarketplacePreviewResult = {
   finalAmount: number
   interestAmount: number
+  customerInterestAmount: number
   installmentCostAmount: number
   feeAmount: number
   fixedFeeAmount: number
@@ -40,6 +41,7 @@ type MarketplacePreviewResult = {
   appliedDiscountPercent: number
   appliedFeePercent: number
   appliedInterestPercent: number
+  appliedCustomerInterestPercent: number
 }
 
 function marketplaceCalculateAmounts(input: {
@@ -92,6 +94,10 @@ function marketplaceCalculateAmounts(input: {
   if (installmentFeeBearer === "customer") {
     currentTotal = toSafeMoney(currentTotal + installmentCostAmount)
   }
+  const customerInterestAmount = (pm.feeBearer === "customer" ? fixedInterestAmount : 0) +
+    (installmentFeeBearer === "customer" ? installmentCostAmount : 0)
+  const appliedCustomerInterestPercent = (pm.feeBearer === "customer" ? fixedInterestPercent : 0) +
+    (installmentFeeBearer === "customer" ? Number(installmentFeePercent || 0) : 0)
   const amountBeforeFee = currentTotal
 
   // Step 3: administrative/fixed fee over the running total after interest.
@@ -105,6 +111,7 @@ function marketplaceCalculateAmounts(input: {
   return {
     finalAmount,
     interestAmount,
+    customerInterestAmount,
     installmentCostAmount,
     feeAmount: percentageFeeAmount,
     fixedFeeAmount,
@@ -116,6 +123,7 @@ function marketplaceCalculateAmounts(input: {
     appliedDiscountPercent: discountPercent,
     appliedFeePercent: feePercent,
     appliedInterestPercent: totalInterestPercent,
+    appliedCustomerInterestPercent,
   }
 }
 
@@ -138,7 +146,7 @@ export async function previewMarketplacePaymentAction(input: {
   if (isUuid) {
     const { data, error } = await adminSupabase
       .from("payment_methods")
-      .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, installment_fee_bearer")
+      .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, is_online_default, name, default_finance_account_id, max_installments, fee_bearer, installment_fee_bearer")
       .eq("id", input.paymentMethodId)
       .eq("partner_id", input.partnerId)
       .eq("is_active", true)
@@ -150,7 +158,7 @@ export async function previewMarketplacePaymentAction(input: {
     method = data
   } else {
     const { pickBestPaymentMethod } = await import("@/lib/services/payment-method.service")
-    const best = await pickBestPaymentMethod(adminSupabase as any, input.paymentMethodId as any, input.partnerId, { preferDefault: true })
+    const best = await pickBestPaymentMethod(adminSupabase as any, input.paymentMethodId as any, input.partnerId, { preferDefault: true, preferOnlineDefault: true })
     if (!best) {
       return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o método selecionado." }
     }
@@ -193,12 +201,17 @@ export async function previewMarketplacePaymentAction(input: {
         installmentNumber: i,
         paymentMethod: feeConfig,
       })
+      const hasCustomerInterest = (calc.customerInterestAmount ?? 0) > 0
+      const customerInterestPercent = hasCustomerInterest
+        ? (calc.appliedCustomerInterestPercent ?? calc.appliedInterestPercent)
+        : 0
       installmentOptions.push({
         installments: i,
         installmentValue: calc.installmentAmounts[0] || 0,
-        hasInterest: calc.interestAmount > 0,
-        interestPercent: calc.interestAmount > 0 ? calc.appliedInterestPercent : 0,
+        hasInterest: hasCustomerInterest,
+        interestPercent: customerInterestPercent,
         totalInterest: calc.interestAmount,
+        customerInterestAmount: calc.customerInterestAmount,
         installmentCostAmount: calc.installmentCostAmount,
         totalFee: calc.feeAmount,
         fixedFee: calc.fixedFeeAmount,

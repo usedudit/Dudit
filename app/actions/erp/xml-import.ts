@@ -87,6 +87,7 @@ interface ImportItemPreview {
 async function findOrCreateSupplier(
   supabase: any,
   partnerId: string,
+  storeId: string | null,
   emitente: NFMetadata["emitente"],
 ): Promise<{ id: string | null; isNew: boolean; document: string; documentType: "cpf" | "cnpj" }> {
   const docType: "cpf" | "cnpj" = emitente.cnpj ? "cnpj" : "cpf"
@@ -694,7 +695,7 @@ export async function uploadXMLAction(
     }
 
     // 10. Buscar ou preparar fornecedor
-    const supplier = await findOrCreateSupplier(supabase, partnerId, metadata.emitente)
+    const supplier = await findOrCreateSupplier(supabase, partnerId, storeId, metadata.emitente)
     const formattedPhone = cleanAndFormatPhone(metadata.emitente.fone) || null
 
     // 5. Se fornecedor não existe, precisamos criar
@@ -704,6 +705,7 @@ export async function uploadXMLAction(
         .from("suppliers")
         .insert({
           partner_id: partnerId,
+          store_id: storeId,
           name: sanitizeInput(metadata.emitente.nome, 150),
           nome_fantasia: sanitizeInput(metadata.emitente.nome_fantasia || metadata.emitente.nome, 150),
           cnpj: supplier.documentType === "cnpj" ? supplier.document : null,

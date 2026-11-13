@@ -86,7 +86,7 @@ const TransactionGridCard = React.memo(
                                     const gridStatusVariant = isPartial ? "orange" : transaction.statusVariant;
                                     return (
                                         <Tooltip text={`Status: ${gridStatusLabel}`}>
-                                            <Badge variant={gridStatusVariant} className="whitespace-nowrap scale-90 shrink-0">{gridStatusLabel}</Badge>
+                                            <Badge variant={gridStatusVariant} className="whitespace-nowrap scale-90 shrink-0"></Badge>
                                         </Tooltip>
                                     );
                                 })()}

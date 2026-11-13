@@ -67,6 +67,7 @@ import {
   sumReceivedByMethod,
 } from "@/lib/payments/payment-ledger";
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label";
+import { isStoreCreditMethod } from "@/lib/payments/payment-method";
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery";
 import { buildNotificationContent } from "@/lib/notifications/templates";
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities";
@@ -457,6 +458,10 @@ function sanitizePaymentBreakdown(
       wantsChange: entry?.wantsChange || undefined,
       payWithAmount:
         entry?.payWithAmount != null ? Number(entry.payWithAmount) : undefined,
+      changeAmount:
+        entry?.changeAmount != null
+          ? Math.max(0, Number(entry.changeAmount))
+          : undefined,
       provider: entry?.provider || null,
       paymentTypeId: entry?.paymentTypeId || null,
       paymentStatus: entry?.paymentStatus || null,
@@ -2713,13 +2718,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         Number(entry.fixedFeeAmount || 0),
       );
     }
-    if (
-      m === "store_credit" ||
-      m === "store-credit" ||
-      m.includes("vale-compra") ||
-      m.includes("vale_compra") ||
-      m.includes("crédito")
-    ) {
+    if (isStoreCreditMethod(entry.method) || isStoreCreditMethod(m)) {
       paymentMethodStoreCreditAmount = Math.max(
         0,
         paymentMethodStoreCreditAmount +

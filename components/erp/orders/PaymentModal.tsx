@@ -2632,8 +2632,13 @@ const PaymentModal = ({
                 ? Number(paymentCalculation?.finalAmount ?? paymentBaseAmount)
                 : Number(paymentCalculation?.finalAmount ?? finalTotalWithMethodPricing ?? netChargeTarget);
             singleMethodLegAmount = methodLegAmount;
+            // `amountReceived` is the pre-adjustment base for the financial
+            // engine. For cash with change the physical amount handed over is
+            // only display data (`payWithAmount` + `changeAmount`) and must
+            // never inflate the charged value or the order total.
+            const moneyBaseReceived = Number(paymentCalculation?.amountReceived ?? methodLegAmount);
             const actualReceived = isUnpaid ? 0 : (view === 'money'
-                ? (wantsChange ? Math.max(payWithAmount, methodLegAmount) : Math.max(methodLegAmount, methodLegAmount))
+                ? moneyBaseReceived
                 : isPartialSingleLeg
                     ? Number(paymentCalculation?.amountReceived ?? paymentBaseAmount)
                     : Number(paymentCalculation?.amountReceived ?? methodLegAmount ?? 0));
@@ -2714,7 +2719,7 @@ const PaymentModal = ({
                 : null;
 
         const singleRegisterAmount =
-            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : (view === 'money' && wantsChange ? Math.max(payWithAmount, singleMethodLegAmount) : singleMethodLegAmount)))) : (effectiveCreditApplied + (splitFinalCharged || 0));
+            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : singleMethodLegAmount))) : (effectiveCreditApplied + (splitFinalCharged || 0));
 
         const paidToRegister =
             existingPaidAmount + singleRegisterAmount;
@@ -3005,11 +3010,11 @@ const PaymentModal = ({
 
         const isPendingPayment = isUnpaidRegister || paymentPendingType !== 'none';
         const payloadPaidAmount = Number(payload?.paidAmount ?? 0);
+        // Cash change is display-only: the paid total is always the charged
+        // value from the payload, never the physical cash handed over.
         const snapshotTotalPaid = isPendingPayment
             ? existingPaidAmount
-            : (view === 'money' && wantsChange
-                ? Math.max(payWithAmount, totalPaidCalculated)
-                : (payloadPaidAmount > 0.009 ? payloadPaidAmount : totalPaidCalculated));
+            : (payloadPaidAmount > 0.009 ? payloadPaidAmount : totalPaidCalculated);
         const pricingDiscount = Number(currentPricingTotals.paymentMethodDiscountAmount || 0);
         const isMerchantFee = (currentPricingTotals.feeBearer || "merchant") === "merchant";
         const isMerchantInstallment = (currentPricingTotals.installmentFeeBearer || "merchant") === "merchant";
@@ -4360,7 +4365,7 @@ const PaymentModal = ({
                                         </div>
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total recebido</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.totalPaid : (view === 'money' && wantsChange ? payWithAmount : totalPaidCalculated))}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.totalPaid : totalPaidCalculated)}</div>
                                         </div>
                                         {(successSnapshot ? successSnapshot.change : changeAmount) > 0 && (
                                             <div>

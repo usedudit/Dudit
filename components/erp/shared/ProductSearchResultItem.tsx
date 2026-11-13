@@ -67,12 +67,10 @@ function resolveImage(item: any, variants: any[]): string {
 
 function resolveIsService(item: any, forced?: boolean): boolean {
     if (forced !== undefined) return forced
-    return Boolean(
-        item?.isService ||
-        item?.is_service ||
-        item?.product_type === "service" ||
-        item?.product_type === "Serviço"
-    )
+    if (item?.isService !== undefined) return Boolean(item.isService)
+    if (item?.is_service !== undefined) return Boolean(item.is_service)
+    const productType = typeof item?.product_type === "string" ? item.product_type.toLowerCase() : ""
+    return productType === "service" || productType === "serviço" || productType === "servico"
 }
 
 export function ProductSearchResultItem({

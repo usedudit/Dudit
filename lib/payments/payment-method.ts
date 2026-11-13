@@ -21,6 +21,42 @@ export function toLegacyPaymentType(value: string | null | undefined): string {
   return "outros"
 }
 
+/**
+ * Detects store credit / vale-compra payment labels without matching regular
+ * credit cards ("Cartão de Crédito") by accident.
+ */
+export function isStoreCreditMethod(value?: string | null): boolean {
+  const raw = String(value || "").trim().toLowerCase()
+  if (!raw) return false
+  if (raw === "exchange") return true
+  if (
+    raw.includes("store_credit") ||
+    raw.includes("store-credit") ||
+    raw.includes("store credit")
+  ) {
+    return true
+  }
+  if (
+    raw.includes("vale-compra") ||
+    raw.includes("vale_compra") ||
+    raw.includes("vale compra")
+  ) {
+    return true
+  }
+  return (
+    raw.includes("crédito de troca") ||
+    raw.includes("credito de troca") ||
+    raw.includes("crédito na loja") ||
+    raw.includes("credito na loja") ||
+    raw.includes("crédito em loja") ||
+    raw.includes("credito em loja") ||
+    raw.includes("crédito de loja") ||
+    raw.includes("credito de loja") ||
+    raw.includes("crédito do cliente") ||
+    raw.includes("credito do cliente")
+  )
+}
+
 export function formatPaymentMethodLabel(value?: string | null): string {
   const normalized = String(value || "").trim().toLowerCase()
   if (!normalized || normalized === "pendente" || normalized === "método não definido") return "Método não definido"

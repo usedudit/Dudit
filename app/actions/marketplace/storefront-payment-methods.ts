@@ -13,6 +13,7 @@ export interface StorefrontPaymentMethod {
   maxInstallments: number
   supportsInstallments: boolean
   cardBrand: string | null
+  isOnlineDefault?: boolean
 }
 
 /**
@@ -28,12 +29,13 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string, store
   let query = supabase
     .from("payment_methods")
     .select(
-      "id, type, payment_type, is_active, is_default, " +
+      "id, type, payment_type, is_active, is_default, is_online_default, " +
       "discount_percent, fee_percent, fee_fixed, " +
       "max_installments, supports_installments, priority, card_brand, store_id"
     )
     .eq("partner_id", partnerId)
     .eq("is_active", true)
+    .order("is_online_default", { ascending: false })
     .order("is_default", { ascending: false })
     .order("priority", { ascending: false })
     .order("discount_percent", { ascending: false })
@@ -73,6 +75,7 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string, store
       maxInstallments: Math.max(1, Number(m.max_installments || 1)),
       supportsInstallments: Boolean(m.supports_installments ?? ((m.max_installments || 1) > 1)),
       cardBrand: m.card_brand || null,
+      isOnlineDefault: Boolean(m.is_online_default),
     })
   }
 

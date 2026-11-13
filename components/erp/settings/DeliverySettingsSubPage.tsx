@@ -82,7 +82,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
     const [chargeByDistance, setChargeByDistance] = useState(false)
     const [editingRule, setEditingRule] = useState<any | null>(null)
     const [ruleToDelete, setRuleToDelete] = useState<any | null>(null)
-    const [activeTab, setActiveTab] = useState<"delivery" | "service">("delivery")
+    const [activeTab, setActiveTab] = useState<string>("delivery")
     const [settings, setSettings] = useState({
         baseFee: "0",
         includedKm: "0",
@@ -112,7 +112,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
     })
     const [rules, setRules] = useState<any[]>([])
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
-    const [newRule, setNewRule] = useState({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
+    const [newRule, setNewRule] = useState<{ startTime: string; endTime: string; type: "fixed" | "multiplier"; value: string }>({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
     const [rulePage, setRulePage] = useState(1)
     const isMobile = useMediaQuery("(max-width: 767px)")
     const rulesPerPage = isMobile ? 4 : 6
@@ -450,114 +450,114 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                                     />
                                                                 ) : (
                                                                     <>
-                                                                    {/* Desktop Table */}
-                                                                    <div className="hidden md:block w-full overflow-hidden bg-white dark:bg-dark-background">
-                                                                        <div className="overflow-x-auto">
-                                                                            <table className="w-full border-separate border-spacing-0">
-                                                                                <thead>
-                                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
-                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
-                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
-                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
-                                                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
-                                                                                    </tr>
-                                                                                </thead>
-                                                                                <tbody>
-                                                                                    {paginatedRules.map((rule) => {
-                                                                                        const baseFeeNum = Number(settings.baseFee || 0);
-                                                                                        const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
-                                                                                        return (
-                                                                                            <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
-                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.startTime}</td>
-                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.endTime}</td>
-                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">
-                                                                                                    {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
-                                                                                                </td>
-                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading text-left">
-                                                                                                    <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
-                                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
-                                                                                                        Taxa final = {formatCurrency(finalFee)}
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
-                                                                                                    <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-                                                                                                        <ActionsDropdown
-                                                                                                            onEdit={() => {
-                                                                                                                setEditingRule(rule)
-                                                                                                                setNewRule({
-                                                                                                                    startTime: rule.startTime,
-                                                                                                                    endTime: rule.endTime,
-                                                                                                                    type: rule.type,
-                                                                                                                    value: String(rule.value),
-                                                                                                                })
-                                                                                                                setIsRuleModalOpen(true)
-                                                                                                            }}
-                                                                                                            onDelete={() => setRuleToDelete(rule)}
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </tr>
-                                                                                        )
-                                                                                    })}
-                                                                                </tbody>
-                                                                            </table>
+                                                                        {/* Desktop Table */}
+                                                                        <div className="hidden md:block w-full overflow-hidden bg-white dark:bg-dark-background">
+                                                                            <div className="overflow-x-auto">
+                                                                                <table className="w-full border-separate border-spacing-0">
+                                                                                    <thead>
+                                                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">Início</th>
+                                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Fim</th>
+                                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Tipo</th>
+                                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Valor</th>
+                                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody>
+                                                                                        {paginatedRules.map((rule) => {
+                                                                                            const baseFeeNum = Number(settings.baseFee || 0);
+                                                                                            const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
+                                                                                            return (
+                                                                                                <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
+                                                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.startTime}</td>
+                                                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">{rule.endTime}</td>
+                                                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">
+                                                                                                        {rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}
+                                                                                                    </td>
+                                                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading text-left">
+                                                                                                        <div>{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</div>
+                                                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-normal">
+                                                                                                            Taxa final = {formatCurrency(finalFee)}
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                                        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                                                                                            <ActionsDropdown
+                                                                                                                onEdit={() => {
+                                                                                                                    setEditingRule(rule)
+                                                                                                                    setNewRule({
+                                                                                                                        startTime: rule.startTime,
+                                                                                                                        endTime: rule.endTime,
+                                                                                                                        type: rule.type,
+                                                                                                                        value: String(rule.value),
+                                                                                                                    })
+                                                                                                                    setIsRuleModalOpen(true)
+                                                                                                                }}
+                                                                                                                onDelete={() => setRuleToDelete(rule)}
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            )
+                                                                                        })}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
 
-                                                                    {/* Mobile Grid Cards */}
-                                                                    <div className="md:hidden grid grid-cols-1 gap-4">
-                                                                        {paginatedRules.map((rule) => {
-                                                                            const baseFeeNum = Number(settings.baseFee || 0);
-                                                                            const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
-                                                                            return (
-                                                                                <div key={rule.id} className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                                                                    <div className="flex items-center justify-between mb-3">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <ClockIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.startTime} - {rule.endTime}</span>
+                                                                        {/* Mobile Grid Cards */}
+                                                                        <div className="md:hidden grid grid-cols-1 gap-4">
+                                                                            {paginatedRules.map((rule) => {
+                                                                                const baseFeeNum = Number(settings.baseFee || 0);
+                                                                                const finalFee = rule.type === "fixed" ? (baseFeeNum + Number(rule.value || 0)) : (baseFeeNum * Number(rule.value || 0));
+                                                                                return (
+                                                                                    <div key={rule.id} className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                                        <div className="flex items-center justify-between mb-3">
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <ClockIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.startTime} - {rule.endTime}</span>
+                                                                                            </div>
+                                                                                            <ActionsDropdown
+                                                                                                onEdit={() => {
+                                                                                                    setEditingRule(rule)
+                                                                                                    setNewRule({
+                                                                                                        startTime: rule.startTime,
+                                                                                                        endTime: rule.endTime,
+                                                                                                        type: rule.type,
+                                                                                                        value: String(rule.value),
+                                                                                                    })
+                                                                                                    setIsRuleModalOpen(true)
+                                                                                                }}
+                                                                                                onDelete={() => setRuleToDelete(rule)}
+                                                                                            />
                                                                                         </div>
-                                                                                        <ActionsDropdown
-                                                                                            onEdit={() => {
-                                                                                                setEditingRule(rule)
-                                                                                                setNewRule({
-                                                                                                    startTime: rule.startTime,
-                                                                                                    endTime: rule.endTime,
-                                                                                                    type: rule.type,
-                                                                                                    value: String(rule.value),
-                                                                                                })
-                                                                                                setIsRuleModalOpen(true)
-                                                                                            }}
-                                                                                            onDelete={() => setRuleToDelete(rule)}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className="flex items-center justify-between">
-                                                                                        <div className="flex flex-col">
-                                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}</span>
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="flex flex-col">
+                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? "Acréscimo" : "Multiplicador"}</span>
+                                                                                            </div>
+                                                                                            <div className="flex flex-col text-right">
+                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
+                                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</span>
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div className="flex flex-col text-right">
-                                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
-                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}</span>
+                                                                                        <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Taxa final: <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(finalFee)}</span></span>
                                                                                         </div>
                                                                                     </div>
-                                                                                    <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Taxa final: <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(finalFee)}</span></span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )
-                                                                        })}
-                                                                    </div>
-
-                                                                    {totalRulePages > 1 && (
-                                                                        <div className="mt-4">
-                                                                            <Pagination
-                                                                                currentPage={rulePage}
-                                                                                totalPages={totalRulePages}
-                                                                                onPageChange={setRulePage}
-                                                                            />
+                                                                                )
+                                                                            })}
                                                                         </div>
-                                                                    )}
+
+                                                                        {totalRulePages > 1 && (
+                                                                            <div className="mt-4">
+                                                                                <Pagination
+                                                                                    currentPage={rulePage}
+                                                                                    totalPages={totalRulePages}
+                                                                                    onPageChange={setRulePage}
+                                                                                />
+                                                                            </div>
+                                                                        )}
                                                                     </>
                                                                 )}
                                                             </div>
@@ -573,29 +573,27 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                             {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
                                                         </span>
                                                     }>
-                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body -mt-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
-                                                        <div className="flex gap-2">
+                                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body -mt-4 mb-3">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
+                                                        <div className="flex rounded-lg border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handlePayerSelect("customer")}
-                                                                className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
-                                                                    ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                                    : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${settings.deliveryPayer === "customer"
+                                                                    ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                                                    : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
                                                                     } ${isFree ? "opacity-50" : ""}`}
                                                             >
                                                                 Cliente
-                                                                <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
                                                             </button>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handlePayerSelect("seller")}
-                                                                className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
-                                                                    ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                                    : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors border-l border-brand-border dark:border-dark-border ${settings.deliveryPayer === "seller"
+                                                                    ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                                                    : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
                                                                     } ${isFree ? "opacity-50" : ""}`}
                                                             >
                                                                 Vendedor
-                                                                <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
                                                             </button>
                                                         </div>
                                                     </FormSection>
@@ -611,28 +609,26 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                                     </span>
                                                 }>
                                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex rounded-lg border border-brand-border dark:border-dark-border overflow-hidden">
                                                         <button
                                                             type="button"
                                                             onClick={() => handlePayerSelect("customer")}
-                                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "customer"
-                                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${settings.deliveryPayer === "customer"
+                                                                ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                                                : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
                                                                 } ${isFree ? "opacity-50" : ""}`}
                                                         >
                                                             Cliente
-                                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Repassa ao cliente</div>
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => handlePayerSelect("seller")}
-                                                            className={`flex-1 px-3 py-2 text-sm font-bold rounded-lg border-2 transition-all ${settings.deliveryPayer === "seller"
-                                                                ? "border-brand-dark dark:border-dark-heading bg-brand-dark/5 dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading"
-                                                                : "border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:border-brand-dark/30"
+                                                            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors border-l border-brand-border dark:border-dark-border ${settings.deliveryPayer === "seller"
+                                                                ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                                                : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
                                                                 } ${isFree ? "opacity-50" : ""}`}
                                                         >
                                                             Vendedor
-                                                            <div className="text-[10px] font-normal opacity-70 mt-0.5">Subsídio da loja</div>
                                                         </button>
                                                     </div>
                                                 </SidebarCard>
@@ -647,65 +643,50 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                         <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
                                             {/* Main Content - Left Column */}
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-4">
-                                                {/* Atendimento de serviços (raio + taxa de deslocamento) */}
-                                                <div className="mt-8">
-                                                    <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
-                                                    <Accordion
-                                                        title={
-                                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
-                                                                Atendimento a domicílio de serviços
-                                                                {!serviceSettings.hasOverride && (
-                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">(padrão da loja)</span>
-                                                                )}
-                                                            </span>
-                                                        }
-                                                        defaultOpen={true}
-                                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
-                                                    >
-                                                        <div className="space-y-6 pb-4">
-                                                            <Input
-                                                                label="Distância máxima de atendimento"
-                                                                value={serviceSettings.maxServiceKm}
-                                                                onChange={(e) => setServiceSettings((s) => ({ ...s, maxServiceKm: e.target.value }))}
-                                                                suffix="km"
-                                                                placeholder="Ilimitado"
+                                                <FormSection title="Atendimento a domicílio de serviços" description={!serviceSettings.hasOverride ? "(padrão da loja)" : undefined}>
+                                                    <div className="space-y-6 pb-4">
+                                                        <Input
+                                                            label="Distância máxima de atendimento"
+                                                            value={serviceSettings.maxServiceKm}
+                                                            onChange={(e) => setServiceSettings((s) => ({ ...s, maxServiceKm: e.target.value }))}
+                                                            suffix="km"
+                                                            placeholder="Ilimitado"
+                                                        />
+                                                        <FormDropdown
+                                                            label="Taxa de deslocamento"
+                                                            value={serviceSettings.travelFeeMode}
+                                                            setValue={(value) => setServiceSettings((s) => ({ ...s, travelFeeMode: (value as any) || "free" }))}
+                                                            options={[
+                                                                { value: "free", label: "Gratuito" },
+                                                                { value: "flat", label: "Valor fixo" },
+                                                                { value: "per_km", label: "Por km cobrado" },
+                                                                { value: "tiered", label: "Por faixa de km" },
+                                                            ]}
+                                                        />
+                                                        <Input
+                                                            label="KM gratuito de deslocamento"
+                                                            value={serviceSettings.freeTravelKm}
+                                                            onChange={(e) => setServiceSettings((s) => ({ ...s, freeTravelKm: e.target.value }))}
+                                                            suffix="km"
+                                                            type="number"
+                                                            min={0}
+                                                        />
+                                                        {serviceSettings.travelFeeMode === "flat" && (
+                                                            <MoneyInput
+                                                                label="Taxa fixa de deslocamento"
+                                                                value={serviceSettings.travelFlatFee}
+                                                                onChange={(val) => setServiceSettings((s) => ({ ...s, travelFlatFee: String(val) }))}
                                                             />
-                                                            <FormDropdown
-                                                                label="Taxa de deslocamento"
-                                                                value={serviceSettings.travelFeeMode}
-                                                                setValue={(value) => setServiceSettings((s) => ({ ...s, travelFeeMode: (value as any) || "free" }))}
-                                                                options={[
-                                                                    { value: "free", label: "Gratuito" },
-                                                                    { value: "flat", label: "Valor fixo" },
-                                                                    { value: "per_km", label: "Por km cobrado" },
-                                                                    { value: "tiered", label: "Por faixa de km" },
-                                                                ]}
+                                                        )}
+                                                        {serviceSettings.travelFeeMode === "per_km" && (
+                                                            <MoneyInput
+                                                                label="Preço por km cobrado"
+                                                                value={serviceSettings.travelPerKm}
+                                                                onChange={(val) => setServiceSettings((s) => ({ ...s, travelPerKm: String(val) }))}
                                                             />
-                                                            <Input
-                                                                label="KM gratuito de deslocamento"
-                                                                value={serviceSettings.freeTravelKm}
-                                                                onChange={(e) => setServiceSettings((s) => ({ ...s, freeTravelKm: e.target.value }))}
-                                                                suffix="km"
-                                                                type="number"
-                                                                min={0}
-                                                            />
-                                                            {serviceSettings.travelFeeMode === "flat" && (
-                                                                <MoneyInput
-                                                                    label="Taxa fixa de deslocamento"
-                                                                    value={serviceSettings.travelFlatFee}
-                                                                    onChange={(val) => setServiceSettings((s) => ({ ...s, travelFlatFee: String(val) }))}
-                                                                />
-                                                            )}
-                                                            {serviceSettings.travelFeeMode === "per_km" && (
-                                                                <MoneyInput
-                                                                    label="Preço por km cobrado"
-                                                                    value={serviceSettings.travelPerKm}
-                                                                    onChange={(val) => setServiceSettings((s) => ({ ...s, travelPerKm: String(val) }))}
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </Accordion>
-                                                </div>
+                                                        )}
+                                                    </div>
+                                                </FormSection>
                                             </div>
 
                                             {/* Right Column / Sidebar - Service tab */}
@@ -868,7 +849,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                             onChange={(val) => setNewRule((prev) => ({ ...prev, value: String(val) }))}
                             placeholder={newRule.type === "fixed" ? "R$ 0,00" : "Ex: 1.5"}
                             min={0}
-                            step={newRule.type === "fixed" ? 0.01 : 0.1}
+                            step={newRule.type === "fixed" ? "0.01" : "0.1"}
                         />
                     </div>
                 </div>
@@ -881,7 +862,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                     title="Excluir regra"
                     message={`Tem certeza que deseja excluir a regra das ${ruleToDelete.startTime} às ${ruleToDelete.endTime}?`}
                     confirmText="Excluir"
-                    variant="destructive"
+                    variant="danger"
                     onConfirm={async () => {
                         await deleteDeliveryFeeRuleAction(partnerId, ruleToDelete.id)
                         await reload()

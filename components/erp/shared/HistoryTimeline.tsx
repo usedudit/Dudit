@@ -23,6 +23,8 @@ interface HistoryTimelineProps {
     emptyMessage?: string
     title?: string
     subtitle?: string
+    /** Disable Dudit/admin highlighting (green icon circle) - use for standard audit logs like appointment history */
+    disableDuditHighlight?: boolean
 }
 
 /**
@@ -83,7 +85,8 @@ export function HistoryTimeline({
     entries,
     emptyMessage = "Nenhum histórico encontrado.",
     title,
-    subtitle
+    subtitle,
+    disableDuditHighlight
 }: HistoryTimelineProps) {
     if (entries.length === 0) {
         return (
@@ -104,7 +107,7 @@ export function HistoryTimeline({
                 {entries.map((entry, index) => {
                     const Icon = getEntryIcon(entry)
                     const isSystem = entry.actor_name?.toLowerCase() === "sistema"
-                    const isDudit = Boolean(
+                    const isDudit = !disableDuditHighlight && Boolean(
                         entry.highlight ||
                         entry.actor_name?.toLowerCase().includes("dudit") ||
                         entry.metadata?.dudit_action ||

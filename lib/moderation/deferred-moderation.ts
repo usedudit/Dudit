@@ -18,7 +18,7 @@ import {
  * o item das consultas públicas.
  */
 
-export type DeferredModerationEntityType = "product" | "service" | "community_video"
+export type DeferredModerationEntityType = "product" | "service" | "community_video" | "recurring_plan"
 
 export type DeferredTextModerationPayload = {
   entityType: DeferredModerationEntityType
@@ -37,6 +37,7 @@ const ENTITY_CONFIG: Record<
   product: { table: "products", nameColumn: "name", exploreType: "produto" },
   service: { table: "services", nameColumn: "name", exploreType: "servico" },
   community_video: { table: "community_videos", nameColumn: "title", exploreType: null },
+  recurring_plan: { table: "recurring_plans", nameColumn: "name", exploreType: null },
 }
 
 async function sha256(input: string): Promise<string> {
@@ -181,7 +182,9 @@ async function refreshEntityCaches(
     const tags =
       payload.entityType === "community_video"
         ? ["community-videos", `community-video-${payload.entityId}`]
-        : [`product-${payload.entityId}`, `service-${payload.entityId}`, "products", "services"]
+        : payload.entityType === "recurring_plan"
+          ? ["recurring-plans", `recurring-plan-${payload.entityId}`]
+          : [`product-${payload.entityId}`, `service-${payload.entityId}`, "products", "services"]
 
     for (const tag of tags) {
       try {

@@ -1641,9 +1641,6 @@ export async function checkoutCartAction(
     if (wantsChange === undefined || wantsChange === null) {
       return { error: "Por favor, informe se precisa de troco para o pagamento em dinheiro." }
     }
-    if (wantsChange && (payWithAmount === undefined || payWithAmount === null || payWithAmount < persistedTotal)) {
-      return { error: "O valor informado para o troco é menor que o total do pedido." }
-    }
   }
 
   let financeAccountId: string | null = null
@@ -1736,13 +1733,47 @@ export async function checkoutCartAction(
       creditQuery = creditQuery.eq("customer_user_id", user.id)
     }
 
-    const { data: creditRows } = await creditQuery
-    const availableCredit = (creditRows || []).reduce((sum: number, c: any) => sum + Number(c.remaining_amount || 0), 0)
+    const [{ data: creditRows }, customerCreditResult] = await Promise.all([
+      creditQuery,
+      resolvedCustomerId
+        ? adminClient
+          .from("customers")
+          .select("store_credit")
+          .eq("id", resolvedCustomerId)
+          .eq("partner_id", partnerId)
+          .maybeSingle()
+        : Promise.resolve({ data: null as { store_credit?: number | null } | null }),
+    ])
+    const creditsTotal = (creditRows || []).reduce(
+      (sum: number, c: any) => sum + Number(c.remaining_amount || 0),
+      0,
+    )
+    // Use the larger value: `customers.store_credit` is the customer-level
+    // balance and may contain credit that has no `store_credits` row (or was
+    // migrated), while summing both would double-count the same balance.
+    const availableCredit = Math.max(
+      0,
+      creditsTotal,
+      Number((customerCreditResult.data as any)?.store_credit || 0),
+    )
     appliedStoreCredit = Math.min(availableCredit, persistedTotal)
+    if (appliedStoreCredit > 0 && !resolvedCustomerId) {
+      // Without a customer row the credit cannot be deducted, so charging the
+      // discounted amount would give the buyer free credit.
+      return { error: "Não foi possível aplicar o crédito da loja. Tente novamente." }
+    }
   }
 
   const remainingBalanceToPay = Math.max(0, Number((persistedTotal - appliedStoreCredit).toFixed(2)))
   const isFullyPaidWithStoreCredit = appliedStoreCredit > 0 && remainingBalanceToPay <= 0.009
+
+  // Cash change is validated against the balance still due after store
+  // credit, and it is stored as display data only.
+  if (chosenType === "cash" && deliveryType === "delivery" && remainingBalanceToPay > 0.009) {
+    if (wantsChange && (payWithAmount === undefined || payWithAmount === null || payWithAmount < remainingBalanceToPay)) {
+      return { error: "O valor informado para o troco é menor que o saldo restante do pedido." }
+    }
+  }
 
   const finalPaymentBreakdown: any[] = []
   if (appliedStoreCredit > 0) {
@@ -2040,6 +2071,8 @@ export async function checkoutCartAction(
     couponApplied: Boolean(couponIdToSave),
     couponDiscount: persistedCouponDiscount,
     finalTotal: persistedTotal,
+    storeCreditApplied: appliedStoreCredit,
+    amountDue: remainingBalanceToPay,
   }
 }
 
@@ -2168,14 +2201,29 @@ export async function getMarketplaceCustomerStoreCreditAction(partnerId: string)
 
   if (error) {
     console.error("Erro ao buscar store_credits do cliente:", error)
-    return { success: false, availableCredit: Number(customer?.store_credit || 0) }
+    return {
+      success: true,
+      availableCredit: Math.max(0, Number(customer?.store_credit || 0)),
+      customerId,
+    }
   }
 
-  const totalCredit = (credits || []).reduce((sum: number, c: any) => sum + Number(c.remaining_amount || 0), 0)
+  const creditsTotal = (credits || []).reduce(
+    (sum: number, c: any) => sum + Number(c.remaining_amount || 0),
+    0,
+  )
+  // `customers.store_credit` is the customer-level balance. Some credits are
+  // added directly to it (or remain after legacy migrations), so use the
+  // larger of the two values instead of double-counting both.
+  const availableCredit = Math.max(
+    0,
+    creditsTotal,
+    Number(customer?.store_credit || 0),
+  )
 
   return {
     success: true,
-    availableCredit: totalCredit,
+    availableCredit,
     customerId,
   }
 }

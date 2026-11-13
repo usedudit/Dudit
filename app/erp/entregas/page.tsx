@@ -18,7 +18,7 @@ export default async function DeliveriesRoutePage() {
   const partnerId = context.partnerId
   const [{ allowed }, page, carrier] = await Promise.all([
     checkPermission(partnerId, "delivery", "view"),
-    getERPDeliveriesPageAction(partnerId, { cursor: null, limit: 25, statusGroup: "active" }),
+    getERPDeliveriesPageAction(partnerId, { cursor: null, limit: 25 }),
     getERPCarrierDeliveriesEnabledAction(partnerId),
   ])
 

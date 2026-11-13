@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { DefaultModal, ListItem, FormSection } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
@@ -13,6 +13,7 @@ interface VendorPaymentMethodsModalProps {
     storeName: string
     paymentMethods: any[]
     price: number
+    partnerId?: string
     mpConnected?: boolean
     mpAcceptedPaymentMethods?: {
         credit_card: boolean
@@ -69,6 +70,7 @@ export function VendorPaymentMethodsModal({
     storeName,
     paymentMethods = [],
     price,
+    partnerId,
     mpConnected = false,
     mpAcceptedPaymentMethods,
 }: VendorPaymentMethodsModalProps) {
@@ -76,7 +78,23 @@ export function VendorPaymentMethodsModal({
     const pixMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "pix")
     const cashMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "cash")
     const transferMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "bank_transfer")
-    const creditMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "credit_card")
+    const creditMethods = useMemo(() => {
+        return paymentMethodsArr
+            .filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "credit_card")
+            .sort((a: any, b: any) => {
+                // Prioritize online default payment method
+                if (a.is_online_default && !b.is_online_default) return -1
+                if (!a.is_online_default && b.is_online_default) return 1
+                // Next prioritize default payment method
+                if (a.is_default && !b.is_default) return -1
+                if (!a.is_default && b.is_default) return 1
+                // Priority
+                const priorityDiff = Number(b.priority || 0) - Number(a.priority || 0)
+                if (priorityDiff !== 0) return priorityDiff
+                // Max installments
+                return Number(b.max_installments || 1) - Number(a.max_installments || 1)
+            })
+    }, [paymentMethodsArr])
     const debitMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "debit_card")
 
     const creditBrands = getUniqueBrands(creditMethods)
@@ -94,7 +112,29 @@ export function VendorPaymentMethodsModal({
         mp.mercado_pago_wallet && { label: "Saldo MP" },
     ].filter(Boolean) as Array<{ label: string; icon?: string }> : []
 
-    const ccMethod = creditMethods[0]
+    const [selectedCreditMethodId, setSelectedCreditMethodId] = useState<string | null>(null)
+
+    // Select the best/default credit method when opening or when methods list changes
+    useEffect(() => {
+        if (isOpen && creditMethods.length > 0) {
+            setSelectedCreditMethodId((prev) => {
+                if (prev && creditMethods.some((m: any) => m.id === prev)) {
+                    return prev
+                }
+                return creditMethods[0].id
+            })
+        }
+    }, [isOpen, creditMethods])
+
+    const ccMethod = useMemo(() => {
+        if (!creditMethods.length) return null
+        if (selectedCreditMethodId) {
+            const found = creditMethods.find((m: any) => m.id === selectedCreditMethodId)
+            if (found) return found
+        }
+        return creditMethods[0]
+    }, [creditMethods, selectedCreditMethodId])
+
     const maxCcInstallments = ccMethod ? Math.max(1, Number(ccMethod.max_installments || 1)) : 1
 
     const [installmentOptions, setInstallmentOptions] = useState<any[]>([])
@@ -102,11 +142,12 @@ export function VendorPaymentMethodsModal({
     const [activeTab, setActiveTab] = useState("payment-methods")
 
     // Determine if we should show tabs (only if there's a credit card method with installment capability)
-    const hasInstallmentCapability = creditMethods.length > 0 && maxCcInstallments > 1
+    const hasInstallmentCapability = creditMethods.some((m: any) => Number(m.max_installments || 1) > 1)
     const shouldShowTabs = hasInstallmentCapability
+    const effectivePartnerId = partnerId || ccMethod?.partner_id
 
     useEffect(() => {
-        if (!isOpen || !ccMethod?.id || price <= 0) {
+        if (!isOpen || !ccMethod?.id || !effectivePartnerId || price <= 0) {
             setInstallmentOptions([])
             return
         }
@@ -115,7 +156,7 @@ export function VendorPaymentMethodsModal({
         setIsLoadingInstallments(true)
 
         previewMarketplacePaymentAction({
-            partnerId: ccMethod.partner_id,
+            partnerId: effectivePartnerId,
             paymentMethodId: ccMethod.id,
             originalAmount: price,
         })
@@ -134,7 +175,7 @@ export function VendorPaymentMethodsModal({
         return () => {
             active = false
         }
-    }, [isOpen, ccMethod?.id, price])
+    }, [isOpen, ccMethod?.id, effectivePartnerId, price])
 
     const renderPaymentMethodsContent = () => (
         <div className="space-y-6">
@@ -202,8 +243,38 @@ export function VendorPaymentMethodsModal({
         </div>
     )
 
+    const formatInterestPercent = (pct: number) => {
+        if (!pct || pct <= 0) return ""
+        const formatted = Number(pct.toFixed(2)).toString().replace(".", ",")
+        return `(${formatted}% a.m.)`
+    }
+
     const renderInstallmentOptionsContent = () => (
         <div className="space-y-4">
+            {creditMethods.length > 1 && (
+                <div className="flex flex-wrap items-center gap-2 pb-1">
+                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">Opção de cartão:</span>
+                    {creditMethods.map((m: any) => {
+                        const isSelected = ccMethod?.id === m.id
+                        return (
+                            <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setSelectedCreditMethodId(m.id)}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                                    isSelected
+                                        ? "border-brand-green bg-green-50 text-brand-green dark:bg-green-950/40 dark:text-green-400"
+                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-body hover:bg-brand-gray/20"
+                                }`}
+                            >
+                                {m.name || "Cartão de Crédito"}
+                                {m.is_online_default ? " (Padrão Online)" : ""}
+                            </button>
+                        )
+                    })}
+                </div>
+            )}
+
             {creditMethods.length === 0 ? (
                 <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
                     Nenhuma opção de parcelamento disponível (sem cartão de crédito configurado).
@@ -228,7 +299,7 @@ export function VendorPaymentMethodsModal({
                                     {opt.hasInterest ? (
                                         <span className="text-[11px] text-brand-green dark:text-green-400 mt-0.5 font-medium">
                                             {opt.interestPercent > 0
-                                                ? `Com juros (${opt.interestPercent.toFixed(1).replace('.', ',')}% a.m.)`
+                                                ? `Com juros ${formatInterestPercent(opt.interestPercent)}`
                                                 : "Com juros"}
                                         </span>
                                     ) : (

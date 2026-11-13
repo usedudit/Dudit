@@ -84,7 +84,7 @@ export function RevenueLimitCard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Badge variant={meta.tone === "gray" ? "gray" : meta.tone}>{meta.label}</Badge>
+          <Badge variant={meta.tone === "gray" ? "gray" : meta.tone} icon={null}>{meta.label}</Badge>
           <Link
             href="/erp/configuracoes?tab=dados-do-negocio&fiscal=1"
             className="text-xs font-bold text-brand-primary hover:underline whitespace-nowrap"

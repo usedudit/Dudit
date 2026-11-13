@@ -4,10 +4,11 @@ import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Badge, Dropdown, DropdownItem } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
-import { getCarrierStatusLabel, getCarrierStatusVariant } from "@/lib/orders/carrier-status"
+import { getCarrierStatusLabel, getCarrierStatusVariant, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { formatDeliveryDaysRange } from "@/lib/utils"
 import { ClockIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
+import { getDeliveryStatusIcon } from "@/lib/orders/status"
 
 interface CarrierDeliveryCardProps {
   shipment: any
@@ -54,7 +55,12 @@ export default function CarrierDeliveryCard({ shipment, onOpenOrder }: CarrierDe
             <ClockIcon size={12} className="shrink-0" />
             <span>Criada {elapsed}</span>
           </div>
-          <Badge variant={statusVariant}>{getCarrierStatusLabel(shipment.carrierStatus)}</Badge>
+          <Badge
+            variant={statusVariant}
+            icon={getDeliveryStatusIcon(getDeliveryStatusForCarrier(shipment.carrierStatus))}
+          >
+            {getCarrierStatusLabel(shipment.carrierStatus)}
+          </Badge>
         </div>
 
         <div className="flex items-center gap-2 mb-2 flex-wrap">

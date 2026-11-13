@@ -77,11 +77,6 @@ const OrderGridCard = React.memo(
                                         <Badge variant="purple" icon={<ReturnIcon />} className="whitespace-nowrap" />
                                     </Tooltip>
                                 )}
-                                {Boolean(order.is_refunded || Number(order.refunded_amount || 0) > 0 || order.situation === "refunded") && (
-                                    <Tooltip text="Possui histórico de reembolso">
-                                        <Badge variant="red" icon={<ReturnIcon />} className="whitespace-nowrap" />
-                                    </Tooltip>
-                                )}
                                 <div className="flex items-center gap-1 shrink-0">
                                     {order.situation === "cancelled" ? (
                                         <Tooltip text="Cancelado">

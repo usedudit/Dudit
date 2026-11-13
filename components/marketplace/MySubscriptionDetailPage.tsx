@@ -22,6 +22,10 @@ import {
   DatePicker,
   FormTextarea,
   ListItem,
+  CepInput,
+  Input,
+  NumberInputWithCheckbox,
+  StateComboBox,
 } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import { useToast } from "@/hooks/use-toast"
@@ -38,7 +42,7 @@ import {
   bookServiceWithCreditAction,
 } from "@/app/actions/marketplace/recurring-subscriptions"
 import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
-import { getAddressesAction } from "@/app/actions/shared/addresses"
+import { getAddressesAction, createAddressAction, updateAddressAction } from "@/app/actions/shared/addresses"
 import { getLatestPurchaseForSubscriptionAction } from "@/app/actions/billing/purchases"
 import { formatCurrency, formatDate, formatFullDate } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -154,7 +158,13 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
   const [savingDetails, setSavingDetails] = useState(false)
 
   const [addressModalOpen, setAddressModalOpen] = useState(false)
+  const [addressFormOpen, setAddressFormOpen] = useState(false)
   const [userAddresses, setUserAddresses] = useState<any[]>([])
+  const [newAddressData, setNewAddressData] = useState({
+      zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
+      addressType: "casa", isDefault: false,
+      latitude: null as number | null, longitude: null as number | null
+  })
   const [loadingAddresses, setLoadingAddresses] = useState(false)
 
   const [executions, setExecutions] = useState<any[]>([])
@@ -458,6 +468,60 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
       toast({ title: "Endereço de entrega atualizado com sucesso!" })
     }
     if (res.data) onUpdate(res.data)
+  }
+
+  const handleSetDefaultAddress = async (addressId: string) => {
+    if (!userId) return
+    const result = await updateAddressAction({
+      addressId,
+      entityId: userId,
+      entityType: "user",
+      isDefault: true,
+    })
+    if (!result.error) {
+      setUserAddresses(prev => prev.map(a => ({ ...a, is_default: a.id === addressId })))
+    } else {
+      toast({ title: "Erro", description: result.error, variant: "destructive" })
+    }
+  }
+
+  const handleSaveNewAddress = async () => {
+    if (!userId) return
+    const { zipCode, street, number, neighborhood, city, state, noNumber, addressType, isDefault } = newAddressData
+    const finalNumber = noNumber ? "S/N" : number
+    if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
+      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios do endereço.", variant: "destructive" })
+      return
+    }
+    const result = await createAddressAction({
+      entityId: userId,
+      entityType: "user",
+      zipCode,
+      street,
+      number: finalNumber,
+      complement: newAddressData.complement,
+      neighborhood,
+      city,
+      state,
+      isDefault,
+      addressType,
+      latitude: newAddressData.latitude ?? null,
+      longitude: newAddressData.longitude ?? null,
+    })
+    if (result.error) {
+      toast({ title: "Erro", description: result.error, variant: "destructive" })
+    } else if (result.address) {
+      setUserAddresses(prev => {
+        const withoutSaved = prev.filter(a => a.id !== result.address.id)
+        if (result.address.is_default || prev.length === 0) {
+          return [result.address, ...withoutSaved.map(a => ({ ...a, is_default: false }))]
+        }
+        return [result.address, ...withoutSaved]
+      })
+      setAddressFormOpen(false)
+      setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, addressType: "casa", isDefault: false, latitude: null, longitude: null })
+      toast({ title: "Sucesso", description: "Endereço salvo com sucesso!" })
+    }
   }
 
   const handleConfirmAddressChange = async (decision: "accept" | "discard") => {
@@ -1270,10 +1334,22 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                         <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                           {addr.street}, {addr.number}
                         </span>
-                        {addr.is_default && (
+                        {addr.is_default ? (
                           <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded">
                             Padrão
                           </span>
+                        ) : (
+                          <button
+                            type="button"
+                            title="Definir como endereço padrão (reflete no ERP de todas as lojas)"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSetDefaultAddress(addr.id)
+                            }}
+                            className="text-[11px] font-medium text-brand-green hover:underline ml-auto shrink-0"
+                          >
+                            Tornar padrão
+                          </button>
                         )}
                       </div>
                       <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
@@ -1290,13 +1366,140 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
               })}
               <Button
                 variant="outline"
-                onClick={() => router.push("/perfil?tab=enderecos")}
+                onClick={() => {
+                  setAddressModalOpen(false)
+                  setAddressFormOpen(true)
+                }}
                 className="w-full mt-2"
               >
-                Gerenciar endereços
+                Adicionar novo endereço
               </Button>
             </div>
           )}
+        </div>
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={addressFormOpen}
+        onClose={() => {
+          setAddressFormOpen(false)
+          setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, addressType: "casa", isDefault: false, latitude: null, longitude: null })
+        }}
+        title="Adicionar novo endereço"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 mb-2">
+            {[
+              { value: "casa", label: "Casa" },
+              { value: "trabalho", label: "Trabalho" },
+              { value: "outro", label: "Outro" },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setNewAddressData(prev => ({ ...prev, addressType: opt.value }))}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${newAddressData.addressType === opt.value
+                  ? "bg-brand-green text-white border-brand-green"
+                  : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
+                  }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <CepInput
+              value={newAddressData.zipCode}
+              onChange={(val) => setNewAddressData(prev => ({ ...prev, zipCode: val }))}
+              onAddressFetched={(addr) => {
+                setNewAddressData(prev => ({
+                  ...prev,
+                  street: addr.street || prev.street,
+                  number: addr.number || prev.number,
+                  noNumber: addr.number ? addr.number === "S/N" : prev.noNumber,
+                  neighborhood: addr.neighborhood || prev.neighborhood,
+                  city: addr.city || prev.city,
+                  state: addr.state || prev.state,
+                  latitude: addr.latitude ?? prev.latitude,
+                  longitude: addr.longitude ?? prev.longitude,
+                }))
+              }}
+              onLoadingChange={() => {}}
+            />
+          </div>
+          <div>
+            <Input
+              label="Rua/Avenida"
+              value={newAddressData.street}
+              onChange={(e) => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
+              placeholder="Rua, Avenida, etc."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <NumberInputWithCheckbox
+                label="Número"
+                number={newAddressData.number}
+                noNumber={newAddressData.noNumber}
+                onNumberChange={(val) => setNewAddressData(prev => ({ ...prev, number: val }))}
+                onNoNumberChange={(checked) => setNewAddressData(prev => ({ ...prev, noNumber: checked, number: checked ? "S/N" : "" }))}
+                placeholder="123"
+              />
+            </div>
+            <div>
+              <Input
+                label="Complemento"
+                value={newAddressData.complement}
+                onChange={(e) => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
+                placeholder="Apto, Bloco, etc."
+              />
+            </div>
+          </div>
+          <div>
+            <Input
+              label="Bairro"
+              value={newAddressData.neighborhood}
+              onChange={(e) => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
+              placeholder="Nome do bairro"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Input
+                label="Cidade"
+                value={newAddressData.city}
+                onChange={(e) => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
+                placeholder="Nome da cidade"
+              />
+            </div>
+            <div>
+              <StateComboBox
+                value={newAddressData.state}
+                onChange={(val) => setNewAddressData(prev => ({ ...prev, state: val }))}
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={newAddressData.isDefault || userAddresses.length === 0}
+              disabled={userAddresses.length === 0}
+              onChange={(e) => setNewAddressData(prev => ({ ...prev, isDefault: e.target.checked }))}
+              className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
+            />
+            <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
+          </label>
+
+          <div className="flex gap-2">
+            <Button onClick={handleSaveNewAddress} disabled={false} className="flex-1">
+              Salvar Endereço
+            </Button>
+            <Button variant="outline" onClick={() => setAddressFormOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
         </div>
       </DefaultModal>
 

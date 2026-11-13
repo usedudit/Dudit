@@ -138,9 +138,15 @@ export function NotificationItem({
               </span>
             ) : null}
           </div>
-          <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 line-clamp-2">
-            {notification.message}
-          </p>
+          {notification.message ? (
+            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 line-clamp-2">
+              {notification.message}
+            </p>
+          ) : notification.type === "cart_abandoned" ? (
+            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 line-clamp-2">
+              Seu carrinho está te esperando. Volte e finalize sua compra!
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
           <span className="text-xs text-brand-dark dark:text-dark-heading">

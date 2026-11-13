@@ -108,6 +108,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         city: "",
         state: "",
         noNumber: false,
+        addressType: "casa",
         isDefault: false,
         latitude: null as number | null,
         longitude: null as number | null,
@@ -196,7 +197,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const handleSaveNewAddressInCart = async () => {
         if (!userId) return
-        const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+        const { zipCode, street, number, neighborhood, city, state, noNumber, addressType } = newAddressData
         const finalNumber = noNumber ? "S/N" : number
         if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
             setAddressFormError("Preencha todos os campos obrigatórios do endereço")
@@ -211,6 +212,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 street, number: finalNumber, complement: newAddressData.complement,
                 neighborhood, city, state, zipCode,
                 isDefault: newAddressData.isDefault || userAddresses.length === 0,
+                addressType,
                 latitude: newAddressData.latitude ?? null,
                 longitude: newAddressData.longitude ?? null,
                 csrf_token: csrfToken,
@@ -228,7 +230,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 notifyAddressUpdated(result.address.id, result.address, (result as any)?.citySlug)
                 setShowNewAddressForm(false)
                 setShowAddressModal(false)
-                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, isDefault: false, latitude: null, longitude: null })
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, addressType: "casa", isDefault: false, latitude: null, longitude: null })
             }
         } catch {
             setAddressFormError("Erro ao salvar endereço.")
@@ -2123,6 +2125,25 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                     }}
                                     placeholder="00000-000"
                                 />
+                            </div>
+                            <div className="flex items-center gap-3 mb-2">
+                                {[
+                                    { value: "casa", label: "Casa" },
+                                    { value: "trabalho", label: "Trabalho" },
+                                    { value: "outro", label: "Outro" },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setNewAddressData(prev => ({ ...prev, addressType: opt.value }))}
+                                        className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${newAddressData.addressType === opt.value
+                                            ? "bg-brand-green text-white border-brand-green"
+                                            : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
                             <div>
                                 <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading block mb-1">Rua / Logradouro *</label>

@@ -4,6 +4,7 @@ type SupabaseLike = any
 
 export type PaymentMethodPickContext = {
     preferDefault?: boolean
+    preferOnlineDefault?: boolean
     storeId?: string | null
 }
 
@@ -27,7 +28,7 @@ export async function pickBestPaymentMethod(
 
     const { data: allMethods } = await supabase
         .from("payment_methods")
-        .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer, installment_fee_bearer, store_id, store_ids")
+        .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, is_online_default, name, default_finance_account_id, max_installments, fee_bearer, installment_fee_bearer, store_id, store_ids")
         .eq("partner_id", partnerId)
         .eq("is_active", true)
 
@@ -50,6 +51,10 @@ export async function pickBestPaymentMethod(
     if (rows.length === 0) return null
 
     rows.sort((a: any, b: any) => {
+        if (context.preferOnlineDefault ?? true) {
+            const onlineDefaultDiff = Number(Boolean(b.is_online_default)) - Number(Boolean(a.is_online_default))
+            if (onlineDefaultDiff !== 0) return onlineDefaultDiff
+        }
         const discountDiff = Number(b.discount_percent || 0) - Number(a.discount_percent || 0)
         if (discountDiff !== 0) return discountDiff
         const feeDiff = Number(a.fee_percent || 0) - Number(b.fee_percent || 0)

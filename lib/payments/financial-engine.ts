@@ -81,6 +81,11 @@ export type PaymentBreakdownEntry = {
   wantsChange?: boolean;
   /** Cash-specific: the amount the customer wants change for (dinheiro recebido para troco) */
   payWithAmount?: number;
+  /**
+   * Cash-specific display-only change amount. Never part of the order total:
+   * the leg `amount`/`effectiveAmount` always keeps the charged value.
+   */
+  changeAmount?: number;
   /** Mercado Pago specific fields */
   provider?: string | null;
   paymentTypeId?: string | null;

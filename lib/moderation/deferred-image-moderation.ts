@@ -7,18 +7,19 @@ import { decideImageStatus } from "@/lib/moderation/image-decision"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export type DeferredImageModerationPayload = {
-  entityType: "product" | "service"
+  entityType: "product" | "service" | "recurring_plan"
   entityId: string
   partnerId: string
   images: string[]
 }
 
 const ENTITY_CONFIG: Record<
-  "product" | "service",
-  { table: string; exploreType: "produto" | "servico" }
+  "product" | "service" | "recurring_plan",
+  { table: string; exploreType: "produto" | "servico" | null }
 > = {
   product: { table: "products", exploreType: "produto" },
   service: { table: "services", exploreType: "servico" },
+  recurring_plan: { table: "recurring_plans", exploreType: null },
 }
 
 /** Tenta limpar os caches que decidem se o item aparece no marketplace. */
@@ -45,7 +46,11 @@ async function refreshEntityCaches(
     const { revalidateTag } = await import("next/cache")
     const tags = [
       `${payload.entityType}-${payload.entityId}`,
-      payload.entityType === "product" ? "products" : "services",
+      payload.entityType === "product"
+        ? "products"
+        : payload.entityType === "service"
+          ? "services"
+          : "recurring-plans",
     ]
 
     for (const tag of tags) {

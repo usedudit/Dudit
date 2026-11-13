@@ -2729,16 +2729,16 @@ export const AppointmentSheet = ({
 
                                             {hasChanges ? (
                                                 <>
-                                                    <Button variant="outline" className="flex-1 font-bold h-12" onClick={handleViewSale}>
-                                                        Ver venda
+                                                    <Button variant="outline" className="flex-1 h-12" onClick={handleViewSale}>
+                                                        Ver pedido
                                                     </Button>
-                                                    <Button variant="default" className="flex-1 font-bold h-12" onClick={handleSaveChanges}>
+                                                    <Button variant="default" className="flex-1 h-12" onClick={handleSaveChanges}>
                                                         Salvar
                                                     </Button>
                                                 </>
                                             ) : (
-                                                <Button variant="default" className="flex-1 font-bold h-12" onClick={handleViewSale}>
-                                                    Ver venda
+                                                <Button variant="default" className="flex-1 h-12" onClick={handleViewSale}>
+                                                    Ver pedido
                                                 </Button>
                                             )}
                                         </div>
@@ -2752,7 +2752,7 @@ export const AppointmentSheet = ({
                                             align="left"
                                             showChevron={false}
                                             trigger={
-                                                <Button variant="outline" className="h-12 w-12 shrink-0 rounded-full border-brand-border bg-white p-0" type="button">
+                                                <Button variant="outline" className="h-12 w-12 shrink-0">
                                                     <ThreeDotsIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
                                                 </Button>
                                             }
@@ -2765,7 +2765,7 @@ export const AppointmentSheet = ({
                                             </DropdownItem>
                                             {isPartiallyPaid && (
                                                 <DropdownItem onClick={handleViewSale}>
-                                                    Ver venda
+                                                    Ver pedido
                                                 </DropdownItem>
                                             )}
                                             {!isPaidOrPartiallyPaid && (
@@ -2776,7 +2776,7 @@ export const AppointmentSheet = ({
                                                     <DropdownItem onClick={() => setCurrentView('datetime')}>
                                                         Remarcar
                                                     </DropdownItem>
-                                                    <DropdownItem className="text-red-500 hover:text-red-600" onClick={() => { setCancelNote(''); setIsCancelConfirmOpen(true); }}>
+                                                    <DropdownItem className="text-brand-red hover:text-brand-red/90" onClick={() => { setCancelNote(''); setIsCancelConfirmOpen(true); }}>
                                                         Cancelar
                                                     </DropdownItem>
                                                 </>

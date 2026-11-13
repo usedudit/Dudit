@@ -4,18 +4,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, Badge } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, SearchIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, ArrowUpDownIcon, LinkIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getSmartDeliverySuggestionsAction, getERPCarrierDeliveriesPageAction, type ERPCarrierDeliveryListCursor } from "@/app/actions/erp/deliveries"
-import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import {
+    getERPDeliveriesPageAction,
+    type ERPDeliveryListCursor,
+    updateERPDeliveryStatusAction,
+    getSmartDeliverySuggestionsAction,
+    getERPCarrierDeliveriesPageAction,
+    type ERPCarrierDeliveryListCursor,
+} from "@/app/actions/erp/deliveries"
+import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { getCarrierStatusLabel, getCarrierStatusVariant, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
+import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import DeliveryPageControls from "./DeliveryPageControls"
 import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
+import DeliveryGridCard from "./DeliveryGridCard"
+import DeliveryListItem from "./DeliveryListRow"
 import CarrierDeliveryBoard from "./CarrierDeliveryBoard"
+import CarrierDeliveryCard from "./CarrierDeliveryCard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
 
@@ -31,29 +44,40 @@ const CHANGE_STATUS_REASONS = [
     { value: "rescheduling", label: "Cliente solicitou reagendamento" },
     { value: "logistics_issue", label: "Problema logístico / Rota" },
     { value: "payment_issue", label: "Problema com pagamento" },
-    { value: "other", label: "Outro" }
+    { value: "other", label: "Outro" },
 ]
 
 function doesTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
     if (currentStatus === "delivered" && nextStatus !== "delivered") {
-        return true;
+        return true
     }
     if (currentStatus === "delivery_failed" && nextStatus !== "delivery_failed") {
-        return true;
+        return true
     }
     if (currentStatus === "sent" && ["preparing", "pickup_available", "delivery_failed", "not_sent", "pending"].includes(nextStatus)) {
-        return true;
+        return true
     }
     if (currentStatus === "pickup_available" && ["preparing", "sent", "delivery_failed", "not_sent", "pending"].includes(nextStatus)) {
-        return true;
+        return true
     }
     if (currentStatus === "preparing" && ["not_sent", "pending", "delivery_failed"].includes(nextStatus)) {
-        return true;
+        return true
     }
-    return false;
+    return false
 }
 
 type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
+
+const COLUMNS: Array<{ id: SortKey | "actions"; label: string; align?: "left" | "center" | "right"; width?: string }> = [
+    { id: "order_id", label: "Pedido / Cliente", align: "left", width: "260px" },
+    { id: "delivery_fee", label: "Taxa de Entrega", align: "left", width: "140px" },
+    { id: "status", label: "Status", align: "left", width: "160px" },
+    { id: "delivery_person", label: "Entregador", align: "left", width: "180px" },
+    { id: "estimated_time", label: "Tempo Estimado", align: "left", width: "140px" },
+    { id: "dates", label: "Saída / Previsão", align: "left", width: "180px" },
+    { id: "delivered_at", label: "Entregue em", align: "left", width: "160px" },
+    { id: "actions", label: "Ações", align: "center", width: "70px" },
+]
 
 export default function DeliveriesPage({
     partnerId,
@@ -93,9 +117,9 @@ export default function DeliveriesPage({
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<"kanban">("kanban")
+    const [viewMode, setViewMode] = useState<"list" | "grid" | "kanban">("list")
 
-    const [mode, setMode] = useState<"deliveries" | "carriers" | "failed">("deliveries")
+    const [mode, setMode] = useState<"deliveries" | "carriers">("deliveries")
     const carrierEnabled = initialCarrierEnabled
     const planSlug = initialPlanSlug || "free"
 
@@ -108,23 +132,23 @@ export default function DeliveriesPage({
     const [statusModal, setStatusModal] = useState<{ deliveryId: string; currentStatus: string; nextStatus: string } | null>(null)
     const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
     const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
-        isOpen: boolean;
-        deliveryId: string;
-        currentStatus: string;
-        nextStatus: string;
-        reasonDropdownValue: string;
-        customReasonText: string;
+        isOpen: boolean
+        deliveryId: string
+        currentStatus: string
+        nextStatus: string
+        reasonDropdownValue: string
+        customReasonText: string
     } | null>(null)
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{
-        isOpen: boolean;
-        deliveryId: string;
-        nextStatus: string;
+        isOpen: boolean
+        deliveryId: string
+        nextStatus: string
     } | null>(null)
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const queryKey = useMemo(() => ["erp", "deliveries", partnerId, "active"] as const, [partnerId])
+    const queryKey = useMemo(() => ["erp", "deliveries", partnerId] as const, [partnerId])
     const {
         items,
         isLoading,
@@ -135,26 +159,8 @@ export default function DeliveriesPage({
         queryKey,
         initialPage: { items: initialDeliveries, nextCursor: initialNextCursor, hasMore: initialHasMore },
         fetchFn: async ({ cursor }) => {
-            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25, statusGroup: "active" })
+            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25 })
             if (!res.success) throw new Error(res.error || "Erro ao carregar entregas.")
-            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
-    })
-
-    const closedQueryKey = useMemo(() => ["erp", "deliveries", partnerId, "closed"] as const, [partnerId])
-    const {
-        items: closedDeliveries,
-        isLoading: closedLoading,
-        isFetchingNextPage: closedFetchingNextPage,
-        hasNextPage: closedHasNextPage,
-        fetchNextPage: fetchClosedNextPage,
-    } = useInfiniteList<any, ERPDeliveryListCursor>({
-        queryKey: closedQueryKey,
-        enabled: mode === "failed",
-        fetchFn: async ({ cursor }) => {
-            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25, statusGroup: "closed" })
-            if (!res.success) throw new Error(res.error || "Erro ao carregar entregas canceladas.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
@@ -184,11 +190,7 @@ export default function DeliveriesPage({
         useErpExport(planSlug || "free")
 
     const handleExportDeliveries = useCallback(() => {
-        const statusFilter = filters.status.length
-            ? filters.status
-            : mode === "failed"
-                ? ["delivery_failed", "cancelled"]
-                : ["pending", "not_sent", "preparing", "sent", "pickup_available", "delivered"]
+        const statusFilter = filters.status.length ? filters.status : undefined
 
         void exportData({
             partnerId,
@@ -200,7 +202,8 @@ export default function DeliveriesPage({
                 datePeriod: filters.datePeriod,
             },
         })
-    }, [exportData, partnerId, debouncedSearch, filters.status, filters.datePeriod, mode])
+    }, [exportData, partnerId, debouncedSearch, filters.status, filters.datePeriod])
+
     const isDelivery = initialUserRole === "delivery"
 
     useInfiniteScrollObserver(observerTarget, {
@@ -208,17 +211,6 @@ export default function DeliveriesPage({
         hasNextPage: !!hasNextPage,
         isFetchingNextPage,
         fetchNextPage: () => fetchNextPage(),
-        rootMargin: "320px",
-        threshold: 0,
-    })
-
-    const closedObserverTarget = useRef<HTMLDivElement>(null)
-
-    useInfiniteScrollObserver(closedObserverTarget, {
-        enabled: mode === "failed",
-        hasNextPage: !!closedHasNextPage,
-        isFetchingNextPage: closedFetchingNextPage,
-        fetchNextPage: () => fetchClosedNextPage(),
         rootMargin: "320px",
         threshold: 0,
     })
@@ -272,15 +264,53 @@ export default function DeliveriesPage({
         checkScroll()
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
-    }, [viewMode, items])
+    }, [viewMode, items, carrierShipments])
 
-    const filterSections: FilterSectionConfig[] = [
-        {
-            id: "datePeriod",
-            title: "Período",
-            type: "date-period",
-        },
-    ]
+    const filterSections: FilterSectionConfig[] = useMemo(() => {
+        if (mode === "carriers") {
+            return [
+                {
+                    id: "status",
+                    title: "Status do envio",
+                    type: "checkbox-list",
+                    options: [
+                        "Aguardando etiqueta",
+                        "Aguardando postagem",
+                        "Postado",
+                        "Em trânsito",
+                        "Entregue",
+                        "Envio cancelado",
+                        "Falha no envio",
+                    ],
+                },
+                {
+                    id: "datePeriod",
+                    title: "Período",
+                    type: "date-period",
+                },
+            ]
+        }
+        return [
+            {
+                id: "status",
+                title: "Status da entrega",
+                type: "checkbox-list",
+                options: [
+                    "Não enviado",
+                    "Em preparação",
+                    "Enviado",
+                    "Entregue",
+                    "Cancelada",
+                    "Falha na entrega",
+                ],
+            },
+            {
+                id: "datePeriod",
+                title: "Período",
+                type: "date-period",
+            },
+        ]
+    }, [mode])
 
     const mapDeliveryRows = useCallback((sourceItems: any[]) => {
         const nowMs = Date.now()
@@ -339,18 +369,12 @@ export default function DeliveriesPage({
 
     const mapped = useMemo(() => {
         const term = debouncedSearch.toLowerCase().trim()
-        const targetTab = mode === "failed" ? "closed" : "active"
-        const sourceItems = mode === "failed" ? closedDeliveries : items
-
-        let list = mapDeliveryRows(sourceItems || [])
+        let list = mapDeliveryRows(items || [])
 
         list = list.filter((d: any) => {
             const matchSearch = !term || d.orderDisplayId.toLowerCase().includes(term) || d.customerName.toLowerCase().includes(term)
             const statusLabel = getDeliveryStatusMeta(d.status).label
-            const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel)
-
-            const isClosedTab = ["cancelled", "delivery_failed"].includes(d.status)
-            const matchTab = targetTab === "closed" ? isClosedTab : !isClosedTab
+            const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel) || filters.status.includes(d.status)
 
             const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
             const createdYmd = d.createdAtMs ? new Date(d.createdAtMs).toISOString().slice(0, 10) : null
@@ -360,13 +384,46 @@ export default function DeliveriesPage({
                     ? createdYmd >= (startYmd || "") && createdYmd <= (endYmd || "9999-12-31")
                     : false
 
-            return matchSearch && matchStatus && matchTab && matchDate
+            return matchSearch && matchStatus && matchDate
         })
 
         if (sortConfig) {
             list = [...list].sort((a: any, b: any) => {
-                let aVal = a[sortConfig.key]
-                let bVal = b[sortConfig.key]
+                let aVal: any
+                let bVal: any
+                switch (sortConfig.key) {
+                    case "order_id":
+                        aVal = a.orderDisplayId || a.orderId || ""
+                        bVal = b.orderDisplayId || b.orderId || ""
+                        break
+                    case "delivery_fee":
+                        aVal = a.deliveryFee || 0
+                        bVal = b.deliveryFee || 0
+                        break
+                    case "status":
+                        aVal = a.status || ""
+                        bVal = b.status || ""
+                        break
+                    case "delivery_person":
+                        aVal = a.deliveryPersonName || ""
+                        bVal = b.deliveryPersonName || ""
+                        break
+                    case "estimated_time":
+                        aVal = a.estimatedDurationMinutes || 0
+                        bVal = b.estimatedDurationMinutes || 0
+                        break
+                    case "dates":
+                        aVal = a.startedAt || a.createdAtMs || 0
+                        bVal = b.startedAt || b.createdAtMs || 0
+                        break
+                    case "delivered_at":
+                        aVal = a.deliveredAt || ""
+                        bVal = b.deliveredAt || ""
+                        break
+                    default:
+                        aVal = a[sortConfig.key]
+                        bVal = b[sortConfig.key]
+                }
                 if (typeof aVal === "string") aVal = aVal.toLowerCase()
                 if (typeof bVal === "string") bVal = bVal.toLowerCase()
                 if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1
@@ -376,14 +433,13 @@ export default function DeliveriesPage({
         }
 
         return list
-    }, [mode, items, closedDeliveries, mapDeliveryRows, debouncedSearch, filters, sortConfig])
+    }, [items, mapDeliveryRows, debouncedSearch, filters, sortConfig])
 
     const tabCounts = useMemo(() => {
-        const deliveriesCount = items?.filter((d: any) => !["cancelled", "delivery_failed"].includes(d.status)).length || 0
+        const deliveriesCount = items?.length || 0
         const carriersCount = carrierShipments?.length || 0
-        const failedCount = closedDeliveries?.filter((d: any) => ["cancelled", "delivery_failed"].includes(d.status)).length || 0
-        return { Delivery: deliveriesCount, Transportadora: carriersCount, "Canceladas / Falhas": failedCount }
-    }, [items, carrierShipments, closedDeliveries])
+        return { Delivery: deliveriesCount, Transportadora: carriersCount }
+    }, [items, carrierShipments])
 
     const totalPages = Math.ceil(mapped.length / 100) || 1
     const [page, setPage] = useState(1)
@@ -397,28 +453,42 @@ export default function DeliveriesPage({
         return mapped.slice(start, start + 100)
     }, [mapped, page])
 
-    const isListLoading = mode === "failed" ? closedLoading : isLoading
-    const listHasNextPage = mode === "failed" ? closedHasNextPage : hasNextPage
+    const isListLoading = isLoading
 
     const filteredCarrierShipments = useMemo(() => {
         const term = debouncedSearch.toLowerCase().trim()
-        const list = carrierShipments || []
-        if (!term) return list
-        return list.filter((shipment: any) => {
-            const haystack = [
-                shipment.orderNumber,
-                shipment.customerName,
-                shipment.customerAddress,
-                shipment.trackingNumber,
-                shipment.carrierName,
-                shipment.serviceName,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase()
-            return haystack.includes(term)
-        })
-    }, [carrierShipments, debouncedSearch])
+        let list = carrierShipments || []
+        if (term) {
+            list = list.filter((shipment: any) => {
+                const haystack = [
+                    shipment.orderNumber,
+                    shipment.customerName,
+                    shipment.customerAddress,
+                    shipment.trackingNumber,
+                    shipment.carrierName,
+                    shipment.serviceName,
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .toLowerCase()
+                return haystack.includes(term)
+            })
+        }
+        if (filters.status.length > 0) {
+            list = list.filter((shipment: any) => {
+                const label = getCarrierStatusLabel(shipment.carrierStatus)
+                return filters.status.includes(label) || filters.status.includes(shipment.carrierStatus)
+            })
+        }
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
+        if (startYmd || endYmd) {
+            list = list.filter((shipment: any) => {
+                const createdYmd = shipment.createdAtMs ? new Date(shipment.createdAtMs).toISOString().slice(0, 10) : null
+                return createdYmd ? createdYmd >= (startYmd || "") && createdYmd <= (endYmd || "9999-12-31") : false
+            })
+        }
+        return list
+    }, [carrierShipments, debouncedSearch, filters])
 
     const executeStatusChange = async (deliveryId: string, nextStatus: string, reason?: string) => {
         setStatusOverrides(prev => ({ ...prev, [deliveryId]: nextStatus }))
@@ -426,7 +496,7 @@ export default function DeliveriesPage({
             deliveryId,
             partnerId,
             status: nextStatus as any,
-            changeReason: reason || undefined
+            changeReason: reason || undefined,
         })
 
         if (!res.success) {
@@ -438,7 +508,7 @@ export default function DeliveriesPage({
             toast({
                 title: "Erro ao atualizar status",
                 description: res.error || "Não foi possível atualizar o status da entrega.",
-                variant: "destructive"
+                variant: "destructive",
             })
         } else {
             toast({
@@ -529,13 +599,11 @@ export default function DeliveriesPage({
                                     <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                                         {mode === "carriers"
                                             ? "Acompanhe os envios atendidos por transportadora."
-                                            : mode === "failed"
-                                                ? "Acompanhe as entregas canceladas e com falha."
-                                                : "Gerencie as entregas vinculadas aos pedidos."}
+                                            : "Gerencie as entregas vinculadas aos pedidos."}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    {mode !== "carriers" && !isDelivery && (
+                                    {!isDelivery && (
                                         <Button variant="outline" onClick={handleExportDeliveries} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
                                             {isExporting ? "Exportando..." : "Exportar"}
                                         </Button>
@@ -558,33 +626,6 @@ export default function DeliveriesPage({
                                 </div>
                             </div>
 
-                            {mode === "carriers" ? (
-                                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                                    <div className="mb-4">
-                                        <Input
-                                            name="search"
-                                            placeholder="Buscar por pedido, cliente ou rastreio..."
-                                            value={search}
-                                            onChange={(e) => setSearch(e.target.value)}
-                                            variant="full-rounded"
-                                            label=""
-                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                        />
-                                    </div>
-                                    <CarrierDeliveryBoard
-                                        shipments={filteredCarrierShipments}
-                                        isLoading={carrierLoading}
-                                        integrationEnabled={carrierEnabled}
-                                        onOpenOrder={(orderId) => {
-                                            router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
-                                        }}
-                                    />
-                                    {carrierHasNextPage ? (
-                                        <div ref={carrierObserverTarget} className="h-12 w-full shrink-0" aria-hidden />
-                                    ) : null}
-                                </div>
-                            ) : (
-                                <>
                             <DeliveryPageControls
                                 search={search}
                                 onSearchChange={setSearch}
@@ -600,71 +641,314 @@ export default function DeliveriesPage({
                                 mode={mode}
                                 setMode={setMode}
                                 tabCounts={tabCounts}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
                             />
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                                <AnimatePresence mode="wait">
-                                    {paginated.length === 0 ? (
-                                        <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc={
-                                                    planGate
-                                                        ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                                                        : "https://img.dudit.com.br/static/mascots/Entregas.png"
-                                                }
-                                                imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
-                                                title={isListLoading ? "Carregando entregas..." : planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
-                                                subtitle={
-                                                    isListLoading
-                                                        ? "Buscando as entregas mais recentes."
-                                                        : planGate
-                                                            ? planGate.message
-                                                            : isDelivery
-                                                                ? "Nenhuma entrega atribuída a você no momento."
-                                                                : mode === "failed"
-                                                                    ? "Nenhuma entrega cancelada ou com falha encontrada."
-                                                                    : "Crie uma entrega a partir de um pedido para começar."
-                                                }
-                                                itemButton={
-                                                    isListLoading
-                                                        ? undefined
-                                                        : planGate
-                                                            ? {
-                                                                text: "Ver Plano Escalar",
-                                                                action: () => openPlanUpgrade("escalar"),
-                                                            }
-                                                            : isDelivery || mode === "failed"
-                                                                ? undefined
-                                                                : {
-                                                                    text: "Adicionar primeira entrega",
-                                                                    action: () => openEntity("create"),
+                                {mode === "carriers" ? (
+                                    <AnimatePresence mode="wait">
+                                        {filteredCarrierShipments.length === 0 ? (
+                                            <FadeIn key="empty-carrier" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                                <IconPlaceholder
+                                                    placeholderType="image"
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
+                                                    imageAlt="Sem envios"
+                                                    title={carrierLoading ? "Carregando envios..." : !carrierEnabled ? "Transportadora não configurada" : "Nenhum envio encontrado"}
+                                                    subtitle={
+                                                        carrierLoading
+                                                            ? "Buscando os pedidos atendidos por transportadora."
+                                                            : !carrierEnabled
+                                                                ? "Configure a integração com a transportadora para acompanhar os envios aqui."
+                                                                : "Nenhum envio corresponde aos filtros selecionados."
+                                                    }
+                                                />
+                                            </FadeIn>
+                                        ) : viewMode === "kanban" ? (
+                                            <FadeIn key="carrier-kanban" className="w-full">
+                                                <CarrierDeliveryBoard
+                                                    shipments={filteredCarrierShipments}
+                                                    isLoading={carrierLoading}
+                                                    integrationEnabled={carrierEnabled}
+                                                    onOpenOrder={(orderId) => {
+                                                        router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
+                                                    }}
+                                                />
+                                            </FadeIn>
+                                        ) : viewMode === "grid" ? (
+                                            <FadeIn key="carrier-grid" className="w-full">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                    {filteredCarrierShipments.map((shipment: any) => (
+                                                        <CarrierDeliveryCard
+                                                            key={shipment.id}
+                                                            shipment={shipment}
+                                                            onOpenOrder={(orderId) => {
+                                                                router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </FadeIn>
+                                        ) : (
+                                            <FadeIn key="carrier-list" className="w-full">
+                                                <div className="w-full overflow-hidden rounded-xl relative">
+                                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg pl-4">
+                                                                        Pedido / Cliente
+                                                                    </th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                        Transportadora
+                                                                    </th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                        Rastreio
+                                                                    </th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                        Prazo
+                                                                    </th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                        Taxa
+                                                                    </th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                        Status
+                                                                    </th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg pr-4 text-center">
+                                                                        Ações
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {filteredCarrierShipments.map((shipment: any) => {
+                                                                    const statusVariant = getCarrierStatusVariant(shipment.carrierStatus)
+                                                                    const brandIcon = getCarrierBrandIcon(shipment.carrierName, shipment.serviceName)
+                                                                    return (
+                                                                        <tr
+                                                                            key={shipment.id}
+                                                                            className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                                                                            onClick={() => router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)}
+                                                                        >
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border pl-4">
+                                                                                <div className="flex flex-col min-w-0">
+                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                        {shipment.orderNumber}
+                                                                                    </span>
+                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                        {shipment.customerName}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                                    <img src={brandIcon} alt={shipment.carrierName} className="w-4 h-4 object-contain shrink-0" />
+                                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                                                        {shipment.serviceName || shipment.carrierName}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                {shipment.trackingNumber ? (
+                                                                                    shipment.trackingUrl ? (
+                                                                                        <a
+                                                                                            href={shipment.trackingUrl}
+                                                                                            target="_blank"
+                                                                                            rel="noreferrer"
+                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                            className="text-xs font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
+                                                                                        >
+                                                                                            {shipment.trackingNumber}
+                                                                                            <LinkIcon size={12} />
+                                                                                        </a>
+                                                                                    ) : (
+                                                                                        <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                                                            {shipment.trackingNumber}
+                                                                                        </span>
+                                                                                    )
+                                                                                ) : (
+                                                                                    <span className="text-xs text-brand-inactive-text">—</span>
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                                    {formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays) || "—"}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                <span className="text-[13px] font-bold text-brand-primary">
+                                                                                    {formatCurrency(shipment.deliveryFee || 0)}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                <Badge
+                                                                                    variant={statusVariant}
+                                                                                    icon={getDeliveryStatusIcon(getDeliveryStatusForCarrier(shipment.carrierStatus))}
+                                                                                >
+                                                                                    {getCarrierStatusLabel(shipment.carrierStatus)}
+                                                                                </Badge>
+                                                                            </td>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border pr-4 text-center">
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation()
+                                                                                        router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)
+                                                                                    }}
+                                                                                >
+                                                                                    Ver pedido
+                                                                                </Button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </FadeIn>
+                                        )}
+                                    </AnimatePresence>
+                                ) : (
+                                    <AnimatePresence mode="wait">
+                                        {paginated.length === 0 ? (
+                                            <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                                <IconPlaceholder
+                                                    placeholderType="image"
+                                                    imageSrc={
+                                                        planGate
+                                                            ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                                            : "https://img.dudit.com.br/static/mascots/Entregas.png"
+                                                    }
+                                                    imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
+                                                    title={isListLoading ? "Carregando entregas..." : planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
+                                                    subtitle={
+                                                        isListLoading
+                                                            ? "Buscando as entregas mais recentes."
+                                                            : planGate
+                                                                ? planGate.message
+                                                                : isDelivery
+                                                                    ? "Nenhuma entrega atribuída a você no momento."
+                                                                    : "Nenhuma entrega corresponde aos filtros ou crie uma entrega para começar."
+                                                    }
+                                                    itemButton={
+                                                        isListLoading
+                                                            ? undefined
+                                                            : planGate
+                                                                ? {
+                                                                    text: "Ver Plano Escalar",
+                                                                    action: () => openPlanUpgrade("escalar"),
                                                                 }
-                                                }
-                                            />
-                                        </FadeIn>
-                                    ) : (
-                                        <FadeIn key="kanban" className="w-full">
-                                            <DeliveryKanbanBoard
-                                                deliveries={mapped}
-                                                activeTab={mode === "failed" ? "closed" : "active"}
-                                                onDetails={(id) => openEntity("view", id)}
-                                                onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
-                                                onQuickStatusChange={handleQuickStatusChange}
-                                            />
-                                        </FadeIn>
-                                    )}
-                                </AnimatePresence>
-                                {listHasNextPage ? (
-                                    <div
-                                        ref={mode === "failed" ? closedObserverTarget : observerTarget}
-                                        className="h-12 w-full shrink-0"
-                                        aria-hidden
-                                    />
-                                ) : null}
+                                                                : isDelivery
+                                                                    ? undefined
+                                                                    : {
+                                                                        text: "Adicionar primeira entrega",
+                                                                        action: () => openEntity("create"),
+                                                                    }
+                                                    }
+                                                />
+                                            </FadeIn>
+                                        ) : viewMode === "kanban" ? (
+                                            <FadeIn key="kanban" className="w-full">
+                                                <DeliveryKanbanBoard
+                                                    deliveries={mapped}
+                                                    onDetails={(id) => openEntity("view", id)}
+                                                    onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
+                                                    onQuickStatusChange={handleQuickStatusChange}
+                                                />
+                                            </FadeIn>
+                                        ) : viewMode === "grid" ? (
+                                            <FadeIn key="grid" className="w-full">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                    {paginated.map((delivery: any) => (
+                                                        <DeliveryGridCard
+                                                            key={delivery.id}
+                                                            delivery={delivery}
+                                                            onDetails={() => openEntity("view", delivery.id)}
+                                                            onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
+                                                            onQuickStatusChange={handleQuickStatusChange}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </FadeIn>
+                                        ) : (
+                                            <FadeIn key="list" className="w-full">
+                                                <div className="w-full overflow-hidden rounded-xl relative">
+                                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    {COLUMNS.map((col, idx) => {
+                                                                        const isSortable = col.id !== "actions"
+                                                                        const isSorted = sortConfig?.key === col.id
+                                                                        const isFirst = idx === 0
+                                                                        const isLast = idx === COLUMNS.length - 1
+
+                                                                        return (
+                                                                            <th
+                                                                                key={col.id}
+                                                                                className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-4" : ""} ${isLast ? "rounded-r-lg pr-4" : ""}`}
+                                                                                style={{ width: col.width }}
+                                                                                onClick={() => {
+                                                                                    if (!isSortable) return
+                                                                                    setSortConfig(prev => ({
+                                                                                        key: col.id as SortKey,
+                                                                                        direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                    }))
+                                                                                }}
+                                                                            >
+                                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                    <span>{col.label}</span>
+                                                                                    {isSortable && (
+                                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                            <ArrowUpDownIcon
+                                                                                                size={14}
+                                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                            />
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </th>
+                                                                        )
+                                                                    })}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginated.map((delivery: any) => (
+                                                                    <DeliveryListItem
+                                                                        key={delivery.id}
+                                                                        delivery={delivery}
+                                                                        columns={COLUMNS}
+                                                                        onDetails={() => openEntity("view", delivery.id)}
+                                                                        onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
+                                                                        onQuickStatusChange={handleQuickStatusChange}
+                                                                    />
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </FadeIn>
+                                        )}
+                                    </AnimatePresence>
+                                )}
+
+                                {mode === "carriers" ? (
+                                    carrierHasNextPage ? (
+                                        <div ref={carrierObserverTarget} className="h-12 w-full shrink-0" aria-hidden />
+                                    ) : null
+                                ) : (
+                                    hasNextPage ? (
+                                        <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden />
+                                    ) : null
+                                )}
                             </div>
-                                </>
-                            )}
                         </div>
                     </FadeIn>
                 )}
@@ -720,7 +1004,6 @@ export default function DeliveriesPage({
                                         className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between hover:border-brand-primary/40 transition-all duration-200"
                                     >
                                         <div>
-                                            {/* Map Thumbnail Decorator */}
                                             <div className="w-full h-[84px] bg-brand-gray dark:bg-dark-border/40 rounded-xl relative overflow-hidden mb-3.5 flex items-center justify-center group">
                                                 <img
                                                     src="https://img.dudit.com.br/static/MapLarge.png"
@@ -738,7 +1021,6 @@ export default function DeliveriesPage({
                                                 </div>
                                             </div>
 
-                                            {/* Header Info */}
                                             <div className="flex items-start justify-between gap-2 mb-3">
                                                 <div className="min-w-0">
                                                     <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
@@ -775,7 +1057,6 @@ export default function DeliveriesPage({
                                                 </Button>
                                             </div>
 
-                                            {/* Order Items List */}
                                             <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
                                                 {(sug.orders || []).map((o: any) => (
                                                     <div key={o.id} className="flex items-center justify-between gap-2 text-xs">
@@ -896,9 +1177,9 @@ export default function DeliveriesPage({
                     onClose={() => setSimpleConfirmModal(null)}
                     onConfirm={async () => {
                         if (simpleConfirmModal) {
-                            const { deliveryId, nextStatus } = simpleConfirmModal;
-                            setSimpleConfirmModal(null);
-                            await executeStatusChange(deliveryId, nextStatus);
+                            const { deliveryId, nextStatus } = simpleConfirmModal
+                            setSimpleConfirmModal(null)
+                            await executeStatusChange(deliveryId, nextStatus)
                         }
                     }}
                     variant="warning"

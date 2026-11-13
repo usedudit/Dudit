@@ -14,6 +14,7 @@ import {
     ThreeDotsLoader,
     Input,
     PeriodDropdown,
+    Spinner,
 } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
@@ -415,20 +416,19 @@ export function AppointmentsSuggestionsSheet({
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2 shrink-0">
-                                    <Badge variant="orange">{item.status}</Badge>
+                                    <Badge variant="orange" icon={null}>{item.status}</Badge>
                                     <Button
                                         size="sm"
-                                        variant="filled"
-                                        className="h-8 text-xs gap-1.5 bg-brand-green hover:bg-emerald-600 text-white"
+                                        className="h-8"
                                         disabled={confirmingId === item.id}
                                         onClick={(e) => handleConfirmAppointment(item.id, e)}
+                                        leftIcon={<CalendarCheck />}
                                     >
                                         {confirmingId === item.id ? (
-                                            <ThreeDotsLoader />
+                                            <Spinner />
                                         ) : (
                                             <>
-                                                <CalendarCheck size={14} />
-                                                <span>Confirmar</span>
+                                                Confirmar
                                             </>
                                         )}
                                     </Button>
@@ -527,7 +527,7 @@ export function AppointmentsSuggestionsSheet({
                                     </span>
                                 </div>
                                 <span className="font-semibold text-brand-green">
-                                    Ver cliente →
+                                    Ver cliente
                                 </span>
                             </div>
                         </div>

@@ -523,7 +523,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnConditions, setReturnConditions] = useState<Record<string, "sealed" | "opened" | "damaged">>({});
     const [returnServiceItems, setReturnServiceItems] = useState<Record<string, boolean>>({});
     const [returnEvidence, setReturnEvidence] = useState<(string | File)[]>([]);
-    const [returnModalTab, setReturnModalTab] = useState<"items" | "evidence">("items");
+    const [returnModalTab, setReturnModalTab] = useState<string>("items");
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [sellerReturnCapabilities, setSellerReturnCapabilities] = useState<{

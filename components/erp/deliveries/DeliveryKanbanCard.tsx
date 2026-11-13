@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown, Badge } from "@/components/reusable"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
-import { getDeliveryStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusLabel, getDeliveryStatusIcon } from "@/lib/orders/status"
 import { ClockIcon, MoneyIcon, MotorbikeIcon } from "@/lib/icons"
 import { Tooltip } from "@/components/reusable"
 
@@ -85,18 +85,24 @@ export default function DeliveryKanbanCard({
         </div>
 
         {/* Title Row: ID & Order Count & Status Badge */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          {delivery.orderCount === 1 ? (
-            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-              {delivery.orderDisplayId}
-            </span>
-          ) : (
-            <>
-              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            {delivery.orderCount === 1 ? (
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                {delivery.orderDisplayId}
+              </span>
+            ) : (
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                 Múltiplos pedidos ({delivery.orderCount})
               </span>
-            </>
-          )}
+            )}
+          </div>
+          <Badge
+            variant={statusMeta.variant}
+            icon={getDeliveryStatusIcon(delivery.status)}
+          >
+            {statusMeta.label}
+          </Badge>
         </div>
 
         {/* Description / Customer info */}

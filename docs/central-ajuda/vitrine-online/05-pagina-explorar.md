@@ -150,7 +150,7 @@ Se sua busca por uma cidade específica retornar poucos resultados, o sistema au
 | Seção | O que aparece |
 | :--- | :--- |
 | **Lojas um pouco mais distantes** | Vendedores do seu estado ou região que correspondem à busca |
-| **Um pouco mais distantes do seu raio de busca** | Todos os itens encontrados fora do seu raio, listados direto na página. Respondem normalmente aos filtros e à ordenação. Ao lado de cada item aparece apenas a cidade e o estado do vendedor. |
+| **Um pouco mais distante do seu raio de busca** | Todos os itens encontrados fora do seu raio, listados direto na página. Respondem normalmente aos filtros e à ordenação. Ao lado de cada item aparece apenas a cidade e o estado do vendedor. |
 
 ## Controles de navegação
 

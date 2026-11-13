@@ -100,12 +100,12 @@ export async function fetchPartnerProductsBucket(storeIdOverride?: string | null
 
       let query = supabase
         .from("products")
-        .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, video_thumbnail, fallback_variant_image, moderation_status, moderation_reason, flagged_images, unit, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+        .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, video_thumbnail, moderation_status, moderation_reason, unit, technical_specs, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
         .eq("partner_id", partnerId)
         .eq("is_active", true)
 
       if (storeId) {
-        query = query.eq("store_id", storeId)
+        query = query.or(`store_id.eq.${storeId},store_id.is.null`)
       }
 
       const { data, error } = await query
@@ -122,25 +122,8 @@ export async function fetchPartnerProductsBucket(storeIdOverride?: string | null
     30,
   )
 
-  return (rows || []).map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    sku: p.sku || "N/A",
-    gtin: p.gtin || null,
-    price: p.price || 0,
-    promotional_price: p.promotional_price,
-    category_id: p.category_id || null,
-    stock: p.stock_available ?? 0,
-    allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
-    image: p.images && p.images.length > 0 ? p.images[0] : null,
-    has_variants: p.product_variants && p.product_variants.length > 0,
-    unit: p.unit || null,
-    addon_groups: (Array.isArray(p.addon_groups) && p.addon_groups.length > 0)
-      ? p.addon_groups
-      : (Array.isArray(p.technical_specs?.addon_groups) && p.technical_specs.addon_groups.length > 0)
-        ? p.technical_specs.addon_groups
-        : [],
-    variants: (p.product_variants || []).map((variant: any) => ({
+  return (rows || []).map((p: any) => {
+    const variants = (p.product_variants || []).map((variant: any) => ({
       id: variant.id,
       name: variant.variant_name,
       sku: variant.sku || "N/A",
@@ -149,8 +132,49 @@ export async function fetchPartnerProductsBucket(storeIdOverride?: string | null
       image: typeof variant.variant_options === "object" && variant.variant_options
         ? variant.variant_options.image || null
         : null,
-    })),
-  }))
+    }))
+
+    const variantWithImage = variants.find((v: any) => Boolean(v.image))
+    const fallbackVariantImage = variantWithImage?.image || null
+
+    let flaggedImages: string[] = []
+    if (p.moderation_reason) {
+      try {
+        const parsed = JSON.parse(p.moderation_reason)
+        if (Array.isArray(parsed?.flagged_images)) {
+          flaggedImages = parsed.flagged_images.filter((img: any): img is string => typeof img === "string" && img.trim().length > 0)
+        }
+      } catch {}
+    }
+
+    return {
+      id: p.id,
+      name: p.name,
+      sku: p.sku || "N/A",
+      gtin: p.gtin || null,
+      price: p.price || 0,
+      promotional_price: p.promotional_price,
+      category_id: p.category_id || null,
+      stock: p.stock_available ?? 0,
+      allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
+      image: p.images && p.images.length > 0 ? p.images[0] : null,
+      video_thumbnail: p.video_thumbnail || null,
+      fallback_variant_image: fallbackVariantImage,
+      moderation_status: p.moderation_status || null,
+      moderation_reason: p.moderation_reason || null,
+      flagged_images: flaggedImages,
+      product_type: p.product_type || "Físico",
+      isService: false,
+      has_variants: variants.length > 0,
+      unit: p.unit || null,
+      addon_groups: (Array.isArray(p.addon_groups) && p.addon_groups.length > 0)
+        ? p.addon_groups
+        : (Array.isArray(p.technical_specs?.addon_groups) && p.technical_specs.addon_groups.length > 0)
+          ? p.technical_specs.addon_groups
+          : [],
+      variants,
+    }
+  })
 }
 
 /**
@@ -247,21 +271,29 @@ export async function fetchPartnerSuppliersBucket(explicitPartnerId?: string): P
   if (!user) throw new Error("Unauthorized")
 
   let partnerId = explicitPartnerId
+  let storeId: string | null = null
   if (!partnerId) {
     const context = await getCurrentPartnerContext()
     if (!context) throw new Error("No context")
     partnerId = context.partnerId
+    storeId = context.activeStoreId
   }
 
   const { allowed } = await checkPermission(partnerId, "suppliers", "view")
   if (!allowed) throw new Error("Forbidden")
 
   const supabase = await getSupabaseServerClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from("suppliers")
     .select("id, name, email, phone, cnpj, image_url")
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+
+  const { data, error } = await query
     .order("name", { ascending: true })
     .limit(500)
 
@@ -319,13 +351,13 @@ export type PartnerServiceBucketItem = {
   image?: string | null
 }
 
-export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucketItem[]> {
+export async function fetchPartnerServicesBucket(storeIdOverride?: string | null): Promise<PartnerServiceBucketItem[]> {
   const user = await getCurrentUser()
   if (!user) throw new Error("Unauthorized")
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
-  const storeId = context.activeStoreId
+  const storeId = storeIdOverride || context.activeStoreId
 
   const rows = await getCachedErpPage(
     ["partner-services-bucket", partnerId, storeId || "all-stores"],
@@ -341,7 +373,7 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
         .eq("is_active", true)
 
       if (storeId) {
-        query = query.eq("store_id", storeId)
+        query = query.or(`store_id.eq.${storeId},store_id.is.null`)
       }
 
       const { data, error } = await query
@@ -376,10 +408,10 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
  * Combined products + services catalog used by sales documents (orders, quotes).
  * Keeping the mapping in one place guarantees the exact same card data everywhere.
  */
-export async function fetchPartnerSalesCatalogBucket() {
+export async function fetchPartnerSalesCatalogBucket(storeIdOverride?: string | null) {
   const [products, services] = await Promise.all([
-    fetchPartnerProductsBucket(),
-    fetchPartnerServicesBucket(),
+    fetchPartnerProductsBucket(storeIdOverride),
+    fetchPartnerServicesBucket(storeIdOverride),
   ])
 
   const mappedServices = services.map((service) => ({

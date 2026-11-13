@@ -829,6 +829,17 @@ async function processWebhookWithRetry(
           return
         }
 
+        // Se é um pagamento originado no ERP (onde o pedido é registrado pelo checkout do operador ao confirmar o pagamento):
+        const isErpPayment = paymentInfo?.metadata?.context === "erp" || String(paymentInfo?.external_reference || "").startsWith("ERP-")
+        if (isErpPayment) {
+          if (attempt < MAX_RETRIES - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            return processWebhookWithRetry(body, requestId, attempt + 1)
+          }
+          console.warn(`[WEBHOOK] Pagamento ERP ${paymentId} (${paymentInfo.status}) recebido mas nenhum pedido correspondente foi encontrado após retentativas. O pedido pode estar sendo salvo pelo operador do ERP ou a venda foi cancelada.`)
+          return
+        }
+
         console.error("[WEBHOOK] Order not found in database:", orderError?.message)
         if (attempt < MAX_RETRIES - 1) {
           await new Promise((resolve) => setTimeout(resolve, 2000))

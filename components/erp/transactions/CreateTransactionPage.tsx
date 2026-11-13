@@ -1666,20 +1666,32 @@ export default function CreateTransactionPage({
                         </p>
                     ) : (
                         <div>
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate block mb-2">
                                 Situação
                             </label>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields || isPaidTransaction}>
+                            <div className="flex rounded-lg border border-brand-border dark:border-dark-border overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setStatus("paid")}
+                                    disabled={lockFinancialFields || isPaidTransaction}
+                                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${status === "paid"
+                                        ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                        : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
+                                        } ${lockFinancialFields || isPaidTransaction ? "opacity-50 cursor-not-allowed" : ""}`}
+                                >
                                     {paidLabel}
-                                </Button>
-                                <Button
-                                    variant={status === "pending" ? "default" : "outline"}
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={() => setStatus("pending")}
                                     disabled={lockFinancialFields || isPaidTransaction}
+                                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors border-l border-brand-border dark:border-dark-border ${status === "pending"
+                                        ? "bg-brand-dark text-white dark:bg-dark-heading dark:text-dark-background"
+                                        : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-dark-border/50"
+                                        } ${lockFinancialFields || isPaidTransaction ? "opacity-50 cursor-not-allowed" : ""}`}
                                 >
                                     Pendente
-                                </Button>
+                                </button>
                             </div>
                         </div>
                     )}

@@ -58,11 +58,12 @@ import {
 } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
-import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
+import { getAddressesAction, createAddressAction, updateAddressAction } from "@/app/actions/shared/addresses"
 import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
+import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getStoreUrl, getServiceUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
@@ -255,6 +256,7 @@ export function ServiceDetailsPageClient({
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
         zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
+        addressType: "casa", isDefault: false,
         latitude: null as number | null, longitude: null as number | null
     })
 
@@ -467,6 +469,24 @@ export function ServiceDetailsPageClient({
         notifyAddressUpdated(addressId, addr)
     }
 
+    const handleSetDefaultAddress = async (addressId: string) => {
+        if (!userId) return
+        const csrfToken = await fetchCSRFTokenSingleton() || ""
+        const result = await updateAddressAction({
+            addressId,
+            entityId: userId,
+            entityType: "user",
+            isDefault: true,
+            csrf_token: csrfToken,
+        })
+        if (!result.error) {
+            await loadUserAddresses()
+            notifyAddressUpdated()
+        } else {
+            setDeliveryError(result.error)
+        }
+    }
+
     const handleCepBlur = async () => {
         const zip = newAddressData.zipCode.replace(/\D/g, "")
         if (zip.length !== 8) return
@@ -496,7 +516,7 @@ export function ServiceDetailsPageClient({
 
     const handleSaveNewAddress = async () => {
         if (!userId) return
-        const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+        const { zipCode, street, number, neighborhood, city, state, noNumber, addressType, isDefault } = newAddressData
         const finalNumber = noNumber ? "S/N" : number
         if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
             setDeliveryError("Preencha todos os campos obrigatórios do endereço")
@@ -508,7 +528,8 @@ export function ServiceDetailsPageClient({
             entityId: userId, entityType: "user",
             street, number: finalNumber, complement: newAddressData.complement,
             neighborhood, city, state, zipCode,
-            isDefault: userAddresses.length === 0,
+            isDefault,
+            addressType,
             latitude: newAddressData.latitude ?? null,
             longitude: newAddressData.longitude ?? null,
             csrf_token: csrfToken,
@@ -525,7 +546,7 @@ export function ServiceDetailsPageClient({
                 notifyAddressUpdated()
             }
             setShowAddressForm(false)
-            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
+            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, addressType: "casa", isDefault: false, latitude: null, longitude: null })
             setDeliveryError(null)
         }
         setDeliveryLoading(false)
@@ -551,12 +572,14 @@ export function ServiceDetailsPageClient({
         const total = bestPrice
 
         // Real Pix Discount from Partner's payment methods
-        const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
+        const activePixMethods = (partner.paymentMethods || []).filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === "pix" && m.is_active)
+        const pixMethod = activePixMethods.find((m: any) => m.is_online_default) || activePixMethods.find((m: any) => m.is_default) || activePixMethods[0]
         const pixDiscountPercent = pixMethod?.discount_percent || 0
         const pixTotal = bestPrice * (1 - (pixDiscountPercent / 100))
 
         // Real Installments from Partner's credit card method
-        const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
+        const activeCcMethods = (partner.paymentMethods || []).filter((m: any) => toCanonicalPaymentType(m.type || m.payment_type) === "credit_card" && m.is_active)
+        const ccMethod = activeCcMethods.find((m: any) => m.is_online_default) || activeCcMethods.find((m: any) => m.is_default) || activeCcMethods[0]
         const hasCC = !!ccMethod
         const maxInstallments = ccMethod?.max_installments || 1
         const installmentPrice = bestPrice / maxInstallments
@@ -1834,6 +1857,7 @@ export function ServiceDetailsPageClient({
                 storeName={partner.store_name}
                 paymentMethods={partner.paymentMethods}
                 price={pricing.current}
+                partnerId={partner.partner_id || partner.id}
                 mpConnected={!!partner.mp_user_id}
                 mpAcceptedPaymentMethods={partner.mp_accepted_payment_methods}
             />
@@ -1951,7 +1975,26 @@ export function ServiceDetailsPageClient({
                                 />
                             </div>
                             <div className="flex-1 pr-4">
-                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                    {address.is_default ? (
+                                        <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded shrink-0">
+                                            Padrão
+                                        </span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            title="Definir como endereço padrão (reflete no ERP de todas as lojas)"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleSetDefaultAddress(address.id)
+                                            }}
+                                            className="text-[11px] font-medium text-brand-green hover:underline ml-auto shrink-0"
+                                        >
+                                            Tornar padrão
+                                        </button>
+                                    )}
+                                </div>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
                             </div>
@@ -1976,6 +2019,26 @@ export function ServiceDetailsPageClient({
                 title="Adicionar novo endereço"
             >
                 <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3 mb-2">
+                        {[
+                            { value: "casa", label: "Casa" },
+                            { value: "trabalho", label: "Trabalho" },
+                            { value: "outro", label: "Outro" },
+                        ].map(opt => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setNewAddressData(prev => ({ ...prev, addressType: opt.value }))}
+                                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${newAddressData.addressType === opt.value
+                                    ? "bg-brand-green text-white border-brand-green"
+                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
+                                    }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+
                     <div>
                         <CepInput
                             value={newAddressData.zipCode}
@@ -2049,6 +2112,17 @@ export function ServiceDetailsPageClient({
                             />
                         </div>
                     </div>
+
+                    <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
+                        <input
+                            type="checkbox"
+                            checked={newAddressData.isDefault || userAddresses.length === 0}
+                            disabled={userAddresses.length === 0}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, isDefault: e.target.checked }))}
+                            className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
+                        />
+                        <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
+                    </label>
 
                     <Button
                         onClick={handleSaveNewAddress}

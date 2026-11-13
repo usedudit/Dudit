@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import type React from "react"
 import { useMemo } from "react"
@@ -331,7 +331,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações básicas" className="mb-8">
                     <div className="mb-10">
-                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
+                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={serviceData.moderation_status || 'approved'} />
                     </div>
 
                     <div className="space-y-6">

@@ -453,15 +453,17 @@ export function buildWhatsappMessage(
                 `- ${store}`,
             ].join("\n")
 
-        case "cart_abandoned":
+        case "cart_abandoned": {
+            const storeText = ctx.store_name ? `em ${ctx.store_name}` : "na nossa loja"
             return [
-                `🛒 *Carrinho abandonado*`,
+                `🛒 *Seu carrinho está te esperando!*`,
                 ``,
                 ``,
-                `Olá, ${customer}! Seu carrinho na ${store} está te esperando.`,
+                `Olá, ${customer}! Seu carrinho ${storeText} ainda está te esperando.`,
                 ``,
                 `Volte e finalize sua compra enquanto os itens ainda estão disponíveis! ✨`,
             ].filter(Boolean).join("\n")
+        }
 
         case "order_cancelled":
             return [
@@ -776,24 +778,41 @@ export function buildNotificationContent(
                 message: ctx.customerName || "Confira o novo comunicado da plataforma.",
             }
         case "cart_abandoned": {
-            const store = ctx.storeName || "nossa loja"
+            const storeText = ctx.storeName ? `em ${ctx.storeName}` : "na nossa loja"
             const itemCount = ctx.itemCount || 0
             const names = ctx.productNames?.filter(Boolean) || []
 
-            if (itemCount <= 3 && names.length > 0) {
-                const namesStr = names.length === 1
-                    ? names[0]
-                    : names.slice(0, -1).join(", ") + " e " + names[names.length - 1]
+            if (names.length > 0) {
+                if (itemCount <= 3 && names.length <= 3) {
+                    const namesStr = names.length === 1
+                        ? names[0]
+                        : names.slice(0, -1).join(", ") + " e " + names[names.length - 1]
 
+                    return {
+                        title: "🛒 Carrinho te esperando!",
+                        message: `Seu carrinho ${storeText} com ${namesStr} está te esperando. Volte e finalize sua compra!`,
+                    }
+                }
+
+                const remaining = itemCount > names.length ? itemCount - 1 : names.length - 1
                 return {
                     title: "🛒 Carrinho te esperando!",
-                    message: `Seu carrinho na ${store} com ${namesStr} está te esperando. Volte e finalize sua compra!`,
+                    message: remaining > 0
+                        ? `Seu carrinho ${storeText} com ${names[0]} e mais ${remaining} ${remaining === 1 ? "item" : "itens"} está te esperando. Volte e finalize sua compra!`
+                        : `Seu carrinho ${storeText} com ${names[0]} está te esperando. Volte e finalize sua compra!`,
+                }
+            }
+
+            if (itemCount > 0) {
+                return {
+                    title: "🛒 Carrinho te esperando!",
+                    message: `Seu carrinho ${storeText} com ${itemCount} ${itemCount === 1 ? "item" : "itens"} está te esperando. Volte e finalize sua compra!`,
                 }
             }
 
             return {
                 title: "🛒 Carrinho te esperando!",
-                message: `Seu carrinho na ${store} está te esperando. Volte e finalize sua compra!`,
+                message: `Seu carrinho ${storeText} está te esperando. Volte e finalize sua compra!`,
             }
         }
         default:

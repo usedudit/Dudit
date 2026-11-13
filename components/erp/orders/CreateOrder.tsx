@@ -2667,7 +2667,7 @@ export default function CreateOrder({
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
                             existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
                             lockPaymentCompletion={isAlreadyPaid}
-                            orderId={orderId || undefined}
+                            orderId={editOrderId || undefined}
                             isMarketplaceOrder={isMarketplaceOrder}
                             role={role}
                             originalPaymentMethod={originalPaymentMethod}

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react"
 import { motion } from "framer-motion"
 import { Package, AlertTriangleIcon, InfoIcon } from "@/lib/icons"
-import { IconPlaceholder } from "@/components/reusable"
+import { Badge, type BadgeVariant, IconPlaceholder } from "@/components/reusable"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -63,10 +63,10 @@ function resolveResourcesFromServices(services: any[]): ItemEntry[] {
     return Array.from(seen.values())
 }
 
-const usageTypeLabels: Record<string, { label: string; color: string }> = {
-    consumed: { label: 'Consumido', color: 'text-red-600 bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' },
-    returnable: { label: 'Retornável', color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30' },
-    reference: { label: 'Referência', color: 'text-gray-500 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-dark-border' },
+const usageTypeLabels: Record<ItemEntry['usageType'], { label: string; color: BadgeVariant }> = {
+    consumed: { label: 'Consumido', color: "red" },
+    returnable: { label: 'Retornável', color: "orange" },
+    reference: { label: 'Referência', color: "gray" },
 }
 
 export function AppointmentItemsStep({ items, onItemsChange, services, partnerPlan }: AppointmentItemsStepProps) {
@@ -154,13 +154,13 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                     <span className="text-[11px] text-brand-inactive-text truncate">
                                         {item.serviceName}
                                     </span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${typeInfo.color}`}>
+                                    <Badge variant={typeInfo.color} className="scale-90 whitespace-nowrap">
                                         {typeInfo.label}
-                                    </span>
+                                    </Badge>
                                     {!hasProductStock && (
-                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border text-brand-inactive-text bg-brand-gray/50 dark:bg-dark-border/40 border-brand-border dark:border-dark-border">
+                                        <Badge variant="gray" className="scale-90 whitespace-nowrap">
                                             Item manual
-                                        </span>
+                                        </Badge>
                                     )}
                                 </div>
                                 {isConsumed && hasProductStock && (
@@ -171,12 +171,11 @@ export function AppointmentItemsStep({ items, onItemsChange, services, partnerPl
                                             </span>
                                         ) : (
                                             <>
-                                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                                                    willGoNegative ? 'text-red-600 bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-800/40 dark:text-red-400' :
+                                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${willGoNegative ? 'text-red-600 bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-800/40 dark:text-red-400' :
                                                     willGoBelowMin ? 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-400' :
-                                                    projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-400' :
-                                                    'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800/40 dark:text-emerald-400'
-                                                }`}>
+                                                        projectedStock <= minStock && minStock > 0 ? 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-400' :
+                                                            'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800/40 dark:text-emerald-400'
+                                                    }`}>
                                                     {willGoNegative ? (
                                                         <>
                                                             <AlertTriangleIcon size={10} className="mr-0.5" />

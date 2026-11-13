@@ -90,6 +90,10 @@ const COMMON_CITY_ACCENTS: Record<string, string> = {
     "joao-pessoa": "João Pessoa",
 };
 
+// Cache em memória para sugestões e autocomplete entre montagens do Header
+let cachedSuggestionBucket: { label: string; type: string }[] | null = null
+const autocompleteCache = new Map<string, { label: string; type: string }[]>()
+
 interface HeaderProps {
     setView?: (
         view:
@@ -178,9 +182,12 @@ const Header: React.FC<HeaderProps> = ({
     const showDeliveryInfo = useMemo(() => isHome || ["/perfil", "/pedidos", "/sacola"].includes(pathname) || pathname.startsWith("/explorar"), [isHome, pathname])
 
     const [searchValue, setSearchValue] = useState("")
-    const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>([])
+    const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>(() => cachedSuggestionBucket || [])
     const [rpcSuggestions, setRpcSuggestions] = useState<{ label: string; type: string }[]>([])
+    const [activeRpcQuery, setActiveRpcQuery] = useState("")
+    const [isAutocompleteLoading, setIsAutocompleteLoading] = useState(false)
     const [isSearchInputFocused, setIsSearchInputFocused] = useState(false)
+    const [suggestionsLoaded, setSuggestionsLoaded] = useState(() => !!cachedSuggestionBucket)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
     const [isThemeTransitioning, setIsThemeTransitioning] = useState(false)
@@ -568,50 +575,88 @@ const Header: React.FC<HeaderProps> = ({
 
     const searchContainerRef = useRef<HTMLDivElement>(null)
     const closeMenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const [suggestionsLoaded, setSuggestionsLoaded] = useState(false)
 
-    // LAZY LOAD: Buscar sugestões APENAS quando o usuário focar no campo de busca
-    useEffect(() => {
-        if (!isSearchInputFocused || suggestionsLoaded) return
-        const loadSuggestions = async () => {
-            try {
-                const bucket = await getSearchSuggestionsBucket()
-                setSuggestionBucket(bucket)
-                setSuggestionsLoaded(true)
-            } catch (error) {
-                console.error("Error loading search suggestions:", error)
-            }
+    const loadSuggestions = useCallback(async () => {
+        if (cachedSuggestionBucket) {
+            setSuggestionBucket(cachedSuggestionBucket)
+            setSuggestionsLoaded(true)
+            return
         }
-        loadSuggestions()
-    }, [isSearchInputFocused, suggestionsLoaded])
+        try {
+            const bucket = await getSearchSuggestionsBucket()
+            cachedSuggestionBucket = bucket
+            setSuggestionBucket(bucket)
+            setSuggestionsLoaded(true)
+        } catch (error) {
+            console.error("Error loading search suggestions:", error)
+        }
+    }, [])
+
+    // LAZY LOAD: Carrega o bucket no foco desktop OU quando a busca mobile/tablet abrir
+    useEffect(() => {
+        if ((!isSearchInputFocused && !isMobileSearchOpen) || suggestionsLoaded) return
+        void loadSuggestions()
+    }, [isSearchInputFocused, isMobileSearchOpen, suggestionsLoaded, loadSuggestions])
 
     useEffect(() => {
         const trimmed = searchValue.trim()
-        if (trimmed.length < 2) {
+        const lowerTrimmed = trimmed.toLowerCase()
+        if (lowerTrimmed.length < 2) {
             setRpcSuggestions([])
+            setActiveRpcQuery("")
+            setIsAutocompleteLoading(false)
             return
         }
+
+        // Cache instantâneo (0ms)
+        if (autocompleteCache.has(lowerTrimmed)) {
+            setRpcSuggestions(autocompleteCache.get(lowerTrimmed)!)
+            setActiveRpcQuery(lowerTrimmed)
+            setIsAutocompleteLoading(false)
+            return
+        }
+
+        setIsAutocompleteLoading(true)
+        let cancelled = false
+
         const timer = setTimeout(async () => {
             try {
                 const results = await getMarketplaceAutocompleteAction(trimmed)
-                setRpcSuggestions(results)
+                if (!cancelled) {
+                    autocompleteCache.set(lowerTrimmed, results)
+                    setRpcSuggestions(results)
+                    setActiveRpcQuery(lowerTrimmed)
+                    setIsAutocompleteLoading(false)
+                }
             } catch (error) {
-                console.error("Error loading autocomplete:", error)
+                if (!cancelled) {
+                    console.error("Error loading autocomplete:", error)
+                    setIsAutocompleteLoading(false)
+                }
             }
-        }, 220)
-        return () => clearTimeout(timer)
+        }, 180)
+
+        return () => {
+            cancelled = true
+            clearTimeout(timer)
+        }
     }, [searchValue])
 
     const filteredSuggestions = useMemo(() => {
-        if (!searchValue.trim()) return []
-        if (searchValue.trim().length >= 2 && rpcSuggestions.length > 0) {
+        const trimmed = searchValue.trim()
+        if (!trimmed) return []
+        const lowerTrimmed = trimmed.toLowerCase()
+
+        // Se o RPC retornou sugestões para a busca atual, usa elas:
+        if (activeRpcQuery === lowerTrimmed && rpcSuggestions.length > 0) {
             return rpcSuggestions.slice(0, 8)
         }
-        const search = searchValue.toLowerCase().trim()
+
+        // Fallback instantâneo (0ms) a partir do bucket local
         return suggestionBucket
-            .filter((item) => item.label.toLowerCase().includes(search))
+            .filter((item) => item.label.toLowerCase().includes(lowerTrimmed))
             .slice(0, 8)
-    }, [suggestionBucket, searchValue, rpcSuggestions])
+    }, [suggestionBucket, searchValue, rpcSuggestions, activeRpcQuery])
 
     const showSearchDropdown = isSearchInputFocused && searchValue.length > 0 && filteredSuggestions.length > 0
     const showOverlay = isSearchInputFocused || isUserMenuOpen
@@ -657,6 +702,16 @@ const Header: React.FC<HeaderProps> = ({
     const handleSearchFocus = useCallback(() => {
         setIsSearchInputFocused(true)
         setIsUserMenuOpen(false)
+        void loadSuggestions()
+    }, [loadSuggestions])
+
+    const handleCloseMobileSearch = useCallback(() => {
+        setIsMobileSearchOpen(false)
+        setIsSearchInputFocused(false)
+        setSearchValue("")
+        setRpcSuggestions([])
+        setActiveRpcQuery("")
+        setIsAutocompleteLoading(false)
     }, [])
 
     const handleUserMouseEnter = useCallback(() => {
@@ -872,8 +927,12 @@ const Header: React.FC<HeaderProps> = ({
                                 </div>
                             ) : (
                                 <button
-                                    onClick={() => setIsMobileSearchOpen(true)}
-                                    className="bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200 cursor-text"
+                                    onClick={() => {
+                                        setIsMobileSearchOpen(true)
+                                        setIsSearchInputFocused(true)
+                                        void loadSuggestions()
+                                    }}
+                                    className="bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200 cursor-text hover:border-brand-green/40 transition-colors"
                                 >
                                     <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
                                     <span className="text-brand-dark text-[14px] placeholder-gray-400 font-normal">Buscar na Dudit</span>
@@ -997,98 +1056,136 @@ const Header: React.FC<HeaderProps> = ({
                     className="lg:hidden fixed inset-0 z-[200] bg-white dark:bg-dark-surface flex flex-col"
                     style={{ zIndex }}
                 >
-                    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
-                        <button
-                            onClick={() => {
-                                setIsMobileSearchOpen(false)
-                                setSearchValue("")
-                                setRpcSuggestions([])
-                            }}
-                            className="shrink-0 p-1 text-brand-dark dark:text-dark-heading"
-                        >
-                            <ChevronLeftIcon size={24} strokeWidth={2.5} />
-                        </button>
+                    <div className="w-full max-w-3xl mx-auto flex flex-col h-full">
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
+                            <button
+                                onClick={handleCloseMobileSearch}
+                                className="shrink-0 p-1 text-brand-dark dark:text-dark-heading hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+                                title="Voltar"
+                            >
+                                <ChevronLeftIcon size={24} strokeWidth={2.5} />
+                            </button>
 
-                        <div className="flex-1 flex items-center h-[40px] bg-brand-gray dark:bg-dark-border/30 rounded-full px-4">
-                            <SearchIcon
-                                size={18}
-                                className="text-brand-green dark:text-brand-green shrink-0 mr-2"
-                            />
-
-                            <input
-                                type="text"
-                                autoFocus
-                                placeholder="Buscar na Dudit"
-                                className="bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[15px] w-full placeholder-gray-400 dark:placeholder-gray-500 font-normal"
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                        handleSearch(searchValue)
-                                        setIsMobileSearchOpen(false)
-                                    }
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault()
+                                    handleSearch(searchValue)
                                 }}
-                            />
-
-                            {searchValue.length > 0 && (
+                                className="flex-1 flex items-center h-[40px] bg-brand-gray dark:bg-dark-border/30 rounded-full px-3"
+                            >
                                 <button
-                                    onClick={() => {
-                                        setSearchValue("")
-                                        setRpcSuggestions([])
-                                    }}
-                                    className="shrink-0 p-1 text-gray-400"
+                                    type="submit"
+                                    className="text-brand-green dark:text-brand-green shrink-0 p-1 mr-1 hover:opacity-80 transition-opacity"
+                                    title="Buscar"
                                 >
-                                    <XIcon size={18} />
+                                    <SearchIcon size={18} />
                                 </button>
-                            )}
-                        </div>
-                    </div>
 
-                    <div className="flex-1 overflow-y-auto">
-                        {filteredSuggestions.length > 0 ? (
-                            <div className="divide-y divide-gray-50 dark:divide-dark-border">
-                                {filteredSuggestions.map((suggestion, index) => (
-                                    <button
-                                        key={index}
-                                        type="button"
-                                        className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors text-left"
-                                        onClick={() => {
-                                            setSearchValue(suggestion.label)
-                                            setIsMobileSearchOpen(false)
-                                            handleSearch(suggestion.label)
-                                        }}
-                                    >
-                                        <SearchIcon
-                                            size={18}
-                                            className="text-brand-inactive-text dark:text-dark-body shrink-0"
-                                        />
-
-                                        <span className="text-[15px] text-brand-dark dark:text-dark-heading flex-1 min-w-0 truncate">
-                                            {suggestion.label}
-                                        </span>
-
-                                        <ChevronRightIcon
-                                            size={16}
-                                            className="text-brand-inactive-text dark:text-dark-body shrink-0"
-                                        />
-                                    </button>
-                                ))}
-                            </div>
-                        ) : searchValue.trim().length >= 2 ? (
-                            <div className="flex flex-col items-center justify-center py-16 px-6">
-                                <IconPlaceholder
-                                    icon={SearchIcon}
-                                    title={`Nenhuma sugestão para "${searchValue}"`}
-                                    itemButton={{
-                                        text: "Buscar mesmo assim",
-                                        action: () => {
-                                            setIsMobileSearchOpen(false)
+                                <input
+                                    type="search"
+                                    autoFocus
+                                    enterKeyHint="search"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    placeholder="Buscar na Dudit"
+                                    className="bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[15px] w-full placeholder-gray-400 dark:placeholder-gray-500 font-normal py-0"
+                                    value={searchValue}
+                                    onFocus={handleSearchFocus}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault()
                                             handleSearch(searchValue)
-                                        },
+                                        }
                                     }}
                                 />
-                            </div>
-                        ) : null}
+
+                                {searchValue.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchValue("")
+                                            setRpcSuggestions([])
+                                            setActiveRpcQuery("")
+                                        }}
+                                        className="shrink-0 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                        title="Limpar busca"
+                                    >
+                                        <XIcon size={18} />
+                                    </button>
+                                )}
+                            </form>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto">
+                            {/* Linha de ação rápida: Buscar pelo termo digitado */}
+                            {searchValue.trim().length > 0 && (
+                                <button
+                                    type="button"
+                                    className="w-full flex items-center gap-3 px-5 py-3.5 bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 transition-colors text-left border-b border-gray-100 dark:border-dark-border"
+                                    onClick={() => handleSearch(searchValue)}
+                                >
+                                    <SearchIcon size={18} className="text-brand-green shrink-0" />
+                                    <span className="text-[15px] font-medium text-brand-green flex-1 min-w-0 truncate">
+                                        Buscar por &ldquo;{searchValue.trim()}&rdquo;
+                                    </span>
+                                    <ChevronRightIcon size={16} className="text-brand-green shrink-0" />
+                                </button>
+                            )}
+
+                            {filteredSuggestions.length > 0 ? (
+                                <div className="divide-y divide-gray-50 dark:divide-dark-border">
+                                    {filteredSuggestions.map((suggestion, index) => (
+                                        <button
+                                            key={index}
+                                            type="button"
+                                            className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors text-left"
+                                            onClick={() => {
+                                                setSearchValue(suggestion.label)
+                                                handleSearch(suggestion.label)
+                                            }}
+                                        >
+                                            <SearchIcon
+                                                size={18}
+                                                className="text-brand-inactive-text dark:text-dark-body shrink-0"
+                                            />
+
+                                            <span className="text-[15px] text-brand-dark dark:text-dark-heading flex-1 min-w-0 truncate">
+                                                {suggestion.label}
+                                            </span>
+
+                                            <ChevronRightIcon
+                                                size={16}
+                                                className="text-brand-inactive-text dark:text-dark-body shrink-0"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : searchValue.trim().length >= 2 ? (
+                                isAutocompleteLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-12 px-6">
+                                        <div className="flex items-center gap-2 text-brand-inactive-text dark:text-dark-body text-sm">
+                                            <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                                            <span>Buscando sugestões...</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-16 px-6">
+                                        <IconPlaceholder
+                                            icon={SearchIcon}
+                                            title={`Nenhuma sugestão para "${searchValue}"`}
+                                            itemButton={{
+                                                text: "Buscar mesmo assim",
+                                                action: () => {
+                                                    handleSearch(searchValue)
+                                                },
+                                            }}
+                                        />
+                                    </div>
+                                )
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             )}
@@ -1229,9 +1326,15 @@ const Header: React.FC<HeaderProps> = ({
                     )}
 
                     <div className="flex-1 relative z-[110] mx-4 h-[42px]" ref={searchContainerRef}>
-                        <div className="relative flex items-center w-full h-full bg-white rounded-full transition-all duration-200 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault()
+                                handleSearch()
+                            }}
+                            className="relative flex items-center w-full h-full bg-white rounded-full transition-all duration-200 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_2px_12px_rgba(0,0,0,0.12)]"
+                        >
                             <input
-                                type="text"
+                                type="search"
                                 className="flex-1 h-full bg-transparent border-none outline-none text-brand-dark placeholder-gray-400 text-[15px] px-5 w-full font-normal rounded-l-full"
                                 placeholder="Buscar produtos, marcas e muito mais..."
                                 onFocus={handleSearchFocus}
@@ -1241,12 +1344,13 @@ const Header: React.FC<HeaderProps> = ({
                             />
 
                             <Button
+                                type="submit"
                                 onClick={() => handleSearch()}
                                 className="h-[34px] w-[34px] p-0 flex items-center justify-center mr-1 rounded-full bg-brand-green hover:bg-brand-green/90"
                             >
                                 <SearchIcon size={18} className="text-white" />
                             </Button>
-                        </div>
+                        </form>
 
                         {showSearchDropdown && (
                             <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-dark-surface rounded-[16px] shadow-xl border border-gray-100 dark:border-dark-border overflow-hidden animate-fade-in z-[120]">

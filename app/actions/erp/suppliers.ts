@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { redirect } from 'next/navigation'
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -108,9 +109,14 @@ export async function createComprehensiveSupplierAction(data: {
 
   const supplierCode = await generateUniqueSupplierCode(supabase)
 
+  // Get active store ID from context
+  const context = await getCurrentPartnerContext()
+  const storeId = context?.activeStoreId || null
+
   // Criar supplier SEM colunas de endereço
   const { data: newSupplier, error } = await supabase.from("suppliers").insert({
     partner_id: data.partnerId,
+    store_id: storeId,
     name: sanitizeInput(data.name, 150),
     email: data.email || null,
     phone: data.phone || null,
@@ -191,8 +197,13 @@ export async function createSupplierAction(data: {
 
   const supplierCode = await generateUniqueSupplierCode(supabase)
 
+  // Get active store ID from context
+  const context = await getCurrentPartnerContext()
+  const storeId = context?.activeStoreId || null
+
   const { data: newSupplier, error } = await supabase.from("suppliers").insert({
     partner_id: data.partnerId,
+    store_id: storeId,
     name: sanitizeInput(data.name, 150),
     email: data.email || null,
     phone: data.phone || null,
@@ -434,6 +445,7 @@ export async function duplicateSupplierAction(supplierId: string) {
     .from("suppliers")
     .insert({
       partner_id: originalSupplier.partner_id,
+      store_id: originalSupplier.store_id,
       name: sanitizeInput(`${originalSupplier.name} (copia)`, 150),
       email: originalSupplier.email,
       phone: originalSupplier.phone,
@@ -494,12 +506,13 @@ export async function getERPSuppliersPageAction(
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_SUPPLIERS_PAGE_SIZE))))
     const fetchLimit = limit + 1
+    const storeId = options?.storeId || null
 
     const page = await getCachedErpPage(
       [
         "erp-suppliers-page",
         partnerId,
-        options?.storeId || "all-stores",
+        storeId || "all-stores",
         cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
         String(limit),
       ],
@@ -510,6 +523,10 @@ export async function getERPSuppliersPageAction(
           .from("suppliers")
           .select("id, name, email, phone, person_type, cpf, cnpj, nome_fantasia, inscricao_estadual, status, created_at, supplier_code, notes, image_url")
           .eq("partner_id", partnerId)
+
+        if (storeId) {
+          q = q.eq("store_id", storeId)
+        }
 
         if (cursor) q = q.or(buildSupplierKeysetOrFilter(cursor))
 
@@ -760,10 +777,15 @@ export async function createSupplierQuickAction(input: {
 
   const supplierCode = await generateUniqueSupplierCode(supabase)
 
+  // Get active store ID from context
+  const context = await getCurrentPartnerContext()
+  const storeId = context?.activeStoreId || null
+
   const { data: supplier, error } = await supabase
     .from("suppliers")
     .insert({
       partner_id: input.partnerId,
+      store_id: storeId,
       name,
       email: email || null,
       phone: phone || null,

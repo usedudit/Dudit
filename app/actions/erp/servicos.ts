@@ -481,6 +481,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.paymentRequirement !== undefined) payload.payment_requirement = data.paymentRequirement
         if (data.show_price_in_store !== undefined) payload.show_price_in_store = data.show_price_in_store
         if (data.showPriceInStore !== undefined) payload.show_price_in_store = data.showPriceInStore
+        if (data.images !== undefined) payload.images = data.images
         if (data.requiresManualModeration || data.requires_manual_moderation) {
             payload.moderation_status = 'flagged'
         }

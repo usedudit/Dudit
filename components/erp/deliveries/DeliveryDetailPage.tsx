@@ -176,25 +176,41 @@ export default function DeliveryDetailPage({
     }, [deliveryId])
 
     useEffect(() => {
-        if (activeTab !== "mapa_rota" || route !== null) return
+        if (route !== null) return
 
         let alive = true
         const run = async () => {
             setRouteLoading(true)
-            const res = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
-            if (!alive) return
-            if (res.success) {
-                setRoute(res.data)
-                setRouteError(null)
-            } else {
+            try {
+                const res = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
+                if (!alive) return
+                if (res.success) {
+                    setRoute(res.data)
+                    setRouteError(null)
+                } else {
+                    setRoute(null)
+                    setRouteError(res.error || "Não foi possível carregar a rota.")
+                }
+            } catch (err: any) {
+                if (!alive) return
                 setRoute(null)
-                setRouteError(res.error || "Não foi possível carregar a rota.")
+                setRouteError(err?.message || "Não foi possível carregar a rota.")
+            } finally {
+                if (alive) setRouteLoading(false)
             }
-            setRouteLoading(false)
         }
         run()
         return () => { alive = false }
-    }, [deliveryId, partnerId, activeTab, route])
+    }, [deliveryId, partnerId, route])
+
+    useEffect(() => {
+        if (activeTab === "mapa_rota") {
+            const timer = setTimeout(() => {
+                window.dispatchEvent(new Event("resize"))
+            }, 100)
+            return () => clearTimeout(timer)
+        }
+    }, [activeTab])
 
     const confirmDeliveryWarningStatusChange = async () => {
         if (!deliveryWarningModal) return

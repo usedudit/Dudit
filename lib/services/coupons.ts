@@ -56,7 +56,7 @@ export async function validateCouponRow(
     customerId?: string | null
     subtotal: number
     shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
+    items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null; price?: number | null; quantity?: number | null }>
     manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
   }
 ): Promise<CouponValidationResult> {

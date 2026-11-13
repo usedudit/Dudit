@@ -77,6 +77,16 @@ export default function DeliveryKanbanBoard({
             badgeClass: "bg-emerald-100/60 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300",
             items: deliveredDeliveries,
         },
+        {
+            id: "cancelled",
+            title: "Canceladas / Falhas",
+            subtitle: "Não concluídas",
+            themeClass: "bg-rose-50/70 border-rose-100/50 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
+            dotBgClass: "bg-rose-100 dark:bg-rose-900/40",
+            dotClass: "bg-rose-500",
+            badgeClass: "bg-rose-100/60 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300",
+            items: cancelledDeliveries,
+        },
     ]
 
     const handleDragOver = (e: React.DragEvent, colId: string) => {
@@ -99,100 +109,60 @@ export default function DeliveryKanbanBoard({
 
     return (
         <div className="flex flex-col h-full w-full">
-            <AnimatePresence mode="wait">
-                {activeTab === "active" ? (
-                    /* Kanban Board View */
-                    <motion.div
-                        key="kanban-active"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex lg:grid lg:grid-cols-4 gap-5 overflow-x-auto lg:overflow-x-visible pb-6 snap-x snap-mandatory scrollbar-hide select-none"
+            <motion.div
+                key="kanban-board"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex xl:grid xl:grid-cols-5 gap-4 overflow-x-auto xl:overflow-x-visible pb-6 snap-x snap-mandatory scrollbar-hide select-none"
+            >
+                {columns.map((col) => (
+                    <div
+                        key={col.id}
+                        className="flex-none w-[290px] xl:w-auto snap-center flex flex-col h-full min-h-[500px]"
                     >
-                        {columns.map((col) => (
-                            <div
-                                key={col.id}
-                                className="flex-none w-[310px] sm:w-[330px] lg:w-auto snap-center flex flex-col h-full min-h-[500px]"
-                            >
-                                {/* Clean Column Header Pill */}
-                                <div className={`flex items-center justify-between p-3 rounded-full border ${col.themeClass} shrink-0 mb-4`}>
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${col.dotBgClass}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${col.dotClass}`} />
-                                        </span>
-                                        <h3 className="font-bold text-xs truncate">
-                                            {col.title}
-                                        </h3>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${col.badgeClass}`}>
-                                            {col.items.length}
-                                        </span>
-                                    </div>
-                                </div>
+                        {/* Clean Column Header Pill */}
+                        <div className={`flex items-center justify-between p-3 rounded-full border ${col.themeClass} shrink-0 mb-4`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${col.dotBgClass}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${col.dotClass}`} />
+                                </span>
+                                <h3 className="font-bold text-xs truncate">
+                                    {col.title}
+                                </h3>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${col.badgeClass}`}>
+                                    {col.items.length}
+                                </span>
+                            </div>
+                        </div>
 
-                                {/* Column Body / Card Container with Drag & Drop */}
-                                <div
-                                    onDragOver={(e) => handleDragOver(e, col.id)}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={(e) => handleDrop(e, col.id)}
-                                    className={`flex-1 flex flex-col gap-3.5 p-3 rounded-2xl border transition-all duration-200 ${dragOverCol === col.id
-                                        ? "bg-gray-100/70 border-brand-green/30 dark:bg-zinc-800/40 dark:border-brand-green/30"
-                                        : "border-transparent bg-gray-50/30 dark:bg-zinc-900/10"
-                                        } overflow-y-auto max-h-[calc(100vh-320px)] min-h-[400px] custom-scrollbar`}
-                                >
-                                    <AnimatePresence mode="popLayout">
-                                        {col.items.length === 0 ? (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className="flex flex-col items-center justify-center py-16 px-4 text-center h-full border border-dashed border-brand-border/60 dark:border-dark-border/40 rounded-xl bg-white/50 dark:bg-dark-surface/20"
-                                            >
-                                                <IconPlaceholder
-                                                    icon={CheckCircleIcon}
-                                                    title="Tudo limpo por aqui!"
-                                                    subtitle="Nenhuma entrega com este status."
-                                                />
-                                            </motion.div>
-                                        ) : (
-                                            col.items.map((delivery) => (
-                                                <DeliveryKanbanCard
-                                                    key={delivery.id}
-                                                    delivery={delivery}
-                                                    onDetails={() => onDetails(delivery.id)}
-                                                    onEdit={onEdit ? () => onEdit(delivery.id) : undefined}
-                                                    onQuickStatusChange={onQuickStatusChange}
-                                                />
-                                            ))
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </div>
-                        ))}
-                    </motion.div>
-                ) : (
-                    /* Cancelled & Failed Deliveries Grid */
-                    <motion.div
-                        key="kanban-cancelled"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full"
-                    >
-                        {cancelledDeliveries.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-brand-border dark:border-dark-border rounded-2xl bg-white dark:bg-dark-surface">
-                                <p className="font-bold text-brand-dark dark:text-dark-heading">
-                                    Nenhuma entrega cancelada ou falha encontrada
-                                </p>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                    Somente entregas canceladas ou com falha aparecem nesta aba.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5 pb-6">
-                                <AnimatePresence>
-                                    {cancelledDeliveries.map((delivery) => (
+                        {/* Column Body / Card Container with Drag & Drop */}
+                        <div
+                            onDragOver={(e) => handleDragOver(e, col.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, col.id)}
+                            className={`flex-1 flex flex-col gap-3.5 p-3 rounded-2xl border transition-all duration-200 ${dragOverCol === col.id
+                                ? "bg-gray-100/70 border-brand-green/30 dark:bg-zinc-800/40 dark:border-brand-green/30"
+                                : "border-transparent bg-gray-50/30 dark:bg-zinc-900/10"
+                                } overflow-y-auto max-h-[calc(100vh-320px)] min-h-[400px] custom-scrollbar`}
+                        >
+                            <AnimatePresence mode="popLayout">
+                                {col.items.length === 0 ? (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className="flex flex-col items-center justify-center py-16 px-4 text-center h-full border border-dashed border-brand-border/60 dark:border-dark-border/40 rounded-xl bg-white/50 dark:bg-dark-surface/20"
+                                    >
+                                        <IconPlaceholder
+                                            icon={CheckCircleIcon}
+                                            title="Tudo limpo por aqui!"
+                                            subtitle="Nenhuma entrega com este status."
+                                        />
+                                    </motion.div>
+                                ) : (
+                                    col.items.map((delivery) => (
                                         <DeliveryKanbanCard
                                             key={delivery.id}
                                             delivery={delivery}
@@ -200,13 +170,13 @@ export default function DeliveryKanbanBoard({
                                             onEdit={onEdit ? () => onEdit(delivery.id) : undefined}
                                             onQuickStatusChange={onQuickStatusChange}
                                         />
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                        )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                                    ))
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+                ))}
+            </motion.div>
         </div>
     )
 }

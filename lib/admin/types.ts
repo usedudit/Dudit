@@ -170,7 +170,7 @@ export interface CursorPaginatedResult<T> {
 
 export interface ModerationItem {
     id: string
-    type: "product" | "service" | "partner" | "return_dispute" | "community_video"
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video" | "recurring_plan"
     title: string
     description: string | null
     price: number

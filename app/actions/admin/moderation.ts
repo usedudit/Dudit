@@ -165,12 +165,40 @@ export async function getModerationQueue(
         console.error("[ADMIN_MODERATION] Failed to fetch services queue:", serviceError.message)
     }
 
-    const hasMore = (products?.length || 0) > pageSize || (services?.length || 0) > pageSize
+    // Query recurring_plans pending moderation
+    let planQuery = supabase
+        .from("recurring_plans")
+        .select(`
+      id, name, description, images, moderation_status, moderation_reason, created_at, store_id,
+      partner:partners!inner(id, user_id),
+      store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
+    `)
+
+    if (statusFilter && statusFilter !== "all") {
+        planQuery = planQuery.eq("moderation_status", statusFilter)
+    } else {
+        planQuery = planQuery.in("moderation_status", ["pending_moderation", "flagged", "needs_images"])
+    }
+
+    if (cursor) {
+        planQuery = planQuery.lt("created_at", cursor)
+    }
+
+    planQuery = planQuery.order("created_at", { ascending: false }).limit(pageSize + 1)
+
+    const { data: plans, error: planError } = await planQuery
+
+    if (planError) {
+        console.error("[ADMIN_MODERATION] Failed to fetch recurring_plans queue:", planError.message)
+    }
+
+    const hasMore = (products?.length || 0) > pageSize || (services?.length || 0) > pageSize || (plans?.length || 0) > pageSize
     const items = (products || []).slice(0, pageSize)
     const serviceItems = (services || []).slice(0, pageSize)
+    const planItems = (plans || []).slice(0, pageSize)
 
     // Fetch owner names + store profiles
-    const allItems = [...items, ...serviceItems]
+    const allItems = [...items, ...serviceItems, ...planItems]
     const ownerIds = [...new Set(allItems.map((p: any) => p.partner?.user_id).filter(Boolean))]
     let ownerMap = new Map<string, string>()
     if (ownerIds.length > 0) {
@@ -258,6 +286,38 @@ export async function getModerationQueue(
         }
     })
 
+    const mappedPlans: ModerationItem[] = planItems.map((pl: any) => {
+        const st = pl.store || storeExtraMap.get(pl.store_id)
+        return {
+            id: pl.id,
+            type: "recurring_plan" as const,
+            title: pl.name,
+            description: pl.description,
+            price: 0,
+            images: pl.images || [],
+            owner_store_name: st?.name || "Desconhecido",
+            owner_user_name: ownerMap.get(pl.partner?.user_id) || "",
+            partner_id: pl.partner?.id || "",
+            store_id: pl.store_id || undefined,
+            store_name: st?.name || undefined,
+            store_phone: st?.phone || undefined,
+            store_description: st?.description || undefined,
+            store_banner_url: st?.banner_url || undefined,
+            store_gallery: st?.gallery || undefined,
+            store_logo_url: st?.logo_url || undefined,
+            owner_user_id: pl.partner?.user_id || undefined,
+            moderation_status: pl.moderation_status,
+            moderation_reason: pl.moderation_reason || null,
+            risk_score: st?.risk_score ?? 0,
+            created_at: pl.created_at,
+            category_name: null,
+            brand_name: null,
+            video_url: null,
+            video_type: null,
+            video_thumbnail: null,
+        }
+    })
+
     // Community videos query
     let videoQuery = supabase
         .from("community_videos")
@@ -338,7 +398,7 @@ export async function getModerationQueue(
     }))
 
     // Combine and sort
-    const combined = [...mappedVideos, ...mappedProducts, ...mappedServices, ...mappedReturns]
+    const combined = [...mappedVideos, ...mappedProducts, ...mappedServices, ...mappedPlans, ...mappedReturns]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, pageSize)
 
@@ -354,7 +414,7 @@ export async function getModerationQueue(
 
 export async function approveModeration(
     entityId: string,
-    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product",
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video" | "recurring_plan" = "product",
     options?: AdminModerationActionOptions
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdminScope("moderation")
@@ -489,8 +549,8 @@ export async function approveModeration(
         return { success: true }
     }
 
-    const isItem = type === "product" || type === "service"
-    const targetTable = type === "product" ? "products" : type === "service" ? "services" : "partners"
+    const isItem = type === "product" || type === "service" || type === "recurring_plan"
+    const targetTable = type === "product" ? "products" : type === "service" ? "services" : type === "recurring_plan" ? "recurring_plans" : "partners"
 
     const { data: entity, error: fetchError } = await supabase
         .from(targetTable)
@@ -499,7 +559,7 @@ export async function approveModeration(
         .single()
 
     if (fetchError || !entity) {
-        return { success: false, error: `${type === "product" ? "Produto" : type === "service" ? "Serviço" : "Perfil"} não encontrado` }
+        return { success: false, error: `${type === "product" ? "Produto" : type === "service" ? "Serviço" : type === "recurring_plan" ? "Plano" : "Perfil"} não encontrado` }
     }
 
     if (isItem) {
@@ -510,7 +570,7 @@ export async function approveModeration(
                 moderation_reason: null,
                 moderation_reviewed_by: admin.userId,
                 moderation_reviewed_at: new Date().toISOString(),
-                status: "ativo",
+                status: type === "recurring_plan" ? "active" : "ativo",
             })
             .eq("id", entityId)
 
@@ -518,16 +578,18 @@ export async function approveModeration(
 
         // Sincroniza e revalida caches
         try {
-            const { syncToExploreRedis } = await import("@/lib/redis-sync")
-            await syncToExploreRedis({
-                id: entityId,
-                type: type === "product" ? "produto" : "servico",
-                data: {},
-                silent: true,
-            })
+            if (type === "product" || type === "service") {
+                const { syncToExploreRedis } = await import("@/lib/redis-sync")
+                await syncToExploreRedis({
+                    id: entityId,
+                    type: type === "product" ? "produto" : "servico",
+                    data: {},
+                    silent: true,
+                })
+            }
             const { revalidateTag } = await import("next/cache")
             ;(revalidateTag as any)(`${type}-${entityId}`, "max")
-            ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+            ;(revalidateTag as any)(type === "product" ? "products" : type === "service" ? "services" : "recurring-plans", "max")
         } catch (syncErr) {
             console.warn("[ADMIN_MODERATION] Erro ao sincronizar cache pós-aprovação:", syncErr)
         }
@@ -557,8 +619,9 @@ export async function approveModeration(
             }
 
             // Append to audit_logs for timeline visibility
+            const typeName = type === "service" ? "serviço" : type === "recurring_plan" ? "plano" : "produto"
             const changeLines = [
-                `Aprovou o ${type === "service" ? "serviço" : "produto"} na moderação.`,
+                `Aprovou o ${typeName} na moderação.`,
                 ...(options?.reason?.trim() ? [`Mensagem: "${options.reason.trim()}"`] : []),
                 ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
             ]
@@ -606,7 +669,7 @@ export async function rejectFlaggedImages(
     entityId: string,
     reason: string,
     flaggedImageUrls: string[],
-    type: "product" | "service" = "product",
+    type: "product" | "service" | "recurring_plan" = "product",
     options?: AdminModerationActionOptions
 ): Promise<{ success: boolean; error?: string; noImagesLeft?: boolean }> {
     const admin = await requireAdminScope("moderation")
@@ -632,7 +695,7 @@ export async function rejectFlaggedImages(
         .maybeSingle()
     const adminName = profile?.full_name || admin.email || "Equipe Dudit"
 
-    const targetTable = type === "service" ? "services" : "products"
+    const targetTable = type === "service" ? "services" : type === "recurring_plan" ? "recurring_plans" : "products"
     // Anti-IDOR: re-fetch entity with all relevant data
     const { data: entity, error: fetchError } = await supabase
         .from(targetTable)
@@ -762,7 +825,7 @@ export async function rejectFlaggedImages(
             moderation_reason: detailedReason,
             moderation_reviewed_by: admin.userId,
             moderation_reviewed_at: new Date().toISOString(),
-            status: "ativo",
+            status: type === "recurring_plan" ? "active" : "ativo",
         })
         .eq("id", entityId)
 
@@ -771,16 +834,18 @@ export async function rejectFlaggedImages(
     }
 
     try {
-        const { syncToExploreRedis } = await import("@/lib/redis-sync")
-        await syncToExploreRedis({
-            id: entityId,
-            type: type === "product" ? "produto" : "servico",
-            data: {},
-            silent: true,
-        })
+        if (type === "product" || type === "service") {
+            const { syncToExploreRedis } = await import("@/lib/redis-sync")
+            await syncToExploreRedis({
+                id: entityId,
+                type: type === "product" ? "produto" : "servico",
+                data: {},
+                silent: true,
+            })
+        }
         const { revalidateTag } = await import("next/cache")
         ;(revalidateTag as any)(`${type}-${entityId}`, "max")
-        ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+        ;(revalidateTag as any)(type === "product" ? "products" : type === "service" ? "services" : "recurring-plans", "max")
     } catch {}
 
     // Delete flagged images from R2
@@ -863,7 +928,7 @@ export async function rejectFlaggedImages(
 export async function removeModerationImage(
     entityId: string,
     imageUrl: string,
-    type: "product" | "service" = "product",
+    type: "product" | "service" | "recurring_plan" = "product",
     options?: AdminModerationActionOptions
 ): Promise<{ success: boolean; error?: string; remainingImages?: string[]; noImagesLeft?: boolean }> {
     const admin = await requireAdminScope("moderation")
@@ -883,7 +948,7 @@ export async function removeModerationImage(
         .maybeSingle()
     const adminName = profile?.full_name || admin.email || "Equipe Dudit"
 
-    const targetTable = type === "service" ? "services" : "products"
+    const targetTable = type === "service" ? "services" : type === "recurring_plan" ? "recurring_plans" : "products"
     const { data: entity, error: fetchError } = await supabase
         .from(targetTable)
         .select("id, name, images, moderation_status, partner_id")
@@ -995,16 +1060,18 @@ export async function removeModerationImage(
 
     // Sincroniza Redis e revalida tags
     try {
-        const { syncToExploreRedis } = await import("@/lib/redis-sync")
-        await syncToExploreRedis({
-            id: entityId,
-            type: type === "product" ? "produto" : "servico",
-            data: {},
-            silent: true,
-        })
+        if (type === "product" || type === "service") {
+            const { syncToExploreRedis } = await import("@/lib/redis-sync")
+            await syncToExploreRedis({
+                id: entityId,
+                type: type === "product" ? "produto" : "servico",
+                data: {},
+                silent: true,
+            })
+        }
         const { revalidateTag } = await import("next/cache")
         ;(revalidateTag as any)(`${type}-${entityId}`, "max")
-        ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+        ;(revalidateTag as any)(type === "product" ? "products" : type === "service" ? "services" : "recurring-plans", "max")
     } catch {}
 
     return { success: true, remainingImages, noImagesLeft }

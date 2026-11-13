@@ -6,7 +6,19 @@ import { Button, Dropdown, DropdownItem, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
-import { SearchIcon, FilterIcon, PlusIcon, SparklesIcon, Settings2Icon, CalendarIcon, MotorbikeIcon, TruckIcon, BlockedIcon } from "@/lib/icons"
+import {
+    SearchIcon,
+    FilterIcon,
+    PlusIcon,
+    SparklesIcon,
+    Settings2Icon,
+    CalendarIcon,
+    MotorbikeIcon,
+    TruckIcon,
+    GridIcon,
+    ListIcon,
+    ColumnsIcon,
+} from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter } from "@/lib/utils/filter-date-period"
 
@@ -53,15 +65,16 @@ interface DeliveryPageControlsProps {
     filters: { status: string[]; datePeriod: DatePeriodFilterValue }
     setFilters: React.Dispatch<React.SetStateAction<{ status: string[]; datePeriod: DatePeriodFilterValue }>>
     hasActiveFilters: boolean
-    mode: "deliveries" | "carriers" | "failed"
-    setMode: (mode: "deliveries" | "carriers" | "failed") => void
-    tabCounts?: { Delivery: number; Transportadora: number; "Canceladas / Falhas": number }
+    mode: "deliveries" | "carriers"
+    setMode: (mode: "deliveries" | "carriers") => void
+    tabCounts?: { Delivery: number; Transportadora: number }
+    viewMode?: "list" | "grid" | "kanban"
+    onViewModeChange?: (mode: "list" | "grid" | "kanban") => void
 }
 
 const TAB_CONFIG: Record<DeliveryPageControlsProps["mode"], { label: string; icon: typeof MotorbikeIcon; variant: "gray" | "green" | "red" | "blue" }> = {
     deliveries: { label: "Delivery", icon: MotorbikeIcon, variant: "blue" },
     carriers: { label: "Transportadora", icon: TruckIcon, variant: "green" },
-    failed: { label: "Canceladas / Falhas", icon: BlockedIcon, variant: "red" },
 }
 
 export default function DeliveryPageControls({
@@ -79,6 +92,8 @@ export default function DeliveryPageControls({
     mode,
     setMode,
     tabCounts,
+    viewMode,
+    onViewModeChange,
 }: DeliveryPageControlsProps) {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -104,15 +119,15 @@ export default function DeliveryPageControls({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs
                     value={mode}
-                    onValueChange={(val) => setMode(val as "deliveries" | "carriers" | "failed")}
+                    onValueChange={(val) => setMode(val as "deliveries" | "carriers")}
                 >
                     <TabsList className="px-0">
                         {(
-                            ["deliveries", "carriers", "failed"] as const
+                            ["deliveries", "carriers"] as const
                         ).map((tab) => {
                             const config = TAB_CONFIG[tab]
                             const Icon = config.icon
-                            const countKey = tab === "deliveries" ? "Delivery" : tab === "carriers" ? "Transportadora" : "Canceladas / Falhas"
+                            const countKey = tab === "deliveries" ? "Delivery" : "Transportadora"
                             return (
                                 <TabsTrigger
                                     key={tab}
@@ -150,7 +165,29 @@ export default function DeliveryPageControls({
                     >
                         <FilterIcon className="w-4 h-4" />
                     </Button>
-                    {userRole !== "delivery" && (
+                    {onViewModeChange && viewMode && (
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    {viewMode === "list" ? <ListIcon className="w-4 h-4" /> : viewMode === "grid" ? <GridIcon className="w-4 h-4" /> : <ColumnsIcon className="w-4 h-4" />}
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            <DropdownItem onClick={() => onViewModeChange("list")}>
+                                <ListIcon size={14} /> Lista
+                            </DropdownItem>
+                            <DropdownItem onClick={() => onViewModeChange("grid")}>
+                                <GridIcon size={14} /> Grade
+                            </DropdownItem>
+                            <DropdownItem onClick={() => onViewModeChange("kanban")}>
+                                <ColumnsIcon size={14} /> Kanban
+                            </DropdownItem>
+                        </Dropdown>
+                    )}
+                    {userRole !== "delivery" && mode === "deliveries" && (
                         <Dropdown
                             trigger={
                                 <Button variant="outline" className="w-[42px] h-[42px] p-0">
@@ -166,7 +203,7 @@ export default function DeliveryPageControls({
                             </DropdownItem>
                         </Dropdown>
                     )}
-                    {userRole !== "delivery" && (
+                    {userRole !== "delivery" && mode === "deliveries" && (
                         <Button
                             onClick={onAdd}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"
@@ -181,7 +218,7 @@ export default function DeliveryPageControls({
                         <div className="w-80">
                             <Input
                                 name="search"
-                                placeholder="Buscar por pedido ou cliente..."
+                                placeholder={mode === "carriers" ? "Buscar por pedido, cliente ou rastreio..." : "Buscar por pedido ou cliente..."}
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
                                 variant="full-rounded"
@@ -211,6 +248,36 @@ export default function DeliveryPageControls({
                             className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.right ? "opacity-100" : "opacity-0"}`}
                         />
                     </div>
+
+                    {/* View Toggles */}
+                    {onViewModeChange && viewMode && (
+                        <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange("list")}
+                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                                title="Visualização em Lista"
+                            >
+                                <ListIcon className="w-[18px] h-[18px]" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange("grid")}
+                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                                title="Visualização em Grade"
+                            >
+                                <GridIcon className="w-[18px] h-[18px]" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange("kanban")}
+                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "kanban" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                                title="Visualização em Kanban"
+                            >
+                                <ColumnsIcon className="w-[18px] h-[18px]" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

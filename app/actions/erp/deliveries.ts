@@ -472,9 +472,9 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
   const user = await requireUser()
   const actor = await getDeliveryActorScope(params.partnerId)
   await requirePartnerRouteAccess(params.partnerId, "logistics", { specificPermission: "can_view_delivery_details" })
-  const supabase = await getSupabaseServerClient()
+  const admin = getAdminClient()
 
-  const { data: delivery, error } = await supabase
+  const { data: delivery, error } = await admin
     .from("deliveries")
     .select(`
       id,
@@ -508,7 +508,7 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
     }
   }
 
-  const { data: store } = await supabase
+  const { data: store } = await admin
     .from("stores")
     .select("id, name, addresses!store_id(street, number, complement, neighborhood, city, state, zip_code, latitude, longitude)")
     .eq("partner_id", params.partnerId)
@@ -516,7 +516,7 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
     .limit(1)
     .maybeSingle()
   const addr = Array.isArray(store?.addresses) ? store.addresses[0] : null
-  const origin = addr?.latitude && addr?.longitude
+  let origin = addr?.latitude && addr?.longitude
     ? {
       lat: Number(addr.latitude),
       lng: Number(addr.longitude),
@@ -529,6 +529,28 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
     }
     : null
 
+  if (!origin && addr) {
+    const storeAddress = [
+      [addr.street, addr.number].filter(Boolean).join(", "),
+      addr.neighborhood,
+      [addr.city, addr.state].filter(Boolean).join(" - "),
+      addr.zip_code,
+    ].filter(Boolean).join(", ")
+    if (storeAddress) {
+      const storeCoords = await getOrCreateCachedCoords({ supabase: admin, partnerId: params.partnerId, addressText: storeAddress })
+      if (storeCoords) {
+        origin = {
+          lat: storeCoords.lat,
+          lng: storeCoords.lng,
+          name: store?.name || "Loja",
+          address: storeAddress,
+        }
+      }
+    }
+  }
+
+  const originCityState = addr?.city && addr?.state ? `${addr.city}, ${addr.state}` : null
+
   const links = Array.isArray((delivery as any).delivery_orders) ? (delivery as any).delivery_orders : []
   const sorted = [...links].sort((a: any, b: any) => Number(a.position || 9999) - Number(b.position || 9999))
 
@@ -537,7 +559,16 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
       const order = link?.orders || {}
       const address = formatAddress(order)
       if (!address) return null
-      const coords = await getOrCreateCachedCoords({ supabase, partnerId: params.partnerId, addressText: address })
+
+      let addressToGeocode = address
+      if (originCityState && !address.toLowerCase().includes(originCityState.toLowerCase())) {
+        addressToGeocode = `${address}, ${originCityState}`
+      }
+
+      let coords = await getOrCreateCachedCoords({ supabase: admin, partnerId: params.partnerId, addressText: addressToGeocode })
+      if (!coords && addressToGeocode !== address) {
+        coords = await getOrCreateCachedCoords({ supabase: admin, partnerId: params.partnerId, addressText: address })
+      }
       if (!coords) return null
 
       const distanceKm = order?.distance_km != null ? Number(order.distance_km) : (origin ? Number(calculateDistance(origin, coords).toFixed(2)) : null)

@@ -39,6 +39,7 @@ export async function createOrderAction(data: {
   payDepositOnly?: boolean
   checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null
   useMercadoPago?: boolean
+  useStoreCredit?: boolean
 }) {
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
@@ -101,6 +102,9 @@ export async function createOrderAction(data: {
     data.payWithAmount,
     data.payDepositOnly,
     data.checkoutPricingSnapshot,
+    undefined,
+    undefined,
+    Boolean(data.useStoreCredit),
   )
 }
 

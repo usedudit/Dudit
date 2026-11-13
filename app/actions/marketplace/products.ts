@@ -699,18 +699,19 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     const plansRes = await supabase
       .from("recurring_plans")
       .select(`
-        id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+        id, name, description, status, moderation_status, moderation_reason, images, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
         marketplace_score, signups_last_30_days, favorites_count, views_count,
         partners!inner(id, is_showcase_active),
         stores(id, name, description, logo_url, banner_url, phone, opening_hours, addresses!store_id!left(city, state)),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, name, price, images),
-          services:service_id(id, name, price, duration_minutes)
+          services:service_id(id, name, price, duration_minutes, images)
         )
       `)
       .eq("status", "active")
       .eq("show_in_marketplace", true)
+      .or("moderation_status.eq.approved,moderation_status.is.null")
       .in("partner_id", partnerIds)
 
     if (plansRes.error) {
@@ -793,17 +794,37 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
           }
         }
         computedPrice += qty * itemPrice
+
+        if (!firstImage) {
+          if (planItem.item_type === 'product' && planItem.products?.images) {
+            const imgs = planItem.products.images
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              firstImage = imgs[0]
+            }
+          } else if (planItem.item_type === 'service' && planItem.services?.images) {
+            const imgs = planItem.services.images
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              firstImage = imgs[0]
+            }
+          }
+        }
       }
     }
 
-    const image = firstImage || rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+    // Prioriza a imagem do próprio plano; fallback para o primeiro item ou logo da loja
+    const ownImages = (Array.isArray(item.images) ? item.images : [])
+      .filter((img: any): img is string => typeof img === "string" && img.trim().length > 0)
+    const fallbackImage = firstImage || rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const finalImages = ownImages.length > 0 ? ownImages : [fallbackImage]
 
     return {
       id: item.id,
       name: item.name,
       description: item.description,
       price: computedPrice,
-      images: [image],
+      images: finalImages,
+      moderation_status: item.moderation_status || null,
+      moderation_reason: item.moderation_reason || null,
       itemType: 'plano',
       partners: partner,
       frequency_type: item.frequency_type,

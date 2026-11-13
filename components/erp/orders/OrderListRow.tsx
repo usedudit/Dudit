@@ -98,11 +98,6 @@ const OrderListItem = React.memo(
                                             <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
                                         </Tooltip>
                                     )}
-                                    {Boolean(order.is_refunded || Number(order.refunded_amount || 0) > 0 || order.situation === "refunded") && (
-                                        <Tooltip text="Possui histórico de reembolso">
-                                            <Badge variant="red" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
-                                        </Tooltip>
-                                    )}
                                 </div>
                                 <div className="mt-1 flex items-center">
                                     {(() => {

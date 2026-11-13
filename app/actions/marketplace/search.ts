@@ -141,16 +141,27 @@ function normalizePlan(item: any) {
             }
             computedPrice += qty * itemPrice
 
-            if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
-                const imgs = planItem.products.images
-                if (Array.isArray(imgs) && imgs.length > 0) {
-                    firstImage = imgs[0]
+            if (!firstImage) {
+                if (planItem.item_type === 'product' && planItem.products?.images) {
+                    const imgs = planItem.products.images
+                    if (Array.isArray(imgs) && imgs.length > 0) {
+                        firstImage = imgs[0]
+                    }
+                } else if (planItem.item_type === 'service' && planItem.services?.images) {
+                    const imgs = planItem.services.images
+                    if (Array.isArray(imgs) && imgs.length > 0) {
+                        firstImage = imgs[0]
+                    }
                 }
             }
         }
     }
 
-    const image = firstImage || rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+    // Prioriza a imagem principal cadastrada no próprio plano recorrente; fallback para o primeiro item (produto/serviço) ou logo da loja
+    const ownImages = (Array.isArray(item.images) ? item.images : [])
+        .filter((img: any): img is string => typeof img === "string" && img.trim().length > 0)
+    const fallbackImage = firstImage || rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const finalImages = ownImages.length > 0 ? ownImages : [fallbackImage]
 
     return {
         id: item.id,
@@ -158,7 +169,9 @@ function normalizePlan(item: any) {
         name: item.name,
         description: item.description,
         price: computedPrice,
-        images: [image],
+        images: finalImages,
+        moderation_status: item.moderation_status || null,
+        moderation_reason: item.moderation_reason || null,
         itemType: 'plano',
         partners: partner,
         frequency_type: item.frequency_type,
@@ -732,18 +745,19 @@ async function hydrateMarketplaceSearchHits(
     if (planosIds.length > 0) {
         promises.push(
             supabase.from("recurring_plans").select(`
-                id, short_id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                id, short_id, name, description, status, moderation_status, moderation_reason, images, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                 partners(id, is_showcase_active),
                 stores!left(id, short_id, name, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
                 recurring_plan_items(
                     id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                     products:product_id(id, name, price, images),
-                    services:service_id(id, name, price, duration_minutes)
+                    services:service_id(id, name, price, duration_minutes, images)
                 )
             `)
                 .in("id", planosIds)
                 .eq("status", "active")
                 .eq("show_in_marketplace", true)
+                .or("moderation_status.eq.approved,moderation_status.is.null")
         )
     }
 
@@ -1142,17 +1156,18 @@ async function searchMarketplaceByCity(
             let rq = supabase
                 .from("recurring_plans")
                 .select(`
-                    id, short_id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                    id, short_id, name, description, status, moderation_status, moderation_reason, images, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                     partners!inner(id, is_showcase_active),
                     stores!left(id, short_id, name, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
                     recurring_plan_items(
                         id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                         products:product_id(id, name, price, images),
-                        services:service_id(id, name, price, duration_minutes)
+                        services:service_id(id, name, price, duration_minutes, images)
                     )
                 `)
                 .eq("status", "active")
                 .eq("show_in_marketplace", true)
+                .or("moderation_status.eq.approved,moderation_status.is.null")
                 .in("partner_id", partnerIds)
                 .order("created_at", { ascending: false })
                 .limit(type === 'planos' || type === 'tudo' ? limitCount : 0)
@@ -1429,6 +1444,7 @@ async function browseMarketplaceByScore(
                         .select("id, marketplace_score, created_at")
                         .eq("status", "active")
                         .eq("show_in_marketplace", true)
+                        .or("moderation_status.eq.approved,moderation_status.is.null")
                         .order("marketplace_score", { ascending: false, nullsFirst: false })
                         .limit(type === 'planos' ? limitCount : Math.min(limitCount, 10))
                     if (limits.partnerIds?.length) {

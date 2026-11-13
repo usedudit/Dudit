@@ -564,10 +564,31 @@ export function buildSaleReceiptFromOrder(
     (sum: number, e: any) => sum + Number(e.amountReceived || 0),
     0,
   );
+  // Cash change is stored as display data (`wantsChange` / `payWithAmount`).
+  // It must not be derived from `amountReceived`, which is the payment base
+  // used by the financial engine and excludes the change handed back.
+  const explicitCashChange = breakdown.reduce((sum: number, e: any) => {
+    const method = String(e?.method || "").toLowerCase();
+    const isCash =
+      method.includes("dinheiro") ||
+      method.includes("cash") ||
+      method.includes("money");
+    if (!isCash) return sum;
+    const payWith = Number(e?.payWithAmount || 0);
+    const storedChange = Number(e?.changeAmount || 0);
+    if (storedChange > 0.005 && (e?.wantsChange || payWith > 0.005)) {
+      return sum + storedChange;
+    }
+    if (payWith <= 0.005) return sum;
+    const charged = Number(e?.effectiveAmount ?? e?.amount ?? 0);
+    return sum + Math.max(0, payWith - charged);
+  }, 0);
   const change =
-    totalReceived > 0.005
-      ? Math.max(0, totalReceived - total)
-      : Math.max(0, paid - total);
+    explicitCashChange > 0.005
+      ? explicitCashChange
+      : totalReceived > 0.005
+        ? Math.max(0, totalReceived - total)
+        : Math.max(0, paid - total);
   const policySnap = order.return_policy_snapshot;
   const customerContact = formatCustomerContact(order);
 
