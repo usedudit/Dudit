@@ -190,7 +190,7 @@ export default function AssistenciaTecnicaSegmentPage() {
                     {
                         icon: <ShieldCheck className="w-5 h-5 text-brand-green" />,
                         title: "Proteção contra calotes e disputas",
-                        description: "Histórico completo de cada conserto com fotos de entrada e saída, garantia e termo de aprovação salvo.",
+                        description: "Histórico completo de cada conserto com fotos de entrada e saída, assinatura e comprovante de recebimento salvos.",
                     },
                     {
                         icon: <FileTextIcon className="w-5 h-5 text-brand-green" />,

@@ -329,12 +329,12 @@ export async function getDashboardLayout(
   const greeting = {
     title: `Olá, ${storeName}! 👋`,
     subtitle: isDesapego
-      ? "Gerencie seus anúncios rápidos e desapegos no marketplace da Dudit."
+      ? "Gerencie seus anúncios rápidos e desapegos na Dudit."
       : checklist
         ? (remainingCount === 1
           ? `🔥 Falta apenas 1 passo para sua vitrine ficar 100% pronta para vender!`
           : `🔥 Você já concluiu ${percentComplete}% da sua loja! Faltam apenas ${remainingCount} passos para começar a vender.`)
-        : "Veja como está o desempenho do seu negócio hoje e turbine suas vendas."
+        : new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
   };
 
   // 7. Gera a URL pública do perfil do vendedor (baseada na loja ativa)

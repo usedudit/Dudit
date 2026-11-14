@@ -5,7 +5,7 @@ export const metadata: Metadata = {
     description: "Agendamento online integrado com WhatsApp, controle de comissões de profissionais, fechamento de caixa e vitrine online para salões, barbearias e estética.",
     openGraph: {
         title: "Sistema para Salões de Beleza e Barbearias | Dudit",
-        description: "Agendamento online, controle de profissionais e comissões, vendas de produtos e vitrine local sem taxa de intermediação.",
+        description: "Agendamento online, controle de profissionais e comissões, vendas de produtos e vitrine online sem taxa de intermediação.",
         url: "https://dudit.com.br/segmentos/saloes-e-barbearias",
         siteName: "Dudit",
         images: [

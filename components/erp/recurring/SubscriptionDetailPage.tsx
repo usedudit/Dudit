@@ -14,6 +14,7 @@ import {
   DatePicker,
   DefaultModal,
   DropdownItem,
+  FormDropdown,
   FormSection,
   FormTextarea,
   IconPlaceholder,
@@ -27,7 +28,11 @@ import {
   TabsList,
   TabsTrigger,
   ThreeDotsLoader,
+  Tooltip,
 } from "@/components/reusable"
+import QuantitySelector from "@/components/reusable/QuantitySelector"
+import { AppointmentSheet } from "@/components/erp/appointments/sheets/AppointmentSheet"
+import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import {
   cancelRecurringSubscriptionAction,
   getRecurringSubscriptionDetailAction,
@@ -41,7 +46,9 @@ import {
   advanceRecurringSubscriptionCycleAction,
 } from "@/app/actions/erp/recurring-subscriptions"
 import { usePermissions } from "@/lib/permission-context"
-import { getAvailableTimeSlotsAction } from "@/app/actions/erp/appointments"
+import { normalizeBusinessInfo } from "@/lib/business-info"
+import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
+import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS } from "@/lib/orders/status"
 import {
   getRecurringFrequencyLabel,
   getRecurringShippingSourceLabel,
@@ -60,7 +67,9 @@ import {
   BlockedIcon,
   ChevronLeftIcon,
   GiftIcon,
+  Package,
   PlayIcon,
+  PrinterIcon,
   RepeatIcon,
   SearchIcon,
   ThreeDotsIcon,
@@ -120,10 +129,10 @@ const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) =>
 
 const EXECUTION_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
   { id: "scheduled_for", label: "Agendada", align: "left", width: "170px" },
-  { id: "orders", label: "Pedido", align: "left", width: "140px" },
-  { id: "completed_at", label: "Concluída em", align: "left", width: "200px" },
+  { id: "value", label: "Valor / Pedido", align: "left", width: "180px" },
+  { id: "completed_at", label: "Concluída em", align: "left", width: "190px" },
+  { id: "status", label: "Situação", align: "center", width: "160px" },
   { id: "actions", label: "Ações", align: "center", width: "110px" },
-  { id: "status", label: "Situação", align: "center", width: "180px" },
 ]
 
 const HISTORY_ITEMS_PER_PAGE = 8
@@ -140,7 +149,15 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 }) => {
   const { toast } = useToast()
   const { setHeaderOverride } = useSidebar()
-  const { role, hasSpecific, canRbac } = usePermissions()
+  const { role, hasSpecific, canRbac, businessInfo: contextBusinessInfo } = usePermissions()
+  const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+  const salesSettings: SalesSettings = useMemo(
+    () => ({
+      ...DEFAULT_SALES_SETTINGS,
+      ...((businessInfo as any)?.salesSettings || {}),
+    }),
+    [businessInfo],
+  )
   const canAdvanceCycle =
     canManage &&
     (role === "OWNER" || role === "ADMIN") &&
@@ -160,21 +177,24 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   const [busy, setBusy] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
 
-  // Agendar serviço com créditos
+  // Agendar serviço com créditos (usa AppointmentSheet do ERP)
   const [scheduleCredit, setScheduleCredit] = useState<any | null>(null)
-  const [scheduleDate, setScheduleDate] = useState("")
-  const [scheduleTime, setScheduleTime] = useState("")
-  const [scheduleNotes, setScheduleNotes] = useState("")
-  const [scheduleSlots, setScheduleSlots] = useState<string[]>([])
-  const [loadingScheduleSlots, setLoadingScheduleSlots] = useState(false)
   const [submittingSchedule, setSubmittingSchedule] = useState(false)
 
   // Registrar entrega de produtos com créditos
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false)
   const [deliveryQuantities, setDeliveryQuantities] = useState<Record<string, number>>({})
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("pickup")
+  const [deliveryStatus, setDeliveryStatus] = useState<string>("delivered")
   const [deliveryNotes, setDeliveryNotes] = useState("")
   const [submittingDelivery, setSubmittingDelivery] = useState(false)
+  const [confirmZeroStock, setConfirmZeroStock] = useState<{
+    itemName: string
+    available: number
+  } | null>(null)
+
+  // Recibo de execução
+  const [printReceiptOrderId, setPrintReceiptOrderId] = useState<string | null>(null)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -232,6 +252,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
       staffPartnerUserId: string | null
       durationMinutes: number | null
       image: string | null
+      stock?: number | null
+      allowSellWithoutStock?: boolean | null
     }
 
     const rows: MergedCredit[] = []
@@ -255,6 +277,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         expiresAt: null,
         staffPartnerUserId: null,
         durationMinutes: item.durationMinutes ?? null,
+        stock: isProduct ? (item.product?.stock ?? null) : null,
+        allowSellWithoutStock: isProduct ? Boolean(item.product?.allowSellWithoutStock) : null,
         image:
           Array.isArray(details?.images) && details.images.length
             ? getR2ImageUrl(details.images[0], "thumbnail")
@@ -285,6 +309,11 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         target.expiresAt = credit.expiresAt
         if (credit.staffPartnerUserId) target.staffPartnerUserId = credit.staffPartnerUserId
         if (credit.durationMinutes != null) target.durationMinutes = credit.durationMinutes
+        if (credit.stock != null) target.stock = credit.stock
+        if (credit.allowSellWithoutStock != null) target.allowSellWithoutStock = credit.allowSellWithoutStock
+        if (credit.images && credit.images.length && !target.image) {
+          target.image = getR2ImageUrl(credit.images[0], "thumbnail")
+        }
       } else if (target) {
         // Registro de ciclo anterior para o mesmo item: só acumula se houver saldo remanescente não expirado
         const isNotExpired = !credit.expiresAt || new Date(credit.expiresAt).getTime() > Date.now()
@@ -292,7 +321,10 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           target.remaining += credit.remaining
           target.quantity += credit.remaining
         }
+        if (credit.stock != null) target.stock = credit.stock
+        if (credit.allowSellWithoutStock != null) target.allowSellWithoutStock = credit.allowSellWithoutStock
       } else {
+        const creditImages = credit.images as string[] | null | undefined
         const row: MergedCredit = {
           id: credit.id,
           itemName: credit.itemName,
@@ -305,7 +337,11 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           expiresAt: credit.expiresAt,
           staffPartnerUserId: credit.staffPartnerUserId ?? null,
           durationMinutes: credit.durationMinutes ?? null,
-          image: null,
+          stock: credit.stock ?? null,
+          allowSellWithoutStock: credit.allowSellWithoutStock ?? null,
+          image: Array.isArray(creditImages) && creditImages.length
+            ? getR2ImageUrl(creditImages[0], "thumbnail")
+            : null,
         }
         rows.push(row)
         if (key) {
@@ -346,69 +382,38 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     setHistoryPage(1)
   }, [historySearch])
 
-  // Horários do modal de agendamento com créditos
-  useEffect(() => {
-    if (!scheduleCredit || !scheduleDate || !scheduleCredit.staffPartnerUserId) {
-      setScheduleSlots([])
-      return
-    }
-    let cancelled = false
-    setLoadingScheduleSlots(true)
-    setScheduleTime("")
-    getAvailableTimeSlotsAction(
-      scheduleDate,
-      scheduleCredit.staffPartnerUserId,
-      Number(scheduleCredit.durationMinutes || 60),
-      0,
-      detail?.subscription?.storeId || null,
-    )
-      .then((res) => {
-        if (cancelled) return
-        const conflicts = new Set<string>((res.conflictingSlots as string[]) || [])
-        setScheduleSlots(((res.slots as string[]) || []).filter((s) => !conflicts.has(s)))
-      })
-      .catch(() => {
-        if (!cancelled) setScheduleSlots([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingScheduleSlots(false)
-      })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduleCredit, scheduleDate])
-
   const openScheduleModal = (credit: any) => {
     setScheduleCredit(credit)
-    setScheduleDate("")
-    setScheduleTime("")
-    setScheduleNotes("")
-    setScheduleSlots([])
   }
 
-  const openDeliveryModal = () => {
-    const productCredits = (detail?.credits || []).filter((c) => c.itemType === "product" && c.remaining > 0)
+  const openDeliveryModal = (selectedCreditId?: string) => {
+    const productCredits = mergedCredits.filter((c) => c.itemType === "product" && c.remaining > 0)
     const initial: Record<string, number> = {}
-    for (const c of productCredits) initial[c.id] = 1
+    for (const c of productCredits) {
+      initial[c.id] = selectedCreditId ? (c.id === selectedCreditId ? 1 : 0) : 1
+    }
     setDeliveryQuantities(initial)
-    setDeliveryType(detail?.subscription?.deliveryType === "delivery" ? "delivery" : "pickup")
+    const defType = detail?.subscription?.deliveryType === "delivery" ? "delivery" : "pickup"
+    setDeliveryType(defType)
+    setDeliveryStatus(defType === "pickup" ? "delivered" : "not_sent")
     setDeliveryNotes("")
     setDeliveryModalOpen(true)
   }
 
-  const handleScheduleWithCredits = async () => {
-    if (!scheduleCredit || !scheduleDate || !scheduleTime || submittingSchedule) return
+  const handleSaveAppointmentWithCredits = async (payload: any | any[]) => {
+    const rows = Array.isArray(payload) ? payload : [payload]
+    const first = rows[0]
+    if (!first || !scheduleCredit) return
     setSubmittingSchedule(true)
     try {
       const res = await scheduleSubscriptionServiceAction({
         partnerId,
         subscriptionId,
-        serviceId: scheduleCredit.serviceId,
-        date: scheduleDate,
-        time: scheduleTime,
-        staffPartnerUserId: scheduleCredit.staffPartnerUserId,
-        notes: scheduleNotes || undefined,
+        serviceId: first.serviceId || scheduleCredit.serviceId,
+        date: first.date,
+        time: first.time,
+        staffPartnerUserId: first.staffId || scheduleCredit.staffPartnerUserId || undefined,
+        notes: first.notes || undefined,
       })
       if (res.success) {
         toast({
@@ -417,6 +422,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         })
         setScheduleCredit(null)
         void loadDetail()
+        if (executionsRequestedRef.current) void loadExecutions()
+        onChanged?.()
       } else {
         toast({ title: "Não foi possível agendar", description: res.error, variant: "destructive" })
       }
@@ -425,26 +432,55 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     }
   }
 
-  const handleRegisterDelivery = async () => {
+  const handleRegisterDelivery = async (forceWithoutStock: boolean = false) => {
     if (submittingDelivery) return
-    const productCredits = (detail?.credits || []).filter((c) => c.itemType === "product" && c.remaining > 0)
-    const items = productCredits
-      .filter((c) => Number(deliveryQuantities[c.id] || 0) > 0)
-      .map((c) => ({
-        productId: c.productId as string,
-        quantity: Number(deliveryQuantities[c.id] || 0),
-      }))
-    if (items.length === 0) {
-      toast({ title: "Informe a quantidade", description: "Ao menos um item deve ter quantidade maior que zero.", variant: "destructive" })
+    const productCredits = mergedCredits.filter((c) => c.itemType === "product" && c.remaining > 0)
+    const selectedCredits = productCredits.filter((c) => Number(deliveryQuantities[c.id] || 0) > 0)
+    if (selectedCredits.length === 0) {
+      toast({
+        title: "Informe a quantidade",
+        description: "Ao menos um item deve ter quantidade maior que zero.",
+        variant: "destructive",
+      })
       return
     }
+
+    if (!forceWithoutStock) {
+      const outOfStockCredit = selectedCredits.find(
+        (c) => Number(c.stock ?? 0) < Number(deliveryQuantities[c.id] || 0),
+      )
+      if (outOfStockCredit) {
+        const canSellWithoutStock =
+          salesSettings.allowNegativeStock !== false || Boolean(outOfStockCredit.allowSellWithoutStock)
+        if (!canSellWithoutStock) {
+          toast({
+            title: "Estoque insuficiente",
+            description: `O produto "${outOfStockCredit.itemName}" está sem estoque e as configurações da empresa não permitem baixas com estoque negativo.`,
+            variant: "destructive",
+          })
+          return
+        }
+        setConfirmZeroStock({
+          itemName: outOfStockCredit.itemName,
+          available: Math.max(0, Number(outOfStockCredit.stock ?? 0)),
+        })
+        return
+      }
+    }
+
     setSubmittingDelivery(true)
     try {
+      const items = selectedCredits.map((c) => ({
+        productId: c.productId as string,
+        quantity: Number(deliveryQuantities[c.id] || 0),
+        allowSellWithoutStock: forceWithoutStock,
+      }))
       const res = await createSubscriptionDeliveryOrderAction({
         partnerId,
         subscriptionId,
         items,
         deliveryType,
+        deliveryStatus,
         notes: deliveryNotes || undefined,
       })
       if (res.success) {
@@ -453,7 +489,9 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           description: `Pedido #${res.orderNumber} criado sem cobrança. Confira em Pedidos.`,
         })
         setDeliveryModalOpen(false)
+        setConfirmZeroStock(null)
         void loadDetail()
+        if (executionsRequestedRef.current) void loadExecutions()
         onChanged?.()
       } else {
         toast({ title: "Não foi possível registrar", description: res.error, variant: "destructive" })
@@ -1077,7 +1115,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                     </Button>
                                   )}
                                   {canManage && credit.remaining > 0 && credit.itemType === "product" && (
-                                    <Button size="sm" onClick={openDeliveryModal}>
+                                    <Button size="sm" onClick={() => openDeliveryModal(credit.id)}>
                                       Registrar entrega
                                     </Button>
                                   )}
@@ -1174,6 +1212,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                   key={execution.id}
                                   execution={execution}
                                   onOpenOrder={openOrder}
+                                  onPrintReceipt={setPrintReceiptOrderId}
+                                  onViewError={setExecutionError}
                                 />
                               ))}
                             </div>
@@ -1206,6 +1246,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                         execution={execution}
                                         columns={EXECUTION_COLUMNS}
                                         onOpenOrder={openOrder}
+                                        onPrintReceipt={setPrintReceiptOrderId}
                                         onViewError={setExecutionError}
                                       />
                                     ))}
@@ -1278,103 +1319,37 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           <p className="text-sm text-brand-red whitespace-pre-wrap">{executionError}</p>
         </DefaultModal>
 
-        <DefaultModal
-          isOpen={!!scheduleCredit}
-          onClose={() => setScheduleCredit(null)}
-          title="Agendar serviço com créditos"
-          maxWidth="md"
-        >
-          {scheduleCredit && (
-            <div className="space-y-4">
-              <InfoCard
-                color="blue"
-                title={scheduleCredit.itemName}
-                message="Agendamento sem cobrança - debita 1 crédito da assinatura do cliente."
-              />
-
-              <DatePicker
-                label="Data"
-                required
-                value={scheduleDate || undefined}
-                onChange={(d: any) => {
-                  if (!d) {
-                    setScheduleDate("")
-                    return
+        {scheduleCredit && (
+          <AppointmentSheet
+            mode="create"
+            defaultDate={new Date()}
+            partnerId={partnerId}
+            storeId={detail?.subscription?.storeId}
+            preselectedClient={
+              detail?.customer
+                ? {
+                    id: detail.customer.id,
+                    name: detail.customer.name,
+                    phone: detail.customer.phone,
+                    email: detail.customer.email,
                   }
-                  const pad = (n: number) => String(n).padStart(2, "0")
-                  const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-                  const today = new Date()
-                  const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
-                  if (iso < todayIso) {
-                    toast({ title: "Data inválida", description: "Escolha uma data a partir de hoje.", variant: "destructive" })
-                    return
-                  }
-                  const expiryIso = scheduleCredit.expiresAt ? String(scheduleCredit.expiresAt).slice(0, 10) : null
-                  if (expiryIso && iso > expiryIso) {
-                    toast({
-                      title: "Data inválida",
-                      description: `Os créditos valem até ${expiryIso.split("-").reverse().join("/")}.`,
-                      variant: "destructive",
-                    })
-                    return
-                  }
-                  setScheduleDate(iso)
-                }}
-              />
-
-              <div>
-                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">
-                  Horário <span className="text-brand-red">*</span>
-                </label>
-                {!scheduleDate ? (
-                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                    Escolha a data para ver os horários.
-                  </p>
-                ) : loadingScheduleSlots ? (
-                  <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                    <ThreeDotsLoader /> Carregando horários...
-                  </div>
-                ) : scheduleSlots.length === 0 ? (
-                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                    Nenhum horário livre nesta data. Tente outro dia.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {scheduleSlots.map((slot) => (
-                      <Button
-                        key={slot}
-                        type="button"
-                        variant={scheduleTime === slot ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setScheduleTime(slot)}
-                      >
-                        {slot}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <FormTextarea
-                label="Observações (opcional)"
-                placeholder="Instruções para o atendimento..."
-                value={scheduleNotes}
-                onChange={(e) => setScheduleNotes(e.target.value)}
-                rows={2}
-                maxLength={500}
-                showCharacterCount
-              />
-
-              <Button
-                className="w-full"
-                onClick={() => void handleScheduleWithCredits()}
-                disabled={!scheduleDate || !scheduleTime || submittingSchedule}
-              >
-                {submittingSchedule ? "Confirmando..." : "Confirmar agendamento"}
-              </Button>
-            </div>
-          )}
-        </DefaultModal>
+                : null
+            }
+            allowedOrderServices={[
+              {
+                id: scheduleCredit.serviceId,
+                name: scheduleCredit.itemName,
+                price: 0,
+                duration: scheduleCredit.durationMinutes || 60,
+                staffId: scheduleCredit.staffPartnerUserId || undefined,
+              },
+            ]}
+            initialStaffId={scheduleCredit?.staffPartnerUserId || undefined}
+            onClose={() => setScheduleCredit(null)}
+            onSave={handleSaveAppointmentWithCredits}
+            isSaving={submittingSchedule}
+          />
+        )}
 
         <DefaultModal
           isOpen={deliveryModalOpen}
@@ -1387,69 +1362,88 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
               color="blue"
               message="Registre a entrega ou retirada dos produtos. O estoque é baixado e 1 crédito é consumido por unidade."
             />
-            {(detail?.credits || [])
-              .filter((c) => c.itemType === "product" && c.remaining > 0)
-              .map((credit) => (
-                <div key={credit.id} className="flex items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                      {credit.itemName}
-                    </p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                      {credit.remaining} crédito(s) disponível(is)
-                      {credit.expiresAt ? ` • Válido até ${formatFullDate(credit.expiresAt)}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setDeliveryQuantities((prev) => ({
-                          ...prev,
-                          [credit.id]: Math.max(0, Number(prev[credit.id] || 0) - 1),
-                        }))
-                      }
-                      disabled={Number(deliveryQuantities[credit.id] || 0) <= 0}
-                    >
-                      −
-                    </Button>
-                    <span className="w-8 text-center text-sm font-bold text-brand-dark dark:text-dark-heading">
-                      {Number(deliveryQuantities[credit.id] || 0)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setDeliveryQuantities((prev) => ({
-                          ...prev,
-                          [credit.id]: Math.min(credit.remaining, Number(prev[credit.id] || 0) + 1),
-                        }))
-                      }
-                      disabled={Number(deliveryQuantities[credit.id] || 0) >= credit.remaining}
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-3">
+              {mergedCredits
+                .filter((c) => c.itemType === "product" && c.remaining > 0)
+                .map((credit) => {
+                  const creditImg = credit.image || PLACEHOLDER_IMAGE
+                  const isZeroStock = Number(credit.stock ?? 0) <= 0
+                  const qty = Number(deliveryQuantities[credit.id] || 0)
 
-            <div>
-              <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">
-                Tipo de entrega <span className="text-brand-red">*</span>
-              </label>
-              <div className="flex gap-2">
-                {(["pickup", "delivery"] as const).map((t) => (
-                  <Button
-                    key={t}
-                    variant={deliveryType === t ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setDeliveryType(t)}
-                  >
-                    {t === "pickup" ? "Retirada" : "Entrega"}
-                  </Button>
-                ))}
-              </div>
+                  return (
+                    <div
+                      key={credit.id}
+                      className="flex items-center justify-between gap-3 border border-brand-border dark:border-dark-border rounded-xl p-3 sm:p-4"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <img
+                          src={creditImg}
+                          alt={credit.itemName}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-12 h-12 rounded-xl object-cover border border-brand-border dark:border-dark-border shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.src = PLACEHOLDER_IMAGE
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                            {credit.itemName}
+                          </p>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
+                            {credit.remaining} crédito(s) disponível(is)
+                            {credit.expiresAt ? ` • Válido até ${formatFullDate(credit.expiresAt)}` : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <QuantitySelector
+                          value={qty}
+                          onChange={(val) => {
+                            const clamped = Math.min(credit.remaining, Math.max(0, val))
+                            setDeliveryQuantities((prev) => ({ ...prev, [credit.id]: clamped }))
+                          }}
+                          min={0}
+                          max={credit.remaining}
+                          size="sm"
+                        />
+                        {isZeroStock && (
+                          <Tooltip text="Produto sem estoque disponível no momento">
+                            <Badge
+                              variant="orange"
+                              icon={<Package size={14} />}
+                              className="shrink-0"
+                            />
+                          </Tooltip>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormDropdown
+                label="Tipo de entrega"
+                options={[
+                  { value: "pickup", label: "Retirada" },
+                  { value: "delivery", label: "Entrega" },
+                ]}
+                value={deliveryType}
+                setValue={(val) => {
+                  const nextType = val as "pickup" | "delivery"
+                  setDeliveryType(nextType)
+                  setDeliveryStatus(nextType === "pickup" ? "delivered" : "not_sent")
+                }}
+              />
+
+              <FormDropdown
+                label="Status de entrega"
+                options={deliveryType === "pickup" ? PICKUP_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS}
+                value={deliveryStatus}
+                setValue={(val) => setDeliveryStatus(val)}
+              />
             </div>
 
             <FormTextarea
@@ -1464,13 +1458,35 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 
             <Button
               className="w-full"
-              onClick={() => void handleRegisterDelivery()}
+              onClick={() => void handleRegisterDelivery(false)}
               disabled={submittingDelivery}
             >
               {submittingDelivery ? "Registrando..." : "Registrar entrega"}
             </Button>
           </div>
         </DefaultModal>
+
+        <AlertModal
+          isOpen={!!confirmZeroStock}
+          title="Estoque insuficiente"
+          message={`O produto "${confirmZeroStock?.itemName || ""}" não possui estoque suficiente (${confirmZeroStock?.available ?? 0} disponíveis). Deseja continuar mesmo assim?`}
+          confirmText="Continuar mesmo assim"
+          cancelText="Cancelar"
+          variant="warning"
+          isLoading={submittingDelivery}
+          onClose={() => setConfirmZeroStock(null)}
+          onConfirm={async () => {
+            await handleRegisterDelivery(true)
+          }}
+        />
+
+        {printReceiptOrderId && (
+          <SaleReceiptPrintModal
+            isOpen={!!printReceiptOrderId}
+            onClose={() => setPrintReceiptOrderId(null)}
+            orderId={printReceiptOrderId}
+          />
+        )}
 
         <AlertModal
           isOpen={!!confirmDialog}

@@ -34,21 +34,21 @@ const segments = [
   },
   {
     title: "Assistência Técnica e Celulares",
-    description: "Checklist de entrada do aparelho, fotos antes/depois, laudo técnico, termo de garantia e acompanhamento de OS online.",
-    type: "technical",
+    description: "Ficha de entrada com fotos do aparelho, histórico da OS, orçamentos pelo WhatsApp e acompanhamento do conserto online.",
+    type: "assistance",
     href: "/segmentos/assistencia-tecnica-celulares"
   },
   {
     title: "Confeitarias, Docerias e Marmitas",
-    description: "Receba pedidos e encomendas de forma organizada, monte cardápio digital sem taxas de entrega e controle insumos.",
+    description: "Receba pedidos organizados, monte seu cardápio digital sem comissão por venda e controle produtos e estoque.",
     type: "confectionery",
     href: "/segmentos/confeitarias-e-alimentacao"
   },
   {
     title: "Autônomos e Prestadores de Serviços",
-    description: "Crie orçamentos profissionais em PDF, envie para clientes com um clique e receba pagamentos com 100% do lucro seu.",
+    description: "Monte sua vitrine de serviços, envie orçamentos em PDF, organize a agenda e receba com o valor do serviço todo seu.",
     type: "freelance",
-    href: "/auth/login?mode=partner"
+    href: "/segmentos/autonomos-e-prestadores-de-servicos"
   }
 ];
 
@@ -116,6 +116,23 @@ const SegmentMockup = ({ type }: { type: string }) => {
           </div>
         </div>
       );
+    case 'assistance':
+      return (
+        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ordem de Serviço</span>
+            <FileIcon size={12} className="text-brand-inactive-text" />
+          </div>
+          <div className="border-2 border-dashed border-brand-border rounded-lg p-3">
+            <div className="text-[10px] font-bold text-brand-dark mb-1">OS #1284</div>
+            <div className="text-[8px] text-brand-inactive-text mb-3">Troca de tela - iPhone 12</div>
+            <div className="flex justify-between items-center">
+              <div className="text-[10px] font-bold text-brand-dark">R$ 380,00</div>
+              <div className="bg-brand-orange-light text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
+            </div>
+          </div>
+        </div>
+      );
     case 'fashion':
       return (
         <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
@@ -164,7 +181,7 @@ const SegmentMockup = ({ type }: { type: string }) => {
           </div>
           <div className="bg-brand-gray p-2.5 rounded-lg mb-2">
             <div className="text-[10px] font-bold text-brand-dark">Instalação Elétrica</div>
-            <div className="text-[8px] text-brand-inactive-text">Atendimento no seu bairro</div>
+            <div className="text-[8px] text-brand-inactive-text">Atendimento local e nacional</div>
           </div>
           <div className="flex justify-between items-center text-[8px]">
             <span className="text-brand-green font-bold">Orçamento no WhatsApp</span>
@@ -179,7 +196,7 @@ const SegmentMockup = ({ type }: { type: string }) => {
 const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
   <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
     <GridLines />
-    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
       <div className="grid lg:grid-cols-2 gap-12 items-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -190,7 +207,7 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
             Produtos, serviços e negócios de todos os tipos.
           </h1>
           <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-            Na Dudit você encontra desde produtos até profissionais e empresas da sua região para resolver o seu dia a dia.
+            Na Dudit você encontra desde produtos até profissionais e empresas da sua cidade ou de todo o Brasil para resolver o seu dia a dia.
           </p>
           <div className="flex flex-wrap gap-4">
             <Button onClick={() => onNavigate('explore')}>Explorar categorias</Button>
@@ -270,7 +287,7 @@ export default function SegmentsPage() {
     else if (page === 'privacidade') router.push('/institucional/privacidade');
     else if (page === 'about') router.push('/institucional/sobre');
     else if (page === 'start-selling') router.push('/auth/login?mode=partner');
-    else if (page === 'explore') router.push('/');
+    else if (page === 'explore') router.push('/explorar');
     else router.push('/');
   };
 

@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Sistema para Confeitarias, Docerias e Marmitarias: Pedidos sem Taxa | Dudit",
-    description: "Receba encomendas pelo WhatsApp, controle ficha técnica de ingredientes, organize entregas e tenha um catálogo online com 0% de comissão por venda.",
+    description: "Receba encomendas pelo WhatsApp, controle produtos e estoque, organize entregas e tenha um catálogo online com 0% de comissão por venda.",
     openGraph: {
         title: "Sistema para Confeitarias e Pequena Alimentação | Dudit",
-        description: "Catálogo digital, encomendas pelo WhatsApp, ficha técnica e entregas sem taxas abusivas de aplicativos.",
+        description: "Catálogo digital, encomendas pelo WhatsApp, controle de produtos e entregas sem taxas abusivas de aplicativos.",
         url: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao",
         siteName: "Dudit",
         images: [

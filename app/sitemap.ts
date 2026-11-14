@@ -59,6 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { url: "https://dudit.com.br/segmentos/saloes-e-barbearias", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
         { url: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
         { url: "https://dudit.com.br/segmentos/lojas-de-roupas-e-calcados", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/segmentos/autonomos-e-prestadores-de-servicos", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
     ]
 
     // --- Help Center Categories & Articles (AEO / GEO) ---

@@ -1,8 +1,8 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useTransition, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon, PackageIcon, BriefcaseIcon, StoreIcon, ThreeDotsIcon, FilterIcon } from "@/lib/icons"
+import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon, PackageIcon, BriefcaseIcon, StoreIcon, ThreeDotsIcon, FilterIcon, Settings2Icon } from "@/lib/icons"
 import { Button, Input, Badge, FormDropdown, AlertModal, FormSection, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, IconPlaceholder, SidebarCard, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
 import { FormTextarea } from "@/components/reusable"
@@ -241,170 +241,97 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
         <FadeIn>
             <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative pb-24 lg:pb-0">
-                    {/* Desktop Controls Bar - Mode Dropdown + Actions */}
-                    <div className="hidden md:flex items-center justify-between px-8 py-4 gap-4 border-b border-brand-border dark:border-dark-border">
-                        <div className="flex items-center gap-3">
-                            {/* Mode Selector Dropdown */}
-                            <Dropdown
-                                trigger={
-                                    <Button
-                                        variant={mode === "automatic" ? "filled" : "outline"}
-                                        className="h-[42px] px-4 gap-2"
-                                        leftIcon={
-                                            mode === "automatic" ? (
-                                                <PackageIcon size={16} />
-                                            ) : mode === "manual" ? (
-                                                <SearchIcon size={16} />
-                                            ) : (
-                                                <PlayIcon size={16} />
-                                            )
-                                        }
-                                    >
-                                        {mode === "automatic" ? "Fila de Moderação" : mode === "manual" ? "Busca por ID" : "Vídeos da Comunidade"}
-                                    </Button>
-                                }
-                                align="left"
-                                showChevron={false}
-                                width="w-56"
-                            >
-                                <DropdownItem onClick={() => handleModeChange("automatic")} className={mode === "automatic" ? "font-medium text-brand-green" : ""}>
-                                    <PackageIcon size={16} className="mr-2" /> Fila de Moderação
-                                </DropdownItem>
-                                <DropdownItem onClick={() => handleModeChange("manual")} className={mode === "manual" ? "font-medium text-brand-green" : ""}>
-                                    <SearchIcon size={16} className="mr-2" /> Busca por ID
-                                </DropdownItem>
-                                <DropdownItem onClick={() => handleModeChange("videos")} className={mode === "videos" ? "font-medium text-brand-green" : ""}>
-                                    <PlayIcon size={16} className="mr-2" /> Vídeos da Comunidade
-                                </DropdownItem>
-                            </Dropdown>
-                        </div>
-                        
-                        {/* Desktop Actions - only for manual mode */}
-                        {mode === "manual" && (
-                            <div className="flex items-center gap-2">
-                                <div className="w-72">
-                                    <Input
-                                        name="search-id"
-                                        placeholder={`ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...`}
-                                        value={searchId}
-                                        onChange={(e) => setSearchId(e.target.value)}
-                                        onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()}
-                                        className="h-[42px]"
-                                        variant="full-rounded"
-                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                    />
-                                </div>
-                                <div className="w-40">
-                                    <FormDropdown
-                                        options={SEARCH_TYPES}
-                                        value={searchType}
-                                        setValue={(v) => { setSearchType(v as SearchType); setResult(null); setError("") }}
-                                    />
-                                </div>
-                                <Button variant="default" onClick={handleSearch} disabled={isPending} isLoading={isPending} className="h-[42px]">
-                                    <SearchIcon size={18} /> Buscar
-                                </Button>
+                    {/* Header para Busca por ID ou Vídeos da Comunidade (Fila de Moderação tem seu próprio header completo com o Ações dropdown) */}
+                    {mode !== "automatic" && (
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-8 py-4 gap-4 border-b border-brand-border dark:border-dark-border">
+                            <div className="flex flex-col gap-1">
+                                <h1 className="text-[24px] md:text-[28px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                    {mode === "manual" ? "Busca por ID" : "Vídeos da Comunidade"}
+                                </h1>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm font-medium">
+                                    {mode === "manual"
+                                        ? "Inspecione e modere diretamente um registro específico pelo UUID ou código"
+                                        : "Revise vídeos enviados por parceiros para a comunidade"}
+                                </p>
                             </div>
-                        )}
-                        
-                        {/* Desktop Actions - only for videos mode */}
-                        {mode === "videos" && (
-                            <div className="flex items-center gap-2">
-                                <div className="w-80">
-                                    <Input
-                                        name="search-videos"
-                                        placeholder="Buscar por título ou loja..."
-                                        value={videoSearch}
-                                        onChange={(e) => setVideoSearch(e.target.value)}
-                                        className="h-[42px]"
-                                        variant="full-rounded"
-                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Mobile/Tablet Controls Bar */}
-                    <div className="md:hidden flex flex-col gap-3 px-4 py-3 border-b border-brand-border dark:border-dark-border">
-                        {/* Search Input */}
-                        <div className="w-full">
-                            <Input
-                                name="mobile-search"
-                                placeholder={mode === "automatic" ? "Buscar na fila..." : mode === "manual" ? `ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...` : "Buscar por título ou loja..."}
-                                value={mode === "manual" ? searchId : mode === "videos" ? videoSearch : ""}
-                                onChange={(e) => {
-                                    if (mode === "manual") setSearchId(e.target.value);
-                                    else if (mode === "videos") setVideoSearch(e.target.value);
-                                }}
-                                onKeyDown={(e: React.KeyboardEvent) => {
-                                    if (e.key === "Enter") {
-                                        if (mode === "manual") handleSearch();
-                                    }
-                                }}
-                                className="h-[44px]"
-                                variant="full-rounded"
-                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                            />
-                        </div>
-                        
-                        {/* Actions Dropdown Button */}
-                        <div className="flex items-center justify-end">
-                            <Dropdown
-                                trigger={
-                                    <Button variant="outline" className="w-[44px] h-[44px] p-0 rounded-full">
-                                        <ThreeDotsIcon className="w-5 h-5 text-brand-inactive-text" />
-                                    </Button>
-                                }
-                                align="right"
-                                showChevron={false}
-                                width="w-56"
-                            >
-                                <DropdownItem onClick={() => handleModeChange("automatic")} className={mode === "automatic" ? "font-medium text-brand-green" : ""}>
-                                    <PackageIcon size={16} className="mr-2" /> Fila de Moderação
-                                </DropdownItem>
-                                <DropdownItem onClick={() => handleModeChange("manual")} className={mode === "manual" ? "font-medium text-brand-green" : ""}>
-                                    <SearchIcon size={16} className="mr-2" /> Busca por ID
-                                </DropdownItem>
-                                <DropdownItem onClick={() => handleModeChange("videos")} className={mode === "videos" ? "font-medium text-brand-green" : ""}>
-                                    <PlayIcon size={16} className="mr-2" /> Vídeos da Comunidade
-                                </DropdownItem>
+                            <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
                                 {mode === "manual" && (
                                     <>
-                                        <div className="border-t border-brand-border dark:border-dark-border my-1" />
-                                        <div className="w-full">
-                                            <div className="px-3 py-2 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                Tipo de busca
-                                            </div>
-                                            {SEARCH_TYPES.map((t) => (
-                                                <DropdownItem
-                                                    key={t.value}
-                                                    onClick={() => { setSearchType(t.value); setResult(null); setError("") }}
-                                                    className={searchType === t.value ? "font-medium text-brand-green" : ""}
-                                                >
-                                                    {searchType === t.value && <CheckCircleIcon size={14} className="mr-2 text-brand-green" />}
-                                                    {t.label}
-                                                </DropdownItem>
-                                            ))}
+                                        <div className="w-full sm:w-64">
+                                            <Input
+                                                name="search-id"
+                                                placeholder={`ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...`}
+                                                value={searchId}
+                                                onChange={(e) => setSearchId(e.target.value)}
+                                                onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()}
+                                                className="h-[42px]"
+                                                variant="full-rounded"
+                                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                            />
                                         </div>
+                                        <div className="w-36">
+                                            <FormDropdown
+                                                options={SEARCH_TYPES}
+                                                value={searchType}
+                                                setValue={(v) => { setSearchType(v as SearchType); setResult(null); setError("") }}
+                                            />
+                                        </div>
+                                        <Button variant="default" onClick={handleSearch} disabled={isPending} isLoading={isPending} className="h-[42px]">
+                                            <SearchIcon size={18} /> Buscar
+                                        </Button>
                                     </>
                                 )}
+
                                 {mode === "videos" && (
-                                    <>
-                                        <div className="border-t border-brand-border dark:border-dark-border my-1" />
-                                        <DropdownItem onClick={() => loadVideos(1)}>
-                                            <FilterIcon size={16} className="mr-2" /> Atualizar lista
-                                        </DropdownItem>
-                                    </>
+                                    <div className="w-full sm:w-72">
+                                        <Input
+                                            name="search-videos"
+                                            placeholder="Buscar por título ou loja..."
+                                            value={videoSearch}
+                                            onChange={(e) => setVideoSearch(e.target.value)}
+                                            className="h-[42px]"
+                                            variant="full-rounded"
+                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                        />
+                                    </div>
                                 )}
-                            </Dropdown>
+
+                                <Dropdown
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="h-[42px] px-3 gap-2"
+                                            leftIcon={<Settings2Icon size={18} />}
+                                        >
+                                            Ações
+                                        </Button>
+                                    }
+                                    align="right"
+                                    showChevron={false}
+                                >
+                                    <DropdownItem onClick={() => handleModeChange("automatic")}>
+                                        <PackageIcon size={16} /> Fila de Moderação
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => handleModeChange("manual")} className={mode === "manual" ? "font-bold text-brand-green" : ""}>
+                                        <SearchIcon size={16} /> Busca por ID
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => handleModeChange("videos")} className={mode === "videos" ? "font-bold text-brand-green" : ""}>
+                                        <PlayIcon size={16} /> Vídeos da Comunidade
+                                    </DropdownItem>
+                                </Dropdown>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Content Area */}
                     {mode === "automatic" ? (
                         <div className="w-full">
-                            <ModerationList initialData={initialData} />
+                            <ModerationList
+                                initialData={initialData}
+                                currentMode={mode}
+                                onModeChange={handleModeChange}
+                            />
                         </div>
                     ) : mode === "manual" ? (
                         <div className="px-4 md:px-8 pb-8">

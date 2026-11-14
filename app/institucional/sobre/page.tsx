@@ -14,7 +14,7 @@ import { INSTITUTIONAL_FAQ } from '@/lib/constants/institutional-faq';
 const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
     <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
         <GridLines />
-        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+        <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
@@ -73,7 +73,7 @@ const PorQueExiste = () => {
                             Muitas vezes as pessoas procuram no Instagram, no WhatsApp, em grupos ou dependem de marketplaces tradicionais com taxas abusivas de 12% a 20%. Por outro lado, quem vende fica refém de softwares caros ou limitados a clientes que passam na porta.
                         </p>
                         <p className="text-brand-inactive-text text-base leading-relaxed">
-                            <strong className="text-brand-dark">A Dudit nasceu para unir comércio de proximidade e alcance nacional com 0% de comissão:</strong> permita que clientes da sua cidade retirem no balcão ou recebam via motoboy, e envie pedidos para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.
+                            <strong className="text-brand-dark">A Dudit nasceu para unir comércio de proximidade e alcance nacional com 0% de comissão:</strong> permitindo que clientes da sua cidade retirem no balcão ou recebam via motoboy, e que você envie pedidos para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.
                         </p>
                     </div>
 
@@ -110,7 +110,7 @@ const BentoPillars = () => {
         {
             title: "Para quem vende",
             subtitle: "VISIBILIDADE E ALCANCE",
-            description: "Vender presencialmente no PDV, online na sua região ou despachar para todo o país com 0% de comissão por venda.",
+            description: "Vender presencialmente no PDV, online na sua cidade ou despachar para todo o país com 0% de comissão por venda.",
             type: "sell"
         },
         {
@@ -183,7 +183,7 @@ const BentoPillars = () => {
                                         <div className="space-y-1.5 text-[10px] text-brand-inactive-text">
                                             <div className="flex justify-between"><span>Estoque</span><span className="text-brand-dark font-bold">Organizado</span></div>
                                             <div className="flex justify-between"><span>Agenda</span><span className="text-brand-dark font-bold">Disponível</span></div>
-                                            <div className="flex justify-between"><span>Financeiro</span><span className="text-brand-green font-bold">100% Seu</span></div>
+                                            <div className="flex justify-between"><span>Financeiro</span><span className="text-brand-green font-bold">Sob controle</span></div>
                                         </div>
                                     </div>
                                 )}
@@ -254,7 +254,7 @@ export default function SobrePage() {
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio');
         else if (page === 'start-selling') router.push('/auth/login?mode=partner');
-        else if (page === 'explore') router.push('/');
+        else if (page === 'explore') router.push('/explorar');
         else if (page === 'segments') router.push('/institucional/segmentos');
         else if (page === 'pricing') router.push('/institucional/planos');
         else if (page === 'terms') router.push('/institucional/termos');

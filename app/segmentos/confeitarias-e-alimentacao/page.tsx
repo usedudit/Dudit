@@ -7,7 +7,6 @@ import {
     ShoppingBagIcon,
     TagIcon,
     MoneyIcon,
-    CalendarIcon,
 } from "@/lib/icons"
 
 const softwareSchema = {
@@ -35,7 +34,7 @@ const faqs = [
     },
     {
         question: "Serve para marmita, salgado e comida por quilo?",
-        answer: "Serve. Além de bolos e doces, você cadastra marmitas, marmitas fitness, salgados, kits e combos, com variações de tamanho e adicionais.",
+        answer: "Serve. Além de bolos e doces, você cadastra marmitas, salgados e outros itens, com variações de tamanho e adicionais.",
     },
 ]
 
@@ -93,7 +92,7 @@ export default function ConfeitariasEAlimentacaoSegmentPage() {
                         </div>
 
                         <div className="bg-emerald-50 text-emerald-800 text-[11px] p-2.5 rounded-lg font-medium text-center">
-                            ✓ Taxa da Dudit: <strong>R$ 0,00 (100% do lucro é seu)</strong>
+                            ✓ Comissão da Dudit: <strong>R$ 0,00 (o valor do pedido é seu)</strong>
                         </div>
                     </div>
                 </div>
@@ -164,29 +163,32 @@ export default function ConfeitariasEAlimentacaoSegmentPage() {
                         ),
                     },
                     {
-                        label: "ENCOMENDAS",
-                        title: "Encomendas por data",
+                        label: "PDV E CAIXA",
+                        title: "Venda no balcão e na encomenda",
                         description:
-                            "Agende entregas futuras para festas e aniversários e nunca mais esqueça de separar um pedido na data combinada.",
+                            "Registre vendas presenciais e pedidos no mesmo caixa, com baixa de estoque e fechamento do dia em um só lugar.",
                         mockup: (
                             <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
                                 <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
-                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Encomendas</span>
-                                    <CalendarIcon size={12} className="text-brand-inactive-text" />
+                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Caixa de hoje</span>
+                                    <MoneyIcon size={12} className="text-brand-inactive-text" />
                                 </div>
-                                <div className="space-y-1.5">
+                                <div className="space-y-1.5 mb-3">
                                     <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-dark">Sáb, 14/06 - Bolo 2kg</span>
-                                        <span className="text-[8px] font-bold text-brand-orange bg-brand-orange-light px-1.5 py-0.5 rounded">HOJE</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">Bolo de Pote</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">R$ 15,00</span>
                                     </div>
                                     <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-dark">Seg, 16/06 - 30 marmitas</span>
-                                        <span className="text-[8px] font-bold text-brand-green">CONFIRMADO</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">Marmita Fitness</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">R$ 22,00</span>
                                     </div>
                                     <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-inactive-text">Qui, 19/06 - Kit festa</span>
-                                        <span className="text-[8px] font-bold text-brand-inactive-text">A DEFINIR</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">Salgado (6 un.)</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">R$ 18,00</span>
                                     </div>
+                                </div>
+                                <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
+                                    Fechamento do dia pronto
                                 </div>
                             </div>
                         ),

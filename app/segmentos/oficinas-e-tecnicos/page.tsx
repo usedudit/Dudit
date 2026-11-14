@@ -34,8 +34,8 @@ const faqs = [
         answer: "Não. Você envia o orçamento pelo WhatsApp e ele recebe um link. Ao abrir, vê os serviços, os valores e as fotos, e aprova na hora. A ordem de serviço é gerada automaticamente.",
     },
     {
-        question: "Serve para assistência técnica de celulares e eletrodomésticos?",
-        answer: "Sim. O modelo de ordens de serviço funciona para mecânica, elétrica, informática, celular, eletrodomésticos e qualquer outro serviço que exija diagnóstico, aprovação e entrega.",
+        question: "Serve para oficina de motos e serviços de elétrica automotiva?",
+        answer: "Sim. A Dudit serve para oficinas mecânicas, auto centers, funilarias, elétrica automotiva, motos e qualquer serviço que exija diagnóstico, orçamento, aprovação e entrega.",
     },
 ]
 
@@ -61,7 +61,7 @@ export default function OficinasETecnicosSegmentPage() {
     return (
         <SegmentLanding
             schema={schema}
-            badge={{ text: "Especial para Oficinas e Técnicos", icon: <WrenchIcon /> }}
+            badge={{ text: "Especial para Oficinas e Auto Centers", icon: <WrenchIcon /> }}
             title={
                 <>
                     Ordens de Serviço e Orçamentos{" "}
@@ -84,7 +84,7 @@ export default function OficinasETecnicosSegmentPage() {
 
                         <div className="space-y-2 text-xs">
                             <div className="flex justify-between text-gray-600">
-                                <span>Veículo/Item:</span>
+                                <span>Veículo:</span>
                                 <strong className="text-brand-dark">Honda Civic 2020 - Placa ABC-1234</strong>
                             </div>
                             <div className="flex justify-between text-gray-600">
@@ -140,7 +140,7 @@ export default function OficinasETecnicosSegmentPage() {
                         label: "ORDENS DE SERVIÇO",
                         title: "Ordens de serviço com status",
                         description:
-                            "Acompanhe cada OS (aguardando peças, em andamento, concluída) e mantenha o histórico do veículo ou do equipamento.",
+                            "Acompanhe cada OS (aguardando peças, em andamento, concluída) e mantenha o histórico completo do veículo.",
                         mockup: (
                             <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
                                 <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
@@ -201,7 +201,7 @@ export default function OficinasETecnicosSegmentPage() {
                         icon: <Shield className="w-5 h-5 text-white" />,
                         title: "Peças sob controle",
                         description:
-                            "Saiba o que está no estoque e o que está acabando antes de o cliente chegar com o carro ou o equipamento.",
+                            "Saiba o que está no estoque e o que está acabando antes de o cliente chegar com o carro na oficina.",
                     },
                     {
                         icon: <Clock className="w-5 h-5 text-white" />,

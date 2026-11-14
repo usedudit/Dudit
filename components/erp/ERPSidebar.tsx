@@ -16,6 +16,8 @@ import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscrip
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { isSystemResourceActive } from "@/lib/system-resources"
 import { StoreSwitcher } from "@/components/store-switcher"
+import { useStore } from "@/lib/store-context"
+import { useErpBadges } from "@/lib/hooks/use-erp-badges"
 
 interface SubMenuItem {
     label: string
@@ -162,6 +164,21 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/recorrentes/assinaturas": "escalar",
 }
 
+function ErpRedBadge({ count, className }: { count: number; className?: string }) {
+    if (!count || count <= 0) return null
+    return (
+        <span
+            className={cn(
+                "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5",
+                "bg-red-500 text-white font-bold text-[10px] leading-none rounded-full shadow-sm shrink-0",
+                className
+            )}
+        >
+            {count > 99 ? "99+" : count}
+        </span>
+    )
+}
+
 function ErpPlanGatedNavItem({
     href,
     label,
@@ -172,6 +189,8 @@ function ErpPlanGatedNavItem({
     icon: Icon,
     iconClassName,
     isActiveGroup,
+    badge,
+    collapsed,
     children,
 }: {
     href: string
@@ -183,6 +202,8 @@ function ErpPlanGatedNavItem({
     icon?: React.ComponentType<{ className?: string }>
     iconClassName?: string
     isActiveGroup?: boolean
+    badge?: number
+    collapsed?: boolean
     children?: React.ReactNode
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -193,14 +214,23 @@ function ErpPlanGatedNavItem({
     const content = (
         <>
             {Icon ? (
-                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0 relative">
                     <Icon className={cn("w-[20px] h-[20px]", isActiveGroup ? "text-brand-green" : "text-current", iconClassName)} />
+                    {collapsed && badge && badge > 0 ? (
+                        <span className="absolute top-2 right-2 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                        </span>
+                    ) : null}
                 </div>
             ) : null}
             <span className={cn("flex items-center gap-2 min-w-0 flex-1", Icon ? "" : "")}>
                 <span className={cn("truncate", labelClass)}>{label}</span>
                 {star ? <img src={star} alt="" className="w-4 h-4 shrink-0 object-contain" /> : null}
             </span>
+            {!collapsed && badge && badge > 0 ? (
+                <ErpRedBadge count={badge} className="ml-auto mr-1" />
+            ) : null}
             {children}
         </>
     )
@@ -236,7 +266,9 @@ export function ERPSidebar() {
     const pathname = usePathname()
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen, sidebarCard } = useSidebar()
     const isCollapsed = !isExpanded
-    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug, role, canRbac } = usePermissions()
+    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug, role, canRbac, partnerId } = usePermissions()
+    const { selectedStore } = useStore()
+    const { getBadgeForHref, getBadgeForGroup } = useErpBadges(partnerId, selectedStore?.id)
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
 
@@ -572,6 +604,7 @@ export function ERPSidebar() {
                             const isDirectActive = item.href ? isActivePath(item.href) : false
                             const isSubActive = hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href))
                             const isActiveGroup = isDirectActive || isSubActive
+                            const groupBadge = getBadgeForGroup(item.label)
 
                             return (
                                 <li
@@ -594,6 +627,8 @@ export function ERPSidebar() {
                                                             planSlug={planSlug}
                                                             icon={Icon}
                                                             isActiveGroup={isActiveGroup}
+                                                            badge={groupBadge}
+                                                            collapsed={isCollapsed}
                                                             itemClass={cn(
                                                                 "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
                                                                 isActiveGroup ? activeClasses : inactiveClasses
@@ -633,13 +668,19 @@ export function ERPSidebar() {
                                                             isActiveGroup ? activeClasses : inactiveClasses
                                                         )}
                                                     >
-                                                        <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                                                        <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0 relative">
                                                             <Icon
                                                                 className={cn(
                                                                     "w-[20px] h-[20px] transition-colors",
                                                                     isActiveGroup ? "text-brand-green" : "text-current"
                                                                 )}
                                                             />
+                                                            {isCollapsed && groupBadge > 0 && (
+                                                                <span className="absolute top-2 right-2 flex h-2 w-2">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                                                                </span>
+                                                            )}
                                                         </div>
 
                                                         <span
@@ -652,6 +693,10 @@ export function ERPSidebar() {
                                                         >
                                                             {item.label}
                                                         </span>
+
+                                                        {!isCollapsed && groupBadge > 0 && (
+                                                            <ErpRedBadge count={groupBadge} className="mr-1.5" />
+                                                        )}
 
                                                         {hasSubmenu && !isCollapsed && (
                                                             <ChevronDownIcon
@@ -679,13 +724,19 @@ export function ERPSidebar() {
                                                     isActiveGroup ? activeClasses : inactiveClasses
                                                 )}
                                             >
-                                                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                                                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0 relative">
                                                     <Icon
                                                         className={cn(
                                                             "w-[20px] h-[20px] transition-colors",
                                                             isActiveGroup ? "text-brand-green" : "text-current"
                                                         )}
                                                     />
+                                                    {isCollapsed && groupBadge > 0 && (
+                                                        <span className="absolute top-2 right-2 flex h-2 w-2">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <span
@@ -698,6 +749,10 @@ export function ERPSidebar() {
                                                 >
                                                     {item.label}
                                                 </span>
+
+                                                {!isCollapsed && groupBadge > 0 && (
+                                                    <ErpRedBadge count={groupBadge} className="mr-1.5" />
+                                                )}
 
                                                 {hasSubmenu && !isCollapsed && (
                                                     <ChevronDownIcon
@@ -761,6 +816,7 @@ export function ERPSidebar() {
                                                                             href={subItem.href}
                                                                             label={subItem.label}
                                                                             planSlug={planSlug}
+                                                                            badge={getBadgeForHref(subItem.href)}
                                                                             itemClass={cn(
                                                                                 "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
                                                                                 isActive ? activeClasses : inactiveClasses
@@ -788,8 +844,9 @@ export function ERPSidebar() {
                                                     className="absolute left-[calc(100%+16px)] top-0 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl min-w-[200px] overflow-hidden"
                                                 >
                                                     {/* Header do Card com cor diferente para destaque */}
-                                                    <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50">
+                                                    <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50 flex items-center justify-between">
                                                         <span className="text-sm font-bold text-white block">{item.label}</span>
+                                                        {groupBadge > 0 && <ErpRedBadge count={groupBadge} />}
                                                     </div>
 
                                                     {/* Corpo do Card */}
@@ -816,6 +873,7 @@ export function ERPSidebar() {
                                                                         href={subItem.href}
                                                                         label={subItem.label}
                                                                         planSlug={planSlug}
+                                                                        badge={getBadgeForHref(subItem.href)}
                                                                         itemClass="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
                                                                         labelClass={isActive ? "text-brand-green font-medium" : undefined}
                                                                         onNavigate={() => {
@@ -899,6 +957,7 @@ export function ERPSidebar() {
                                     const hasSubmenu = item.submenu && item.submenu.length > 0
                                     const isMenuExpanded = openSubmenu === item.label
                                     const isActive = item.href ? isActivePath(item.href) : (hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href)))
+                                    const groupBadge = getBadgeForGroup(item.label)
 
                                     return (
                                         <div key={item.label} className="flex flex-col">
@@ -916,6 +975,7 @@ export function ERPSidebar() {
                                                 >
                                                     <Icon size={20} className={isActive ? "text-brand-green" : ""} />
                                                     <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                    {groupBadge > 0 && <ErpRedBadge count={groupBadge} className="mr-2" />}
                                                     {hasSubmenu && (
                                                         <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
                                                     )}
@@ -931,6 +991,7 @@ export function ERPSidebar() {
                                                 >
                                                     <Icon size={20} className={isActive ? "text-brand-green" : ""} />
                                                     <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                    {groupBadge > 0 && <ErpRedBadge count={groupBadge} className="mr-2" />}
                                                     {hasSubmenu && (
                                                         <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
                                                     )}
@@ -954,6 +1015,7 @@ export function ERPSidebar() {
                                                                 href={sub.href}
                                                                 label={sub.label}
                                                                 planSlug={planSlug}
+                                                                badge={getBadgeForHref(sub.href)}
                                                                 itemClass={cn(
                                                                     "py-2 px-3 rounded-lg text-sm transition-colors",
                                                                     isActivePath(sub.href) ? activeClasses : inactiveClasses

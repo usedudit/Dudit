@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   MoreHorizontal,
   ShoppingCartIcon,
@@ -103,15 +104,26 @@ const activityIconMap: Record<string, any> = {
   tag: TagIcon,
 };
 
-export function RecentActivities({ activities }: { activities: any[] }) {
+export function RecentActivities({ activities, moreHref, limit = 4 }: { activities: any[]; moreHref?: string; limit?: number }) {
   if (!activities || activities.length === 0) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 flex flex-col justify-center min-h-[340px]">
-        <div className="flex items-center space-x-3 mb-8">
-          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-            <Activity size={18} className="text-brand-dark dark:text-dark-heading" />
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+              <Activity size={18} className="text-brand-dark dark:text-dark-heading" />
+            </div>
+            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
           </div>
-          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
+          {moreHref ? (
+            <Link href={moreHref} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
+              <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
+            </Link>
+          ) : (
+            <button className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
+              <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
+            </button>
+          )}
         </div>
         <IconPlaceholder
           title="Sem Atividades"
@@ -122,9 +134,9 @@ export function RecentActivities({ activities }: { activities: any[] }) {
     );
   }
 
-  // Sort and slice to max 4 activities
+  // Sort and slice to max activities
   const sortedActivities = [...activities].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-  const limitedActivities = sortedActivities.slice(0, 4);
+  const limitedActivities = sortedActivities.slice(0, limit);
 
   const groups: Record<string, any[]> = {};
   for (const item of limitedActivities) {
@@ -163,7 +175,7 @@ export function RecentActivities({ activities }: { activities: any[] }) {
       return {
         title,
         items: groups[ymd].map(item => {
-          const Icon = activityIconMap[item.icon] || AlertCircleIcon
+          const Icon = typeof item.icon === "string" ? (activityIconMap[item.icon] || AlertCircleIcon) : (item.icon || AlertCircleIcon)
           return {
             id: item.id,
             time: item.time + (item.user ? ` · ${item.user}` : ""),
@@ -184,9 +196,15 @@ export function RecentActivities({ activities }: { activities: any[] }) {
           </div>
           <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
         </div>
-        <button className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
-          <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
-        </button>
+        {moreHref ? (
+          <Link href={moreHref} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
+            <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
+          </Link>
+        ) : (
+          <button className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
+            <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
+          </button>
+        )}
       </div>
 
       <div className="space-y-8">

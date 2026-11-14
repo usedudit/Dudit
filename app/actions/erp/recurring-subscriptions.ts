@@ -392,7 +392,7 @@ export async function getRecurringSubscriptionExecutionsAction(partnerId: string
       .select(`
         id, subscription_id, partner_id, scheduled_for, status, order_id, appointment_ids,
         error_message, created_at, completed_at,
-        orders:order_id(id, order_number, total_amount, situation)
+        orders:order_id(id, order_number, total_amount, situation, payment_method, delivery_status, delivery_type)
       `)
       .eq("partner_id", partnerId)
       .eq("subscription_id", subscriptionId)
@@ -432,7 +432,7 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
         recurring_subscription_items(
           id, item_type, product_id, service_id, quantity, unit_price,
           preferred_time, duration_minutes, sort_order,
-          products:product_id(id, name, images),
+          products:product_id(id, name, images, stock_available, stock_quantity, allow_sell_without_stock),
           services:service_id(id, name, images)
         )
       `)
@@ -444,8 +444,8 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
         .select(`
           id, service_id, product_id, quantity, consumed, expires_at, created_at,
           recurring_subscription_items(staff_partner_user_id, duration_minutes),
-          services(name),
-          products(name)
+          services(id, name, images),
+          products(id, name, images, stock_available, stock_quantity, allow_sell_without_stock)
         `)
         .eq("partner_id", partnerId)
         .eq("subscription_id", subscriptionId)
@@ -497,7 +497,15 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
         sortOrder: Number(item.sort_order || 0),
         preferredTime: item.preferred_time ?? null,
         durationMinutes: item.duration_minutes != null ? Number(item.duration_minutes) : null,
-        product: item.products || null,
+        product: item.products
+          ? {
+              id: String(item.products.id),
+              name: String(item.products.name || "Produto"),
+              images: item.products.images || null,
+              stock: Number(item.products.stock_available ?? item.products.stock_quantity ?? 0),
+              allowSellWithoutStock: Boolean(item.products.allow_sell_without_stock),
+            }
+          : null,
         service: item.services || null,
       }))
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -519,6 +527,13 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
         ? Number(credit.recurring_subscription_items.duration_minutes)
         : null,
       createdAt: credit.created_at != null ? String(credit.created_at) : null,
+      images: credit.products?.images || credit.services?.images || null,
+      stock: credit.products != null
+        ? Number(credit.products.stock_available ?? credit.products.stock_quantity ?? 0)
+        : null,
+      allowSellWithoutStock: credit.products != null
+        ? Boolean(credit.products.allow_sell_without_stock)
+        : null,
     }))
 
     const detail: RecurringSubscriptionDetail = {
@@ -1041,8 +1056,9 @@ export async function scheduleSubscriptionServiceAction(input: {
 export async function createSubscriptionDeliveryOrderAction(input: {
   partnerId: string
   subscriptionId: string
-  items: Array<{ productId: string; variantId?: string | null; quantity: number }>
+  items: Array<{ productId: string; variantId?: string | null; quantity: number; allowSellWithoutStock?: boolean }>
   deliveryType?: "delivery" | "pickup"
+  deliveryStatus?: string
   notes?: string
 }) {
   try {
@@ -1089,13 +1105,20 @@ export async function createSubscriptionDeliveryOrderAction(input: {
           ? "delivery"
           : "pickup"
 
+    const allowedPickupStatuses = ["not_sent", "preparing", "pickup_available", "delivered"]
+    const allowedDeliveryStatuses = ["not_sent", "preparing", "sent", "delivered", "delivery_failed"]
+    const validStatuses = deliveryType === "pickup" ? allowedPickupStatuses : allowedDeliveryStatuses
+    const deliveryStatus = input.deliveryStatus && validStatuses.includes(input.deliveryStatus)
+      ? input.deliveryStatus
+      : (deliveryType === "pickup" ? "delivered" : "not_sent")
+
     const productIds = Array.from(new Set(items.map((i) => i.productId)))
     const variantIds = Array.from(new Set(items.map((i) => i.variantId).filter(Boolean))) as string[]
 
     const [{ data: products }, { data: variants }] = await Promise.all([
       supabase
         .from("products")
-        .select("id, name, price, cost_price")
+        .select("id, name, price, cost_price, allow_sell_without_stock")
         .in("id", productIds)
         .eq("partner_id", partnerId),
       variantIds.length
@@ -1190,7 +1213,7 @@ export async function createSubscriptionDeliveryOrderAction(input: {
         order_source: "Assinatura",
         delivery_type: deliveryType,
         situation: "paid",
-        delivery_status: deliveryType === "pickup" ? "delivered" : "not_sent",
+        delivery_status: deliveryStatus,
         total_amount: 0,
         paid_amount: 0,
         discount_value: linesSubtotal,
@@ -1220,11 +1243,16 @@ export async function createSubscriptionDeliveryOrderAction(input: {
       throw itemsErr
     }
 
-    const stockItems = items.map((item) => ({
-      product_id: item.productId,
-      variant_id: item.variantId || null,
-      quantity: Number(item.quantity),
-    }))
+    const stockItems = items.map((item) => {
+      const product = productsMap.get(item.productId) as any
+      const allowNegative = Boolean(item.allowSellWithoutStock || product?.allow_sell_without_stock)
+      return {
+        product_id: item.productId,
+        variant_id: item.variantId || null,
+        quantity: Number(item.quantity),
+        allow_sell_without_stock: allowNegative,
+      }
+    })
     const storeId = (sub.store_id as string | null) || null
 
     const { reserveOrderInventory, finalizeOrderInventory } = await import("@/lib/stock/reservations")

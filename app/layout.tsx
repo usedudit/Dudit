@@ -222,7 +222,7 @@ const jsonLd = {
                 description: "Plano gratuito disponível. Planos pagos a partir de R$ 29,90/mês com 0% de comissão por venda.",
             },
             featureList: [
-                "0% de comissão por venda (lucro 100% do comerciante)",
+                "0% de comissão por venda (o valor da venda fica com o comerciante)",
                 "Envios para todo o Brasil via transportadoras e Correios integrados",
                 "Vendas locais com entrega própria, retirada no balcão ou motoboy",
                 "PDV balcão para frente de caixa e vendas presenciais",

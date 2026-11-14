@@ -192,7 +192,7 @@ async function computeDrePeriod(
       payment_method_interest_amount, payment_method_discount_amount,
       sale_items (id, product_id, variant_id, product_name, quantity,
         unit_price, unit_cost, total_price, subtotal,
-        original_price, is_gift, discount_amount)
+        original_price, is_gift)
     `)
     .eq("partner_id", partnerId)
     .neq("status", "cancelled")
@@ -373,7 +373,7 @@ async function computeDrePeriod(
     for (const item of (s.sale_items as any[]) || []) {
       const qty = Number(item.quantity || 0)
       const chargedPrice = Number(item.unit_price || 0)
-      const nominalPrice = item.original_price != null
+      const nominalPrice = Number(item.original_price || 0) > 0
         ? Number(item.original_price)
         : chargedPrice
       if (item.is_gift) continue // brinde: receita 0
@@ -381,14 +381,15 @@ async function computeDrePeriod(
     }
     productsRevenue += saleNominalGross
 
-    // Descontos: item_discount (fallback per-item) + manual + coupon + pm discount
-    // PDV não tem coluna item_discount_amount no sale; usamos soma per-item
+    // Descontos por item: derivados do preço nominal (`original_price`) menos o
+    // preço cobrado. Não lemos `sale_items.discount_amount` diretamente para
+    // continuar funcionando em bancos que ainda não aplicaram a migration.
     const derivedItemDiscount = (s.sale_items as any[])?.reduce((sum: number, it: any) => {
       if (it.is_gift) return sum
-      const stored = Number(it.discount_amount || 0)
-      const charged = Number(it.unit_price || 0) * Number(it.quantity || 1)
-      const nominal = (it.original_price != null ? Number(it.original_price) : Number(it.unit_price || 0)) * Number(it.quantity || 1)
-      return sum + (stored > 0 ? stored : Math.max(0, nominal - charged))
+      const qty = Number(it.quantity || 1)
+      const charged = Number(it.unit_price || 0) * qty
+      const nominal = (Number(it.original_price || 0) > 0 ? Number(it.original_price) : Number(it.unit_price || 0)) * qty
+      return sum + Math.max(0, nominal - charged)
     }, 0) || 0
 
     const couponDiscount = Number(s.discount_amount || 0) // cupom no PDV
@@ -443,7 +444,7 @@ async function computeDrePeriod(
     for (const item of (o.order_items as any[]) || []) {
       const qty = Number(item.quantity || 0)
       const chargedPrice = Number(item.product_price || 0)
-      const nominalPrice = item.original_price != null && Number.isFinite(Number(item.original_price))
+      const nominalPrice = Number(item.original_price || 0) > 0
         ? Number(item.original_price)
         : chargedPrice
       if (item.is_gift) continue // brinde: receita 0

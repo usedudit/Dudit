@@ -1,18 +1,19 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useTransition } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import { Badge, Button } from "@/components/reusable"
 import {
-    XIcon,
     CheckCircleIcon,
     TrashIcon,
     EyeIcon,
     AlertTriangleIcon,
     StoreIcon,
-    LinkIcon,
-    EditIcon,
+    PackageIcon,
+    BriefcaseIcon,
+    UserIcon,
+    XIcon,
 } from "@/lib/icons"
-import { Badge, Button, Tooltip, Spinner } from "@/components/reusable"
-import { useModalLayer } from "@/lib/modal-stack"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { extractFlaggedImages, isImageFlagged } from "@/lib/utils/product-display-images"
 import {
@@ -20,9 +21,10 @@ import {
     rejectModeration,
     removeModerationImagesBatch,
 } from "@/app/actions/admin/moderation"
+import { useAdminActionModal } from "../AdminActionModal"
 import { toast } from "@/hooks/use-notification"
 import type { ModerationItem } from "@/lib/admin/types"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 
 interface AdminQuickModerationModalProps {
     item: ModerationItem
@@ -31,76 +33,58 @@ interface AdminQuickModerationModalProps {
     onResolved: (action: "approved" | "rejected" | "updated", updatedItem?: ModerationItem) => void
 }
 
+const TYPE_LABELS: Record<string, string> = {
+    product: "Produto",
+    service: "Serviço",
+    recurring_plan: "Plano",
+    partner: "Perfil",
+    community_video: "Vídeo",
+    return_dispute: "Disputa",
+}
+
 export function AdminQuickModerationModal({
     item,
     isOpen,
     onClose,
     onResolved,
 }: AdminQuickModerationModalProps) {
-    const modalZIndex = useModalLayer(isOpen)
-    const [isPending, startTransition] = useTransition()
+    const { modal: actionModal, runAction } = useAdminActionModal()
 
     // Imagens atuais do item
     const [images, setImages] = useState<string[]>(item.images || [])
 
-    // Conjunto de URLs marcadas para remoção
-    const [selectedToRemove, setSelectedToRemove] = useState<Set<string>>(new Set())
+    // Imagens selecionadas para remoção
+    const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set())
 
-    // Estado do fluxo de rejeição
-    const [isRejecting, setIsRejecting] = useState(false)
-    const [rejectReason, setRejectReason] = useState("")
-
-    // Lightbox para inspecionar imagem ampliada
+    // Lightbox para ver em tela cheia
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
-    // Lista de imagens que o Sightengine sinalizou no motivo
-    const flaggedByAi = useMemo(() => {
+    // Imagens sinalizadas pela IA
+    const aiFlaggedUrls = useMemo(() => {
         return extractFlaggedImages(item.moderation_reason)
     }, [item.moderation_reason])
 
-    // Pre-seleciona automaticamente as imagens sinalizadas pelo Sightengine para facilitar a vida do admin
-    useEffect(() => {
-        setImages(item.images || [])
-        const flaggedSet = new Set<string>()
-        if (flaggedByAi.length > 0 && Array.isArray(item.images)) {
-            for (const img of item.images) {
-                if (isImageFlagged(img, flaggedByAi)) {
-                    flaggedSet.add(img)
-                }
-            }
-        }
-        setSelectedToRemove(flaggedSet)
-        setIsRejecting(false)
-        setRejectReason("")
-        setLightboxIndex(null)
-    }, [item, flaggedByAi])
-
-    // Fecha ao pressionar ESC
+    // Sincroniza e pré-marca fotos com flag da IA quando o modal abre
     useEffect(() => {
         if (!isOpen) return
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                if (lightboxIndex !== null) {
-                    setLightboxIndex(null)
-                } else if (isRejecting) {
-                    setIsRejecting(false)
-                } else {
-                    onClose()
-                }
+        const currentImages = item.images || []
+        setImages(currentImages)
+
+        const flagged = extractFlaggedImages(item.moderation_reason)
+        const initialSelected = new Set<string>()
+
+        for (const img of currentImages) {
+            if (isImageFlagged(img, flagged)) {
+                initialSelected.add(img)
             }
         }
-        window.addEventListener("keydown", handleKeyDown)
-        return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [isOpen, lightboxIndex, isRejecting, onClose])
+        setSelectedForRemoval(initialSelected)
+    }, [isOpen, item.images, item.moderation_reason])
 
-    if (!isOpen) return null
-
-    const typeLabel = item.type === "product" ? "Produto" : item.type === "service" ? "Serviço" : "Item"
-    const remainingCount = images.length - selectedToRemove.size
-    const selectedCount = selectedToRemove.size
+    const typeLabel = TYPE_LABELS[item.type] || "Item"
 
     const toggleImageSelection = (imgUrl: string) => {
-        setSelectedToRemove((prev) => {
+        setSelectedForRemoval((prev) => {
             const next = new Set(prev)
             if (next.has(imgUrl)) {
                 next.delete(imgUrl)
@@ -112,467 +96,419 @@ export function AdminQuickModerationModal({
     }
 
     const selectAllImages = () => {
-        setSelectedToRemove(new Set(images))
+        setSelectedForRemoval(new Set(images))
     }
 
     const clearSelection = () => {
-        setSelectedToRemove(new Set())
+        setSelectedForRemoval(new Set())
     }
 
-    // ─── Ação: Remover Selecionadas E Aprovar Produto ──────────────────────────
-    const handleRemoveAndApprove = () => {
+    const selectedCount = selectedForRemoval.size
+
+    // ─── Ações via AdminActionModal (mostra resumo das alterações, motivo e notificação) ───
+
+    const handleRemoveAndApprove = useCallback(async () => {
         if (selectedCount === 0) return
-        if (remainingCount === 0) {
-            toast.error("Não é possível aprovar um item sem nenhuma imagem restante.")
-            return
-        }
+        const selectedList = Array.from(selectedForRemoval)
 
-        startTransition(async () => {
-            const res = await removeModerationImagesBatch(
-                item.id,
-                Array.from(selectedToRemove),
-                item.type as any,
-                { autoApproveRemaining: true }
-            )
-
-            if (res.success) {
-                toast.success(`${selectedCount} imagem(ns) removida(s) e ${typeLabel.toLowerCase()} aprovado com sucesso!`)
-                onResolved("approved")
-                onClose()
-            } else {
-                toast.error(res.error || "Erro ao processar moderação")
-            }
-        })
-    }
-
-    // ─── Ação: Apenas Remover Selecionadas (sem aprovar ainda) ─────────────────
-    const handleOnlyRemoveSelected = () => {
-        if (selectedCount === 0) return
-
-        startTransition(async () => {
-            const res = await removeModerationImagesBatch(
-                item.id,
-                Array.from(selectedToRemove),
-                item.type as any,
-                { autoApproveRemaining: false }
-            )
-
-            if (res.success) {
-                const nextImages = res.remainingImages || images.filter(img => !selectedToRemove.has(img))
-                setImages(nextImages)
-                setSelectedToRemove(new Set())
-                toast.success(`${selectedCount} imagem(ns) removida(s) do ${typeLabel.toLowerCase()}!`)
-                if (res.noImagesLeft) {
-                    toast.info("O item ficou sem imagens e agora está com status 'Sem imagens'.")
-                }
-                onResolved("updated", {
-                    ...item,
-                    images: nextImages,
-                    moderation_status: res.newStatus || item.moderation_status,
+        await runAction({
+            title: `Remover Imagens e Aprovar ${typeLabel}`,
+            description: `As ${selectedCount} imagem(ns) selecionadas serão excluídas e o ${typeLabel.toLowerCase()} será aprovado no marketplace.`,
+            changedFields: [
+                `${selectedCount} imagem(ns) excluída(s)`,
+                "Status alterado para Aprovado",
+            ],
+            confirmLabel: "Remover e Aprovar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const res = await removeModerationImagesBatch(item.id, selectedList, item.type as any, {
+                    autoApproveRemaining: true,
+                    notifySeller: payload.notifySeller,
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
                 })
-            } else {
+                if (res.success) {
+                    toast.success(`${typeLabel} aprovado e imagens removidas com sucesso!`)
+                    onResolved("approved")
+                    onClose()
+                    return { success: true }
+                }
+                toast.error(res.error || "Erro ao processar ação")
+                return { success: false, error: res.error }
+            },
+        })
+    }, [item.id, item.type, typeLabel, selectedCount, selectedForRemoval, runAction, onResolved, onClose])
+
+    const handleOnlyRemoveSelected = useCallback(async () => {
+        if (selectedCount === 0) return
+        const selectedList = Array.from(selectedForRemoval)
+
+        await runAction({
+            title: `Remover Imagens`,
+            description: `Confirme a exclusão de ${selectedCount} imagem(ns) deste ${typeLabel.toLowerCase()}.`,
+            changedFields: [
+                `${selectedCount} imagem(ns) selecionada(s) para exclusão`,
+            ],
+            confirmLabel: "Remover Imagens",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const res = await removeModerationImagesBatch(item.id, selectedList, item.type as any, {
+                    autoApproveRemaining: false,
+                    notifySeller: payload.notifySeller,
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                })
+                if (res.success) {
+                    const nextImgs = res.remainingImages || []
+                    setImages(nextImgs)
+                    setSelectedForRemoval(new Set())
+                    toast.success(`${selectedCount} imagem(ns) removida(s) com sucesso!`)
+                    onResolved("updated", { ...item, images: nextImgs })
+                    return { success: true }
+                }
                 toast.error(res.error || "Erro ao remover imagens")
-            }
+                return { success: false, error: res.error }
+            },
         })
-    }
+    }, [item, typeLabel, selectedCount, selectedForRemoval, runAction, onResolved])
 
-    // ─── Ação: Aprovar Diretamente (com todas as imagens mantidas) ─────────────
-    const handleApproveDirectly = () => {
-        startTransition(async () => {
-            const res = await approveModeration(item.id, item.type as any)
-            if (res.success) {
-                toast.success(`${typeLabel} aprovado com sucesso no marketplace!`)
-                onResolved("approved")
-                onClose()
-            } else {
-                toast.error(res.error || `Erro ao aprovar ${typeLabel.toLowerCase()}`)
-            }
+    const handleApproveDirectly = useCallback(async () => {
+        await runAction({
+            title: `Aprovar ${typeLabel}`,
+            description: `Confirme a aprovação de "${item.title}" no marketplace.`,
+            changedFields: [
+                "Status alterado para Aprovado",
+            ],
+            confirmLabel: "Aprovar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const res = await approveModeration(item.id, item.type as any, {
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (res.success) {
+                    toast.success(`${typeLabel} aprovado com sucesso!`)
+                    onResolved("approved")
+                    onClose()
+                    return { success: true }
+                }
+                toast.error(res.error || "Erro ao aprovar item")
+                return { success: false, error: res.error }
+            },
         })
-    }
+    }, [item.id, item.type, item.title, typeLabel, runAction, onResolved, onClose])
 
-    // ─── Ação: Confirmar Rejeição do Item Inteiro ──────────────────────────────
-    const handleConfirmReject = () => {
-        const reason = rejectReason.trim()
-        if (!reason) {
-            toast.error("Informe o motivo da rejeição para o lojista.")
-            return
-        }
-
-        startTransition(async () => {
-            const res = await rejectModeration(item.id, reason, item.type as any)
-            if (res.success) {
-                toast.success(`${typeLabel} rejeitado. O lojista foi notificado.`)
-                onResolved("rejected")
-                onClose()
-            } else {
-                toast.error(res.error || `Erro ao rejeitar ${typeLabel.toLowerCase()}`)
-            }
+    const handleReject = useCallback(async () => {
+        await runAction({
+            title: `Rejeitar ${typeLabel}`,
+            description: `Informe o motivo da rejeição de "${item.title}".`,
+            requireReason: true,
+            changedFields: [
+                "Status alterado para Rejeitado",
+            ],
+            confirmLabel: "Confirmar Rejeição",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const res = await rejectModeration(item.id, payload.reason, item.type as any, {
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (res.success) {
+                    toast.success(`${typeLabel} rejeitado com sucesso!`)
+                    onResolved("rejected")
+                    onClose()
+                    return { success: true }
+                }
+                toast.error(res.error || "Erro ao rejeitar item")
+                return { success: false, error: res.error }
+            },
         })
-    }
+    }, [item.id, item.type, item.title, typeLabel, runAction, onResolved, onClose])
 
-    const quickReasons = [
-        "Imagem inadequada com violação dos termos",
-        "Conteúdo para maiores / nudez ou violência",
-        "Propaganda enganosa / imagem não condizente",
-        "Direitos autorais ou uso indevido de marca",
-        "Qualidade muito baixa / ilegível",
-    ]
+    const statusBadgeVariant =
+        item.moderation_status === "flagged"
+            ? "red"
+            : item.moderation_status === "approved"
+                ? "green"
+                : item.moderation_status === "rejected"
+                    ? "red"
+                    : item.moderation_status === "needs_images"
+                        ? "blue"
+                        : "orange"
+
+    const statusLabel =
+        item.moderation_status === "flagged"
+            ? "Flagged"
+            : item.moderation_status === "approved"
+                ? "Aprovado"
+                : item.moderation_status === "rejected"
+                    ? "Rejeitado"
+                    : item.moderation_status === "needs_images"
+                        ? "Sem imagens"
+                        : "Pendente"
 
     return (
-        <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
-            style={{ zIndex: modalZIndex }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !isPending) onClose()
-            }}
-        >
-            <div
-                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* ─── Header ──────────────────────────────────────────────────────── */}
-                <div className="p-5 border-b border-brand-border dark:border-dark-border flex items-start justify-between gap-4 bg-brand-gray/30 dark:bg-dark-border/20 shrink-0">
-                    <div className="flex flex-col gap-1.5 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-brand-dark/10 dark:bg-white/10 text-brand-dark dark:text-dark-heading uppercase tracking-wider">
-                                {typeLabel}
-                            </span>
-                            {item.moderation_status === "flagged" ? (
-                                <Badge variant="red" className="flex items-center gap-1 font-semibold">
-                                    <AlertTriangleIcon size={12} /> Sinalizado (Flagged)
-                                </Badge>
-                            ) : item.moderation_status === "pending_moderation" ? (
-                                <Badge variant="orange" className="font-semibold">Pendente</Badge>
-                            ) : item.moderation_status === "needs_images" ? (
-                                <Badge variant="blue" className="font-semibold">Sem imagens</Badge>
-                            ) : (
-                                <Badge variant="gray">{item.moderation_status}</Badge>
-                            )}
+        <>
+            <DefaultModal
+                isOpen={isOpen}
+                onClose={onClose}
+                title={`Moderar ${typeLabel}: ${item.title}`}
+                maxWidth="3xl"
+                footer={
+                    <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
+                        <Button variant="outline" onClick={onClose}>
+                            Cancelar
+                        </Button>
 
-                            {item.price > 0 && (
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">
-                                    {formatCurrency(item.price)}
-                                </span>
-                            )}
-                        </div>
-
-                        <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading truncate" title={item.title}>
-                            {item.title}
-                        </h2>
-
-                        <div className="flex items-center gap-3 text-xs text-brand-inactive-text dark:text-dark-body flex-wrap">
-                            <span className="flex items-center gap-1 font-medium">
-                                <StoreIcon size={13} /> {item.store_name || item.owner_store_name || "Loja"}
-                            </span>
-                            <span>•</span>
-                            <span>Enviado em {formatDate(item.created_at)}</span>
-                            <span>•</span>
-                            <span className="font-mono opacity-80">ID: {item.id}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                        <a
-                            href={item.type === "product" ? `/erp/produtos/${item.id}` : `/erp/servicos?edit=${item.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 rounded-lg text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition-colors flex items-center gap-1 text-xs font-medium"
-                            title="Abrir detalhes completos no ERP em nova aba"
-                        >
-                            <EditIcon size={15} />
-                            <span className="hidden sm:inline">Ver no ERP</span>
-                        </a>
-                        <button
-                            onClick={onClose}
-                            disabled={isPending}
-                            className="p-2 rounded-lg text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition-colors disabled:opacity-50"
-                        >
-                            <XIcon size={18} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* ─── Motivo da Moderação (se houver) ──────────────────────────────── */}
-                {item.moderation_reason && (
-                    <div className="px-5 py-3 bg-red-50 dark:bg-red-950/30 border-b border-red-200 dark:border-red-900/50 flex items-start gap-2.5 shrink-0">
-                        <AlertTriangleIcon size={16} className="text-brand-red shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                            <span className="text-xs font-bold text-brand-red uppercase tracking-wider block">
-                                Detecção de Segurança / Moderação
-                            </span>
-                            <p className="text-xs text-brand-red/90 mt-0.5 line-clamp-2">
-                                {item.moderation_reason}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {/* ─── Conteúdo: Galeria de Imagens com Seleção Direta ───────────────── */}
-                <div className="p-5 flex-1 overflow-y-auto">
-                    {isRejecting ? (
-                        /* ─── Sub-tela de Rejeição Rápida ─── */
-                        <div className="flex flex-col gap-4 py-2 animate-in fade-in duration-150">
-                            <div className="flex items-center gap-2 text-brand-red font-bold text-base">
-                                <AlertTriangleIcon size={18} />
-                                Rejeitar {typeLabel} do Marketplace
-                            </div>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                Selecione um motivo padrão ou digite uma justificativa clara para o lojista corrigir o problema:
-                            </p>
-
-                            {/* Sugestões rápidas de motivos */}
-                            <div className="flex flex-wrap gap-2">
-                                {quickReasons.map((qr) => (
-                                    <button
-                                        key={qr}
-                                        type="button"
-                                        onClick={() => setRejectReason(qr)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-left ${rejectReason === qr
-                                                ? "bg-brand-red text-white border-brand-red"
-                                                : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
-                                            }`}
+                        <div className="flex items-center gap-2">
+                            {selectedCount > 0 ? (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleOnlyRemoveSelected}
+                                        className="border-brand-red text-brand-red hover:bg-brand-red/10"
                                     >
-                                        {qr}
-                                    </button>
-                                ))}
-                            </div>
+                                        <TrashIcon size={14} className="mr-1.5" />
+                                        Apenas Remover ({selectedCount})
+                                    </Button>
 
-                            <textarea
-                                value={rejectReason}
-                                onChange={(e) => setRejectReason(e.target.value)}
-                                placeholder="Descreva o motivo da recusa detalhadamente..."
-                                rows={4}
-                                className="w-full p-3 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading text-sm focus:outline-none focus:ring-2 focus:ring-brand-red/50 resize-none"
-                                autoFocus
-                            />
+                                    <Button
+                                        onClick={handleRemoveAndApprove}
+                                        className="bg-brand-green hover:bg-brand-green/90 text-white font-bold"
+                                    >
+                                        <CheckCircleIcon size={16} className="mr-1.5" />
+                                        Remover ({selectedCount}) e Aprovar
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={handleReject}
+                                        className="bg-brand-red hover:bg-brand-red/90 text-white"
+                                    >
+                                        <TrashIcon size={14} className="mr-1.5" />
+                                        Rejeitar
+                                    </Button>
 
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsRejecting(false)}
-                                    disabled={isPending}
-                                >
-                                    Voltar para Fotos
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    onClick={handleConfirmReject}
-                                    disabled={isPending || !rejectReason.trim()}
-                                    className="bg-brand-red hover:bg-brand-red/90 text-white font-semibold"
-                                >
-                                    {isPending ? <Spinner size={16} /> : <TrashIcon size={15} />}
-                                    Confirmar Rejeição
-                                </Button>
-                            </div>
+                                    <Button
+                                        onClick={handleApproveDirectly}
+                                        className="bg-brand-green hover:bg-brand-green/90 text-white font-bold"
+                                    >
+                                        <CheckCircleIcon size={16} className="mr-1.5" />
+                                        Aprovar {typeLabel}
+                                    </Button>
+                                </>
+                            )}
                         </div>
-                    ) : (
-                        /* ─── Galeria de Fotos ─── */
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                                <div>
-                                    <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                        Imagens do Catálogo ({images.length})
-                                    </h3>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Clique sobre as imagens que você deseja <strong className="text-brand-red font-semibold">remover</strong>.
-                                    </p>
-                                </div>
-
-                                {images.length > 0 && (
-                                    <div className="flex items-center gap-2 text-xs">
-                                        {selectedCount > 0 ? (
-                                            <>
-                                                <span className="font-bold text-brand-red">
-                                                    {selectedCount} selecionada{selectedCount > 1 ? "s" : ""} para remoção
-                                                </span>
-                                                <button
-                                                    onClick={clearSelection}
-                                                    className="text-brand-inactive-text hover:underline"
-                                                >
-                                                    (Limpar)
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <button
-                                                onClick={selectAllImages}
-                                                className="text-brand-inactive-text hover:underline"
-                                            >
-                                                Marcar todas
-                                            </button>
-                                        )}
-                                    </div>
+                    </div>
+                }
+            >
+                <div className="space-y-4 pt-1">
+                    {/* Resumo do Item */}
+                    <div className="p-3.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/40 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-lg bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                {item.type === "service" ? (
+                                    <BriefcaseIcon size={18} className="text-brand-inactive-text" />
+                                ) : item.type === "partner" ? (
+                                    <UserIcon size={18} className="text-brand-inactive-text" />
+                                ) : (
+                                    <PackageIcon size={18} className="text-brand-inactive-text" />
                                 )}
                             </div>
-
-                            {images.length === 0 ? (
-                                <div className="p-8 text-center border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                                    <p className="text-sm font-medium text-brand-inactive-text">
-                                        Este {typeLabel.toLowerCase()} não possui imagens cadastradas.
-                                    </p>
+                            <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                    {item.title}
+                                </span>
+                                <div className="flex items-center gap-2 text-xs text-brand-inactive-text">
+                                    <span className="flex items-center gap-1 truncate">
+                                        <StoreIcon size={12} className="shrink-0" />
+                                        {item.store_name || item.owner_store_name || "Loja desconhecida"}
+                                    </span>
+                                    {item.price !== undefined && item.price > 0 && (
+                                        <>
+                                            <span>•</span>
+                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(item.price)}
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
-                                    {images.map((imgUrl, idx) => {
-                                        const isSelected = selectedToRemove.has(imgUrl)
-                                        const isAiFlagged = isImageFlagged(imgUrl, flaggedByAi)
-                                        const fullUrl = getR2ImageUrl(imgUrl)
+                            </div>
+                        </div>
 
-                                        return (
-                                            <div
-                                                key={imgUrl || idx}
-                                                onClick={() => toggleImageSelection(imgUrl)}
-                                                className={`group relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-200 select-none ${isSelected
-                                                        ? "ring-3 ring-brand-red border-2 border-brand-red shadow-lg shadow-brand-red/10 scale-[0.98]"
-                                                        : "border border-brand-border dark:border-dark-border hover:border-brand-dark/50 dark:hover:border-white/50"
-                                                    }`}
+                        <div className="flex items-center gap-2">
+                            <Badge variant="gray">{typeLabel}</Badge>
+                            <Badge variant={statusBadgeVariant}>{statusLabel}</Badge>
+                        </div>
+                    </div>
+
+                    {/* Aviso de Flagged pela IA se houver */}
+                    {item.moderation_reason && (
+                        <div className="p-3 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/20 text-xs text-red-700 dark:text-red-300 flex items-start gap-2.5">
+                            <AlertTriangleIcon size={16} className="text-brand-red shrink-0 mt-0.5" />
+                            <div className="space-y-1 min-w-0 flex-1">
+                                <span className="font-semibold block">Sinalização de Moderação:</span>
+                                <p className="text-[11px] leading-relaxed break-words opacity-90">
+                                    {item.moderation_reason}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Galeria de Fotos */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div>
+                                <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                    Imagens do Catálogo ({images.length})
+                                </h3>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Clique nas imagens que deseja <strong className="text-brand-red font-semibold">remover</strong> antes de aprovar.
+                                </p>
+                            </div>
+
+                            {images.length > 0 && (
+                                <div className="flex items-center gap-3 text-xs">
+                                    {selectedCount > 0 ? (
+                                        <>
+                                            <span className="font-bold text-brand-red">
+                                                {selectedCount} selecionada{selectedCount > 1 ? "s" : ""}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={clearSelection}
+                                                className="text-brand-inactive-text hover:underline cursor-pointer"
                                             >
-                                                <img
-                                                    src={fullUrl}
-                                                    alt={`Foto ${idx + 1}`}
-                                                    className={`w-full h-full object-cover transition-transform duration-200 ${isSelected ? "opacity-40 grayscale-50 scale-95" : "group-hover:scale-105"
-                                                        }`}
-                                                    loading="lazy"
-                                                />
+                                                Limpar
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={selectAllImages}
+                                            className="text-brand-inactive-text hover:underline cursor-pointer"
+                                        >
+                                            Marcar todas
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
-                                                {/* Tag da IA se foi ela que sinalizou esta imagem */}
-                                                {isAiFlagged && (
-                                                    <span className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-red text-white shadow-xs flex items-center gap-1">
-                                                        <AlertTriangleIcon size={10} /> IA Flagged
+                        {images.length === 0 ? (
+                            <div className="p-8 text-center border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl">
+                                <p className="text-xs text-brand-inactive-text">
+                                    Este item não possui imagens cadastradas.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                                {images.map((imgUrl, index) => {
+                                    const fullUrl = getR2ImageUrl(imgUrl)
+                                    const isSelected = selectedForRemoval.has(imgUrl)
+                                    const isAiFlagged = isImageFlagged(imgUrl, aiFlaggedUrls)
+
+                                    return (
+                                        <div
+                                            key={`${imgUrl}-${index}`}
+                                            onClick={() => toggleImageSelection(imgUrl)}
+                                            className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all duration-200 select-none group ${
+                                                isSelected
+                                                    ? "border-brand-red ring-2 ring-brand-red/30 bg-brand-red/10"
+                                                    : isAiFlagged
+                                                        ? "border-amber-400 dark:border-amber-500 shadow-xs"
+                                                        : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
+                                            }`}
+                                        >
+                                            <img
+                                                src={fullUrl}
+                                                alt={`Foto ${index + 1}`}
+                                                className={`w-full h-full object-cover transition-transform duration-200 ${
+                                                    isSelected ? "opacity-60 scale-95" : "group-hover:scale-105"
+                                                }`}
+                                                loading="lazy"
+                                            />
+
+                                            {/* Badge Superior Esquerdo: Remoção ou Numeração */}
+                                            <div className="absolute top-2 left-2 z-10">
+                                                {isSelected ? (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-red text-white flex items-center gap-1 shadow-sm">
+                                                        <TrashIcon size={11} /> Remover
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-black/60 text-white backdrop-blur-xs">
+                                                        #{index + 1}
                                                     </span>
                                                 )}
-
-                                                {/* Botão de lupa para ver tela cheia */}
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        setLightboxIndex(idx)
-                                                    }}
-                                                    className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
-                                                    title="Ampliar foto"
-                                                >
-                                                    <EyeIcon size={13} />
-                                                </button>
-
-                                                {/* Overlay e Badge quando selecionada para remover */}
-                                                {isSelected ? (
-                                                    <div className="absolute inset-0 bg-red-600/20 flex flex-col items-center justify-center gap-1 text-brand-red font-bold p-2 text-center">
-                                                        <div className="w-8 h-8 rounded-full bg-brand-red text-white flex items-center justify-center shadow-md">
-                                                            <TrashIcon size={16} />
-                                                        </div>
-                                                        <span className="text-[11px] uppercase tracking-wide bg-white/90 dark:bg-black/80 px-2 py-0.5 rounded font-black text-brand-red shadow-xs">
-                                                            Remover
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between text-white text-[11px]">
-                                                        <span>Foto #{idx + 1}</span>
-                                                        <span className="text-white/80 text-[10px]">Clique p/ remover</span>
-                                                    </div>
-                                                )}
                                             </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
 
-                            {/* Informações adicionais do item */}
-                            {item.description && (
-                                <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                    <h4 className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
-                                        Descrição
-                                    </h4>
-                                    <p className="text-xs text-brand-dark dark:text-dark-heading max-h-24 overflow-y-auto leading-relaxed">
-                                        {item.description}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                            {/* Botão de Zoom (Lightbox) */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setLightboxIndex(index)
+                                                }}
+                                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                                                title="Visualizar em tamanho real"
+                                            >
+                                                <EyeIcon size={14} />
+                                            </button>
 
-                {/* ─── Footer: Ações Rápidas ─────────────────────────────────────────── */}
-                <div className="p-4 px-5 border-t border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-border/20 flex items-center justify-between gap-3 shrink-0 flex-wrap">
-                    <Button
-                        variant="outline"
-                        onClick={onClose}
-                        disabled={isPending}
-                        className="text-xs font-semibold"
-                    >
-                        Fechar
-                    </Button>
+                                            {/* Badge Inferior: Flagged por IA */}
+                                            {isAiFlagged && !isSelected && (
+                                                <div className="absolute bottom-2 left-2 right-2 z-10">
+                                                    <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-500 text-white block text-center truncate shadow-sm">
+                                                        Flagged por IA
+                                                    </span>
+                                                </div>
+                                            )}
 
-                    {!isRejecting && (
-                        <div className="flex items-center gap-2 flex-wrap ml-auto">
-                            {/* Botão de Rejeição */}
-                            <Button
-                                variant="outline"
-                                onClick={() => setIsRejecting(true)}
-                                disabled={isPending}
-                                className="text-brand-red hover:bg-brand-red/10 border-brand-red/30 text-xs font-semibold"
-                            >
-                                Rejeitar {typeLabel}
-                            </Button>
-
-                            {/* Se houver fotos selecionadas: botão de apenas remover */}
-                            {selectedCount > 0 && (
-                                <Button
-                                    variant="outline"
-                                    onClick={handleOnlyRemoveSelected}
-                                    disabled={isPending}
-                                    className="border-brand-red text-brand-red hover:bg-brand-red/10 text-xs font-semibold"
-                                >
-                                    {isPending ? <Spinner size={16} /> : <TrashIcon size={14} />}
-                                    Apenas Remover ({selectedCount})
-                                </Button>
-                            )}
-
-                            {/* Botão Principal */}
-                            {selectedCount > 0 ? (
-                                <Button
-                                    onClick={handleRemoveAndApprove}
-                                    disabled={isPending || remainingCount === 0}
-                                    className="bg-brand-green hover:bg-brand-green/90 text-white font-bold text-xs shadow-xs"
-                                >
-                                    {isPending ? <Spinner size={16} /> : <CheckCircleIcon size={15} />}
-                                    Remover ({selectedCount}) e Aprovar
-                                </Button>
-                            ) : (
-                                <Button
-                                    onClick={handleApproveDirectly}
-                                    disabled={isPending}
-                                    className="bg-brand-green hover:bg-brand-green/90 text-white font-bold text-xs shadow-xs"
-                                >
-                                    {isPending ? <Spinner size={16} /> : <CheckCircleIcon size={15} />}
-                                    Aprovar {typeLabel}
-                                </Button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Lightbox para ampliação */}
-            {lightboxIndex !== null && images[lightboxIndex] && (
-                <div
-                    className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-[200]"
-                    onClick={() => setLightboxIndex(null)}
-                >
-                    <div className="relative max-w-[90vw] max-h-[90vh]">
-                        <img
-                            src={getR2ImageUrl(images[lightboxIndex])}
-                            alt=""
-                            className="max-w-full max-h-[85vh] object-contain rounded-lg"
-                        />
-                        <button
-                            onClick={() => setLightboxIndex(null)}
-                            className="absolute -top-10 right-0 text-white/90 hover:text-white p-2"
-                        >
-                            <XIcon size={24} />
-                        </button>
+                                            {/* Overlay visual quando selecionada */}
+                                            {isSelected && (
+                                                <div className="absolute inset-0 bg-brand-red/20 flex items-center justify-center pointer-events-none">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-red text-white flex items-center justify-center shadow-md">
+                                                        <TrashIcon size={20} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
+            </DefaultModal>
+
+            {/* Lightbox para ampliação em tela cheia */}
+            {lightboxIndex !== null && images[lightboxIndex] && (
+                <div
+                    className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-[220]"
+                    onClick={() => setLightboxIndex(null)}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setLightboxIndex(null)}
+                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+                    >
+                        <XIcon size={20} />
+                    </button>
+                    <img
+                        src={getR2ImageUrl(images[lightboxIndex])}
+                        alt="Visualização ampliada"
+                        className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
             )}
-        </div>
+
+            {/* Modal de Ação Administrativa (motivo, risk score, notificação) */}
+            {actionModal}
+        </>
     )
 }

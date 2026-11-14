@@ -66,10 +66,11 @@ export async function getAdminCommunityVideos(
             title,
             description,
             video_url,
-            thumbnail_url,
+            video_thumbnail,
+            duration,
             moderation_status,
             views_count,
-            likes_count,
+            clicks_count,
             published_at,
             created_at,
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
@@ -93,7 +94,14 @@ export async function getAdminCommunityVideos(
     const { data, error } = await query
     if (error) throw error
 
-    const items = (data || []) as any[]
+    const items = ((data || []) as any[]).map((row: any) => ({
+        ...row,
+        thumbnail_url: row.video_thumbnail || null,
+        video_thumbnail: row.video_thumbnail || null,
+        likes_count: row.clicks_count || 0,
+        store_name: row.stores?.name || "Loja Parceira",
+        partner_name: row.stores?.name || "Loja Parceira",
+    }))
     const hasMore = items.length > pageSize
 
     return {

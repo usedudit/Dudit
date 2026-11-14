@@ -28,7 +28,7 @@ const softwareSchema = {
 const faqs = [
     {
         question: "O cliente precisa criar conta para agendar?",
-        answer: "Não. Ele abre o link da sua agenda, escolhe o profissional, o serviço e o horário disponível, e confirma. O agendamento entra na sua agenda na hora.",
+        answer: "Sim. Para agendar e acompanhar o horário, o cliente precisa de uma conta gratuita na Dudit. O cadastro é rápido e ele conclui o agendamento sem sair da página.",
     },
     {
         question: "Consigo bloquear horários e pausas?",
@@ -206,9 +206,9 @@ export default function SaloesEBarbeariasSegmentPage() {
                     },
                     {
                         icon: <Sparkles className="w-5 h-5 text-white" />,
-                        title: "Cliente fiel",
+                        title: "Cliente que volta",
                         description:
-                            "Cada visita fica no histórico. Você sabe o que o cliente fez, o que costuma comprar e quando voltará.",
+                            "O histórico de atendimentos fica salvo. Em Sugestões & Oportunidades, a Dudit mostra clientes que não voltam há um tempo para você chamar de novo.",
                     },
                     {
                         icon: <Users className="w-5 h-5 text-white" />,

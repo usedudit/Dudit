@@ -55,7 +55,7 @@ const sitemapSections: SiteMapSection[] = [
             {
                 label: "Assistência Técnica e Celulares",
                 href: "/segmentos/assistencia-tecnica-celulares",
-                description: "OS com checklist de entrada, fotos do aparelho antes/depois e termo de garantia",
+                description: "OS com ficha de entrada, fotos do aparelho e histórico do conserto",
             },
             {
                 label: "Salões de Beleza e Barbearias",
@@ -65,12 +65,17 @@ const sitemapSections: SiteMapSection[] = [
             {
                 label: "Confeitarias, Docerias e Marmitarias",
                 href: "/segmentos/confeitarias-e-alimentacao",
-                description: "Cardápio digital para WhatsApp, pedidos organizados e 0% de taxa por entrega",
+                description: "Cardápio digital para WhatsApp, pedidos organizados e 0% de comissão por venda",
             },
             {
                 label: "Lojas de Roupas, Calçados e Acessórios",
                 href: "/segmentos/lojas-de-roupas-e-calcados",
                 description: "Grade de estoque por cor e tamanho, etiquetas de código de barras e PDV",
+            },
+            {
+                label: "Autônomos e Prestadores de Serviços",
+                href: "/segmentos/autonomos-e-prestadores-de-servicos",
+                description: "Vitrine de serviços, orçamentos em PDF, agenda e financeiro em um só lugar",
             },
         ],
     },

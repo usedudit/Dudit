@@ -115,7 +115,15 @@ export async function getAdminServiceOrders(
     const { data, error } = await query
     if (error) throw error
 
-    const items = (data || []) as any[]
+    const items = ((data || []) as any[]).map((row: any) => ({
+        ...row,
+        customer_name: row.customer_snapshot?.name || "Cliente não informado",
+        customer_phone: row.customer_snapshot?.phone || null,
+        customer_email: row.customer_snapshot?.email || null,
+        total_amount: Number(row.total_amount || 0),
+        store_name: row.stores?.name || "Loja Parceira",
+        partner_name: row.stores?.name || "Loja Parceira",
+    }))
     const hasMore = items.length > pageSize
 
     return {

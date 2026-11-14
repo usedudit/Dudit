@@ -1134,19 +1134,19 @@ export async function removeModerationImagesBatch(
         updated_at: new Date().toISOString(),
     }
 
-    if (noImagesLeft) {
-        newStatus = "needs_images"
-        updatePayload.moderation_status = "needs_images"
-        updatePayload.moderation_reason = reasonText || "Todas as imagens foram removidas pela moderação."
-        updatePayload.moderation_reviewed_by = admin.userId
-        updatePayload.moderation_reviewed_at = new Date().toISOString()
-    } else if (options?.autoApproveRemaining) {
+    if (options?.autoApproveRemaining) {
         newStatus = "approved"
         updatePayload.moderation_status = "approved"
         updatePayload.moderation_reason = null
         updatePayload.moderation_reviewed_by = admin.userId
         updatePayload.moderation_reviewed_at = new Date().toISOString()
         updatePayload.status = type === "recurring_plan" ? "active" : "ativo"
+    } else if (noImagesLeft) {
+        newStatus = "needs_images"
+        updatePayload.moderation_status = "needs_images"
+        updatePayload.moderation_reason = reasonText || "Todas as imagens foram removidas pela moderação."
+        updatePayload.moderation_reviewed_by = admin.userId
+        updatePayload.moderation_reviewed_at = new Date().toISOString()
     }
 
     const { error: updateError } = await supabase

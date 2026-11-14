@@ -1,14 +1,31 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Button, Badge, Input, Tabs, TabsList, TabsTrigger, Pagination, IconPlaceholder, DefaultModal, FormTextarea } from "@/components/reusable"
+import React, { useState, useTransition, useMemo } from "react"
+import {
+    Button,
+    Badge,
+    Input,
+    Pagination,
+    IconPlaceholder,
+    ActionsDropdown,
+    DefaultModal,
+    FormTextarea,
+} from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
-import { VideoIcon, EditIcon, EyeIcon, PlayIcon } from "@/lib/icons"
+import {
+    VideoIcon,
+    EditIcon,
+    EyeIcon,
+    StoreIcon,
+    SearchIcon,
+    ListIcon,
+    GridIcon,
+} from "@/lib/icons"
+import { Play } from "lucide-react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDate } from "@/lib/utils"
 import { useAdminActionModal } from "@/components/admin/AdminActionModal"
 import {
-    getAdminCommunityVideos,
     updateAdminCommunityVideo,
     type AdminVideoStats,
 } from "@/app/actions/admin/community-videos"
@@ -18,27 +35,32 @@ interface CommunityVideosListProps {
     initialStats?: AdminVideoStats
 }
 
-const STATUS_MAP: Record<string, { label: string; variant: "green" | "orange" | "red" | "gray" }> = {
-    approved: { label: "Aprovado", variant: "green" },
+const STATUS_MAP: Record<string, { label: string; variant: "green" | "orange" | "red" | "blue" | "gray" }> = {
     pending: { label: "Pendente", variant: "orange" },
-    rejected: { label: "Recusado", variant: "red" },
+    approved: { label: "Aprovado", variant: "green" },
+    rejected: { label: "Rejeitado", variant: "red" },
 }
 
 export default function CommunityVideosList({ initialData, initialStats }: CommunityVideosListProps) {
     const [videos, setVideos] = useState(initialData)
     const [stats, setStats] = useState(initialStats)
-    const [statusTab, setStatusTab] = useState("all")
+    const [activeTab, setActiveTab] = useState("all")
+    const [viewMode, setViewMode] = useState<"list" | "grid">("list")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const itemsPerPage = 8
+    const itemsPerPage = 10
 
+    // Detail / Video Player Modal
+    const [playingVideo, setPlayingVideo] = useState<any | null>(null)
+
+    // Edit / Moderation State
     const [editingVideo, setEditingVideo] = useState<any | null>(null)
     const [editForm, setEditForm] = useState<{
         moderation_status: "approved" | "pending" | "rejected"
         title: string
         description: string
     }>({
-        moderation_status: "approved",
+        moderation_status: "pending",
         title: "",
         description: "",
     })
@@ -46,24 +68,43 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
     const [isPending, startTransition] = useTransition()
     const { modal: actionModal, runAction } = useAdminActionModal()
 
-    const filtered = videos.filter((v) => {
-        const matchesStatus = statusTab === "all" ? true : v.moderation_status === statusTab
-        const matchesSearch =
-            !search.trim() ||
-            v.title?.toLowerCase().includes(search.toLowerCase()) ||
-            v.description?.toLowerCase().includes(search.toLowerCase()) ||
-            v.stores?.name?.toLowerCase().includes(search.toLowerCase())
+    const tabs = useMemo(() => [
+        { id: "all", label: "Todos os Vídeos", count: stats?.total ?? videos.length },
+        { id: "pending", label: "Pendentes", count: stats?.pending ?? 0 },
+        { id: "approved", label: "Aprovados", count: stats?.approved ?? 0 },
+        { id: "rejected", label: "Rejeitados", count: stats?.rejected ?? 0 },
+    ], [stats, videos.length])
 
-        return matchesStatus && matchesSearch
-    })
+    const filtered = useMemo(() => {
+        return videos.filter((v) => {
+            const status = v.moderation_status || "pending"
+            let matchesTab = true
+            if (activeTab !== "all") {
+                matchesTab = status === activeTab
+            }
 
-    const paginated = filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+            const term = search.trim().toLowerCase()
+            const matchesSearch =
+                !term ||
+                v.title?.toLowerCase().includes(term) ||
+                v.description?.toLowerCase().includes(term) ||
+                v.store_name?.toLowerCase().includes(term) ||
+                v.stores?.name?.toLowerCase().includes(term)
+
+            return matchesTab && matchesSearch
+        })
+    }, [videos, activeTab, search])
+
+    const paginated = useMemo(() => {
+        return filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    }, [filtered, page])
+
     const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1
 
     const handleOpenEdit = (video: any) => {
         setEditingVideo(video)
         setEditForm({
-            moderation_status: video.moderation_status || "approved",
+            moderation_status: video.moderation_status || "pending",
             title: video.title || "",
             description: video.description || "",
         })
@@ -77,13 +118,13 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         if (editForm.title !== (editingVideo.title || "")) changedFields.push("título")
         if (editForm.description !== (editingVideo.description || "")) changedFields.push("descrição")
 
-        const result = await runAction({
-            title: "Salvar Alterações no Vídeo",
-            description: `Vídeo "${editingVideo.title || editingVideo.id}" (${editingVideo.stores?.name || "Loja"})`,
+        await runAction({
+            title: "Salvar Moderação do Vídeo",
+            description: `Vídeo "${editingVideo.title || "Sem título"}" (${editingVideo.store_name || editingVideo.stores?.name || "Loja"})`,
             changedFields,
             force: true,
             confirmLabel: "Salvar e Notificar",
-            notifyLabel: "Enviar notificação pelo Dudit ao vendedor",
+            notifyLabel: "Enviar notificação pelo Dudit ao criador do vídeo",
             runner: async (payload) => {
                 const res = await updateAdminCommunityVideo(
                     editingVideo.id,
@@ -96,164 +137,383 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                 )
 
                 if (!res.success) {
-                    return { success: false, error: res.error || "Erro ao atualizar vídeo" }
+                    toast({ title: "Erro ao salvar", description: res.error, variant: "destructive" })
+                    return { success: false, error: res.error }
                 }
 
-                // Update local state
+                toast({ title: "Sucesso", description: "Vídeo moderado com sucesso." })
                 setVideos((prev) =>
-                    prev.map((item) =>
-                        item.id === editingVideo.id
+                    prev.map((v) =>
+                        v.id === editingVideo.id
                             ? {
-                                  ...item,
-                                  ...editForm,
+                                  ...v,
+                                  moderation_status: editForm.moderation_status,
+                                  title: editForm.title,
+                                  description: editForm.description,
                               }
-                            : item
+                            : v
                     )
                 )
-
-                toast.success("Vídeo da comunidade atualizado com sucesso!")
                 setEditingVideo(null)
                 return { success: true }
             },
         })
-
-        if (!result.cancelled && !result.success) {
-            toast.error(result.error || "Erro ao salvar alterações.")
-        }
     }
 
     return (
-        <FadeIn className="p-6 max-w-7xl mx-auto space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                    <p className="text-xs text-brand-inactive-text font-medium">Total de Vídeos</p>
-                    <p className="text-2xl font-bold text-brand-dark dark:text-white mt-1">{stats?.total ?? videos.length}</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                    <p className="text-xs text-brand-inactive-text font-medium">Aprovados</p>
-                    <p className="text-2xl font-bold text-green-500 mt-1">{stats?.approved ?? 0}</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                    <p className="text-xs text-brand-inactive-text font-medium">Pendentes</p>
-                    <p className="text-2xl font-bold text-yellow-500 mt-1">{stats?.pending ?? 0}</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                    <p className="text-xs text-brand-inactive-text font-medium">Recusados</p>
-                    <p className="text-2xl font-bold text-red-500 mt-1">{stats?.rejected ?? 0}</p>
-                </div>
-            </div>
-
-            {/* Controls: Search & Tabs */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <Tabs value={statusTab} onValueChange={(val) => { setStatusTab(val); setPage(1) }}>
-                    <TabsList className="bg-brand-gray dark:bg-dark-border/40 p-1 rounded-xl">
-                        <TabsTrigger value="all">Todos</TabsTrigger>
-                        <TabsTrigger value="approved">Aprovados</TabsTrigger>
-                        <TabsTrigger value="pending">Pendentes</TabsTrigger>
-                        <TabsTrigger value="rejected">Recusados</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-
-                <div className="w-full md:w-72">
-                    <Input
-                        type="text"
-                        placeholder="Buscar por título ou loja..."
-                        value={search}
-                        onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                    />
-                </div>
-            </div>
-
-            {/* List / Table */}
-            {paginated.length === 0 ? (
-                <IconPlaceholder
-                    icon={VideoIcon}
-                    title="Nenhum vídeo encontrado"
-                    subtitle="Não há vídeos correspondentes aos filtros aplicados."
-                />
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {paginated.map((video) => {
-                        const meta = STATUS_MAP[video.moderation_status] || { label: video.moderation_status, variant: "gray" as const }
-
+        <FadeIn className="w-full space-y-6 pt-4 px-4 md:px-8 max-w-[1700px] mx-auto pb-12">
+            {/* Top Controls matching ERP */}
+            <div className="flex flex-col gap-4">
+                {/* Tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {tabs.map((tab) => {
+                        const isActive = activeTab === tab.id
                         return (
-                            <div
-                                key={video.id}
-                                className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
+                            <button
+                                key={tab.id}
+                                onClick={() => {
+                                    setActiveTab(tab.id)
+                                    setPage(1)
+                                }}
+                                className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                    isActive
+                                        ? "bg-brand-dark dark:bg-white text-white dark:text-brand-dark shadow-sm"
+                                        : "bg-white dark:bg-dark-surface text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white border border-brand-border dark:border-dark-border"
+                                }`}
                             >
-                                <div className="relative aspect-[9/16] bg-black max-h-[300px] overflow-hidden group">
-                                    {video.thumbnail_url ? (
-                                        <img
-                                            src={video.thumbnail_url}
-                                            alt={video.title || "Thumbnail"}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-white/30">
-                                            <PlayIcon className="w-12 h-12" />
-                                        </div>
-                                    )}
-
-                                    <div className="absolute top-2 right-2">
-                                        <Badge variant={meta.variant}>{meta.label}</Badge>
-                                    </div>
-
-                                    {video.video_url && (
-                                        <a
-                                            href={video.video_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity text-white"
-                                        >
-                                            <PlayIcon className="w-10 h-10" />
-                                        </a>
-                                    )}
-                                </div>
-
-                                <div className="p-4 flex-1 flex flex-col justify-between">
-                                    <div>
-                                        <h3 className="font-bold text-sm text-brand-dark dark:text-white line-clamp-1">{video.title || "Sem título"}</h3>
-                                        <p className="text-xs text-brand-inactive-text line-clamp-2 mt-1">{video.description || "Sem descrição"}</p>
-                                        <p className="text-xs font-medium text-brand-green mt-2 truncate">{video.stores?.name || "Loja"}</p>
-                                    </div>
-
-                                    <div className="mt-4 pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between text-xs text-brand-inactive-text">
-                                        <span>{video.views_count || 0} visualizações</span>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => handleOpenEdit(video)}
-                                            className="inline-flex items-center gap-1.5"
-                                        >
-                                            <EditIcon className="w-3.5 h-3.5" />
-                                            <span>Moderar</span>
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
+                                <span>{tab.label}</span>
+                                <span
+                                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                        isActive
+                                            ? "bg-white/20 text-white dark:bg-brand-dark/20 dark:text-brand-dark"
+                                            : "bg-brand-gray dark:bg-dark-border text-brand-inactive-text"
+                                    }`}
+                                >
+                                    {tab.count}
+                                </span>
+                            </button>
                         )
                     })}
                 </div>
-            )}
 
-            {totalPages > 1 && (
-                <div className="flex justify-end pt-4">
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        onPageChange={setPage}
+                {/* Search & Actions Bar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="relative w-full sm:w-80 md:w-96">
+                        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
+                        <Input
+                            placeholder="Buscar vídeos por título ou loja..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value)
+                                setPage(1)
+                            }}
+                            className="pl-10 h-10 text-xs rounded-xl border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                        />
+                    </div>
+
+                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-0.5 ml-auto">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`p-2 rounded-lg transition-colors ${
+                                viewMode === "list"
+                                    ? "bg-brand-green-light dark:bg-dark-border text-brand-dark dark:text-white"
+                                    : "text-brand-inactive-text hover:text-brand-dark"
+                            }`}
+                            title="Visualização em Lista"
+                        >
+                            <ListIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode("grid")}
+                            className={`p-2 rounded-lg transition-colors ${
+                                viewMode === "grid"
+                                    ? "bg-brand-green-light dark:bg-dark-border text-brand-dark dark:text-white"
+                                    : "text-brand-inactive-text hover:text-brand-dark"
+                            }`}
+                            title="Visualização em Grade"
+                        >
+                            <GridIcon className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content Area */}
+            {filtered.length === 0 ? (
+                <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex flex-col justify-center min-h-[360px]">
+                    <IconPlaceholder
+                        title="Nenhum vídeo encontrado"
+                        subtitle="Não há vídeos correspondentes aos filtros aplicados."
+                        className="py-12"
                     />
+                </div>
+            ) : viewMode === "list" ? (
+                /* ERP List / Table Layout */
+                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-brand-gray/50 dark:bg-dark-border/30 border-b border-brand-border dark:border-dark-border">
+                                <tr>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
+                                        Vídeo
+                                    </th>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
+                                        Loja / Criador
+                                    </th>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
+                                        Visualizações
+                                    </th>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
+                                        Cliques
+                                    </th>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
+                                        Data de Envio
+                                    </th>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body text-center">
+                                        Status
+                                    </th>
+                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body text-center">
+                                        Ações
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                {paginated.map((video) => {
+                                    const meta = STATUS_MAP[video.moderation_status?.toLowerCase()] || {
+                                        label: video.moderation_status,
+                                        variant: "gray" as const,
+                                    }
+                                    const storeName = video.store_name || video.stores?.name || "Loja Parceira"
+                                    const thumb = video.video_thumbnail || video.thumbnail_url
+
+                                    return (
+                                        <tr
+                                            key={video.id}
+                                            onClick={() => setPlayingVideo(video)}
+                                            className="h-[76px] cursor-pointer hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20 transition-colors"
+                                        >
+                                            <td className="py-3.5 px-5 align-middle">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded-xl bg-neutral-900 overflow-hidden relative shrink-0 border border-brand-border dark:border-dark-border flex items-center justify-center group-hover:scale-105 transition-transform">
+                                                        {thumb ? (
+                                                            <img
+                                                                src={thumb}
+                                                                alt=""
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <VideoIcon size={20} className="text-neutral-500" />
+                                                        )}
+                                                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Play size={16} className="text-white fill-current" />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading block line-clamp-1 max-w-[240px]">
+                                                            {video.title || "Vídeo sem título"}
+                                                        </span>
+                                                        <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body line-clamp-1 max-w-[240px]">
+                                                            {video.description || "Sem descrição"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-3.5 px-5 align-middle">
+                                                <div className="flex items-center gap-1.5 font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                    <StoreIcon size={14} className="text-brand-green shrink-0" />
+                                                    <span className="truncate max-w-[180px]">{storeName}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3.5 px-5 align-middle text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                {video.views_count ?? 0}
+                                            </td>
+                                            <td className="py-3.5 px-5 align-middle text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                {video.clicks_count ?? 0}
+                                            </td>
+                                            <td className="py-3.5 px-5 align-middle text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                {formatDate(video.created_at)}
+                                            </td>
+                                            <td className="py-3.5 px-5 align-middle text-center">
+                                                <Badge variant={meta.variant}>{meta.label}</Badge>
+                                            </td>
+                                            <td
+                                                className="py-3.5 px-5 align-middle text-center"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setPlayingVideo(video)}
+                                                        className="text-xs h-8 px-2"
+                                                        title="Assistir Vídeo"
+                                                    >
+                                                        <Play size={14} />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleOpenEdit(video)}
+                                                        className="text-xs h-8 px-2.5"
+                                                    >
+                                                        Moderar
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div className="p-4 border-t border-brand-border dark:border-dark-border flex justify-end">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPageChange={setPage}
+                            />
+                        </div>
+                    )}
+                </div>
+            ) : (
+                /* ERP Grid Mode matching VideoGridCard */
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {paginated.map((video) => {
+                            const meta = STATUS_MAP[video.moderation_status?.toLowerCase()] || {
+                                label: video.moderation_status,
+                                variant: "gray" as const,
+                            }
+                            const storeName = video.store_name || video.stores?.name || "Loja Parceira"
+                            const thumb = video.video_thumbnail || video.thumbnail_url
+
+                            return (
+                                <div
+                                    key={video.id}
+                                    onClick={() => setPlayingVideo(video)}
+                                    className="rounded-[24px] bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border overflow-hidden hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                                >
+                                    <div className="relative aspect-[9/16] max-h-[260px] bg-neutral-900 w-full overflow-hidden flex items-center justify-center">
+                                        {thumb ? (
+                                            <img
+                                                src={thumb}
+                                                alt=""
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                            />
+                                        ) : (
+                                            <VideoIcon size={32} className="text-neutral-600" />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                            <div className="w-10 h-10 rounded-full bg-white/90 text-brand-dark flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                                <Play size={18} className="fill-current ml-0.5" />
+                                            </div>
+                                        </div>
+                                        <div className="absolute top-3 right-3">
+                                            <Badge variant={meta.variant}>{meta.label}</Badge>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 flex flex-col justify-between flex-1">
+                                        <div>
+                                            <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading line-clamp-1 group-hover:text-brand-green transition-colors">
+                                                {video.title || "Vídeo sem título"}
+                                            </h4>
+                                            <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pt-1">
+                                                <StoreIcon size={12} className="text-brand-green shrink-0" />
+                                                <span className="truncate">{storeName}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-3 mt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between text-xs text-brand-inactive-text">
+                                            <span>{video.views_count ?? 0} visualizações</span>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleOpenEdit(video)
+                                                }}
+                                                className="text-xs h-7 px-2"
+                                            >
+                                                Moderar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div className="p-4 bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border flex justify-end">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPageChange={setPage}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Modal de Edição / Moderação */}
+            {/* Video Player Modal */}
+            {playingVideo && (
+                <DefaultModal
+                    isOpen={Boolean(playingVideo)}
+                    onClose={() => setPlayingVideo(null)}
+                    title={playingVideo.title || "Visualizar Vídeo"}
+                    description={`Loja: ${playingVideo.store_name || playingVideo.stores?.name || "Loja Parceira"}`}
+                    footer={
+                        <div className="flex justify-between items-center w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    const v = playingVideo
+                                    setPlayingVideo(null)
+                                    handleOpenEdit(v)
+                                }}
+                            >
+                                Alterar Status / Moderar
+                            </Button>
+                            <Button variant="default" onClick={() => setPlayingVideo(null)}>
+                                Fechar
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4 pt-1">
+                        <div className="aspect-[9/16] max-h-[460px] mx-auto rounded-2xl overflow-hidden bg-black flex items-center justify-center">
+                            {playingVideo.video_url ? (
+                                <video
+                                    src={playingVideo.video_url}
+                                    poster={playingVideo.video_thumbnail || playingVideo.thumbnail_url}
+                                    controls
+                                    autoPlay
+                                    className="w-full h-full object-contain"
+                                />
+                            ) : (
+                                <p className="text-white text-xs">URL do vídeo indisponível</p>
+                            )}
+                        </div>
+
+                        {playingVideo.description && (
+                            <p className="text-xs text-brand-dark dark:text-dark-heading leading-relaxed">
+                                {playingVideo.description}
+                            </p>
+                        )}
+                    </div>
+                </DefaultModal>
+            )}
+
+            {/* Edit / Moderation Modal */}
             {editingVideo && (
                 <DefaultModal
                     isOpen={Boolean(editingVideo)}
                     onClose={() => setEditingVideo(null)}
-                    title={`Moderar Vídeo: ${editingVideo.title || "Sem título"}`}
-                    description={`Loja: ${editingVideo.stores?.name || "Loja"}`}
+                    title={`Moderar Vídeo da Comunidade`}
+                    description={`Loja: ${editingVideo.store_name || editingVideo.stores?.name || "Loja Parceira"}`}
                     footer={
                         <div className="flex justify-end gap-2 w-full">
                             <Button variant="ghost" onClick={() => setEditingVideo(null)}>
@@ -273,11 +533,16 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                             <select
                                 className="w-full px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-white text-sm"
                                 value={editForm.moderation_status}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, moderation_status: e.target.value as any }))}
+                                onChange={(e) =>
+                                    setEditForm((prev) => ({
+                                        ...prev,
+                                        moderation_status: e.target.value as any,
+                                    }))
+                                }
                             >
                                 <option value="approved">Aprovado (Visível no feed público)</option>
-                                <option value="pending">Pendente (Em análise)</option>
-                                <option value="rejected">Recusado (Oculto da plataforma)</option>
+                                <option value="pending">Pendente (Aguardando revisão)</option>
+                                <option value="rejected">Rejeitado (Oculto do feed)</option>
                             </select>
                         </div>
 
@@ -288,13 +553,12 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                             <Input
                                 value={editForm.title}
                                 onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
-                                placeholder="Título do vídeo..."
                             />
                         </div>
 
                         <div>
                             <FormTextarea
-                                label="Descrição e Tags"
+                                label="Descrição do Vídeo"
                                 value={editForm.description}
                                 onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
                                 rows={3}
@@ -304,9 +568,8 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                 </DefaultModal>
             )}
 
-            {/* Modal de Auditoria e Notificação Administrativa */}
+            {/* Action Context Modal (Notification + Audit) */}
             {actionModal}
         </FadeIn>
     )
 }
-

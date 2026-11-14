@@ -31,6 +31,7 @@ import {
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
+import { createPortal } from "react-dom"
 import { Drawer } from "vaul"
 
 interface SubMenuItem {
@@ -277,12 +278,18 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
         setOpenSubmenu((prev) => (prev === label ? null : label))
     }
 
+    const [hoverTop, setHoverTop] = useState<number>(0)
+
     // Lógica de Hover com Delay
-    const handleMouseEnter = (label: string) => {
+    const handleMouseEnter = (label: string, e?: React.MouseEvent) => {
         if (!isCollapsed) return
         if (hoverTimeoutRef.current) {
             clearTimeout(hoverTimeoutRef.current)
             hoverTimeoutRef.current = null
+        }
+        if (e) {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setHoverTop(rect.top)
         }
         setHoveredItem(label)
     }
@@ -306,10 +313,9 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
             <div
                 ref={sidebarRef}
                 className={cn(
-                    "hidden xl:flex flex-col fixed z-40 left-0 top-0 h-screen border-r",
+                    "hidden xl:flex flex-col h-screen max-h-screen border-r shrink-0 sticky top-0 z-40 select-none",
                     "bg-brand-dark dark:bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
-                    "xl:static xl:translate-x-0",
                     isCollapsed ? "xl:w-[68px]" : "xl:w-64",
                 )}
             >
@@ -355,12 +361,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                 </button>
 
                 <nav
-                    className={cn(
-                        "flex-grow py-2 px-3",
-                        isCollapsed
-                            ? "overflow-visible"
-                            : "overflow-y-auto overflow-x-hidden scrollbar-hide"
-                    )}
+                    className="flex-1 min-h-0 py-2 px-3 pb-10 overflow-y-auto no-scrollbar scrollbar-hide select-none"
                     style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                 >
                     <div className="space-y-4">
@@ -390,7 +391,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                                                 <li
                                                     key={item.label}
                                                     className="relative group w-full"
-                                                    onMouseEnter={() => handleMouseEnter(item.label)}
+                                                    onMouseEnter={(e) => handleMouseEnter(item.label, e)}
                                                     onMouseLeave={handleMouseLeave}
                                                 >
                                                     <div className="w-full">
@@ -499,53 +500,6 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                                                                 </div>
                                                             </div>
                                                         )}
-
-                                                        {/* SUBMENU - MODO COLAPSADO (CARD ANIMADO COM FRAMER MOTION) */}
-                                                        <AnimatePresence>
-                                                            {isCollapsed && hoveredItem === item.label && (
-                                                                <motion.div
-                                                                    initial={{ opacity: 0, x: 10, scale: 0.95 }}
-                                                                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                                                                    exit={{ opacity: 0, x: 5, scale: 0.95 }}
-                                                                    transition={{ duration: 0.15, ease: "easeOut" }}
-                                                                    className="absolute left-[calc(100%+16px)] top-0 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl min-w-[200px] overflow-hidden"
-                                                                >
-                                                                    <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50 flex items-center justify-between">
-                                                                        <span className="text-sm font-bold text-white block">{item.label}</span>
-                                                                        {badge && (
-                                                                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-brand-red text-white leading-none">
-                                                                                {badge}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div className="py-1 bg-dark-background">
-                                                                        {hasSubmenu ? (
-                                                                            item.submenu!.map((subItem) => {
-                                                                                const isActive = isActivePath(subItem.href)
-                                                                                return (
-                                                                                    <Link
-                                                                                        key={subItem.href}
-                                                                                        href={subItem.href}
-                                                                                        prefetch={false}
-                                                                                        className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
-                                                                                    >
-                                                                                        <span className={isActive ? "text-brand-green font-medium" : ""}>
-                                                                                            {subItem.label}
-                                                                                        </span>
-                                                                                    </Link>
-                                                                                )
-                                                                            })
-                                                                        ) : (
-                                                                            <div className="p-2">
-                                                                                <div className="text-xs text-brand-inactive-text px-2 pb-1">Navegar para {item.label}</div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </motion.div>
-                                                            )}
-                                                        </AnimatePresence>
-
                                                     </div>
                                                 </li>
                                             )
@@ -694,6 +648,72 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                     </Drawer.Content>
                 </Drawer.Portal>
             </Drawer.Root>
+            {isMounted && isCollapsed && hoveredItem && typeof document !== "undefined" && (() => {
+                const hoveredNav = allNavItems.find((i) => i.label === hoveredItem)
+                if (!hoveredNav || !hoveredNav.submenu) return null
+                const badge = hoveredNav.label === "Moderação"
+                    ? badges.moderation
+                    : hoveredNav.label === "Denúncias"
+                    ? badges.reports
+                    : hoveredNav.label === "Trocas e Devoluções"
+                    ? badges.returns
+                    : undefined
+
+                return createPortal(
+                    <div
+                        style={{
+                            position: "fixed",
+                            top: Math.max(12, Math.min(typeof window !== "undefined" ? window.innerHeight - 220 : 500, hoverTop)),
+                            left: 76,
+                            zIndex: 9999,
+                        }}
+                        onMouseEnter={() => {
+                            if (hoverTimeoutRef.current) {
+                                clearTimeout(hoverTimeoutRef.current)
+                                hoverTimeoutRef.current = null
+                            }
+                        }}
+                        onMouseLeave={handleMouseLeave}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, x: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 5, scale: 0.95 }}
+                            transition={{ duration: 0.15, ease: "easeOut" }}
+                            className="bg-dark-surface border border-dark-border rounded-xl shadow-2xl min-w-[200px] overflow-hidden"
+                        >
+                            <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50 flex items-center justify-between">
+                                <span className="text-sm font-bold text-white block">{hoveredNav.label}</span>
+                                {badge ? (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-brand-red text-white leading-none">
+                                        {badge}
+                                    </span>
+                                ) : null}
+                            </div>
+
+                            <div className="py-1 bg-dark-background">
+                                {hoveredNav.submenu.map((subItem) => {
+                                    const isActive = isActivePath(subItem.href)
+                                    return (
+                                        <Link
+                                            key={subItem.href}
+                                            href={subItem.href}
+                                            prefetch={false}
+                                            className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
+                                            onClick={() => setHoveredItem(null)}
+                                        >
+                                            <span className={isActive ? "text-brand-green font-medium" : ""}>
+                                                {subItem.label}
+                                            </span>
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        </motion.div>
+                    </div>,
+                    document.body
+                )
+            })()}
         </TooltipPrimitive.Provider>
     )
 }

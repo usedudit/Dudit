@@ -16,7 +16,7 @@ export default function DpaPage() {
         else if (page === 'terms') router.push('/institucional/termos');
         else if (page === 'privacidade') router.push('/institucional/privacidade');
         else if (page === 'dpa') router.push('/institucional/dpa');
-        else if (page === 'start-selling') router.push('/erp/inicio');
+        else if (page === 'start-selling') router.push('/auth/login?mode=partner');
         else console.log('Navigating to:', page);
     };
 

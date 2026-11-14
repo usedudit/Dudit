@@ -2,30 +2,49 @@
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import ModerationListRow from "./ModerationListRow"
+import ModerationGridCard from "./ModerationGridCard"
 import ModerationPageControls from "./ModerationPageControls"
 import AdminModerationDetailView from "./AdminModerationDetailView"
 import { AdminQuickModerationModal } from "./AdminQuickModerationModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { StoreIcon } from "@/lib/icons"
+import {
+    Settings2Icon,
+    PackageIcon,
+    SearchIcon,
+    PlayIcon,
+    RotateIcon,
+} from "@/lib/icons"
 import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
-import { getModerationQueue, approveModeration } from "@/app/actions/admin/moderation"
+import { getModerationQueue, approveModeration, rejectModeration } from "@/app/actions/admin/moderation"
+import { useAdminActionModal } from "../AdminActionModal"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
-const ITEMS_PER_PAGE = 8
+const ITEMS_PER_PAGE = 12
 
 interface ModerationListProps {
     initialData?: CursorPaginatedResult<ModerationItem>
+    currentMode?: "automatic" | "manual" | "videos"
+    onModeChange?: (mode: "automatic" | "manual" | "videos") => void
 }
 
-const ModerationList = ({ initialData }: ModerationListProps) => {
-    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+const ModerationList = ({
+    initialData,
+    currentMode = "automatic",
+    onModeChange,
+}: ModerationListProps) => {
+    const { state: entityState, close: closeEntity } = useEntityState()
     const router = useRouter()
+    const { modal: actionModal, runAction } = useAdminActionModal()
+
     const [statusFilter, setStatusFilter] = useState("all")
+    const [typeFilter, setTypeFilter] = useState("all")
+    const [viewMode, setViewMode] = useState<"list" | "grid">("list")
     const [isPending, startTransition] = useTransition()
     const [items, setItems] = useState<ModerationItem[]>(initialData?.data || [])
     const [search, setSearch] = useState("")
@@ -33,33 +52,94 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
     const [quickReviewItem, setQuickReviewItem] = useState<ModerationItem | null>(null)
 
     // ─── Approve Handler ──────────────────────────────────────────────────────
-    const handleApprove = (id: string, type: ModerationItem["type"]) => {
-        startTransition(async () => {
-            const result = await approveModeration(id, type as any)
-            if (result.success) {
-                const label = type === "product" ? "Produto" : type === "service" ? "Serviço" : type === "partner" ? "Perfil" : "Item"
-                toast.success(`${label} aprovado com sucesso!`)
-                setItems(prev => prev.filter(i => i.id !== id))
-                setPage(1)
-            } else {
-                const label = type === "product" ? "produto" : type === "service" ? "serviço" : type === "partner" ? "perfil" : "item"
-                toast.error(result.error || `Erro ao aprovar ${label}`)
-            }
+    const handleApprove = useCallback((id: string, type: ModerationItem["type"]) => {
+        const item = items.find((i) => i.id === id)
+        const typeLabel = type === "product" ? "Produto" : type === "service" ? "Serviço" : type === "partner" ? "Perfil" : "Item"
+
+        runAction({
+            title: `Aprovar ${typeLabel}`,
+            description: `Confirme a aprovação de "${item?.title || id}" no marketplace.`,
+            changedFields: ["Status alterado para Aprovado"],
+            confirmLabel: "Aprovar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await approveModeration(id, type as any, {
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success(`${typeLabel} aprovado com sucesso!`)
+                    setItems((prev) => prev.filter((i) => i.id !== id))
+                    return { success: true }
+                }
+                toast.error(result.error || `Erro ao aprovar ${typeLabel.toLowerCase()}`)
+                return { success: false, error: result.error }
+            },
         })
-    }
+    }, [items, runAction])
+
+    // ─── Reject Handler ───────────────────────────────────────────────────────
+    const handleReject = useCallback((item: ModerationItem) => {
+        const typeLabel = item.type === "product" ? "Produto" : item.type === "service" ? "Serviço" : item.type === "partner" ? "Perfil" : "Item"
+
+        runAction({
+            title: `Rejeitar ${typeLabel}`,
+            description: `Informe o motivo da rejeição de "${item.title}".`,
+            requireReason: true,
+            changedFields: ["Status alterado para Rejeitado"],
+            confirmLabel: "Confirmar Rejeição",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await rejectModeration(item.id, payload.reason, item.type as any, {
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success(`${typeLabel} rejeitado com sucesso!`)
+                    setItems((prev) => prev.filter((i) => i.id !== item.id))
+                    return { success: true }
+                }
+                toast.error(result.error || `Erro ao rejeitar ${typeLabel.toLowerCase()}`)
+                return { success: false, error: result.error }
+            },
+        })
+    }, [runAction])
+
+    // ─── Edit Handler ─────────────────────────────────────────────────────────
+    const handleEdit = useCallback((item: ModerationItem) => {
+        let editUrl = ""
+        if (item.type === "product") {
+            editUrl = `/ddt-admin/catalog/products/${item.id}`
+        } else if (item.type === "service") {
+            editUrl = `/ddt-admin/catalog/services/${item.id}`
+        } else if (item.type === "recurring_plan") {
+            editUrl = `/ddt-admin/catalog/plans/${item.id}`
+        } else if (item.type === "partner") {
+            editUrl = `/ddt-admin/partners/${item.id}`
+        } else if (item.type === "community_video") {
+            editUrl = `/ddt-admin/videos`
+        }
+
+        if (editUrl) {
+            window.open(editUrl, "_blank")
+        } else {
+            setQuickReviewItem(item)
+        }
+    }, [])
 
     // ─── Detail / Quick Review Handler ─────────────────────────────────────────
-    // Abre o modal rápido de moderação para visualização, remoção de imagens e aprovação rápida
-    const handleDetail = (item: ModerationItem) => {
+    const handleDetail = useCallback((item: ModerationItem) => {
         setQuickReviewItem(item)
-    }
+    }, [])
 
     // ─── Status Filter Handler ───────────────────────────────────────────────
     const handleStatusFilterChange = useCallback((newFilter: string) => {
         setStatusFilter(newFilter)
         startTransition(async () => {
             try {
-                const result = await getModerationQueue(null, 50, newFilter)
+                const result = await getModerationQueue(null, 100, newFilter)
                 setItems(result.data)
             } catch (err) {
                 console.error("Failed to load moderation queue for status:", err)
@@ -71,10 +151,12 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
     const refreshItems = useCallback(() => {
         startTransition(async () => {
             try {
-                const result = await getModerationQueue(null, 50, statusFilter)
+                const result = await getModerationQueue(null, 100, statusFilter)
                 setItems(result.data)
+                toast.success("Fila de moderação atualizada")
             } catch (err) {
                 console.error("Failed to refresh moderation queue:", err)
+                toast.error("Erro ao atualizar fila")
             }
         })
     }, [statusFilter])
@@ -83,9 +165,14 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
     const filteredItems = useMemo(() => {
         const term = search.trim().toLowerCase()
 
-        return items.filter(item => {
+        return items.filter((item) => {
             // Status filter
             if (statusFilter !== "all" && item.moderation_status !== statusFilter) {
+                return false
+            }
+
+            // Type filter
+            if (typeFilter !== "all" && item.type !== typeFilter) {
                 return false
             }
 
@@ -101,7 +188,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
 
             return true
         })
-    }, [items, statusFilter, search])
+    }, [items, statusFilter, typeFilter, search])
 
     // ─── Pagination ──────────────────────────────────────────────────
     const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE))
@@ -113,11 +200,11 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
     // Reset to page 1 on filter/search change
     useEffect(() => {
         setPage(1)
-    }, [statusFilter, search])
+    }, [statusFilter, typeFilter, search])
 
     // ─── If viewing detail (inline) ──────────────────────────────────────────────────────────
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentItem = items.find(i => i.id === entityState.entityId)
+        const currentItem = items.find((i) => i.id === entityState.entityId)
         if (currentItem) {
             return (
                 <AdminModerationDetailView
@@ -152,14 +239,44 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                         </p>
                     </div>
 
+                    {/* Dropdown de Ações no estilo ERP com Settings2Icon */}
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={refreshItems}
-                            disabled={isPending}
-                            className="px-3 py-1.5 text-sm font-medium text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border rounded-lg hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors disabled:opacity-50"
+                        <Dropdown
+                            trigger={
+                                <Button
+                                    variant="outline"
+                                    className="h-[42px] px-3 gap-2"
+                                    leftIcon={<Settings2Icon size={18} />}
+                                >
+                                    Ações
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
                         >
-                            {isPending ? "Atualizando..." : "Atualizar"}
-                        </button>
+                            <DropdownItem
+                                onClick={() => onModeChange?.("automatic")}
+                                className={currentMode === "automatic" ? "font-bold text-brand-green" : ""}
+                            >
+                                <PackageIcon size={16} /> Fila de Moderação
+                            </DropdownItem>
+                            <DropdownItem
+                                onClick={() => onModeChange?.("manual")}
+                                className={currentMode === "manual" ? "font-bold text-brand-green" : ""}
+                            >
+                                <SearchIcon size={16} /> Busca por ID
+                            </DropdownItem>
+                            <DropdownItem
+                                onClick={() => onModeChange?.("videos")}
+                                className={currentMode === "videos" ? "font-bold text-brand-green" : ""}
+                            >
+                                <PlayIcon size={16} /> Vídeos da Comunidade
+                            </DropdownItem>
+                            <div className="border-t border-brand-border dark:border-dark-border my-1" />
+                            <DropdownItem onClick={refreshItems} disabled={isPending}>
+                                <RotateIcon size={16} className={isPending ? "animate-spin" : ""} /> Atualizar Fila
+                            </DropdownItem>
+                        </Dropdown>
                     </div>
                 </div>
 
@@ -170,28 +287,61 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                             Moderação
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[13px] font-medium">
-                            Revise produtos, serviços e perfis pendentes
+                            Revise itens pendentes
                         </p>
                     </div>
-                    <button
-                        onClick={refreshItems}
-                        disabled={isPending}
-                        className="px-2.5 py-1.5 text-xs font-medium text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border rounded-lg hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors disabled:opacity-50"
+
+                    <Dropdown
+                        trigger={
+                            <Button
+                                variant="outline"
+                                className="w-[42px] h-[42px] p-0 flex items-center justify-center"
+                            >
+                                <Settings2Icon className="w-4 h-4" />
+                            </Button>
+                        }
+                        align="right"
+                        showChevron={false}
                     >
-                        {isPending ? "..." : "Atualizar"}
-                    </button>
+                        <DropdownItem
+                            onClick={() => onModeChange?.("automatic")}
+                            className={currentMode === "automatic" ? "font-bold text-brand-green" : ""}
+                        >
+                            <PackageIcon size={16} /> Fila de Moderação
+                        </DropdownItem>
+                        <DropdownItem
+                            onClick={() => onModeChange?.("manual")}
+                            className={currentMode === "manual" ? "font-bold text-brand-green" : ""}
+                        >
+                            <SearchIcon size={16} /> Busca por ID
+                        </DropdownItem>
+                        <DropdownItem
+                            onClick={() => onModeChange?.("videos")}
+                            className={currentMode === "videos" ? "font-bold text-brand-green" : ""}
+                        >
+                            <PlayIcon size={16} /> Vídeos da Comunidade
+                        </DropdownItem>
+                        <div className="border-t border-brand-border dark:border-dark-border my-1" />
+                        <DropdownItem onClick={refreshItems} disabled={isPending}>
+                            <RotateIcon size={16} /> Atualizar Fila
+                        </DropdownItem>
+                    </Dropdown>
                 </div>
 
                 {/* Page Controls (ERP Standard) */}
                 <ModerationPageControls
                     statusFilter={statusFilter}
                     setStatusFilter={handleStatusFilterChange}
+                    typeFilter={typeFilter}
+                    setTypeFilter={setTypeFilter}
                     search={search}
                     onSearchChange={setSearch}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
                     items={items}
                 />
 
-                {/* List Content */}
+                {/* List / Grid Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
                     <AnimatePresence mode="wait">
                         {isPending && items.length === 0 ? (
@@ -205,89 +355,82 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                     imageAlt="Fila vazia"
                                     title="Nenhum item na fila"
-                                    subtitle={search || statusFilter !== "all"
-                                        ? "Tente ajustar seus filtros de busca."
-                                        : "Todos os itens foram revisados ou não correspondem aos filtros atuais."
+                                    subtitle={
+                                        search || statusFilter !== "all" || typeFilter !== "all"
+                                            ? "Tente ajustar seus filtros de busca."
+                                            : "Todos os itens foram revisados ou não correspondem aos filtros atuais."
                                     }
-                                    itemButton={search || statusFilter !== "all" ? {
-                                        text: "Limpar filtros",
-                                        action: () => {
-                                            setStatusFilter("all")
-                                            setSearch("")
-                                        },
-                                        variant: "outline",
-                                    } : undefined}
+                                    itemButton={
+                                        search || statusFilter !== "all" || typeFilter !== "all"
+                                            ? {
+                                                text: "Limpar filtros",
+                                                action: () => {
+                                                    setStatusFilter("all")
+                                                    setTypeFilter("all")
+                                                    setSearch("")
+                                                },
+                                                variant: "outline",
+                                            }
+                                            : undefined
+                                    }
                                 />
                             </FadeIn>
-                        ) : (
-                            <FadeIn key="list" className="w-full">
-                                {/* Mobile View (Cards) */}
-                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                        ) : viewMode === "grid" ? (
+                            /* ─── Grid View ─── */
+                            <FadeIn key="grid" className="w-full">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                     {paginatedItems.map((item) => (
-                                        <div
+                                        <ModerationGridCard
                                             key={item.id}
-                                            className="py-4 flex items-start gap-3 cursor-pointer"
-                                            onClick={() => handleDetail(item)}
-                                        >
-                                            <div className="w-14 h-14 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                {item.images?.[0] ? (
-                                                    <img
-                                                        src={getR2ImageUrl(item.images[0])}
-                                                        alt=""
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center">
-                                                        <StoreIcon className="w-5 h-5 text-brand-inactive-text" />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                        {item.title}
-                                                    </h3>
-                                                    <Badge variant={
-                                                        item.moderation_status === "pending_moderation" ? "orange" :
-                                                            item.moderation_status === "flagged" ? "red" :
-                                                                item.moderation_status === "approved" ? "green" :
-                                                                    item.moderation_status === "rejected" ? "red" :
-                                                                        item.moderation_status === "needs_images" ? "blue" : "gray"
-                                                    } className="scale-90 origin-left">
-                                                        {item.moderation_status === "pending_moderation" ? "Pendente" :
-                                                            item.moderation_status === "flagged" ? "Flagged" :
-                                                                item.moderation_status === "approved" ? "Aprovado" :
-                                                                    item.moderation_status === "rejected" ? "Rejeitado" :
-                                                                        item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
-                                                    </Badge>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 text-xs text-brand-inactive-text truncate">
-                                                    <StoreIcon size={12} className="shrink-0" />
-                                                    <span className="truncate">{item.store_name || item.owner_store_name}</span>
-                                                </div>
-
-                                                <span className="text-[10px] font-medium text-brand-inactive-text opacity-70 truncate">
-                                                    {item.id}
-                                                </span>
-                                            </div>
-                                        </div>
+                                            item={item}
+                                            isPending={isPending}
+                                            onDetail={handleDetail}
+                                            onApprove={handleApprove}
+                                            onReject={handleReject}
+                                            onEdit={handleEdit}
+                                        />
                                     ))}
                                 </div>
 
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="mt-6">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                            fixedUntil="lg"
+                                        />
+                                    </div>
+                                )}
+                            </FadeIn>
+                        ) : (
+                            /* ─── List View ─── */
+                            <FadeIn key="list" className="w-full">
                                 {/* Desktop Table View */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                <div className="w-full overflow-hidden rounded-xl relative">
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
-                                                    <th className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Produto</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Loja</th>
-                                                    <th className="py-3 px-2 w-20 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Imagens</th>
-                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Data</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Status</th>
-                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Ações</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Item / Produto
+                                                    </th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Loja
+                                                    </th>
+                                                    <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Tipo
+                                                    </th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Data
+                                                    </th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Status
+                                                    </th>
+                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                        Ações
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -298,6 +441,8 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                                         isPending={isPending}
                                                         onDetail={handleDetail}
                                                         onApprove={handleApprove}
+                                                        onReject={handleReject}
+                                                        onEdit={handleEdit}
                                                     />
                                                 ))}
                                             </tbody>
@@ -305,7 +450,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                     </div>
                                 </div>
 
-                                {/* Pagination (ERP Standard) */}
+                                {/* Pagination */}
                                 {totalPages > 1 && (
                                     <div className="mt-6">
                                         <Pagination
@@ -322,7 +467,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 </div>
             </div>
 
-            {/* Modal de Moderação Rápida (Seleção de fotos, remoção e aprovação) */}
+            {/* Modal de Moderação Rápida (com DefaultModal e useAdminActionModal) */}
             {quickReviewItem && (
                 <AdminQuickModerationModal
                     item={quickReviewItem}
@@ -341,6 +486,9 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                     }}
                 />
             )}
+
+            {/* Modal de Ação para aprovações/rejeições diretas */}
+            {actionModal}
         </FadeIn>
     )
 }

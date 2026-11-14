@@ -68,7 +68,7 @@ export async function getAdminPromotions(
             min_cart_value,
             max_discount_value,
             usage_limit,
-            usage_count,
+            coupon_usages(count),
             is_active,
             starts_at,
             ends_at,
@@ -96,7 +96,12 @@ export async function getAdminPromotions(
     const { data, error } = await query
     if (error) throw error
 
-    const items = (data || []) as any[]
+    const items = ((data || []) as any[]).map((row: any) => ({
+        ...row,
+        usage_count: Array.isArray(row.coupon_usages) ? row.coupon_usages[0]?.count || 0 : 0,
+        store_name: row.stores?.name || "Loja Parceira",
+        partner_name: row.stores?.name || "Loja Parceira",
+    }))
     const hasMore = items.length > pageSize
 
     return {

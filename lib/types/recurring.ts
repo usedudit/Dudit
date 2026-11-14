@@ -175,7 +175,13 @@ export type RecurringSubscriptionDetailItem = {
   sortOrder: number
   preferredTime: string | null
   durationMinutes: number | null
-  product: { id: string; name: string; images?: string[] | null } | null
+  product: {
+    id: string
+    name: string
+    images?: string[] | null
+    stock?: number | null
+    allowSellWithoutStock?: boolean | null
+  } | null
   service: { id: string; name: string; images?: string[] | null } | null
 }
 
@@ -192,6 +198,9 @@ export type RecurringSubscriptionDetailCredit = {
   staffPartnerUserId?: string | null
   durationMinutes?: number | null
   createdAt?: string | null
+  images?: string[] | null
+  stock?: number | null
+  allowSellWithoutStock?: boolean | null
 }
 
 export type RecurringSubscriptionDetail = {

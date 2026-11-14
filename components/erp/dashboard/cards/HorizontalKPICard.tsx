@@ -1,17 +1,21 @@
 "use client"
 
+import Link from "next/link"
 import { MoneyIcon, ShoppingCartIcon, Users, CreditCardIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { FitText } from "@/components/ui/fit-text"
 
-interface KPIItem {
+export interface KPIItem {
     title: string
     value: string | number
     trend?: string
+    badgeText?: string
+    badgeVariant?: "green" | "red" | "orange" | "blue" | "gray"
     subtext?: string
     icon?: React.ComponentType<{ size?: number; className?: string }>
     iconBg?: string
     iconColor?: string
+    href?: string
 }
 
 interface HorizontalKPICardProps {
@@ -55,8 +59,8 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                 const iconBg = item.iconBg || "bg-brand-green-light dark:bg-dark-border/40"
                 const iconColor = item.iconColor || "text-brand-dark dark:text-dark-heading"
 
-                return (
-                    <div key={item.title} className="p-4 sm:p-5 lg:p-6 flex flex-col justify-between min-w-0 overflow-hidden">
+                const cardContent = (
+                    <>
                         <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
                             <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                                 <div className={cn("w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0", iconBg)}>
@@ -69,21 +73,50 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                                     {item.title}
                                 </FitText>
                             </div>
-                            {item.trend && (
+                            {item.badgeText ? (
+                                <span className={cn(
+                                    "text-[10px] sm:text-[11px] lg:text-[12px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full whitespace-nowrap shrink-0",
+                                    item.badgeVariant === "red" || item.badgeVariant === "orange"
+                                        ? "bg-[#fce6e5] text-[#cc4745] dark:bg-red-950/40 dark:text-red-400"
+                                        : item.badgeVariant === "blue"
+                                        ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                                        : "bg-brand-green-secondary text-brand-green dark:bg-green-950/40 dark:text-green-400"
+                                )}>
+                                    {item.badgeText}
+                                </span>
+                            ) : item.trend ? (
                                 <span className={cn(
                                     "text-[10px] sm:text-[11px] lg:text-[12px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full whitespace-nowrap shrink-0",
                                     isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
                                 )}>
                                     {percent}
                                 </span>
-                            )}
+                            ) : null}
                         </div>
 
                         <div className="min-w-0">
-                            <h2 className="text-[22px] sm:text-[26px] lg:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            <h2 className="text-[22px] sm:text-[26px] lg:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none group-hover:text-brand-green transition-colors">
                                 <FitText minSize={14}>{item.value}</FitText>
                             </h2>
                         </div>
+                    </>
+                )
+
+                if (item.href) {
+                    return (
+                        <Link
+                            key={item.title}
+                            href={item.href}
+                            className="p-4 sm:p-5 lg:p-6 flex flex-col justify-between min-w-0 overflow-hidden hover:bg-brand-green-light/10 dark:hover:bg-dark-border/20 transition-colors group"
+                        >
+                            {cardContent}
+                        </Link>
+                    )
+                }
+
+                return (
+                    <div key={item.title} className="p-4 sm:p-5 lg:p-6 flex flex-col justify-between min-w-0 overflow-hidden">
+                        {cardContent}
                     </div>
                 )
             })}

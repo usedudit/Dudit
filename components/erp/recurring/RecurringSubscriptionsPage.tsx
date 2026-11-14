@@ -1037,11 +1037,11 @@ export default function RecurringSubscriptionsPage({
               <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
                   {currentTab !== "home" && (
-                    <div className="hidden md:flex shrink-0 mt-1">
+                    <div className="hidden md:flex shrink-0 mt-5">
                       <Button
                         variant="filled"
                         onClick={() => navigateToSection("home")}
-                        className="w-10 h-10 p-0 flex items-center justify-center"
+                        className="w-10 h-10 p-0 flex"
                         aria-label="Voltar"
                       >
                         <ChevronLeftIcon size={18} />
@@ -1049,10 +1049,10 @@ export default function RecurringSubscriptionsPage({
                     </div>
                   )}
                   <div>
-                    <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
                       {SECTION_META[currentTab].title}
                     </h1>
-                    <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                       {SECTION_META[currentTab].subtitle}
                     </p>
                   </div>

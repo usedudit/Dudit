@@ -104,6 +104,7 @@ export interface ActionsDropdownProps {
   className?: string
   /** Stretches the trigger (and its wrapper) to fill the available width. */
   fullWidth?: boolean
+  disabled?: boolean
   children?: React.ReactNode
 }
 
@@ -127,12 +128,13 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   trigger,
   className,
   fullWidth = false,
+  disabled = false,
   children,
 }) => (
   <Dropdown
     trigger={
       trigger || (
-        <Button variant="outline" className={`${fullWidth ? "w-full" : "w-[40px]"} h-[40px] p-0 flex items-center justify-center ${className || ""}`}>
+        <Button variant="outline" disabled={disabled} className={`${fullWidth ? "w-full" : "w-[40px]"} h-[40px] p-0 flex items-center justify-center ${className || ""}`}>
           <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
         </Button>
       )

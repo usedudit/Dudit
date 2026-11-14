@@ -466,7 +466,7 @@ async function syncPosSaleToOrders(params: {
     unitPrice: Number(item.unit_price || 0),
     quantity: Number(item.quantity || 0),
     basePrice:
-      item.original_price != null
+      Number(item.original_price || 0) > 0
         ? Number(item.original_price)
         : Number(item.unit_price || 0),
   }));
@@ -877,7 +877,10 @@ async function syncPosSaleToOrders(params: {
       sort_order: index,
       is_gift: Boolean(item.is_gift),
       original_price:
-        item.original_price != null ? Number(item.original_price) : null,
+        Number(item.original_price || 0) > 0
+          ? Number(item.original_price)
+          : null,
+      discount_amount: Number(item.discount_amount || 0),
       is_promotional: Boolean(item.is_promotional),
       promotion_id: item.promotion_id || null,
       unit_cost: unitCost,
@@ -1579,9 +1582,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
       salesSettingsResult.data.maxDiscountPercent < 100
     ) {
       const subtotal = Math.max(0, Number(preSaleDraft.subtotal || 0));
-      const totalDiscount =
-        Math.max(0, Number(preSaleDraft.discount_amount || 0)) +
-        Number(preSaleDraft.coupon_discount_amount || 0);
+      const couponStored = Math.max(
+        0,
+        Number(preSaleDraft.coupon_discount_amount || 0),
+      );
+      // `discount_amount` pode já incluir o cupom no PDV; separa para não somar 2x.
+      const manualStored = Math.max(
+        0,
+        Number(preSaleDraft.discount_amount || 0) - couponStored,
+      );
+      const totalDiscount = manualStored + couponStored;
       const effectiveDiscountPercent =
         subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0;
       if (
@@ -1885,6 +1895,23 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         computedCustomName = `${computedCustomName || "Item"} (+ ${addonsText})`;
       }
 
+      // Preço nominal (lista, antes de desconto/brinde por linha). Necessário
+      // para o pedido persistir `order_items.original_price`/`discount_amount`
+      // e o DRE apurar receita bruta e descontos corretamente no PDV.
+      const isGiftItem = Boolean(item.is_gift ?? item.isGift);
+      const chargedUnit = safeMoney(Number(item.unit_price ?? item.price ?? 0));
+      const nominalUnit = Number(
+        item.list_unit_price ??
+          item.listUnitPrice ??
+          item.original_price ??
+          item.originalPrice ??
+          0,
+      );
+      const basePrice =
+        !isGiftItem && Number.isFinite(nominalUnit) && nominalUnit > chargedUnit
+          ? safeMoney(nominalUnit)
+          : null;
+
       return {
         productId: isService
           ? undefined
@@ -1899,7 +1926,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
           (isService ? "service_booking" : "product"),
         variantId: item.variant_id || item.variantId || undefined,
         customName: computedCustomName,
-        unitPrice: safeMoney(Number(item.unit_price ?? item.price ?? 0)),
+        unitPrice: chargedUnit,
+        basePrice,
         quantity: Math.max(
           1,
           Math.floor(Number(item.quantity ?? item.qty ?? 1)),
@@ -1930,7 +1958,14 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     financeAccountId: input.financeAccountId || null,
     items: erpItems,
     subtotal: safeMoney(Number(preSaleDraft.subtotal || 0)),
-    discountValue: safeMoney(Number(preSaleDraft.discount_amount || 0)),
+    // No PDV o cupom pode ser gravado como `discount_amount` (quando o tipo de
+    // desconto é "coupon"). O pedido recalcula o cupom pelo id/código, então
+    // enviamos apenas a parcela manual para não descontar o cupom duas vezes.
+    discountValue: Math.max(
+      0,
+      safeMoney(Number(preSaleDraft.discount_amount || 0)) -
+        safeMoney(Number(preSaleDraft.coupon_discount_amount || 0)),
+    ),
     discountType: "fixed",
     couponCode: preSaleDraft.coupon_code || undefined,
     couponId: preSaleDraft.coupon_id || undefined,

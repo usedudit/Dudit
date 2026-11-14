@@ -30,7 +30,7 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
             <GridLines />
-            <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full">
+            <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
                 <div className="grid lg:grid-cols-2 gap-12 items-center">
                     <motion.div
                         initial={{ opacity: 0, y: 30 }}
@@ -41,7 +41,7 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                             O que você precisa hoje pode estar na <span className="text-brand-green">Dudit.</span>
                         </h1>
                         <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                            Descubra produtos, serviços e negócios perto de você. Compre, anuncie ou agende de um jeito simples.
+                            Descubra produtos, serviços e negócios perto de você ou com envio para todo o Brasil. Compre, anuncie ou agende de um jeito simples.
                         </p>
                         <div className="flex flex-wrap gap-4">
                             <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
@@ -100,7 +100,7 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                     <div className="h-8 w-px bg-gray-100"></div>
                                     <div className="text-center">
                                         <div className="text-xl font-bold text-brand-dark">100%</div>
-                                        <div className="text-[10px] text-brand-inactive-text">do lucro é seu</div>
+                                        <div className="text-[10px] text-brand-inactive-text">do valor da venda é seu</div>
                                     </div>
                                 </div>
                             </div>
@@ -136,7 +136,7 @@ const BentoFeaturesComoAjuda = () => {
         {
             title: "Precisa de alguma coisa?",
             subtitle: "PARA QUEM PROCURA",
-            description: "Encontrar lojas, produtos, serviços e oportunidades perto de você.",
+            description: "Encontrar lojas, produtos, serviços e oportunidades perto de você ou em qualquer cidade do Brasil.",
             type: "buy"
         },
         {
@@ -162,7 +162,7 @@ const BentoFeaturesComoAjuda = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="RESOLVER O QUE VOCÊ PRECISA HOJE"
                     title="O que dá pra fazer na Dudit"
@@ -186,7 +186,7 @@ const BentoFeaturesComoAjuda = () => {
                                     <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
                                         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
                                             <Search className="w-3.5 h-3.5 text-brand-green" />
-                                            <span className="text-[10px] font-bold text-brand-dark">Buscar na sua cidade</span>
+                                            <span className="text-[10px] font-bold text-brand-dark">Buscar na Dudit</span>
                                         </div>
                                         <div className="space-y-2">
                                             <div className="bg-gray-50 p-2 rounded flex items-center justify-between">
@@ -210,7 +210,7 @@ const BentoFeaturesComoAjuda = () => {
                                         <div className="text-sm font-bold text-brand-dark mb-0.5">Violão Seminovo</div>
                                         <div className="text-brand-green font-extrabold text-xs mb-3">R$ 280,00</div>
                                         <div className="w-full bg-brand-green text-white py-1.5 rounded text-[9px] font-bold text-center flex items-center justify-center gap-1">
-                                            <MessageCircle size={10} /> Chamar no WhatsApp
+                                            <ShoppingBag size={10} /> Ver na Dudit
                                         </div>
                                     </div>
                                 )}
@@ -225,7 +225,7 @@ const BentoFeaturesComoAjuda = () => {
                                             dudit.com.br/sualoja
                                         </div>
                                         <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
-                                            Aberta para clientes locais
+                                            Clientes locais e de todo o Brasil
                                         </div>
                                     </div>
                                 )}
@@ -267,24 +267,24 @@ const ParaQuemCompra = () => {
         {
             icon: Search,
             title: "Encontre o que precisa",
-            desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou resolver uma necessidade do dia a dia. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
+            desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou receber de qualquer lugar do Brasil. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
         },
         {
             icon: ShoppingBag,
             title: "Produtos & Serviços",
-            desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, perto de você.",
+            desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, na sua cidade ou com envio nacional.",
         },
         {
             icon: MessageCircle,
             title: "Contato direto",
-            desc: "Tire dúvidas no WhatsApp de quem vende, compare opções e feche o negócio sem burocracia. Direto com o vendedor.",
+            desc: "Compre direto na vitrine, agende pelo sistema ou fale no WhatsApp de quem vende. Sem intermediários e sem burocracia.",
         },
     ];
 
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
                     subtitle="PARA QUEM PROCURA"
                     title="O que você procura?"
@@ -324,7 +324,7 @@ const ParaQuemVende = () => {
         {
             num: "01",
             title: "Mais uma vitrine",
-            desc: "Chegue até mais pessoas da sua cidade. Sua loja aparece para quem está procurando exatamente o que você vende.",
+            desc: "Chegue até mais pessoas da sua cidade e de todo o Brasil. Sua loja aparece para quem está procurando exatamente o que você vende.",
         },
         {
             num: "02",
@@ -334,7 +334,7 @@ const ParaQuemVende = () => {
         {
             num: "03",
             title: "Sem comissão",
-            desc: "100% do lucro da venda fica com você. A Dudit cobra apenas uma taxa fixa mensal, sem surpresas.",
+            desc: "O valor da venda fica com você. A Dudit cobra apenas uma mensalidade fixa, sem taxa por venda.",
         },
         {
             num: "04",
@@ -346,7 +346,7 @@ const ParaQuemVende = () => {
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Lado esquerdo: Imagem */}
                     <motion.div
@@ -448,7 +448,7 @@ const GlobalScale = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="flex flex-col lg:flex-row min-h-[600px] rounded-3xl overflow-hidden shadow-xl">
                     <div className="flex-1 bg-brand-dark p-12 lg:p-16 flex flex-col justify-center relative z-10">
                         <div className="absolute inset-0 pointer-events-none z-0 flex justify-center w-full h-full opacity-20">
@@ -459,7 +459,7 @@ const GlobalScale = () => {
 
                         <div className="relative z-10 text-white">
                             <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SEU LUCRO.</span>
-                            <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />O lucro é 100% seu.</h2>
+                            <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />Sem comissão sobre a venda.</h2>
                             <p className="text-brand-inactive-text text-lg mb-12 max-w-md leading-relaxed">
                                 A Dudit é mais uma vitrine para o seu negócio ser encontrado. Sem taxas escondidas e sem porcentagem sobre as suas vendas.
                             </p>
@@ -471,7 +471,7 @@ const GlobalScale = () => {
                                 </div>
                                 <div>
                                     <div className="text-3xl font-bold text-brand-green mb-1">100%</div>
-                                    <div className="text-brand-inactive-text text-xs">de autonomia para você</div>
+                                    <div className="text-brand-inactive-text text-xs">do valor da venda fica com você</div>
                                 </div>
                             </div>
                         </div>
@@ -512,7 +512,7 @@ const GlobalScale = () => {
                                     <User size={20} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Ana Bolos</span> agendou</p>
+                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Ana Bolos</span> vendeu</p>
                                     <p className="text-sm text-brand-dark font-bold mt-0.5">Bolo de Festa</p>
                                 </div>
                                 <div className="text-brand-green font-bold text-sm">R$ 120,00</div>
@@ -550,7 +550,7 @@ export default function HomePage() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         else if (page === 'start-selling') router.push('/auth/login?mode=partner');
-        else if (page === 'explore') router.push('/');
+        else if (page === 'explore') router.push('/explorar');
         else if (page === 'segments') router.push('/institucional/segmentos');
         else if (page === 'pricing') router.push('/institucional/planos');
         else if (page === 'terms') router.push('/institucional/termos');

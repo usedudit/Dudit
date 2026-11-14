@@ -33,7 +33,7 @@ export default function EstatisticasPage() {
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')
         else if (page === 'start-selling') router.push('/auth/login?mode=partner')
-        else if (page === 'explore') router.push('/')
+        else if (page === 'explore') router.push('/explorar')
         else if (page === 'segments') router.push('/institucional/segmentos')
         else if (page === 'pricing') router.push('/institucional/planos')
         else if (page === 'about') router.push('/institucional/sobre')
@@ -52,7 +52,7 @@ export default function EstatisticasPage() {
             <main>
                 <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
+                    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10 text-center">
                         <motion.div
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -82,7 +82,7 @@ export default function EstatisticasPage() {
 
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -137,7 +137,7 @@ export default function EstatisticasPage() {
 
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <h2 className="text-4xl font-bold text-brand-dark mb-6">
                             Comparativo Factual: Modelos de Comercialização
                         </h2>
@@ -160,7 +160,7 @@ export default function EstatisticasPage() {
                                     <tr>
                                         <td className="px-6 py-4 font-semibold text-brand-dark">Canal de Contato com Cliente</td>
                                         <td className="px-6 py-4">Intermediado pelo app (bloqueado)</td>
-                                        <td className="px-6 py-4 font-medium bg-brand-green/5">Direto no WhatsApp</td>
+                                        <td className="px-6 py-4 font-medium bg-brand-green/5">Direto na Dudit e no WhatsApp</td>
                                     </tr>
                                     <tr>
                                         <td className="px-6 py-4 font-semibold text-brand-dark">Gestão de Frente de Caixa (PDV)</td>
@@ -185,7 +185,7 @@ export default function EstatisticasPage() {
 
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="bg-gray-50 rounded-xl p-8 border border-gray-100">
                             <h3 className="text-xl font-bold text-brand-dark mb-4">
                                 Metodologia de Coleta e Fontes

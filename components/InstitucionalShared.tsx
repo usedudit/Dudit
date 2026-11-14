@@ -47,7 +47,7 @@ interface ToolPageHeroProps {
 export const ToolPageHero = ({ title, description, badge = "Ferramentas Grátis" }: ToolPageHeroProps) => (
     <section className="relative bg-white pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
         <GridLines />
-        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full">
+        <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -150,12 +150,19 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
         window.scrollTo(0, 0);
     };
 
+    const navItems = [
+        { label: 'Início', page: 'home' },
+        { label: 'Sobre', page: 'about' },
+        { label: 'Segmentos', page: 'segments' },
+        { label: 'Planos', page: 'pricing' },
+    ];
+
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-brand-dark py-6 w-full h-[68px] flex items-center justify-between px-4 mx-auto gap-4">
-            <div className="w-full flex items-center justify-between max-w-[1400px] mx-auto">
-                <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-110 pt-1">
+        <header className="fixed top-0 left-0 right-0 z-[100] w-full bg-brand-dark border-b border-white/10 shadow-md">
+            <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-4 lg:px-2 mx-auto gap-4">
+                <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
                     <img
-                        src="https://img.dudit.com.br/static/Logo.png"
+                        src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                         alt="Dudit"
                         width={140}
                         height={40}
@@ -163,20 +170,32 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                     />
                 </Link>
 
-                <nav className="hidden md:flex items-center gap-8 text-gray-300 font-medium text-sm">
-                    <button onClick={() => handleNav('home')} className="hover:text-brand-green transition-colors">Início</button>
-                    <button onClick={() => handleNav('about')} className="hover:text-brand-green transition-colors">Sobre</button>
-                    <button onClick={() => handleNav('segments')} className="hover:text-brand-green transition-colors">Segmentos</button>
-                    <button onClick={() => handleNav('pricing')} className="hover:text-brand-green transition-colors">Planos</button>
+                <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-gray-300 font-medium text-sm">
+                    {navItems.map((item) => (
+                        <button
+                            key={item.page}
+                            onClick={() => handleNav(item.page)}
+                            className="hover:text-brand-green transition-colors"
+                        >
+                            {item.label}
+                        </button>
+                    ))}
                 </nav>
 
-                <div className="hidden md:block">
-                    <Button onClick={() => handleNav('start-selling')}>
-                        Começar Grátis
+                <div className="hidden lg:block">
+                    <Button asChild>
+                        <Link href="/auth/login?mode=partner" prefetch={false}>
+                            Começar Grátis
+                        </Link>
                     </Button>
                 </div>
 
-                <button className="md:hidden text-white p-1" onClick={() => setMobileOpen(!mobileOpen)}>
+                <button
+                    className="lg:hidden text-white p-1"
+                    onClick={() => setMobileOpen(!mobileOpen)}
+                    aria-label={mobileOpen ? 'Fechar menu' : 'Abrir menu'}
+                    aria-expanded={mobileOpen}
+                >
                     <AnimatePresence mode="wait" initial={false}>
                         {mobileOpen ? (
                             <motion.div
@@ -203,7 +222,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                 </button>
             </div>
 
-            {/* Mobile Menu */}
+            {/* Mobile / Tablet Menu */}
             <AnimatePresence>
                 {mobileOpen && (
                     <motion.div
@@ -211,13 +230,27 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="md:hidden absolute top-full left-0 w-full bg-brand-dark border-t border-white/10 overflow-hidden"
+                        className="lg:hidden absolute top-full left-0 w-full bg-brand-dark border-t border-white/10 shadow-lg overflow-hidden"
                     >
-                        <div className="p-4 flex flex-col gap-4">
-                            <button onClick={() => handleNav('home')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Início</button>
-                            <button onClick={() => handleNav('about')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Sobre</button>
-                            <button onClick={() => handleNav('pricing')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Planos</button>
-                            <Button className="w-full justify-center bg-brand-green text-white" onClick={() => handleNav('start-selling')}>Começar agora</Button>
+                        <div className="max-w-[1400px] mx-auto px-4 py-4 flex flex-col gap-1">
+                            {navItems.map((item) => (
+                                <button
+                                    key={item.page}
+                                    onClick={() => handleNav(item.page)}
+                                    className="text-gray-300 block py-3 text-left text-sm font-medium hover:text-brand-green transition-colors"
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                            <Button asChild className="w-full justify-center mt-3">
+                                <Link
+                                    href="/auth/login?mode=partner"
+                                    prefetch={false}
+                                    onClick={() => setMobileOpen(false)}
+                                >
+                                    Começar Grátis
+                                </Link>
+                            </Button>
                         </div>
                     </motion.div>
                 )}
@@ -339,7 +372,7 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <section className="py-10 px-4 bg-white relative">
             <GridLines />
-            <div className="max-w-[1200px] mx-auto relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto relative z-10">
                 <div className="bg-brand-dark rounded-3xl p-8 md:p-10 text-center overflow-hidden relative">
                     {/* Background decorative faint rings */}
                     <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
@@ -351,11 +384,15 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         Pronto para vender na sua cidade <br />e em todo o Brasil?
                     </h2>
                     <h3 className="text-xl md:text-xl text-gray-300 mb-10 max-w-xl mx-auto">
-                        Crie sua vitrine em minutos, receba pedidos pelo WhatsApp e venda sem comissões.
+                        Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda sem comissão.
                     </h3>
 
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button className="h-12" onClick={() => onNavigate('start-selling')}>Começar Grátis</Button>
+                        <Button asChild className="h-12">
+                            <Link href="/auth/login?mode=partner" prefetch={false}>
+                                Começar Grátis
+                            </Link>
+                        </Button>
                     </div>
                 </div>
             </div>

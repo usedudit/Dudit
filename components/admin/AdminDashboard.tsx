@@ -2,27 +2,30 @@
 
 import React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
-    ShieldAlert,
-    Users,
     Activity,
-    AlertTriangle,
     CheckCircle2,
-    Clock,
+    Users,
     ArrowRight,
-    TrendingUp,
-    Wrench,
-    FileSpreadsheet,
-    Tag,
-    Video,
-    Package,
-    Store,
-    RotateCcw,
-    ShoppingBag,
-    CreditCard,
-    Check
 } from "lucide-react"
-import { Badge, type BadgeVariant } from "@/components/reusable/Badge"
+import {
+    ShieldIcon,
+    AlertCircleIcon,
+    ReturnIcon,
+    WrenchIcon,
+    FileTextIcon,
+    TagIcon,
+    VideoIcon,
+    PackageIcon,
+    CreditCardIcon,
+    ShoppingCartIcon,
+    GridIcon,
+    AnalyticsIcon,
+} from "@/lib/icons"
+import { HorizontalKPICard, type KPIItem } from "@/components/erp/dashboard/cards/HorizontalKPICard"
+import { RecentActivities } from "@/components/erp/dashboard/RightColumn"
+import { IconPlaceholder } from "@/components/reusable"
 import Button from "@/components/reusable/Button"
 import type { AdminDashboardStats, AuditLogRow } from "@/lib/admin/types"
 
@@ -47,20 +50,108 @@ const ACTION_LABELS: Record<string, { label: string; color: "green" | "red" | "o
     RETURN_DISPUTE_DECIDE: { label: "Disputa Resolvida", color: "orange" },
 }
 
-function formatRelativeTime(dateString: string): string {
-    const diff = Date.now() - new Date(dateString).getTime()
-    const minutes = Math.floor(diff / 60000)
-    if (minutes < 1) return "Agora mesmo"
-    if (minutes < 60) return `Há ${minutes} min`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `Há ${hours} h`
-    const days = Math.floor(hours / 24)
-    if (days === 1) return "Ontem"
-    if (days < 30) return `Há ${days} dias`
-    return new Date(dateString).toLocaleDateString("pt-BR")
+function formatLogToActivity(log: AuditLogRow) {
+    const action = (log.action_type || (log as any).action || "") as string
+    const meta = (log.metadata || {}) as Record<string, any>
+    const adminUser = log.admin_name || log.admin_email?.split("@")[0] || "DUDIT"
+
+    let title = ""
+    let description = ""
+    let icon = "package"
+
+    if (action === "moderation.approve" || action === "PRODUCT_APPROVE") {
+        title = "Produto approved"
+        description = meta.reason || meta.admin_reason || "Aprovou o produto na moderação."
+        icon = "package"
+    } else if (action === "moderation.remove_image") {
+        title = "Produto atualizado"
+        const count = meta.removed_count || 1
+        description = meta.reason || `Removeu ${count} imagem(ns) na moderação.`
+        icon = "package"
+    } else if (action === "moderation.reject" || action === "PRODUCT_REJECT") {
+        title = "Produto rejeitado"
+        description = meta.reason || meta.admin_reason || "Rejeitou o produto na moderação."
+        icon = "package"
+    } else if (action === "moderation.edit_field") {
+        title = "Produto atualizado"
+        description = meta.reason || "Editou campos do produto na moderação."
+        icon = "package"
+    } else if (action.startsWith("recurring_subscription") || action.includes("subscription")) {
+        title = action.replace(/_/g, " ")
+        description = meta.reason || meta.note || meta.summary || "vendedor registrou entrega de item(ns) usando créditos da assinatura"
+        icon = "file"
+    } else if (action.startsWith("catalog.")) {
+        title = action.replace(/_/g, " ")
+        description = meta.reason || meta.summary || "Atualização de catálogo de produtos/serviços."
+        icon = "package"
+    } else if (action === "user.ban" || action === "USER_BAN") {
+        title = "Usuário banido"
+        description = meta.reason || meta.admin_reason || "Usuário suspenso por violação dos termos."
+        icon = "user"
+    } else if (action === "user.unban" || action === "USER_UNBAN") {
+        title = "Usuário reativado"
+        description = meta.reason || "Acesso de usuário restaurado pelo suporte."
+        icon = "user"
+    } else if (action === "partner.suspend" || action === "PARTNER_SUSPEND") {
+        title = "Loja suspensa"
+        description = meta.reason || "Operação da loja suspensa preventivamente."
+        icon = "user"
+    } else if (action === "service_order.update" || action === "SERVICE_ORDER_UPDATE") {
+        title = "Ordem de Serviço"
+        description = meta.reason || meta.status || "Status da OS alterado pelo administrador."
+        icon = "wrench"
+    } else if (action === "quote.update" || action === "QUOTE_UPDATE") {
+        title = "Orçamento comercial"
+        description = meta.reason || meta.status || "Orçamento atualizado pela administração."
+        icon = "file"
+    } else if (action === "promotion.update" || action === "PROMOTION_UPDATE") {
+        title = "Promoção / Cupom"
+        description = meta.reason || "Configurações da promoção alteradas."
+        icon = "tag"
+    } else if (action === "community_video.update" || action === "COMMUNITY_VIDEO_UPDATE") {
+        title = "Vídeo da Comunidade"
+        description = meta.reason || "Moderação de vídeo curto realizada."
+        icon = "file"
+    } else if (action === "order.update" || action === "ORDER_UPDATE") {
+        title = "Pedido alterado"
+        description = meta.reason || "Status ou itens do pedido alterados."
+        icon = "cart"
+    } else if (action === "return.update" || action === "RETURN_UPDATE") {
+        title = "Disputa de devolução"
+        description = meta.reason || "Intermediação de devolução/estorno realizada."
+        icon = "cart"
+    } else {
+        const actionMeta = ACTION_LABELS[action]
+        title = actionMeta?.label || action.replace(/[._]/g, " ")
+        description = meta.reason || meta.admin_reason || meta.note || meta.summary || ""
+        if (log.target_type === "service_order") icon = "wrench"
+        else if (log.target_type === "quote" || log.target_type === "subscription") icon = "file"
+        else if (log.target_type === "promotion") icon = "tag"
+        else if (log.target_type === "order" || log.target_type === "return_request") icon = "cart"
+        else if (log.target_type === "user" || log.target_type === "partner") icon = "user"
+        else icon = "package"
+    }
+
+    const logDate = new Date(log.created_at)
+    const timeStr = !isNaN(logDate.getTime())
+        ? logDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : "00:00"
+
+    return {
+        id: log.id,
+        date: log.created_at,
+        time: timeStr,
+        user: adminUser.toUpperCase(),
+        title,
+        description,
+        entityRef: log.target_name || "",
+        icon,
+    }
 }
 
 export default function AdminDashboard({ stats: serverStats }: AdminDashboardProps) {
+    const router = useRouter()
+
     const pendingModeration = serverStats?.pendingModeration ?? 0
     const pendingReports = serverStats?.pendingReports ?? 0
     const pendingReturns = serverStats?.pendingReturns ?? 0
@@ -72,82 +163,46 @@ export default function AdminDashboard({ stats: serverStats }: AdminDashboardPro
 
     const totalUrgentAttention = pendingModeration + pendingReports + pendingReturns
 
-    const kpiCards: Array<{
-        label: string
-        value: number
-        href: string
-        icon: React.ComponentType<{ size?: number; className?: string }>
-        badge: string
-        badgeVariant: BadgeVariant
-        color: string
-        bg: string
-        border: string
-    }> = [
+    const kpiItems: KPIItem[] = [
         {
-            label: "Moderação Pendente",
+            title: "Moderação Pendente",
             value: pendingModeration,
             href: "/ddt-admin/moderation",
-            icon: ShieldAlert,
-            badge: pendingModeration > 0 ? "Ação requerida" : "Em dia",
+            icon: ShieldIcon,
+            badgeText: pendingModeration > 0 ? "Ação requerida" : "Em dia",
             badgeVariant: pendingModeration > 0 ? "orange" : "green",
-            color: "text-amber-600 dark:text-amber-400",
-            bg: "bg-amber-50 dark:bg-amber-900/20",
-            border: "border-amber-200 dark:border-amber-900/30",
         },
         {
-            label: "Denúncias Ativas",
+            title: "Denúncias Ativas",
             value: pendingReports,
             href: "/ddt-admin/reports",
-            icon: AlertTriangle,
-            badge: pendingReports > 0 ? "Ação requerida" : "Zero denúncias",
+            icon: AlertCircleIcon,
+            badgeText: pendingReports > 0 ? "Ação requerida" : "Zero denúncias",
             badgeVariant: pendingReports > 0 ? "red" : "green",
-            color: "text-red-600 dark:text-red-400",
-            bg: "bg-red-50 dark:bg-red-900/20",
-            border: "border-red-200 dark:border-red-900/30",
         },
         {
-            label: "Trocas & Devoluções",
+            title: "Trocas & Devoluções",
             value: pendingReturns,
             href: "/ddt-admin/returns",
-            icon: RotateCcw,
-            badge: pendingReturns > 0 ? "Em andamento" : "Resolvidas",
+            icon: ReturnIcon,
+            badgeText: pendingReturns > 0 ? "Em andamento" : "Resolvidas",
             badgeVariant: pendingReturns > 0 ? "orange" : "green",
-            color: "text-brand-orange dark:text-orange-400",
-            bg: "bg-orange-50 dark:bg-orange-900/20",
-            border: "border-orange-200 dark:border-orange-900/30",
         },
         {
-            label: "Ordens de Serviço",
+            title: "Ordens de Serviço",
             value: openOS,
             href: "/ddt-admin/ordens-de-servico",
-            icon: Wrench,
-            badge: "Em andamento",
+            icon: WrenchIcon,
+            badgeText: "Em andamento",
             badgeVariant: "blue",
-            color: "text-blue-600 dark:text-blue-400",
-            bg: "bg-blue-50 dark:bg-blue-900/20",
-            border: "border-blue-200 dark:border-blue-900/30",
         },
         {
-            label: "Orçamentos Abertos",
+            title: "Orçamentos Abertos",
             value: openQuotes,
             href: "/ddt-admin/orcamentos",
-            icon: FileSpreadsheet,
-            badge: "Aguardando",
-            badgeVariant: "cyan",
-            color: "text-cyan-600 dark:text-cyan-400",
-            bg: "bg-cyan-50 dark:bg-cyan-900/20",
-            border: "border-cyan-200 dark:border-cyan-900/30",
-        },
-        {
-            label: "Lojas Integradas MP",
-            value: activeSubs,
-            href: "/ddt-admin/subscriptions",
-            icon: Store,
-            badge: "Ativas",
-            badgeVariant: "green",
-            color: "text-emerald-600 dark:text-emerald-400",
-            bg: "bg-emerald-50 dark:bg-emerald-900/20",
-            border: "border-emerald-200 dark:border-emerald-900/30",
+            icon: FileTextIcon,
+            badgeText: "Aguardando",
+            badgeVariant: "blue",
         },
     ]
 
@@ -156,222 +211,210 @@ export default function AdminDashboard({ stats: serverStats }: AdminDashboardPro
             title: "Ordens de Serviço",
             description: "Gerenciar OS abertas por lojas, status técnico e links públicos",
             href: "/ddt-admin/ordens-de-servico",
-            icon: Wrench,
-            color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20",
+            icon: WrenchIcon,
         },
         {
             title: "Orçamentos",
             description: "Visualizar propostas comerciais, portais públicos e edições",
             href: "/ddt-admin/orcamentos",
-            icon: FileSpreadsheet,
-            color: "text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20",
+            icon: FileTextIcon,
         },
         {
             title: "Vídeos da Comunidade",
             description: "Feed de vídeos curtos compartilhados por lojistas e moderação",
             href: "/ddt-admin/videos",
-            icon: Video,
-            color: "text-purple-600 bg-purple-50 dark:bg-purple-900/20",
+            icon: VideoIcon,
         },
         {
             title: "Campanhas & Cupons",
             description: "Promoções ativas de parceiros e cupons em circulação",
             href: "/ddt-admin/promocoes",
-            icon: Tag,
-            color: "text-pink-600 bg-pink-50 dark:bg-pink-900/20",
+            icon: TagIcon,
         },
         {
             title: "Catálogo de Produtos",
-            description: "Itens cadastrados em todas as lojas, estoque e preços",
+            description: "Itens cadastrados em todas as lojas parceiras, estoque e preços",
             href: "/ddt-admin/catalog/products",
-            icon: Package,
-            color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20",
+            icon: PackageIcon,
         },
         {
             title: "Planos Recorrentes",
             description: "Planos e mensalidades oferecidos pelas lojas a clientes finais",
             href: "/ddt-admin/catalog/plans",
-            icon: CreditCard,
-            color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20",
+            icon: CreditCardIcon,
         },
         {
             title: "Pedidos do Marketplace",
             description: "Visão consolidada de todas as vendas, remessas e status",
             href: "/ddt-admin/orders",
-            icon: ShoppingBag,
-            color: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
+            icon: ShoppingCartIcon,
         },
         {
             title: "Faturamento & Reembolsos",
             description: "Métricas financeiras globais e solicitações de estorno",
             href: "/ddt-admin/billing",
             icon: Activity,
-            color: "text-green-600 bg-green-50 dark:bg-green-900/20",
         },
     ]
 
+    const formattedActivities = recentLogs.map(formatLogToActivity)
+
     return (
-        <div className="p-6 md:p-8 max-w-[1700px] mx-auto space-y-8">
+        <div className="w-full space-y-6 pt-4 px-4 md:px-8 max-w-[1700px] mx-auto pb-12">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-[28px] md:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none mb-2">
-                        Visão Geral do Dudit
+            <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-col gap-2 pt-1">
+                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                        Visão Geral
                     </h1>
                     <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                        Monitoramento em tempo real do marketplace, ERP das lojas parceiras e trilha de auditoria.
+                        Monitoramento global da plataforma, marketplace e ecossistema ERP
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Link href="/ddt-admin/analytics">
                         <Button variant="outline" className="flex items-center gap-2 text-sm font-semibold border-brand-green/30 text-brand-green hover:bg-brand-green/10">
-                            <TrendingUp size={16} /> Analytics & Métricas
+                            <AnalyticsIcon size={16} /> Analytics & Métricas
                         </Button>
                     </Link>
                 </div>
+            </header>
+
+            {/* Row 1: KPI Horizontal Card */}
+            <div className="w-full">
+                <HorizontalKPICard items={kpiItems} />
             </div>
 
-            {/* KPI Cards Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-                {kpiCards.map((stat, index) => {
-                    const Icon = stat.icon
-                    return (
-                        <Link
-                            key={index}
-                            href={stat.href}
-                            className={`bg-white dark:bg-dark-surface rounded-2xl p-4 md:p-5 border ${stat.border} hover:shadow-md transition-all group flex flex-col justify-between`}
-                        >
-                            <div className="flex items-center justify-between mb-3">
-                                <div className={`w-9 h-9 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
-                                    <Icon size={18} />
+            {/* Row 2: Two Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                {/* Left Column (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                    {/* Precisa de Atenção */}
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 min-h-[260px] flex flex-col">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                                    <AlertCircleIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                                 </div>
-                                <Badge variant={stat.badgeVariant}>
-                                    {stat.badge}
-                                </Badge>
-                            </div>
-                            <div>
-                                <h3 className="text-brand-inactive-text dark:text-dark-body text-xs font-semibold uppercase tracking-wider mb-1 line-clamp-1">
-                                    {stat.label}
+                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                    Precisa de Atenção {totalUrgentAttention > 0 && `(${totalUrgentAttention})`}
                                 </h3>
-                                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
-                                    {stat.value}
-                                </p>
                             </div>
-                        </Link>
-                    )
-                })}
-            </div>
-
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Content Area (Left: 2 Cols) */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Action Required Section */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                        <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border flex items-center justify-between bg-gray-50/50 dark:bg-dark-surface/50">
-                            <div className="flex items-center gap-2.5 font-bold text-brand-dark dark:text-dark-heading">
-                                <AlertTriangle size={18} className="text-brand-orange" />
-                                <span>Pendências Operacionais</span>
-                            </div>
-                            <Badge variant={totalUrgentAttention > 0 ? "orange" : "green"}>
-                                {totalUrgentAttention > 0 ? `${totalUrgentAttention} pendências` : "Nenhuma pendência"}
-                            </Badge>
-                        </div>
-
-                        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {totalUrgentAttention === 0 ? (
-                                <div className="p-8 text-center flex flex-col items-center justify-center">
-                                    <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-900/20 text-brand-green flex items-center justify-center mb-3">
-                                        <Check size={24} />
-                                    </div>
-                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-base">Tudo em dia!</h4>
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-md mt-1">
-                                        Não há itens na fila de moderação, denúncias ou disputas de devolução pendentes de ação administrativa.
-                                    </p>
-                                </div>
-                            ) : (
-                                <>
-                                    {pendingModeration > 0 && (
-                                        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <ShieldAlert size={18} />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        Produtos / Serviços Aguardando Moderação
-                                                    </h4>
-                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                        Existem <span className="font-semibold text-amber-700 dark:text-amber-400">{pendingModeration}</span> item(ns) na fila aguardando validação ou revisão manual.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Link href="/ddt-admin/moderation" className="shrink-0">
-                                                <Button variant="outline" className="text-xs font-semibold border-amber-300 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20">
-                                                    Moderar Agora
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    )}
-
-                                    {pendingReports > 0 && (
-                                        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <AlertTriangle size={18} />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        Denúncias de Usuários ou Lojas
-                                                    </h4>
-                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                        Existem <span className="font-semibold text-red-600 dark:text-red-400">{pendingReports}</span> denúncia(s) pendente(s) de análise de conformidade.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Link href="/ddt-admin/reports" className="shrink-0">
-                                                <Button variant="outline" className="text-xs font-semibold border-red-300 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                                    Analisar Denúncias
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    )}
-
-                                    {pendingReturns > 0 && (
-                                        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-brand-orange dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <RotateCcw size={18} />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        Disputas de Trocas e Reembolsos
-                                                    </h4>
-                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                        <span className="font-semibold text-brand-orange">{pendingReturns}</span> solicitação(ões) de devolução requerem intermediação do suporte.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Link href="/ddt-admin/returns" className="shrink-0">
-                                                <Button variant="outline" className="text-xs font-semibold border-orange-300 dark:border-orange-900/50 text-brand-orange hover:bg-orange-50 dark:hover:bg-orange-900/20">
-                                                    Ver Devoluções
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    )}
-                                </>
+                            {totalUrgentAttention > 0 && (
+                                <span className="text-[12px] font-bold px-2.5 py-1 rounded-full bg-[#fce6e5] text-[#cc4745] dark:bg-red-950/40 dark:text-red-400">
+                                    {totalUrgentAttention} pendência{totalUrgentAttention > 1 ? "s" : ""}
+                                </span>
                             )}
                         </div>
+
+                        {totalUrgentAttention === 0 ? (
+                            <IconPlaceholder
+                                title="Tudo em dia!"
+                                subtitle="Não há itens na fila de moderação, denúncias ou disputas de devolução pendentes."
+                                className="flex-1 py-8"
+                            />
+                        ) : (
+                            <div className="overflow-x-auto -mx-6 px-6">
+                                <table className="w-full text-left">
+                                    <tbody>
+                                        {pendingModeration > 0 && (
+                                            <tr
+                                                onClick={() => router.push("/ddt-admin/moderation")}
+                                                className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[72px] cursor-pointer transition-colors hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20"
+                                            >
+                                                <td className="pl-2 align-top pt-3">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                                                            <ShieldIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-0.5">
+                                                                Moderação Pendente ({pendingModeration})
+                                                            </div>
+                                                            <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                Existem {pendingModeration} item(ns) na fila aguardando validação ou revisão manual.
+                                                            </div>
+                                                        </div>
+                                                        <div className="pt-1 shrink-0">
+                                                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green-secondary text-brand-green">
+                                                                Moderar
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {pendingReports > 0 && (
+                                            <tr
+                                                onClick={() => router.push("/ddt-admin/reports")}
+                                                className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[72px] cursor-pointer transition-colors hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20"
+                                            >
+                                                <td className="pl-2 align-top pt-3">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                                                            <AlertCircleIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-0.5">
+                                                                Denúncias de Usuários ou Lojas ({pendingReports})
+                                                            </div>
+                                                            <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                Existem {pendingReports} denúncia(s) pendente(s) de análise de conformidade.
+                                                            </div>
+                                                        </div>
+                                                        <div className="pt-1 shrink-0">
+                                                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green-secondary text-brand-green">
+                                                                Analisar
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {pendingReturns > 0 && (
+                                            <tr
+                                                onClick={() => router.push("/ddt-admin/returns")}
+                                                className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[72px] cursor-pointer transition-colors hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20"
+                                            >
+                                                <td className="pl-2 align-top pt-3">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                                                            <ReturnIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-0.5">
+                                                                Disputas de Trocas e Reembolsos ({pendingReturns})
+                                                            </div>
+                                                            <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {pendingReturns} solicitação(ões) de devolução requerem intermediação do suporte.
+                                                            </div>
+                                                        </div>
+                                                        <div className="pt-1 shrink-0">
+                                                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green-secondary text-brand-green">
+                                                                Ver Devoluções
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Quick Access to Ecosystem Operations */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6">
-                        <div className="flex items-center justify-between mb-5">
+                    {/* Operações do Ecossistema */}
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+                        <div className="flex items-center space-x-3 mb-6">
+                            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                                <GridIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                            </div>
                             <div>
-                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
                                     Operações do Ecossistema
                                 </h3>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
                                     Acesso rápido aos fluxos de trabalho do marketplace e dos ERPs das lojas parceiras
                                 </p>
                             </div>
@@ -384,22 +427,22 @@ export default function AdminDashboard({ stats: serverStats }: AdminDashboardPro
                                     <Link
                                         key={i}
                                         href={action.href}
-                                        className="group p-4 rounded-xl border border-brand-border dark:border-dark-border hover:border-brand-green/40 hover:bg-brand-green/[0.02] dark:hover:bg-dark-surface transition-all flex flex-col justify-between"
+                                        className="p-4 rounded-[18px] border border-brand-border dark:border-dark-border hover:bg-brand-green-light/10 dark:hover:bg-dark-border/20 transition-all flex flex-col justify-between group"
                                     >
                                         <div>
-                                            <div className={`w-10 h-10 rounded-xl ${action.color} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform`}>
-                                                <Icon size={20} />
+                                            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0 mb-3 group-hover:scale-105 transition-transform">
+                                                <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
                                             </div>
-                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
+                                            <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
                                                 {action.title}
                                             </h4>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 line-clamp-2 leading-relaxed">
+                                            <p className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body mt-1 line-clamp-2 leading-relaxed">
                                                 {action.description}
                                             </p>
                                         </div>
-                                        <div className="mt-4 flex items-center text-xs font-semibold text-brand-inactive-text group-hover:text-brand-green transition-colors gap-1">
+                                        <div className="mt-4 flex items-center text-[12px] font-bold text-brand-inactive-text dark:text-dark-body group-hover:text-brand-green transition-colors gap-1">
                                             <span>Acessar</span>
-                                            <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                                            <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
                                         </div>
                                     </Link>
                                 )
@@ -407,108 +450,61 @@ export default function AdminDashboard({ stats: serverStats }: AdminDashboardPro
                         </div>
                     </div>
 
-                    {/* Infrastructure Status */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                        <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Status dos Serviços</h3>
-                            <span className="text-xs text-brand-green font-semibold flex items-center gap-1.5">
+                    {/* Status dos Serviços */}
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                                    <Activity size={18} className="text-brand-dark dark:text-dark-heading" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                                        Status dos Serviços
+                                    </h3>
+                                    <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        Monitoramento da infraestrutura, integrações e segurança
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green-secondary text-brand-green text-xs font-bold self-start sm:self-center">
                                 <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
                                 Todos os sistemas online
-                            </span>
+                            </div>
                         </div>
-                        <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="p-4 rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50/50 dark:bg-green-900/10">
-                                <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold mb-2">
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="p-4 rounded-[18px] border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col justify-between">
+                                <div className="flex items-center gap-2 text-brand-green font-bold text-sm mb-2">
                                     <CheckCircle2 size={16} /> Mercado Pago
                                 </div>
-                                <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">{activeSubs} Lojas</div>
+                                <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{activeSubs} Lojas</div>
                                 <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Split de pagamentos ativo</div>
                             </div>
-                            <div className="p-4 rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50/50 dark:bg-green-900/10">
-                                <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold mb-2">
+                            <div className="p-4 rounded-[18px] border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col justify-between">
+                                <div className="flex items-center gap-2 text-brand-green font-bold text-sm mb-2">
                                     <CheckCircle2 size={16} /> Banco & RLS
                                 </div>
-                                <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">Operacional</div>
+                                <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Operacional</div>
                                 <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Supabase PostgreSQL 15</div>
                             </div>
-                            <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10">
-                                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-bold mb-2">
-                                    <Users size={16} /> Moderação & Bloqueios
+                            <div className="p-4 rounded-[18px] border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col justify-between">
+                                <div className="flex items-center gap-2 text-brand-dark dark:text-dark-heading font-bold text-sm mb-2">
+                                    <Users size={16} /> Segurança & Contas
                                 </div>
-                                <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">{bannedUsers} Bloqueados</div>
-                                <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Segurança de contas</div>
+                                <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{bannedUsers} Bloqueados</div>
+                                <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Contas restritas por moderação</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Right Column (Audit Feed) */}
-                <div className="space-y-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                        <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Ações Administrativas</h3>
-                            <Link href="/ddt-admin/audit" className="text-xs font-semibold text-brand-green hover:underline">
-                                Ver todas
-                            </Link>
-                        </div>
-                        <div className="p-6">
-                            {recentLogs.length === 0 ? (
-                                <div className="text-center py-8 text-brand-inactive-text text-sm">
-                                    Nenhum log recente registrado.
-                                </div>
-                            ) : (
-                                <div className="relative border-l border-brand-border dark:border-dark-border ml-3 space-y-6">
-                                    {recentLogs.slice(0, 8).map((log: AuditLogRow) => {
-                                        const actionMeta = ACTION_LABELS[log.action_type] || {
-                                            label: log.action_type.replace(/_/g, " "),
-                                            color: "gray" as const,
-                                        }
-                                        const adminDisplay = log.admin_name || log.admin_email || "Admin Dudit"
-                                        const reason = (log.metadata as any)?.reason || (log.metadata as any)?.admin_reason
-
-                                        return (
-                                            <div key={log.id} className="relative pl-6">
-                                                <div className="absolute -left-[13px] top-1 w-6 h-6 rounded-full bg-white dark:bg-dark-surface border-2 border-brand-border dark:border-dark-border flex items-center justify-center">
-                                                    <Clock size={11} className="text-brand-inactive-text" />
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading line-clamp-1">
-                                                            {adminDisplay}
-                                                        </span>
-                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body shrink-0 ml-2">
-                                                            {formatRelativeTime(log.created_at)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <Badge variant={actionMeta.color}>
-                                                            {actionMeta.label}
-                                                        </Badge>
-                                                    </div>
-                                                    {log.target_name && (
-                                                        <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
-                                                            Alvo: <span className="text-brand-dark dark:text-dark-heading">{log.target_name}</span>
-                                                        </p>
-                                                    )}
-                                                    {reason && (
-                                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1 bg-gray-50 dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-800 italic line-clamp-2">
-                                                            &ldquo;{reason}&rdquo;
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
-
-                            <Link href="/ddt-admin/audit" className="block mt-6">
-                                <Button variant="ghost" className="w-full text-xs font-semibold flex items-center justify-center gap-2 border border-brand-border dark:border-dark-border">
-                                    Abrir Histórico Completo de Auditoria <ArrowRight size={13} />
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
+                {/* Right Column (4 cols) */}
+                <div className="lg:col-span-4 space-y-6">
+                    <RecentActivities
+                        activities={formattedActivities}
+                        moreHref="/ddt-admin/audit"
+                        limit={8}
+                    />
                 </div>
             </div>
         </div>

@@ -69,22 +69,24 @@ export async function getAdminQuotes(
             partner_id,
             store_id,
             quote_number,
-            customer_name,
-            customer_phone,
-            customer_email,
             status,
-            total_amount,
+            total,
+            subtotal,
             notes,
             valid_until,
+            expiration_date,
             public_token,
             created_at,
             updated_at,
+            customer_id,
+            customers!customer_id (id, name, phone, email),
+            items_count:quote_items(count),
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
         `)
 
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`quote_number.ilike.%${s}%,customer_name.ilike.%${s}%`)
+        query = query.ilike("quote_number", `%${s}%`)
     }
 
     if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
@@ -107,7 +109,16 @@ export async function getAdminQuotes(
     const { data, error } = await query
     if (error) throw error
 
-    const items = (data || []) as any[]
+    const items = ((data || []) as any[]).map((row: any) => ({
+        ...row,
+        customer_name: row.customers?.name || "Cliente não informado",
+        customer_phone: row.customers?.phone || null,
+        customer_email: row.customers?.email || null,
+        total_amount: Number(row.total || row.subtotal || 0),
+        store_name: row.stores?.name || "Loja Parceira",
+        partner_name: row.stores?.name || "Loja Parceira",
+        items_count: Array.isArray(row.items_count) ? row.items_count[0]?.count || 0 : 0,
+    }))
     const hasMore = items.length > pageSize
 
     return {

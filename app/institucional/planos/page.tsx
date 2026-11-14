@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/reusable/Button';
 import {
@@ -19,7 +20,7 @@ const PricingHero = () => {
    return (
       <section className="relative bg-white pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
          <GridLines />
-         <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full">
+         <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
             <motion.div
                initial={{ opacity: 0, y: 30 }}
                animate={{ opacity: 1, y: 0 }}
@@ -128,7 +129,7 @@ const PricingCards = () => {
 
    return (
       <section className="bg-white pb-24 relative">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+         <div className="max-w-[1400px] w-full mx-auto px-4">
             <div className="grid md:grid-cols-3 gap-8 items-stretch pt-8">
                {plans.map((plan, index) => (
                   <motion.div
@@ -155,7 +156,7 @@ const PricingCards = () => {
                         <h3 className={`text-xl font-bold mb-1 ${plan.isDark ? 'text-white' : 'text-brand-dark'}`}>
                            {plan.name}
                         </h3>
-                        <p className="text-[10px] font-bold mb-6 text-brand-green">
+                        <p className="text-[11px] font-bold mb-6 text-brand-green">
                            {plan.objective}
                         </p>
                         <div className="flex items-baseline gap-1">
@@ -202,10 +203,13 @@ const PricingCards = () => {
                      </div>
 
                      <Button
+                        asChild
                         variant={plan.isDark ? "default" : "outline"}
                         className={`w-full mt-10 h-11 ${plan.isDark ? 'bg-brand-green text-white hover:bg-brand-green/90 border-0' : ''}`}
                      >
-                        Começar agora
+                        <Link href="/auth/login?mode=partner" prefetch={false}>
+                           Começar agora
+                        </Link>
                      </Button>
                   </motion.div>
                ))}
@@ -289,7 +293,7 @@ const ComparisonTable = () => {
 
    return (
       <section className="py-24 bg-brand-gray/30 relative">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+         <div className="max-w-[1400px] w-full mx-auto px-4">
             <motion.div
                initial={{ opacity: 0, y: 20 }}
                whileInView={{ opacity: 1, y: 0 }}
@@ -366,11 +370,11 @@ const FAQ = () => {
       },
       {
          q: "Posso usar sem ter empresa?",
-         a: "Sim. Você pode usar pra vender, divulgar serviços ou anunciar algo na sua cidade."
+         a: "Sim. Você pode usar pra vender, divulgar serviços ou anunciar algo na sua cidade ou para todo o Brasil."
       },
       {
          q: "Funciona na minha cidade?",
-         a: "Sim. A Dudit é feita pra funcionar em qualquer cidade."
+         a: "Sim. A Dudit funciona em qualquer cidade do Brasil e também permite vender com envio para todo o país."
       },
       {
          q: "Posso cancelar quando quiser?",
@@ -437,8 +441,10 @@ const FAQ = () => {
             </div>
 
             <div className="mt-12 text-center">
-               <Button variant="outline" className="text-brand-dark hover:text-brand-green border-brand-border">
-                  Ver todas as dúvidas <ArrowRightIcon size={16} />
+               <Button asChild variant="outline" className="text-brand-dark hover:text-brand-green border-brand-border">
+                  <Link href="/ajuda" prefetch={false}>
+                     Ver todas as dúvidas <ArrowRightIcon size={16} />
+                  </Link>
                </Button>
             </div>
          </div>
@@ -471,7 +477,7 @@ const faqLd = {
          name: "Posso usar sem ter empresa?",
          acceptedAnswer: {
             "@type": "Answer",
-            text: "Sim. Você pode usar pra vender, divulgar serviços ou anunciar algo na sua cidade.",
+            text: "Sim. Você pode usar pra vender, divulgar serviços ou anunciar algo na sua cidade ou para todo o Brasil.",
          },
       },
       {
@@ -479,7 +485,7 @@ const faqLd = {
          name: "Funciona na minha cidade?",
          acceptedAnswer: {
             "@type": "Answer",
-            text: "Sim. A Dudit é feita pra funcionar em qualquer cidade.",
+            text: "Sim. A Dudit funciona em qualquer cidade do Brasil e também permite vender com envio para todo o país.",
          },
       },
       {
@@ -498,10 +504,14 @@ export default function PricingPage() {
 
    const onNavigate = (page: string) => {
       if (page === 'home') router.push('/institucional/inicio');
+      else if (page === 'start-selling') router.push('/auth/login?mode=partner');
+      else if (page === 'explore') router.push('/explorar');
       else if (page === 'segments') router.push('/institucional/segmentos');
       else if (page === 'pricing') router.push('/institucional/planos');
       else if (page === 'terms') router.push('/institucional/termos');
       else if (page === 'privacidade') router.push('/institucional/privacidade');
+      else if (page === 'about') router.push('/institucional/sobre');
+      else router.push('/institucional/inicio');
    };
 
    return (

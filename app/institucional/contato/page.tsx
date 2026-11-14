@@ -100,7 +100,7 @@ export default function ContatoPage() {
                 {/* Hero Section */}
                 <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+                    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid lg:grid-cols-2 gap-12 items-center">
                             {/* Lado Esquerdo - Formulário */}
                             <motion.div

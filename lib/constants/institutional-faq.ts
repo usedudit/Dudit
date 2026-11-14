@@ -10,7 +10,7 @@ export const INSTITUTIONAL_FAQ: InstitutionalFaqItem[] = [
     },
     {
         question: "A Dudit cobra comissão sobre as vendas realizadas?",
-        answer: "Não! A Dudit opera com 0% de comissão por venda. Diferente dos marketplaces tradicionais que cobram taxas de 12% a mais de 20% sobre o seu faturamento, na Dudit 100% do lucro das suas vendas fica com você."
+        answer: "Não. A Dudit opera com 0% de comissão por venda. Diferente dos marketplaces tradicionais que cobram percentuais sobre o seu faturamento, na Dudit o valor das suas vendas fica com você. A plataforma é remunerada pela assinatura do plano."
     },
     {
         question: "A Dudit é apenas um guia/diretório de lojas ou um sistema de gestão completo?",
@@ -18,7 +18,7 @@ export const INSTITUTIONAL_FAQ: InstitutionalFaqItem[] = [
     },
     {
         question: "Como funciona a entrega local e o frete nacional na Dudit?",
-        answer: "O lojista tem autonomia completa: pode habilitar a opção de retirada no balcão físico, definir entregadores próprios ou motoboys com taxas personalizadas por bairro ou raio, e ativar fretes nacionais com cálculo automático, geração de etiquetas e rastreio integrado via transportadoras e Correios."
+        answer: "O lojista tem autonomia completa: pode habilitar a retirada no balcão físico, configurar entrega local com cálculo por distância e raio de atendimento, e ativar fretes nacionais com cálculo automático, geração de etiquetas e rastreio integrado via transportadoras e Correios."
     },
     {
         question: "Quais segmentos de negócios podem utilizar a Dudit?",

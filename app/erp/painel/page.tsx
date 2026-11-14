@@ -72,6 +72,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
                                     Visão Geral
                                 </h1>
                                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    Veja como está o desempenho do seu negócio hoje e turbine suas vendas.
                                     {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                                 </p>
                             </div>

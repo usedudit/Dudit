@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Planos e Preços - Sistema de Gestão Completo | Dudit",
+    title: "Planos e Preços - Sistema de Gestão Completo",
     description: "Conheça os planos da Dudit: Começar Grátis (R$ 0), Crescer (R$ 29,90/mês) e Escalar (R$ 49,90/mês). Vitrine online, PDV balcão, pedidos e estoque com 0% de taxa por venda.",
     openGraph: {
-        title: "Planos e Preços - Venda com 0% de Comissão | Dudit",
+        title: "Planos e Preços - Venda com 0% de Comissão",
         description: "Crie sua vitrine online, gerencie pedidos, controle estoque e emita ordens de serviço sem pagar comissões abusivas por venda.",
         url: "https://dudit.com.br/institucional/planos",
         siteName: "Dudit",
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        title: "Planos e Preços - Venda com 0% de Comissão | Dudit",
+        title: "Planos e Preços - Venda com 0% de Comissão",
         description: "Planos a partir de R$ 0/mês. Vitrine online, controle de estoque e pedidos com 0% de comissão por venda.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },

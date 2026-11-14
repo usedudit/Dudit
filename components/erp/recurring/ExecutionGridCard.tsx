@@ -2,14 +2,16 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge } from "@/components/reusable"
-import { ClockIcon } from "@/lib/icons"
+import { ActionsDropdown, Badge, DropdownItem } from "@/components/reusable"
+import { ClockIcon, EyeIcon, InfoIcon, PrinterIcon } from "@/lib/icons"
 import { getRecurringExecutionStatusLabel } from "@/lib/types/recurring"
-import { formatDate, formatDateTime } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 
 interface ExecutionGridCardProps {
   execution: any
   onOpenOrder?: (orderId: string) => void
+  onPrintReceipt?: (orderId: string) => void
+  onViewError?: (errorMessage: string) => void
 }
 
 const statusVariant = (status: string) => {
@@ -19,8 +21,16 @@ const statusVariant = (status: string) => {
   return "gray" as const
 }
 
-export const ExecutionGridCard: React.FC<ExecutionGridCardProps> = ({ execution, onOpenOrder }) => {
+export const ExecutionGridCard: React.FC<ExecutionGridCardProps> = ({
+  execution,
+  onOpenOrder,
+  onPrintReceipt,
+  onViewError,
+}) => {
   const orderNumber = execution.orders?.order_number
+  const hasOrder = Boolean(execution.order_id)
+  const hasError = Boolean(execution.error_message)
+  const hasAnyAction = hasOrder || hasError
 
   return (
     <motion.div
@@ -79,12 +89,41 @@ export const ExecutionGridCard: React.FC<ExecutionGridCardProps> = ({ execution,
           </div>
         </div>
 
-        <div className="flex items-end justify-between mt-1">
+        <div className="flex items-end justify-between mt-1 pt-1 border-t border-dashed border-brand-border/60 dark:border-dark-border/60">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Pedido</span>
+            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor do Ciclo</span>
             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-              {orderNumber ? `#${orderNumber}` : "-"}
+              {execution.orders?.total_amount != null
+                ? formatCurrency(execution.orders.total_amount)
+                : execution.status === "completed"
+                  ? "R$ 0,00"
+                  : "-"}
             </span>
+          </div>
+
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <ActionsDropdown disabled={!hasAnyAction}>
+              {hasOrder && (
+                <>
+                  <DropdownItem onClick={() => onOpenOrder?.(execution.order_id)}>
+                    <EyeIcon size={18} /> Ver pedido
+                  </DropdownItem>
+                  <DropdownItem onClick={() => onPrintReceipt?.(execution.order_id)}>
+                    <PrinterIcon size={18} /> Imprimir recibo
+                  </DropdownItem>
+                </>
+              )}
+              {hasError && (
+                <DropdownItem onClick={() => onViewError?.(execution.error_message)}>
+                  <InfoIcon size={18} /> Ver erro
+                </DropdownItem>
+              )}
+              {!hasAnyAction && (
+                <div className="px-3 py-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                  Nenhuma ação disponível
+                </div>
+              )}
+            </ActionsDropdown>
           </div>
         </div>
       </div>

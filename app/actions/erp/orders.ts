@@ -3776,7 +3776,10 @@ export async function getOrderDetailsAction(
     order_date: sale.created_at,
     // Breakdown imutável para DRE / lucro líquido por pedido (POS)
     manual_discount_amount: manualDiscount,
-    item_discount_amount: 0, // POS sale_items não guarda desconto por linha; preenchido no finalize_pos_sale se necessário
+    item_discount_amount: (sale.sale_items || []).reduce(
+      (acc: number, it: any) => acc + Number(it.discount_amount || 0),
+      0,
+    ),
     campaign_discount_amount: 0,
     order_items: (sale.sale_items || []).map((it: any) => ({
       id: it.id,
