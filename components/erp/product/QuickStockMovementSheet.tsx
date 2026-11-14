@@ -87,7 +87,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         setLiveReservedStock(Math.max(0, Number(res.data.stock_reserved) || 0))
                     }
                 })
-                .catch(() => {})
+                .catch(() => { })
                 .finally(() => {
                     if (!cancelled) setIsLoadingStockStatus(false)
                 })
@@ -257,40 +257,6 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         </div>
                     </div>
                 </div>
-
-                {/* Banner de alerta de reserva caso haja unidades reservadas e não esteja no modo release */}
-                {liveReservedStock > 0 && type !== 'release' && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-3.5 flex items-center justify-between gap-3 p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50"
-                    >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-brand-orange flex items-center justify-center shrink-0">
-                                <LockIcon size={14} />
-                            </div>
-                            <div className="min-w-0 text-xs">
-                                <p className="font-semibold text-brand-dark dark:text-dark-heading">
-                                    {liveReservedStock} {liveReservedStock === 1 ? 'unidade reservada' : 'unidades reservadas'}
-                                </p>
-                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                    {availableStock} disponíveis para venda
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setType('release')
-                                setQuantity(liveReservedStock)
-                                handleReasonChange('Selecione um motivo...')
-                            }}
-                            className="text-xs font-bold text-brand-primary hover:underline shrink-0 px-2 py-1 rounded-md hover:bg-brand-primary/5 transition-colors"
-                        >
-                            Liberar reserva
-                        </button>
-                    </motion.div>
-                )}
             </div>
 
             {/* Form body */}
@@ -366,7 +332,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                                 handleReasonChange('Selecione um motivo...')
                             }}
                             className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all border relative ${type === 'release'
-                                ? 'bg-amber-50/70 dark:bg-amber-900/20 border-brand-orange shadow-sm'
+                                ? 'bg-amber-50/70 dark:bg-amber-900/20 border-brand-orange'
                                 : liveReservedStock <= 0
                                     ? 'opacity-40 cursor-not-allowed bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border'
                                     : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
@@ -377,7 +343,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                                 }`}>
                                 <UnlockIcon size={16} strokeWidth={2.5} />
                                 {liveReservedStock > 0 && (
-                                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-brand-orange text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-brand-orange text-white text-[10px] font-bold flex items-center justify-center">
                                         {liveReservedStock}
                                     </span>
                                 )}
@@ -457,8 +423,8 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                     />
 
                     {type === 'release' ? (
-                        <div className="rounded-xl p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 space-y-1 text-xs">
-                            <p className="text-brand-dark dark:text-dark-heading font-medium">
+                        <div className="text-xs">
+                            <p className="text-brand-inactive-text dark:text-dark-body">
                                 Reserva restante: <strong className="text-brand-orange">{Math.max(0, liveReservedStock - (Number(quantity) || 0))}</strong>
                             </p>
                             <p className="text-brand-inactive-text dark:text-dark-body">
@@ -466,7 +432,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                             </p>
                         </div>
                     ) : type !== 'adjustment' && (
-                        <p className="text-xs text-brand-inactive-text">
+                        <p className="text-brand-inactive-text dark:text-dark-body">
                             Estoque resultante: <strong className="text-brand-dark dark:text-dark-heading">{projectedStock}</strong>
                         </p>
                     )}

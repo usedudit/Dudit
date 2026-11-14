@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
-import { TruckIcon } from "@/lib/icons"
+import { TruckIcon, ClockIcon } from "@/lib/icons"
 
 interface DeliveryListItemProps {
   delivery: any
@@ -40,24 +40,37 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
               <TruckIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">{delivery.orderDisplayId}</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                  {delivery.orderCount > 1 ? `Múltiplos pedidos (${delivery.orderCount})` : delivery.orderDisplayId}
+                </span>
+                {delivery.deliveryTimingState === "late" && (
+                  <Tooltip text={delivery.deliveryTimingLabel || "Entrega atrasada"}>
+                    <Badge variant="red" icon={<ClockIcon size={12} />} className="scale-90 whitespace-nowrap" />
+                  </Tooltip>
+                )}
+              </div>
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {delivery.customerName}{delivery.orderCount > 1 ? ` • +${delivery.orderCount - 1} pedido(s)` : ""}
+                {delivery.customerName}
               </span>
             </div>
           </div>
         )
-      case "delivery_fee":
-        return <span className="text-[13px] font-bold text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</span>
-      case "status":
-        return <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)}>{statusMeta.label}</Badge>
+      case "address":
+        return (
+          <div className="flex flex-col min-w-0 text-left">
+            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate max-w-[220px]" title={delivery.customerAddress}>
+              {delivery.customerAddress || "-"}
+            </span>
+          </div>
+        )
       case "delivery_person": {
         const isPlatform = Boolean(delivery.is_platform_driver || delivery.isPlatformDriver || delivery.platform_driver || delivery.delivery_person_id?.startsWith?.("platform:"))
         return (
           <div className="flex items-center gap-1.5 min-w-0">
             {isPlatform && (
               <Tooltip text="Entregador da Rede Dudit">
-                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
               </Tooltip>
             )}
             <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
@@ -66,27 +79,29 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
           </div>
         )
       }
-      case "estimated_time":
-        return <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{delivery.estimatedDurationMinutes ? `${delivery.estimatedDurationMinutes} min` : "-"}</span>
       case "dates":
         return (
           <div className="flex flex-col text-left">
-            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{delivery.startedAt ? formatDate(delivery.startedAt) : "-"}</span>
+            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+              {delivery.startedAt ? formatDate(delivery.startedAt) : "-"}
+            </span>
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
               Prev.: {delivery.estimatedArrivalAt ? `${formatDate(delivery.estimatedArrivalAt)} ${formatTime(delivery.estimatedArrivalAt)}` : "-"}
             </span>
-            <span className={`text-[11px] font-semibold ${delivery.deliveryTimingState === "late" ? "text-brand-red" : "text-brand-green"}`}>
-              {delivery.deliveryTimingLabel || ""}
-            </span>
-            {delivery.deliveryTimingDetail ? (
-              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
-                {delivery.deliveryTimingDetail}
-              </span>
-            ) : null}
           </div>
         )
       case "delivered_at":
-        return <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{delivery.deliveredAt ? `${formatDate(delivery.deliveredAt)} ${formatTime(delivery.deliveredAt)}` : "-"}</span>
+        return (
+          <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+            {delivery.completedAt
+              ? `${formatDate(delivery.completedAt)} ${formatTime(delivery.completedAt)}`
+              : (delivery.deliveredAt ? `${formatDate(delivery.deliveredAt)} ${formatTime(delivery.deliveredAt)}` : "-")}
+          </span>
+        )
+      case "delivery_fee":
+        return <span className="text-[13px] font-bold text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</span>
+      case "status":
+        return <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)}>{statusMeta.label}</Badge>
       case "actions":
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>

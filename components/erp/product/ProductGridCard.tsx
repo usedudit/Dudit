@@ -53,7 +53,7 @@ const ProductGridCard = React.memo(
         const reservedStock = hasVariantData ? (product.variant_total_reserved ?? 0) : (product.stock_reserved ?? 0)
         const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
-        const imageUrl = getPrimaryProductDisplayImage(product)
+        const imageUrl = getPrimaryProductDisplayImage(product, "thumbnail", { allowFlagged: true })
 
         return (
             <motion.div
@@ -87,11 +87,19 @@ const ProductGridCard = React.memo(
                                     title={product.name}
                                 >
                                     <span className="truncate">{product.name}</span>
-                                    {product.moderation_status === 'pending_moderation' && (
+                                    {product.moderation_status === 'flagged' ? (
+                                        <Tooltip text="Conteúdo ou imagem sinalizado pela moderação. O item fica oculto na vitrine até ser revisado e aprovado.">
+                                            <Badge variant="red" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
+                                        </Tooltip>
+                                    ) : product.moderation_status === 'pending_moderation' ? (
                                         <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                             <Badge variant="orange" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
                                         </Tooltip>
-                                    )}
+                                    ) : product.moderation_status === 'rejected' ? (
+                                        <Tooltip text="Reprovado pela moderação do marketplace.">
+                                            <Badge variant="red" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
+                                        </Tooltip>
+                                    ) : null}
                                 </h3>
                                 {(() => {
                                     const isArchived = product.status === "arquivado" || product.status === "archived"

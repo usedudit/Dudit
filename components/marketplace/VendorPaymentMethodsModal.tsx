@@ -112,28 +112,14 @@ export function VendorPaymentMethodsModal({
         mp.mercado_pago_wallet && { label: "Saldo MP" },
     ].filter(Boolean) as Array<{ label: string; icon?: string }> : []
 
-    const [selectedCreditMethodId, setSelectedCreditMethodId] = useState<string | null>(null)
-
-    // Select the best/default credit method when opening or when methods list changes
-    useEffect(() => {
-        if (isOpen && creditMethods.length > 0) {
-            setSelectedCreditMethodId((prev) => {
-                if (prev && creditMethods.some((m: any) => m.id === prev)) {
-                    return prev
-                }
-                return creditMethods[0].id
-            })
-        }
-    }, [isOpen, creditMethods])
-
     const ccMethod = useMemo(() => {
-        if (!creditMethods.length) return null
-        if (selectedCreditMethodId) {
-            const found = creditMethods.find((m: any) => m.id === selectedCreditMethodId)
-            if (found) return found
-        }
-        return creditMethods[0]
-    }, [creditMethods, selectedCreditMethodId])
+        return (
+            creditMethods.find((m: any) => m.is_online_default) ||
+            creditMethods.find((m: any) => m.is_default) ||
+            creditMethods[0] ||
+            null
+        )
+    }, [creditMethods])
 
     const maxCcInstallments = ccMethod ? Math.max(1, Number(ccMethod.max_installments || 1)) : 1
 
@@ -243,38 +229,8 @@ export function VendorPaymentMethodsModal({
         </div>
     )
 
-    const formatInterestPercent = (pct: number) => {
-        if (!pct || pct <= 0) return ""
-        const formatted = Number(pct.toFixed(2)).toString().replace(".", ",")
-        return `(${formatted}% a.m.)`
-    }
-
     const renderInstallmentOptionsContent = () => (
         <div className="space-y-4">
-            {creditMethods.length > 1 && (
-                <div className="flex flex-wrap items-center gap-2 pb-1">
-                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">Opção de cartão:</span>
-                    {creditMethods.map((m: any) => {
-                        const isSelected = ccMethod?.id === m.id
-                        return (
-                            <button
-                                key={m.id}
-                                type="button"
-                                onClick={() => setSelectedCreditMethodId(m.id)}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                                    isSelected
-                                        ? "border-brand-green bg-green-50 text-brand-green dark:bg-green-950/40 dark:text-green-400"
-                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-body hover:bg-brand-gray/20"
-                                }`}
-                            >
-                                {m.name || "Cartão de Crédito"}
-                                {m.is_online_default ? " (Padrão Online)" : ""}
-                            </button>
-                        )
-                    })}
-                </div>
-            )}
-
             {creditMethods.length === 0 ? (
                 <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
                     Nenhuma opção de parcelamento disponível (sem cartão de crédito configurado).
@@ -298,9 +254,7 @@ export function VendorPaymentMethodsModal({
                                     </span>
                                     {opt.hasInterest ? (
                                         <span className="text-[11px] text-brand-green dark:text-green-400 mt-0.5 font-medium">
-                                            {opt.interestPercent > 0
-                                                ? `Com juros ${formatInterestPercent(opt.interestPercent)}`
-                                                : "Com juros"}
+                                            Com juros
                                         </span>
                                     ) : (
                                         <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">

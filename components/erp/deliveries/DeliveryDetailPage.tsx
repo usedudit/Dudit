@@ -478,11 +478,19 @@ export default function DeliveryDetailPage({
         </div>
     )
 
+    const displayDistance = route?.totalDistanceKm != null
+        ? `${Number(route.totalDistanceKm).toFixed(2)} km`
+        : `${Number(delivery.distance_km || 0).toFixed(2)} km`
+
+    const displayDuration = route?.totalEstimatedDurationMinutes != null
+        ? `${route.totalEstimatedDurationMinutes} min`
+        : `${delivery.estimated_duration_minutes || 0} min`
+
     const deliveryInfoMetrics = (
         <FormSection title="Informações da Entrega" hasSeparator>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ListItem icon={RouteIcon} title="Distância" description={`${Number(delivery.distance_km || 0).toFixed(2)} km`} className="px-4 py-3 gap-4" />
-                <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={`${delivery.estimated_duration_minutes || 0} min`} className="px-4 py-3 gap-4" />
+                <ListItem icon={RouteIcon} title="Distância" description={displayDistance} className="px-4 py-3 gap-4" />
+                <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={displayDuration} className="px-4 py-3 gap-4" />
                 <ListItem icon={ClockArrowUpIcon} title="Saída" description={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} className="px-4 py-3 gap-4" />
                 <ListItem icon={ClockCheckIcon} title="Conclusão" description={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} className="px-4 py-3 gap-4" />
             </div>

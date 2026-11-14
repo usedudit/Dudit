@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, Badge } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
+import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, ArrowUpDownIcon, LinkIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, ArrowUpDownIcon, LinkIcon, TruckIcon, PrinterIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import {
@@ -28,7 +29,7 @@ import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
 import DeliveryGridCard from "./DeliveryGridCard"
 import DeliveryListItem from "./DeliveryListRow"
 import CarrierDeliveryBoard from "./CarrierDeliveryBoard"
-import CarrierDeliveryCard from "./CarrierDeliveryCard"
+import CarrierDeliveryCard, { getEstimatedDeliveryDate } from "./CarrierDeliveryCard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
 
@@ -66,16 +67,16 @@ function doesTransitionRequireReason(currentStatus: string, nextStatus: string):
     return false
 }
 
-type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
+type SortKey = "order_id" | "address" | "delivery_person" | "dates" | "delivered_at" | "delivery_fee" | "status"
 
 const COLUMNS: Array<{ id: SortKey | "actions"; label: string; align?: "left" | "center" | "right"; width?: string }> = [
-    { id: "order_id", label: "Pedido / Cliente", align: "left", width: "260px" },
-    { id: "delivery_fee", label: "Taxa de Entrega", align: "left", width: "140px" },
+    { id: "order_id", label: "Pedido / Cliente", align: "left", width: "240px" },
+    { id: "address", label: "Endereço", align: "left", width: "220px" },
+    { id: "delivery_person", label: "Entregador", align: "left", width: "160px" },
+    { id: "dates", label: "Saída / Previsão", align: "left", width: "160px" },
+    { id: "delivered_at", label: "Conclusão", align: "left", width: "150px" },
+    { id: "delivery_fee", label: "Taxa de Entrega", align: "left", width: "130px" },
     { id: "status", label: "Status", align: "left", width: "160px" },
-    { id: "delivery_person", label: "Entregador", align: "left", width: "180px" },
-    { id: "estimated_time", label: "Tempo Estimado", align: "left", width: "140px" },
-    { id: "dates", label: "Saída / Previsão", align: "left", width: "180px" },
-    { id: "delivered_at", label: "Entregue em", align: "left", width: "160px" },
     { id: "actions", label: "Ações", align: "center", width: "70px" },
 ]
 
@@ -112,8 +113,25 @@ export default function DeliveriesPage({
 
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
-    const [filters, setFilters] = useState<{ status: string[]; datePeriod: DatePeriodFilterValue }>({
+    const [filters, setFilters] = useState<{
+        status: string[]
+        timing: string[]
+        driverType: string[]
+        grouping: string[]
+        carrierName: string[]
+        hasTracking: string[]
+        feeMin: string
+        feeMax: string
+        datePeriod: DatePeriodFilterValue
+    }>({
         status: [],
+        timing: [],
+        driverType: [],
+        grouping: [],
+        carrierName: [],
+        hasTracking: [],
+        feeMin: "",
+        feeMax: "",
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -266,6 +284,15 @@ export default function DeliveriesPage({
         return () => window.removeEventListener("resize", checkScroll)
     }, [viewMode, items, carrierShipments])
 
+    const carrierOptions = useMemo(() => {
+        const set = new Set<string>()
+        ;(carrierShipments || []).forEach((s: any) => {
+            if (s.carrierName) set.add(s.carrierName)
+        })
+        const list = Array.from(set)
+        return list.length > 0 ? list : ["Correios", "Jadlog", "Loggi", "Total Express", "Latam Cargo"]
+    }, [carrierShipments])
+
     const filterSections: FilterSectionConfig[] = useMemo(() => {
         if (mode === "carriers") {
             return [
@@ -282,6 +309,33 @@ export default function DeliveriesPage({
                         "Envio cancelado",
                         "Falha no envio",
                     ],
+                },
+                {
+                    id: "carrierName",
+                    title: "Transportadora",
+                    type: "checkbox-list",
+                    options: carrierOptions,
+                },
+                {
+                    id: "hasTracking",
+                    title: "Rastreio",
+                    type: "checkbox-list",
+                    options: [
+                        "Com rastreio",
+                        "Sem rastreio",
+                    ],
+                },
+                {
+                    id: "feeRange",
+                    title: "Valor do Frete",
+                    type: "range",
+                    rangeConfig: {
+                        minKey: "feeMin",
+                        maxKey: "feeMax",
+                        inputType: "money",
+                        minPlaceholder: "Min",
+                        maxPlaceholder: "Max",
+                    },
                 },
                 {
                     id: "datePeriod",
@@ -305,12 +359,51 @@ export default function DeliveriesPage({
                 ],
             },
             {
+                id: "timing",
+                title: "Pontualidade",
+                type: "checkbox-list",
+                options: [
+                    "Atrasadas",
+                    "No prazo",
+                ],
+            },
+            {
+                id: "driverType",
+                title: "Tipo de entregador",
+                type: "checkbox-list",
+                options: [
+                    "Entrega própria",
+                    "Rede Dudit",
+                ],
+            },
+            {
+                id: "grouping",
+                title: "Agrupamento de pedidos",
+                type: "checkbox-list",
+                options: [
+                    "Pedido único",
+                    "Múltiplos pedidos",
+                ],
+            },
+            {
+                id: "feeRange",
+                title: "Taxa de Entrega",
+                type: "range",
+                rangeConfig: {
+                    minKey: "feeMin",
+                    maxKey: "feeMax",
+                    inputType: "money",
+                    minPlaceholder: "Min",
+                    maxPlaceholder: "Max",
+                },
+            },
+            {
                 id: "datePeriod",
                 title: "Período",
                 type: "date-period",
             },
         ]
-    }, [mode])
+    }, [mode, carrierOptions])
 
     const mapDeliveryRows = useCallback((sourceItems: any[]) => {
         const nowMs = Date.now()
@@ -321,8 +414,10 @@ export default function DeliveriesPage({
             const order = firstLink?.orders || {}
             const deliveryPersonName = raw.partner_users?.user_profiles?.full_name || null
             const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
-            const estimatedArrivalAt = raw.started_at && raw.estimated_duration_minutes
-                ? new Date(new Date(raw.started_at).getTime() + Number(raw.estimated_duration_minutes) * 60000).toISOString()
+            const baseDuration = Number(raw.estimated_duration_minutes || 0)
+            const estimatedDuration = baseDuration > 0 ? baseDuration : (links.length * 20)
+            const estimatedArrivalAt = raw.started_at && estimatedDuration > 0
+                ? new Date(new Date(raw.started_at).getTime() + estimatedDuration * 60000).toISOString()
                 : null
             const isClosed = ["cancelled", "delivery_failed"].includes(effectiveStatus)
             const showTimingBadge = ["sent", "delivered"].includes(effectiveStatus)
@@ -372,9 +467,30 @@ export default function DeliveriesPage({
         let list = mapDeliveryRows(items || [])
 
         list = list.filter((d: any) => {
-            const matchSearch = !term || d.orderDisplayId.toLowerCase().includes(term) || d.customerName.toLowerCase().includes(term)
+            const matchSearch = !term ||
+                d.orderDisplayId.toLowerCase().includes(term) ||
+                d.customerName.toLowerCase().includes(term) ||
+                (d.customerAddress && d.customerAddress.toLowerCase().includes(term)) ||
+                (d.deliveryPersonName && d.deliveryPersonName.toLowerCase().includes(term))
+
             const statusLabel = getDeliveryStatusMeta(d.status).label
             const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel) || filters.status.includes(d.status)
+
+            const matchTiming = filters.timing.length === 0 ||
+                (filters.timing.includes("Atrasadas") && d.deliveryTimingState === "late") ||
+                (filters.timing.includes("No prazo") && d.deliveryTimingState !== "late")
+
+            const matchDriver = filters.driverType.length === 0 ||
+                (filters.driverType.includes("Rede Dudit") && d.isPlatformDriver) ||
+                (filters.driverType.includes("Entrega própria") && !d.isPlatformDriver)
+
+            const matchGrouping = filters.grouping.length === 0 ||
+                (filters.grouping.includes("Pedido único") && d.orderCount === 1) ||
+                (filters.grouping.includes("Múltiplos pedidos") && d.orderCount > 1)
+
+            const minFee = filters.feeMin ? Number(filters.feeMin) : null
+            const maxFee = filters.feeMax ? Number(filters.feeMax) : null
+            const matchFee = (minFee == null || d.deliveryFee >= minFee) && (maxFee == null || d.deliveryFee <= maxFee)
 
             const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
             const createdYmd = d.createdAtMs ? new Date(d.createdAtMs).toISOString().slice(0, 10) : null
@@ -384,7 +500,7 @@ export default function DeliveriesPage({
                     ? createdYmd >= (startYmd || "") && createdYmd <= (endYmd || "9999-12-31")
                     : false
 
-            return matchSearch && matchStatus && matchDate
+            return matchSearch && matchStatus && matchTiming && matchDriver && matchGrouping && matchFee && matchDate
         })
 
         if (sortConfig) {
@@ -396,6 +512,22 @@ export default function DeliveriesPage({
                         aVal = a.orderDisplayId || a.orderId || ""
                         bVal = b.orderDisplayId || b.orderId || ""
                         break
+                    case "address":
+                        aVal = a.customerAddress || ""
+                        bVal = b.customerAddress || ""
+                        break
+                    case "delivery_person":
+                        aVal = a.deliveryPersonName || ""
+                        bVal = b.deliveryPersonName || ""
+                        break
+                    case "dates":
+                        aVal = a.startedAt || a.estimatedArrivalAt || a.createdAtMs || 0
+                        bVal = b.startedAt || b.estimatedArrivalAt || b.createdAtMs || 0
+                        break
+                    case "delivered_at":
+                        aVal = a.completedAt || a.deliveredAt || ""
+                        bVal = b.completedAt || b.deliveredAt || ""
+                        break
                     case "delivery_fee":
                         aVal = a.deliveryFee || 0
                         bVal = b.deliveryFee || 0
@@ -403,22 +535,6 @@ export default function DeliveriesPage({
                     case "status":
                         aVal = a.status || ""
                         bVal = b.status || ""
-                        break
-                    case "delivery_person":
-                        aVal = a.deliveryPersonName || ""
-                        bVal = b.deliveryPersonName || ""
-                        break
-                    case "estimated_time":
-                        aVal = a.estimatedDurationMinutes || 0
-                        bVal = b.estimatedDurationMinutes || 0
-                        break
-                    case "dates":
-                        aVal = a.startedAt || a.createdAtMs || 0
-                        bVal = b.startedAt || b.createdAtMs || 0
-                        break
-                    case "delivered_at":
-                        aVal = a.deliveredAt || ""
-                        bVal = b.deliveredAt || ""
                         break
                     default:
                         aVal = a[sortConfig.key]
@@ -441,17 +557,11 @@ export default function DeliveriesPage({
         return { Delivery: deliveriesCount, Transportadora: carriersCount }
     }, [items, carrierShipments])
 
-    const totalPages = Math.ceil(mapped.length / 100) || 1
+    const PAGE_SIZE = 20
     const [page, setPage] = useState(1)
+    const [carrierPage, setCarrierPage] = useState(1)
 
-    useEffect(() => {
-        setPage(1)
-    }, [debouncedSearch, filters, sortConfig, mode])
-
-    const paginated = useMemo(() => {
-        const start = (page - 1) * 100
-        return mapped.slice(start, start + 100)
-    }, [mapped, page])
+    const totalPages = Math.max(1, Math.ceil(mapped.length / PAGE_SIZE))
 
     const isListLoading = isLoading
 
@@ -476,8 +586,32 @@ export default function DeliveriesPage({
         }
         if (filters.status.length > 0) {
             list = list.filter((shipment: any) => {
-                const label = getCarrierStatusLabel(shipment.carrierStatus)
-                return filters.status.includes(label) || filters.status.includes(shipment.carrierStatus)
+                const isCancelled = shipment.situation === "cancelled" || shipment.carrierStatus === "cancelled"
+                const label = isCancelled ? "Envio cancelado" : getCarrierStatusLabel(shipment.carrierStatus)
+                return filters.status.includes(label) || filters.status.includes(shipment.carrierStatus) || (isCancelled && (filters.status.includes("Cancelado") || filters.status.includes("Envio cancelado")))
+            })
+        }
+        if (filters.carrierName.length > 0) {
+            list = list.filter((shipment: any) => {
+                const name = String(shipment.carrierName || "").toLowerCase()
+                const service = String(shipment.serviceName || "").toLowerCase()
+                return filters.carrierName.some((c: string) => name.includes(c.toLowerCase()) || service.includes(c.toLowerCase()))
+            })
+        }
+        if (filters.hasTracking.length > 0) {
+            list = list.filter((shipment: any) => {
+                const has = Boolean(shipment.trackingNumber)
+                if (filters.hasTracking.includes("Com rastreio") && has) return true
+                if (filters.hasTracking.includes("Sem rastreio") && !has) return true
+                return false
+            })
+        }
+        const minFee = filters.feeMin ? Number(filters.feeMin) : null
+        const maxFee = filters.feeMax ? Number(filters.feeMax) : null
+        if (minFee != null || maxFee != null) {
+            list = list.filter((shipment: any) => {
+                const fee = Number(shipment.deliveryFee != null ? shipment.deliveryFee : (shipment.price || 0))
+                return (minFee == null || fee >= minFee) && (maxFee == null || fee <= maxFee)
             })
         }
         const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
@@ -489,6 +623,38 @@ export default function DeliveriesPage({
         }
         return list
     }, [carrierShipments, debouncedSearch, filters])
+
+    const carrierTotalPages = Math.max(1, Math.ceil(filteredCarrierShipments.length / PAGE_SIZE))
+
+    useEffect(() => {
+        setPage(1)
+        setCarrierPage(1)
+    }, [debouncedSearch, filters, sortConfig, mode])
+
+    const paginated = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE
+        return mapped.slice(start, start + PAGE_SIZE)
+    }, [mapped, page])
+
+    const paginatedCarriers = useMemo(() => {
+        const start = (carrierPage - 1) * PAGE_SIZE
+        return filteredCarrierShipments.slice(start, start + PAGE_SIZE)
+    }, [filteredCarrierShipments, carrierPage])
+
+    const hasActiveFilters = useMemo(() => {
+        if (filters.status.length > 0) return true
+        if (isDatePeriodFilterActive(filters.datePeriod)) return true
+        if (filters.feeMin || filters.feeMax) return true
+        if (mode === "deliveries") {
+            if (filters.timing.length > 0) return true
+            if (filters.driverType.length > 0) return true
+            if (filters.grouping.length > 0) return true
+        } else {
+            if (filters.carrierName.length > 0) return true
+            if (filters.hasTracking.length > 0) return true
+        }
+        return false
+    }, [filters, mode])
 
     const executeStatusChange = async (deliveryId: string, nextStatus: string, reason?: string) => {
         setStatusOverrides(prev => ({ ...prev, [deliveryId]: nextStatus }))
@@ -637,7 +803,7 @@ export default function DeliveriesPage({
                                 userRole={initialUserRole}
                                 filters={filters}
                                 setFilters={setFilters}
-                                hasActiveFilters={filters.status.length > 0 || isDatePeriodFilterActive(filters.datePeriod)}
+                                hasActiveFilters={hasActiveFilters}
                                 mode={mode}
                                 setMode={setMode}
                                 tabCounts={tabCounts}
@@ -647,7 +813,8 @@ export default function DeliveriesPage({
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                                 {mode === "carriers" ? (
-                                    <AnimatePresence mode="wait">
+                                    <>
+                                        <AnimatePresence mode="wait">
                                         {filteredCarrierShipments.length === 0 ? (
                                             <FadeIn key="empty-carrier" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
                                                 <IconPlaceholder
@@ -678,7 +845,7 @@ export default function DeliveriesPage({
                                         ) : viewMode === "grid" ? (
                                             <FadeIn key="carrier-grid" className="w-full">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                    {filteredCarrierShipments.map((shipment: any) => (
+                                                    {paginatedCarriers.map((shipment: any) => (
                                                         <CarrierDeliveryCard
                                                             key={shipment.id}
                                                             shipment={shipment}
@@ -709,10 +876,10 @@ export default function DeliveriesPage({
                                                                         Rastreio
                                                                     </th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Prazo
+                                                                        Prazo / Previsão
                                                                     </th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Taxa
+                                                                        Frete
                                                                     </th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
                                                                         Status
@@ -723,9 +890,14 @@ export default function DeliveriesPage({
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {filteredCarrierShipments.map((shipment: any) => {
-                                                                    const statusVariant = getCarrierStatusVariant(shipment.carrierStatus)
+                                                                {paginatedCarriers.map((shipment: any) => {
+                                                                    const isCancelled = shipment.situation === "cancelled" || shipment.carrierStatus === "cancelled"
+                                                                    const statusVariant = isCancelled ? "red" : getCarrierStatusVariant(shipment.carrierStatus)
+                                                                    const statusLabel = isCancelled ? "Cancelado" : getCarrierStatusLabel(shipment.carrierStatus)
                                                                     const brandIcon = getCarrierBrandIcon(shipment.carrierName, shipment.serviceName)
+                                                                    const daysRange = formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays)
+                                                                    const estimatedDate = getEstimatedDeliveryDate(shipment.createdAt, shipment.deliveryMaxDays)
+
                                                                     return (
                                                                         <tr
                                                                             key={shipment.id}
@@ -773,34 +945,47 @@ export default function DeliveriesPage({
                                                                                 )}
                                                                             </td>
                                                                             <td className="p-3 border-b border-brand-border dark:border-dark-border">
-                                                                                <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                    {formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays) || "—"}
-                                                                                </span>
+                                                                                <div className="flex flex-col text-left">
+                                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                                                        {daysRange || "—"}
+                                                                                    </span>
+                                                                                    {estimatedDate && (
+                                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                            Prev.: {estimatedDate}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
                                                                             </td>
                                                                             <td className="p-3 border-b border-brand-border dark:border-dark-border">
                                                                                 <span className="text-[13px] font-bold text-brand-primary">
-                                                                                    {formatCurrency(shipment.deliveryFee || 0)}
+                                                                                    {formatCurrency(shipment.deliveryFee != null ? shipment.deliveryFee : (shipment.price || 0))}
                                                                                 </span>
                                                                             </td>
                                                                             <td className="p-3 border-b border-brand-border dark:border-dark-border">
                                                                                 <Badge
                                                                                     variant={statusVariant}
-                                                                                    icon={getDeliveryStatusIcon(getDeliveryStatusForCarrier(shipment.carrierStatus))}
+                                                                                    icon={brandIcon ? <img src={brandIcon} alt="Transportadora" className="w-3.5 h-3.5 object-contain" /> : <TruckIcon size={12} />}
                                                                                 >
-                                                                                    {getCarrierStatusLabel(shipment.carrierStatus)}
+                                                                                    {statusLabel}
                                                                                 </Badge>
                                                                             </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border pr-4 text-center">
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="sm"
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation()
-                                                                                        router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)
-                                                                                    }}
-                                                                                >
-                                                                                    Ver pedido
-                                                                                </Button>
+                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border pr-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                                <div className="flex justify-center">
+                                                                                    <ActionsDropdown
+                                                                                        onView={() => router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)}
+                                                                                    >
+                                                                                        {shipment.trackingUrl && (
+                                                                                            <DropdownItem onClick={() => window.open(shipment.trackingUrl, "_blank")}>
+                                                                                                <LinkIcon size={18} /> Rastrear envio
+                                                                                            </DropdownItem>
+                                                                                        )}
+                                                                                        {shipment.labelUrl && (
+                                                                                            <DropdownItem onClick={() => window.open(shipment.labelUrl, "_blank")}>
+                                                                                                <PrinterIcon size={18} /> Imprimir etiqueta
+                                                                                            </DropdownItem>
+                                                                                        )}
+                                                                                    </ActionsDropdown>
+                                                                                </div>
                                                                             </td>
                                                                         </tr>
                                                                     )
@@ -812,8 +997,24 @@ export default function DeliveriesPage({
                                             </FadeIn>
                                         )}
                                     </AnimatePresence>
+                                    {viewMode !== "kanban" && filteredCarrierShipments.length > 0 && carrierTotalPages > 1 && (
+                                        <div className="mt-4 pb-2">
+                                            <Pagination
+                                                currentPage={carrierPage}
+                                                totalPages={carrierTotalPages}
+                                                onPageChange={(p) => {
+                                                    setCarrierPage(p)
+                                                    if (p === carrierTotalPages && carrierHasNextPage && !carrierFetchingNextPage) {
+                                                        void fetchCarrierNextPage()
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    </>
                                 ) : (
-                                    <AnimatePresence mode="wait">
+                                    <>
+                                        <AnimatePresence mode="wait">
                                         {paginated.length === 0 ? (
                                             <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
                                                 <IconPlaceholder
@@ -937,6 +1138,21 @@ export default function DeliveriesPage({
                                             </FadeIn>
                                         )}
                                     </AnimatePresence>
+                                    {viewMode !== "kanban" && mapped.length > 0 && totalPages > 1 && (
+                                        <div className="mt-4 pb-2">
+                                            <Pagination
+                                                currentPage={page}
+                                                totalPages={totalPages}
+                                                onPageChange={(p) => {
+                                                    setPage(p)
+                                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                                        void fetchNextPage()
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    </>
                                 )}
 
                                 {mode === "carriers" ? (
@@ -1192,7 +1408,17 @@ export default function DeliveriesPage({
                 sections={filterSections}
                 filters={filters}
                 setFilters={setFilters}
-                onClear={() => setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
+                onClear={() => setFilters({
+                    status: [],
+                    timing: [],
+                    driverType: [],
+                    grouping: [],
+                    carrierName: [],
+                    hasTracking: [],
+                    feeMin: "",
+                    feeMax: "",
+                    datePeriod: { ...EMPTY_DATE_PERIOD },
+                })}
             />
 
             <ExportColumnSelectionModal

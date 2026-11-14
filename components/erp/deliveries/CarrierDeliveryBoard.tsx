@@ -35,8 +35,13 @@ const COLUMNS = [
 ]
 
 export default function CarrierDeliveryBoard({ shipments, isLoading = false, integrationEnabled = true, onOpenOrder }: CarrierDeliveryBoardProps) {
-  const closed = shipments.filter((s) => ["cancelled", "failed"].includes(String(s.carrierStatus || "")))
-  const active = shipments.filter((s) => !["cancelled", "failed"].includes(String(s.carrierStatus || "")))
+  const isShipmentClosed = (s: any) =>
+    ["cancelled", "failed"].includes(String(s.carrierStatus || "")) ||
+    s.situation === "cancelled" ||
+    s.carrierStatus === "cancelled"
+
+  const closed = shipments.filter(isShipmentClosed)
+  const active = shipments.filter((s) => !isShipmentClosed(s))
 
   if (shipments.length === 0) {
     return (

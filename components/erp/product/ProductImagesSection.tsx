@@ -19,7 +19,7 @@ interface ProductImagesSectionProps {
     uploadingImages?: Set<number>
     blockedImages?: Set<number>
     isSaving?: boolean
-    moderationStatus?: 'approved' | 'pending_moderation' | 'rejected'
+    moderationStatus?: 'approved' | 'pending_moderation' | 'flagged' | 'rejected' | 'in_review' | 'needs_images'
     onImageClick?: (index: number) => void
 }
 

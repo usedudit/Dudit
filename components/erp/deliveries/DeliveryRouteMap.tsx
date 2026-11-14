@@ -108,14 +108,14 @@ export function DeliveryRouteMap({
           zoom: 12,
           attributionControl: false,
         })
-        
+
         // Custom navigation controls styling
         const navControl = new mapboxgl.NavigationControl({
           showCompass: false,
           visualizePitch: false,
         })
         map.addControl(navControl, "top-right")
-        
+
         // Add custom styles for navigation buttons
         styleElement = document.createElement("style")
         styleElement.textContent = `
@@ -222,7 +222,7 @@ export function DeliveryRouteMap({
     for (const m of markersRef.current) {
       try {
         m.remove()
-      } catch {}
+      } catch { }
     }
     markersRef.current = []
 
@@ -304,7 +304,7 @@ export function DeliveryRouteMap({
 
     try {
       mapRef.current?.resize()
-    } catch {}
+    } catch { }
 
     const clearRouteLayer = () => {
       if (!mapRef.current) return
@@ -313,7 +313,7 @@ export function DeliveryRouteMap({
         if (map.getLayer("delivery-route-line")) map.removeLayer("delivery-route-line")
         if (map.getLayer("delivery-route-casing")) map.removeLayer("delivery-route-casing")
         if (map.getSource("delivery-route")) map.removeSource("delivery-route")
-      } catch {}
+      } catch { }
     }
 
     const renderRoute = (geometry: any) => {
@@ -325,8 +325,8 @@ export function DeliveryRouteMap({
           // Ensure map is properly sized before adding layers
           try {
             map.resize()
-          } catch {}
-          
+          } catch { }
+
           const geojson: any = {
             type: "Feature",
             properties: {},
@@ -383,13 +383,13 @@ export function DeliveryRouteMap({
             }
             map.fitBounds(bounds, { padding: 48, maxZoom: 15, duration: 600 })
           }
-          
+
           // Force multiple resize calls after rendering
           setTimeout(() => {
-            try { map.resize() } catch {}
+            try { map.resize() } catch { }
           }, 100)
           setTimeout(() => {
-            try { map.resize() } catch {}
+            try { map.resize() } catch { }
           }, 500)
         } catch (layerErr) {
           console.warn("[DeliveryRouteMap] renderRoute error:", layerErr)
@@ -411,7 +411,7 @@ export function DeliveryRouteMap({
       setRouteStats(null)
       try {
         mapRef.current.easeTo({ center: allCoords[0], zoom: 14, duration: 500 })
-      } catch {}
+      } catch { }
     } else if (allCoords.length >= 2) {
       try {
         const bounds = new mapboxgl.LngLatBounds(allCoords[0], allCoords[0])

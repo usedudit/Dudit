@@ -125,13 +125,16 @@ export function filterUnflaggedImages(
 export function getProductDisplayImages(
   product: ProductImageSource,
   size?: "thumb" | "thumbnail" | "medium" | "large",
+  options?: { allowFlagged?: boolean },
 ): string[] {
-  const ownImages = filterUnflaggedImages(
-    product.images,
-    product.moderation_status,
-    product.moderation_reason,
-    product.flagged_images,
-  )
+  const ownImages = options?.allowFlagged
+    ? (product.images || []).filter((img): img is string => typeof img === "string" && img.trim().length > 0)
+    : filterUnflaggedImages(
+        product.images,
+        product.moderation_status,
+        product.moderation_reason,
+        product.flagged_images,
+      )
 
   if (ownImages.length > 0) {
     return ownImages.map((img) => resolveMediaUrl(img, size))
@@ -139,7 +142,7 @@ export function getProductDisplayImages(
 
   // Se as imagens do produto foram ocultadas por moderação ('flagged'),
   // não mostramos imagens de variante ou thumbnail de vídeo que também possam conter conteúdo sensível.
-  if (product.moderation_status !== "flagged") {
+  if (options?.allowFlagged || product.moderation_status !== "flagged") {
     if (product.fallback_variant_image && String(product.fallback_variant_image).trim()) {
       return [resolveMediaUrl(String(product.fallback_variant_image), size)]
     }
@@ -164,6 +167,7 @@ export function getProductDisplayImages(
 export function getPrimaryProductDisplayImage(
   product: ProductImageSource,
   size?: "thumb" | "thumbnail" | "medium" | "large",
+  options?: { allowFlagged?: boolean },
 ): string {
-  return getProductDisplayImages(product, size)[0]
+  return getProductDisplayImages(product, size, options)[0]
 }

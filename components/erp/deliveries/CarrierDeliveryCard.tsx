@@ -1,141 +1,149 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Dropdown, DropdownItem } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils"
-import { getCarrierStatusLabel, getCarrierStatusVariant, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
+import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
+import { formatCurrency, formatDeliveryDaysRange, formatDate } from "@/lib/utils"
+import { getCarrierStatusLabel, getCarrierStatusVariant } from "@/lib/orders/carrier-status"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
-import { formatDeliveryDaysRange } from "@/lib/utils"
-import { ClockIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
-import { getDeliveryStatusIcon } from "@/lib/orders/status"
+import { TruckIcon, LinkIcon, PrinterIcon } from "@/lib/icons"
 
 interface CarrierDeliveryCardProps {
   shipment: any
   onOpenOrder: (orderId: string) => void
 }
 
-function getRelativeTimeElapsed(createdAtMs: number): string {
-  const diffMs = Date.now() - createdAtMs
-  const diffMins = Math.floor(diffMs / 60000)
-  if (diffMins < 1) return "agora"
-  if (diffMins < 60) return `há ${diffMins} min`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `há ${diffHours} h`
-  const diffDays = Math.floor(diffHours / 24)
-  return `há ${diffDays} dias`
+export function getEstimatedDeliveryDate(createdAt?: string | null, maxDays?: number | null): string | null {
+  if (!createdAt || maxDays == null || maxDays <= 0) return null
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return null
+  let addedDays = 0
+  const current = new Date(date)
+  while (addedDays < maxDays) {
+    current.setDate(current.getDate() + 1)
+    const dayOfWeek = current.getDay()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      addedDays++
+    }
+  }
+  return formatDate(current.toISOString())
 }
 
 export default function CarrierDeliveryCard({ shipment, onOpenOrder }: CarrierDeliveryCardProps) {
-  const [elapsed, setElapsed] = useState("")
-
-  useEffect(() => {
-    setElapsed(getRelativeTimeElapsed(shipment.createdAtMs))
-    const interval = setInterval(() => {
-      setElapsed(getRelativeTimeElapsed(shipment.createdAtMs))
-    }, 15000)
-    return () => clearInterval(interval)
-  }, [shipment.createdAtMs])
-
-  const statusVariant = getCarrierStatusVariant(shipment.carrierStatus)
+  const isCancelled = shipment.situation === "cancelled" || shipment.carrierStatus === "cancelled"
+  const statusVariant = isCancelled ? "red" : getCarrierStatusVariant(shipment.carrierStatus)
+  const statusLabel = isCancelled ? "Cancelado" : getCarrierStatusLabel(shipment.carrierStatus)
   const brandIcon = getCarrierBrandIcon(shipment.carrierName, shipment.serviceName)
+  const daysRange = formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays)
+  const estimatedDate = getEstimatedDeliveryDate(shipment.createdAt, shipment.deliveryMaxDays)
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 cursor-pointer flex flex-col justify-between transition-colors duration-200"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
       onClick={() => onOpenOrder(shipment.orderId)}
     >
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-1 text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-            <ClockIcon size={12} className="shrink-0" />
-            <span>Criada {elapsed}</span>
-          </div>
-          <Badge
-            variant={statusVariant}
-            icon={getDeliveryStatusIcon(getDeliveryStatusForCarrier(shipment.carrierStatus))}
-          >
-            {getCarrierStatusLabel(shipment.carrierStatus)}
-          </Badge>
-        </div>
-
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-            {shipment.orderNumber}
-          </span>
-        </div>
-
-        <div className="space-y-1">
-          <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-            {shipment.customerName}
-          </h4>
-          {shipment.customerAddress ? (
-            <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-normal line-clamp-2" title={shipment.customerAddress}>
-              {shipment.customerAddress}
-            </p>
+      <div className="flex gap-4 mb-2">
+        {/* Visual Indicator */}
+        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+          {brandIcon ? (
+            <img src={brandIcon} alt={shipment.carrierName || "Transportadora"} className="w-6 h-6 object-contain" />
           ) : (
-            <p className="text-xs italic text-brand-inactive-text dark:text-dark-body">
-              Sem endereço informado
-            </p>
+            <TruckIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
           )}
         </div>
 
-        <div className="mt-3.5 space-y-1.5 text-[11px] font-medium text-brand-inactive-text dark:text-dark-body border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
-          <div className="flex items-center gap-1.5 text-brand-dark dark:text-dark-heading min-w-0">
-            <img src={brandIcon} alt={shipment.carrierName} className="w-3.5 h-3.5 object-contain shrink-0" />
-            <span className="truncate">
+        <div className="flex-1 min-w-0">
+          {/* Row 1: Order Number + Status Badge */}
+          <div className="flex justify-between items-start gap-1">
+            <div className="flex items-center gap-2 min-w-0 pr-1">
+              <h3
+                className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0"
+                title={shipment.orderNumber}
+              >
+                {shipment.orderNumber}
+              </h3>
+              <div className="flex items-center shrink-0">
+                <Badge
+                  variant={statusVariant}
+                  icon={brandIcon ? <img src={brandIcon} alt="Transportadora" className="w-3.5 h-3.5 object-contain" /> : <TruckIcon size={12} />}
+                  className="whitespace-nowrap"
+                >
+                  {statusLabel}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Carrier Service • Value */}
+          <div className="flex items-center gap-1.5 mt-1 text-xs">
+            <span className="font-bold text-brand-primary">
+              {formatCurrency(shipment.price != null ? shipment.price : (shipment.deliveryFee || 0))}
+            </span>
+            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+            <span className="font-medium text-brand-inactive-text dark:text-dark-body truncate">
               {shipment.serviceName || shipment.carrierName}
             </span>
           </div>
-
-          {shipment.deliveryMinDays != null || shipment.deliveryMaxDays != null ? (
-            <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
-              <TruckIcon size={12} className="shrink-0" />
-              <span>{formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays)}</span>
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
-              <MoneyIcon size={12} className="shrink-0" />
-              <span>Taxa: <strong>{formatCurrency(shipment.deliveryFee || 0)}</strong></span>
-            </div>
-          </div>
-
-          {shipment.trackingNumber ? (
-            <div className="truncate text-brand-dark dark:text-dark-heading">Rastreio: {shipment.trackingNumber}</div>
-          ) : null}
         </div>
       </div>
 
-      {shipment.trackingUrl ? (
-        <div className="mt-3 flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <Dropdown
-            align="right"
-            fullWidth={false}
-            width="w-48"
-            trigger={
-              <button
-                type="button"
-                className="text-[11px] font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading"
-              >
-                Ações
-              </button>
-            }
-          >
-            <DropdownItem onClick={() => window.open(shipment.trackingUrl, "_blank")}>
-              <TruckIcon size={18} /> Rastrear envio
-            </DropdownItem>
-            <DropdownItem onClick={() => onOpenOrder(shipment.orderId)}>
-              <ClockIcon size={18} /> Abrir pedido
-            </DropdownItem>
-          </Dropdown>
+      {/* Info Rows */}
+      <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+        {/* Row 1: Cliente & Prazo */}
+        <div className="flex justify-between items-end gap-2">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
+            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+              {shipment.customerName}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-0.5 items-end shrink-0 max-w-[50%]">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Prazo</span>
+            <div className="flex flex-col items-end text-right">
+              <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                {daysRange || "—"}
+              </span>
+              {estimatedDate && (
+                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                  Prev.: {estimatedDate}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      ) : null}
+
+        {/* Row 2: Endereço & Actions */}
+        <div className="flex justify-between items-end gap-2">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Endereço</span>
+            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={shipment.customerAddress}>
+              {shipment.customerAddress || "Sem endereço informado"}
+            </span>
+          </div>
+
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <ActionsDropdown
+              onView={() => onOpenOrder(shipment.orderId)}
+            >
+              {shipment.trackingUrl && (
+                <DropdownItem onClick={() => window.open(shipment.trackingUrl, "_blank")}>
+                  <LinkIcon size={18} /> Rastrear envio
+                </DropdownItem>
+              )}
+              {shipment.labelUrl && (
+                <DropdownItem onClick={() => window.open(shipment.labelUrl, "_blank")}>
+                  <PrinterIcon size={18} /> Imprimir etiqueta
+                </DropdownItem>
+              )}
+            </ActionsDropdown>
+          </div>
+        </div>
+      </div>
     </motion.div>
   )
 }

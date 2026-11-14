@@ -63,7 +63,7 @@ export interface Product {
   variants?: { count: number }[] | any[]
   availability_value?: number | null
   availability_unit?: string | null
-  moderation_status?: 'approved' | 'pending_moderation' | 'rejected' | null
+  moderation_status?: 'approved' | 'pending_moderation' | 'flagged' | 'rejected' | 'in_review' | 'needs_images' | null
   variant_min_price?: number
   variant_max_price?: number
   variant_total_stock?: number
@@ -145,7 +145,7 @@ export interface ProductInput {
   promotional_price?: number | null
   availability_value?: number | null
   availability_unit?: string | null
-  moderation_status?: 'approved' | 'pending_moderation' | 'rejected' | null
+  moderation_status?: 'approved' | 'pending_moderation' | 'flagged' | 'rejected' | 'in_review' | 'needs_images' | null
   technical_specs?: any
   addon_groups?: ProductAddonGroup[] | null
   accepts_offers?: boolean | null

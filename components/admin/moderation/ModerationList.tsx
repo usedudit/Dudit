@@ -62,6 +62,19 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
         openEntity("view", item.id)
     }
 
+    // ─── Status Filter Handler ───────────────────────────────────────────────
+    const handleStatusFilterChange = useCallback((newFilter: string) => {
+        setStatusFilter(newFilter)
+        startTransition(async () => {
+            try {
+                const result = await getModerationQueue(null, 50, newFilter)
+                setItems(result.data)
+            } catch (err) {
+                console.error("Failed to load moderation queue for status:", err)
+            }
+        })
+    }, [])
+
     // ─── Refresh Handler ──────────────────────────────────────────────────────
     const refreshItems = useCallback(() => {
         startTransition(async () => {
@@ -180,7 +193,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 {/* Page Controls (ERP Standard) */}
                 <ModerationPageControls
                     statusFilter={statusFilter}
-                    setStatusFilter={setStatusFilter}
+                    setStatusFilter={handleStatusFilterChange}
                     search={search}
                     onSearchChange={setSearch}
                     items={items}

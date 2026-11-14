@@ -67,7 +67,7 @@ const ProductListItem = React.memo(
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                 <img
-                                    src={getPrimaryProductDisplayImage(product)}
+                                    src={getPrimaryProductDisplayImage(product, "thumbnail", { allowFlagged: true })}
                                     alt=""
                                     className="w-full h-full object-cover rounded-full"
                                     loading="lazy"
@@ -76,11 +76,19 @@ const ProductListItem = React.memo(
                             <div className="flex flex-col text-left">
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 flex items-center gap-1.5">
                                     <span className="truncate max-w-[200px] xl:max-w-[300px]">{product.name}</span>
-                                    {product.moderation_status === 'pending_moderation' && (
+                                    {product.moderation_status === 'flagged' ? (
+                                        <Tooltip text="Conteúdo ou imagem sinalizado pela moderação. O item fica oculto na vitrine até ser revisado e aprovado.">
+                                            <Badge variant="red" className="shrink-0" />
+                                        </Tooltip>
+                                    ) : product.moderation_status === 'pending_moderation' ? (
                                         <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                             <Badge variant="orange" className="shrink-0" />
                                         </Tooltip>
-                                    )}
+                                    ) : product.moderation_status === 'rejected' ? (
+                                        <Tooltip text="Reprovado pela moderação do marketplace.">
+                                            <Badge variant="red" className="shrink-0" />
+                                        </Tooltip>
+                                    ) : null}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                     {hasVariants ? "Múltiplos SKUs" : (product.sku || "-")}

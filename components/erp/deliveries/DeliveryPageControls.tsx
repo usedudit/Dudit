@@ -13,6 +13,7 @@ import {
     SparklesIcon,
     Settings2Icon,
     CalendarIcon,
+    ClockIcon,
     MotorbikeIcon,
     TruckIcon,
     GridIcon,
@@ -22,21 +23,86 @@ import {
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter } from "@/lib/utils/filter-date-period"
 
+interface DeliveryFiltersState {
+    status: string[]
+    timing?: string[]
+    driverType?: string[]
+    grouping?: string[]
+    carrierName?: string[]
+    hasTracking?: string[]
+    feeMin?: string
+    feeMax?: string
+    datePeriod: DatePeriodFilterValue
+}
+
 interface BadgeListProps {
-    filters: { status: string[]; datePeriod: DatePeriodFilterValue }
-    setFilters: React.Dispatch<React.SetStateAction<{ status: string[]; datePeriod: DatePeriodFilterValue }>>
+    filters: DeliveryFiltersState
+    setFilters: React.Dispatch<React.SetStateAction<any>>
 }
 
 function BadgeList({ filters, setFilters }: BadgeListProps) {
     return (
         <AnimatePresence>
-            {filters.status.length > 0 && (
+            {filters.status && filters.status.length > 0 && (
                 <FilterChip
                     key="status"
                     label="Status"
                     value={filters.status.join(", ")}
                     icon={<CalendarIcon size={12} />}
-                    onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, status: [] }))}
+                />
+            )}
+            {filters.timing && filters.timing.length > 0 && (
+                <FilterChip
+                    key="timing"
+                    label="Pontualidade"
+                    value={filters.timing.join(", ")}
+                    icon={<ClockIcon size={12} />}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, timing: [] }))}
+                />
+            )}
+            {filters.driverType && filters.driverType.length > 0 && (
+                <FilterChip
+                    key="driverType"
+                    label="Entregador"
+                    value={filters.driverType.join(", ")}
+                    icon={<MotorbikeIcon size={12} />}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, driverType: [] }))}
+                />
+            )}
+            {filters.grouping && filters.grouping.length > 0 && (
+                <FilterChip
+                    key="grouping"
+                    label="Agrupamento"
+                    value={filters.grouping.join(", ")}
+                    icon={<TruckIcon size={12} />}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, grouping: [] }))}
+                />
+            )}
+            {filters.carrierName && filters.carrierName.length > 0 && (
+                <FilterChip
+                    key="carrierName"
+                    label="Transportadora"
+                    value={filters.carrierName.join(", ")}
+                    icon={<TruckIcon size={12} />}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, carrierName: [] }))}
+                />
+            )}
+            {filters.hasTracking && filters.hasTracking.length > 0 && (
+                <FilterChip
+                    key="hasTracking"
+                    label="Rastreio"
+                    value={filters.hasTracking.join(", ")}
+                    icon={<TruckIcon size={12} />}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, hasTracking: [] }))}
+                />
+            )}
+            {(filters.feeMin || filters.feeMax) && (
+                <FilterChip
+                    key="fee"
+                    label="Taxa/Frete"
+                    value={filters.feeMin && filters.feeMax ? `R$ ${filters.feeMin} - R$ ${filters.feeMax}` : filters.feeMin ? `>= R$ ${filters.feeMin}` : `<= R$ ${filters.feeMax}`}
+                    onRemove={() => setFilters((prev: any) => ({ ...prev, feeMin: "", feeMax: "" }))}
                 />
             )}
             {isDatePeriodFilterActive(filters.datePeriod) && (
@@ -46,7 +112,7 @@ function BadgeList({ filters, setFilters }: BadgeListProps) {
                     value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
                     icon={<CalendarIcon size={12} />}
                     onRemove={() =>
-                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))}
+                        setFilters((prev: any) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))}
                 />
             )}
         </AnimatePresence>
@@ -62,8 +128,8 @@ interface DeliveryPageControlsProps {
     canSmartSuggest?: boolean
     addDisabled?: boolean
     userRole?: string | null
-    filters: { status: string[]; datePeriod: DatePeriodFilterValue }
-    setFilters: React.Dispatch<React.SetStateAction<{ status: string[]; datePeriod: DatePeriodFilterValue }>>
+    filters: any
+    setFilters: React.Dispatch<React.SetStateAction<any>>
     hasActiveFilters: boolean
     mode: "deliveries" | "carriers"
     setMode: (mode: "deliveries" | "carriers") => void

@@ -3,7 +3,7 @@ import { AdminModerationPanel } from "@/components/admin/moderation/AdminModerat
 import { getModerationQueue } from "@/app/actions/admin/moderation"
 
 export default async function ModerationPage() {
-    const initialData = await getModerationQueue(null, 50, "pending_moderation")
+    const initialData = await getModerationQueue(null, 50, "all")
 
     return (
         <>

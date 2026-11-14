@@ -54,31 +54,12 @@ export function shouldSkipAccessLog(pathname: string, userAgent?: string | null)
   return false
 }
 
-/** Stores a minimal request record without query strings, cookies, or bodies. */
-export async function recordApplicationAccess(input: ApplicationAccessLogInput): Promise<void> {
-  if (shouldSkipAccessLog(input.path, input.userAgent)) {
-    return
-  }
-
-  try {
-    const { error } = await getAdminClient().from("application_access_logs").insert({
-      ip_address: input.ipAddress,
-      country: input.country,
-      method: input.method,
-      path: input.path,
-      status_code: input.statusCode,
-      user_agent: input.userAgent,
-      cloudflare_ray_id: input.cloudflareRayId,
-    })
-
-    if (error) {
-      console.error("[ACCESS-LOG] Failed to persist request record", { code: error.code })
-    }
-  } catch (error) {
-    console.error("[ACCESS-LOG] Request record unavailable", {
-      error: error instanceof Error ? error.message : String(error),
-    })
-  }
+/**
+ * Obsolete access logger.
+ * Deactivated to protect DB performance and prevent 404 warnings after table removal.
+ */
+export async function recordApplicationAccess(_input: ApplicationAccessLogInput): Promise<void> {
+  // No-op
 }
 
 export function sanitizeAccessLogPath(pathname: string): string {

@@ -596,6 +596,19 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
     return { success: false as const, error: "Nenhum ponto de rota disponível para exibir no mapa." }
   }
 
+  // Calculate cumulative multi-stop route distance and duration across all points
+  let totalDistanceKm = 0
+  let currentCoord = origin ? { lat: origin.lat, lng: origin.lng } : null
+  for (const pt of cleaned) {
+    if (currentCoord && pt.latitude != null && pt.longitude != null) {
+      totalDistanceKm += calculateDistance(currentCoord, { lat: pt.latitude, lng: pt.longitude })
+      currentCoord = { lat: pt.latitude, lng: pt.longitude }
+    }
+  }
+  totalDistanceKm = Number(totalDistanceKm.toFixed(2))
+  const baseMins = estimateDeliveryTime(totalDistanceKm) ?? Math.round(totalDistanceKm * 3)
+  const totalEstimatedDurationMinutes = baseMins + Math.max(0, cleaned.length - 1) * 5
+
   return {
     success: true as const,
     data: {
@@ -603,6 +616,8 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
       deliveryNumber: (delivery as any).delivery_number ?? null,
       points: cleaned,
       origin,
+      totalDistanceKm,
+      totalEstimatedDurationMinutes,
     },
   }
 }
@@ -1390,13 +1405,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       return { success: false as const, error: "Existe pedido já vinculado a uma entrega ativa." }
     }
 
-    const firstOrder = selectedOrders[0]
-    const deliveryAddress = formatAddress(firstOrder)
+    const orderAddresses = (selectedOrders || []).map((o: any) => formatAddress(o)).filter(Boolean)
 
     let distanceKm: number | null = null
     let estimatedDurationMinutes: number | null = null
 
-    if (deliveryAddress) {
+    if (orderAddresses.length > 0) {
       try {
         const { data: defaultStore } = await supabase
           .from("stores")
@@ -1434,14 +1448,23 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           .filter(Boolean)
           .join(" ")
 
-        const [originCoords, destinationCoords] = await Promise.all([
+        const [originCoords, ...destCoordsList] = await Promise.all([
           geocodeWithTimeout(originAddress),
-          geocodeWithTimeout(deliveryAddress),
+          ...orderAddresses.map((addr: string) => geocodeWithTimeout(addr)),
         ])
 
-        if (originCoords && destinationCoords) {
-          distanceKm = Number(calculateDistance(originCoords, destinationCoords).toFixed(2))
-          estimatedDurationMinutes = estimateDeliveryTime(distanceKm)
+        const validCoords = destCoordsList.filter(Boolean) as { lat: number; lng: number }[]
+
+        if (originCoords && validCoords.length > 0) {
+          let totalDist = 0
+          let currentPt = originCoords
+          for (const pt of validCoords) {
+            totalDist += calculateDistance(currentPt, pt)
+            currentPt = pt
+          }
+          distanceKm = Number(totalDist.toFixed(2))
+          const baseDuration = estimateDeliveryTime(distanceKm) ?? Math.round(distanceKm * 3)
+          estimatedDurationMinutes = baseDuration + Math.max(0, validCoords.length - 1) * 5
         }
       } catch (err) {
         console.warn("[createERPDeliveryAction] geocoding/route failed, proceeding without estimates:", err)
@@ -2771,12 +2794,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       .select("order_id, orders(order_number)")
       .eq("delivery_id", payload.deliveryId)
 
-    const firstOrder = orders[0]
-    const deliveryAddress = formatAddress(firstOrder)
+    const orderAddresses = (orders || []).map((o: any) => formatAddress(o)).filter(Boolean)
     let distanceKm: number | null = null
     let estimatedDurationMinutes: number | null = null
 
-    if (deliveryAddress) {
+    if (orderAddresses.length > 0) {
       try {
         const { data: defaultStore } = await supabase
           .from("stores")
@@ -2814,14 +2836,23 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           .filter(Boolean)
           .join(" ")
 
-        const [originCoords, destinationCoords] = await Promise.all([
+        const [originCoords, ...destCoordsList] = await Promise.all([
           geocodeWithTimeout(originAddress),
-          geocodeWithTimeout(deliveryAddress),
+          ...orderAddresses.map((addr: string) => geocodeWithTimeout(addr)),
         ])
 
-        if (originCoords && destinationCoords) {
-          distanceKm = Number(calculateDistance(originCoords, destinationCoords).toFixed(2))
-          estimatedDurationMinutes = estimateDeliveryTime(distanceKm)
+        const validCoords = destCoordsList.filter(Boolean) as { lat: number; lng: number }[]
+
+        if (originCoords && validCoords.length > 0) {
+          let totalDist = 0
+          let currentPt = originCoords
+          for (const pt of validCoords) {
+            totalDist += calculateDistance(currentPt, pt)
+            currentPt = pt
+          }
+          distanceKm = Number(totalDist.toFixed(2))
+          const baseDuration = estimateDeliveryTime(distanceKm) ?? Math.round(distanceKm * 3)
+          estimatedDurationMinutes = baseDuration + Math.max(0, validCoords.length - 1) * 5
         }
       } catch (err) {
         console.warn("[updateERPDeliveryAction] geocoding failed:", err)
@@ -3312,6 +3343,9 @@ export async function getERPCarrierDeliveriesPageAction(
           const shipment = shipments[0] || null
           const breakdown = (row.delivery_breakdown || {}) as Record<string, any>
 
+          const isCancelled = row.situation === "cancelled" || row.delivery_status === "cancelled"
+          const resolvedCarrierStatus = isCancelled ? "cancelled" : (shipment?.status || "awaiting_label")
+
           return {
             id: row.id,
             orderId: row.id,
@@ -3323,7 +3357,7 @@ export async function getERPCarrierDeliveriesPageAction(
             orderSource: row.order_source || "Manual",
             situation: row.situation || "pending",
             orderStatus: row.delivery_status || "not_sent",
-            carrierStatus: shipment?.status || "awaiting_label",
+            carrierStatus: resolvedCarrierStatus,
             carrierName: breakdown.companyName || shipment?.carrier || breakdown.carrier || "Transportadora",
             serviceName: breakdown.serviceName || shipment?.service_name || null,
             serviceCode: shipment?.service_code || null,

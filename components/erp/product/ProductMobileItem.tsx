@@ -52,11 +52,19 @@ const ProductMobileItem = React.memo(
                         <div className="flex items-start justify-between gap-2">
                             <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                 <span className="truncate">{product.name}</span>
-                                {product.moderation_status === 'pending_moderation' && (
+                                {product.moderation_status === 'flagged' ? (
+                                    <Tooltip text="Conteúdo ou imagem sinalizado pela moderação. O item fica oculto na vitrine até ser revisado e aprovado.">
+                                        <Badge variant="red" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
+                                    </Tooltip>
+                                ) : product.moderation_status === 'pending_moderation' ? (
                                     <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                         <Badge variant="orange" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
                                     </Tooltip>
-                                )}
+                                ) : product.moderation_status === 'rejected' ? (
+                                    <Tooltip text="Reprovado pela moderação do marketplace.">
+                                        <Badge variant="red" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
+                                    </Tooltip>
+                                ) : null}
                             </h3>
                             <div
                                 className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${product.is_active ? "bg-brand-green" : "bg-brand-red"

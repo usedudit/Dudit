@@ -1072,11 +1072,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                     Editando
                                                 </Badge>
                                             )}
-                                            {productData.moderation_status === 'pending_moderation' && (
+                                            {productData.moderation_status === 'flagged' ? (
+                                                <Tooltip text="Conteúdo ou imagem sinalizado pela moderação. O item fica oculto na vitrine até ser revisado e aprovado.">
+                                                    <Badge variant="red" className="shrink-0 hidden md:inline-flex" />
+                                                </Tooltip>
+                                            ) : productData.moderation_status === 'pending_moderation' ? (
                                                 <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                                     <Badge variant="orange" className="shrink-0 hidden md:inline-flex" />
                                                 </Tooltip>
-                                            )}
+                                            ) : productData.moderation_status === 'rejected' ? (
+                                                <Tooltip text="Reprovado pela moderação do marketplace.">
+                                                    <Badge variant="red" className="shrink-0 hidden md:inline-flex" />
+                                                </Tooltip>
+                                            ) : null}
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>

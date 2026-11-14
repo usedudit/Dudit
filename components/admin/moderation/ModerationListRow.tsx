@@ -190,7 +190,7 @@ const ModerationListRow = React.memo(({
                                     <EditIcon size={16} /> Editar no ERP
                                 </DropdownItem>
                             )}
-                            {item.moderation_status === "pending_moderation" && (
+                            {(item.moderation_status === "pending_moderation" || item.moderation_status === "flagged") && (
                                 <DropdownItem
                                     onClick={() => onApprove(item.id, item.type)}
                                     className="text-brand-green"
