@@ -1077,6 +1077,167 @@ export async function removeModerationImage(
     return { success: true, remainingImages, noImagesLeft }
 }
 
+// ─── Batch remove images via moderation ──────────────────────────────────
+
+export async function removeModerationImagesBatch(
+    entityId: string,
+    imageUrlsToRemove: string[],
+    type: "product" | "service" | "recurring_plan" = "product",
+    options?: AdminModerationActionOptions & {
+        autoApproveRemaining?: boolean
+    }
+): Promise<{
+    success: boolean
+    error?: string
+    remainingImages?: string[]
+    noImagesLeft?: boolean
+    newStatus?: string
+}> {
+    const admin = await requireAdminScope("moderation")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!Array.isArray(imageUrlsToRemove) || imageUrlsToRemove.length === 0) {
+        return { success: false, error: "Nenhuma imagem selecionada para remoção" }
+    }
+
+    const supabase = getAdminClient()
+
+    // Resolve admin actor name
+    const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("id", admin.userId)
+        .maybeSingle()
+    const adminName = profile?.full_name || admin.email || "Equipe Dudit"
+
+    const targetTable = type === "service" ? "services" : type === "recurring_plan" ? "recurring_plans" : "products"
+    const { data: entity, error: fetchError } = await supabase
+        .from(targetTable)
+        .select("id, name, images, moderation_status, partner_id")
+        .eq("id", entityId)
+        .is("deleted_at", null)
+        .single()
+
+    if (fetchError || !entity) {
+        return { success: false, error: `${type === "service" ? "Serviço" : "Produto"} não encontrado` }
+    }
+
+    const toRemoveSet = new Set(imageUrlsToRemove.map((u) => u.trim()))
+    const currentImages: string[] = entity.images || []
+    const remainingImages = currentImages.filter((img: string) => !toRemoveSet.has(img.trim()))
+    const noImagesLeft = remainingImages.length === 0
+    const reasonText = options?.reason?.trim()
+
+    let newStatus = entity.moderation_status
+    const updatePayload: Record<string, any> = {
+        images: remainingImages,
+        updated_at: new Date().toISOString(),
+    }
+
+    if (noImagesLeft) {
+        newStatus = "needs_images"
+        updatePayload.moderation_status = "needs_images"
+        updatePayload.moderation_reason = reasonText || "Todas as imagens foram removidas pela moderação."
+        updatePayload.moderation_reviewed_by = admin.userId
+        updatePayload.moderation_reviewed_at = new Date().toISOString()
+    } else if (options?.autoApproveRemaining) {
+        newStatus = "approved"
+        updatePayload.moderation_status = "approved"
+        updatePayload.moderation_reason = null
+        updatePayload.moderation_reviewed_by = admin.userId
+        updatePayload.moderation_reviewed_at = new Date().toISOString()
+        updatePayload.status = type === "recurring_plan" ? "active" : "ativo"
+    }
+
+    const { error: updateError } = await supabase
+        .from(targetTable)
+        .update(updatePayload)
+        .eq("id", entityId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    // Delete removed images from R2 in parallel
+    await Promise.all(imageUrlsToRemove.map((url) => _deleteFromR2(url)))
+
+    // Sincroniza e revalida caches
+    try {
+        if (newStatus === "approved" && (type === "product" || type === "service")) {
+            const { syncToExploreRedis } = await import("@/lib/redis-sync")
+            await syncToExploreRedis({
+                id: entityId,
+                type: type === "product" ? "produto" : "servico",
+                data: {},
+                silent: true,
+            })
+        }
+        const { revalidateTag } = await import("next/cache")
+        ;(revalidateTag as any)(`${type}-${entityId}`, "max")
+        ;(revalidateTag as any)(type === "product" ? "products" : type === "service" ? "services" : "recurring-plans", "max")
+    } catch {}
+
+    // Apply risk score adjustment if provided
+    if (entity.partner_id && options?.riskScore) {
+        await applyRiskScore(entity.partner_id, options.riskScore, 2)
+    }
+
+    // Audit log
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_REMOVE_IMAGE,
+        targetType: type,
+        targetId: entityId,
+        metadata: {
+            removedImagesCount: imageUrlsToRemove.length,
+            removedImages: imageUrlsToRemove,
+            remainingImagesCount: remainingImages.length,
+            autoApproved: !!options?.autoApproveRemaining && !noImagesLeft,
+            newStatus,
+            reason: reasonText || null,
+            riskScore: options?.riskScore ?? null,
+            adminName,
+            productName: entity.name,
+        },
+    })
+
+    // Partner timeline log
+    if (entity.partner_id) {
+        const changeLines = [
+            `Removeu ${imageUrlsToRemove.length} imagem(ns) na moderação.`,
+            ...(options?.autoApproveRemaining && !noImagesLeft ? ["Item aprovado para a vitrine com as imagens restantes."] : []),
+            ...(noImagesLeft ? ["O item ficou sem imagens e requer novas imagens para aprovação."] : []),
+            ...(reasonText ? [`Motivo: "${reasonText}"`] : []),
+            ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
+        ]
+        await logAuditEvent({
+            partnerId: entity.partner_id,
+            actorUserId: admin.userId,
+            actorName: adminName,
+            entityType: type,
+            entityId,
+            actionType: options?.autoApproveRemaining && !noImagesLeft ? "approved" : "updated",
+            changeLines,
+            metadata: {
+                is_admin_action: true,
+                dudit_action: true,
+                admin_actor_name: adminName,
+                removed_images: imageUrlsToRemove,
+                reason: reasonText || null,
+                risk_score: options?.riskScore ?? null,
+            },
+            source: "manual",
+        })
+    }
+
+    return {
+        success: true,
+        remainingImages,
+        noImagesLeft,
+        newStatus,
+    }
+}
+
 // ─── Full Reject (reject product entirely) ──────────────────────────────────
 
 export async function rejectModeration(

@@ -176,26 +176,41 @@ const ModerationListRow = React.memo(({
 
                 {/* Ações */}
                 <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                    <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-2 action-btn" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            type="button"
+                            onClick={() => onDetail(item)}
+                            className="px-3 py-1.5 rounded-lg bg-brand-dark dark:bg-dark-border text-white text-xs font-semibold hover:bg-brand-dark/80 dark:hover:bg-dark-border/80 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+                        >
+                            <EyeIcon size={14} /> Moderar
+                        </button>
+
                         <ActionsDropdown
                             onView={() => onDetail(item)}
                         >
                             <DropdownItem onClick={() => onDetail(item)}>
-                                <EyeIcon size={16} /> Visualizar
+                                <EyeIcon size={16} /> Moderar Fotos
                             </DropdownItem>
-                            {item.type === "product" && (
-                                <DropdownItem
-                                    onClick={() => window.open(`/erp/produtos/${item.id}`, "_blank")}
-                                >
-                                    <EditIcon size={16} /> Editar no ERP
-                                </DropdownItem>
-                            )}
                             {(item.moderation_status === "pending_moderation" || item.moderation_status === "flagged") && (
                                 <DropdownItem
                                     onClick={() => onApprove(item.id, item.type)}
                                     className="text-brand-green"
                                 >
-                                    <CheckCircleIcon size={16} /> Aprovar {typeLabel}
+                                    <CheckCircleIcon size={16} /> Aprovar Rápido
+                                </DropdownItem>
+                            )}
+                            {item.type === "product" && (
+                                <DropdownItem
+                                    onClick={() => window.open(`/ddt-admin/catalog/products/${item.id}`, "_blank")}
+                                >
+                                    <EditIcon size={16} /> Ver Catálogo
+                                </DropdownItem>
+                            )}
+                            {item.type === "product" && (
+                                <DropdownItem
+                                    onClick={() => window.open(`/erp/produtos/${item.id}`, "_blank")}
+                                >
+                                    <EditIcon size={16} /> Editar no ERP
                                 </DropdownItem>
                             )}
                             <DropdownItem

@@ -6,6 +6,7 @@ import { Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/component
 import ModerationListRow from "./ModerationListRow"
 import ModerationPageControls from "./ModerationPageControls"
 import AdminModerationDetailView from "./AdminModerationDetailView"
+import { AdminQuickModerationModal } from "./AdminQuickModerationModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { StoreIcon } from "@/lib/icons"
@@ -29,6 +30,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
     const [items, setItems] = useState<ModerationItem[]>(initialData?.data || [])
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
+    const [quickReviewItem, setQuickReviewItem] = useState<ModerationItem | null>(null)
 
     // ─── Approve Handler ──────────────────────────────────────────────────────
     const handleApprove = (id: string, type: ModerationItem["type"]) => {
@@ -46,20 +48,10 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
         })
     }
 
-    // ─── Detail Handler ─────────────────────────────────────────────────────────
-    // Produto/serviço abrem a tela de detalhe do catálogo (form ERP + abas de
-    // Comprador e Loja / Histórico & Auditoria). Demais tipos seguem no detalhe
-    // inline da moderação.
+    // ─── Detail / Quick Review Handler ─────────────────────────────────────────
+    // Abre o modal rápido de moderação para visualização, remoção de imagens e aprovação rápida
     const handleDetail = (item: ModerationItem) => {
-        if (item.type === "product") {
-            router.push(`/ddt-admin/catalog/products/${item.id}`)
-            return
-        }
-        if (item.type === "service") {
-            router.push(`/ddt-admin/catalog/services/${item.id}`)
-            return
-        }
-        openEntity("view", item.id)
+        setQuickReviewItem(item)
     }
 
     // ─── Status Filter Handler ───────────────────────────────────────────────
@@ -329,6 +321,26 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                     </AnimatePresence>
                 </div>
             </div>
+
+            {/* Modal de Moderação Rápida (Seleção de fotos, remoção e aprovação) */}
+            {quickReviewItem && (
+                <AdminQuickModerationModal
+                    item={quickReviewItem}
+                    isOpen={!!quickReviewItem}
+                    onClose={() => setQuickReviewItem(null)}
+                    onResolved={(action, updatedItem) => {
+                        if (action === "approved" || action === "rejected") {
+                            setItems((prev) => prev.filter((i) => i.id !== quickReviewItem.id))
+                            setQuickReviewItem(null)
+                        } else if (action === "updated" && updatedItem) {
+                            setItems((prev) =>
+                                prev.map((i) => (i.id === updatedItem.id ? { ...i, ...updatedItem } : i))
+                            )
+                            setQuickReviewItem((prev) => (prev ? { ...prev, ...updatedItem } : null))
+                        }
+                    }}
+                />
+            )}
         </FadeIn>
     )
 }

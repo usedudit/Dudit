@@ -172,7 +172,7 @@ export default function SegmentLanding({
                                         <h4 className="text-lg font-bold text-brand-dark mb-1">
                                             {feature.title}
                                         </h4>
-                                        <p className="text-brand-inactive-text text-xs leading-relaxed">
+                                        <p className="text-brand-inactive-text text-sm leading-relaxed">
                                             {feature.description}
                                         </p>
                                     </div>
@@ -195,10 +195,10 @@ export default function SegmentLanding({
                                     whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }}
                                     transition={{ delay: idx * 0.1 }}
-                                    className={`py-8 px-8 ${idx < benefits.items.length - 1 ? 'md:border-r md:border-dashed md:border-gray-200' : ''} ${idx < benefits.items.length - 1 ? 'border-b md:border-b-0 border-dashed border-gray-200' : ''}`}
+                                    className={`py-8 px-8 ${idx < benefits.items.length - 1 ? 'md:border-r md:border-dashed md:border-brand-border dark:border-dark-border' : ''} ${idx < benefits.items.length - 1 ? 'border-b md:border-b-0 border-brand-border dark:border-dark-border' : ''}`}
                                 >
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center shrink-0">
+                                        <div className="w-10 h-10 bg-brand-dark rounded-full flex items-center justify-center shrink-0">
                                             {item.icon}
                                         </div>
                                         <h4 className="text-lg font-bold text-brand-dark">{item.title}</h4>

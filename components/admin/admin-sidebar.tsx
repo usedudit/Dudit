@@ -4,7 +4,30 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon, MotorbikeIcon, AnalyticsIcon, SettingsConfigIcon } from "@/lib/icons"
+import {
+    Menu,
+    XIcon,
+    ChevronRightIcon,
+    ChevronDownIcon,
+    HomeIcon,
+    ShieldIcon,
+    ShoppingCartIcon,
+    ReturnIcon,
+    FileTextIcon,
+    WrenchIcon,
+    TagIcon,
+    VideoIcon,
+    MoneyIcon,
+    UserIcon,
+    MegaphoneIcon,
+    FlagIcon,
+    FileIcon,
+    BriefcaseIcon,
+    MotorbikeIcon,
+    AnalyticsIcon,
+    RepeatIcon,
+    SettingsConfigIcon,
+} from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
@@ -22,83 +45,151 @@ interface NavItem {
     submenu?: SubMenuItem[]
 }
 
-const navItems: NavItem[] = [
+interface NavSection {
+    title?: string
+    items: NavItem[]
+}
+
+const navSections: NavSection[] = [
     {
-        icon: HomeIcon,
-        label: "Início",
-        href: "/",
-    },
-    {
-        icon: AnalyticsIcon,
-        label: "Analytics da Dudit",
-        href: "/ddt-admin/analytics",
-    },
-    {
-        icon: SettingsConfigIcon,
-        label: "Sistema & Manutenção",
-        href: "/ddt-admin/system",
-    },
-    {
-        icon: ShieldIcon,
-        label: "Moderação",
-        href: "/ddt-admin/moderation",
-    },
-    {
-        icon: ShoppingCartIcon,
-        label: "Pedidos",
-        href: "/ddt-admin/orders",
-    },
-    {
-        icon: ReturnIcon,
-        label: "Trocas e devolucoes",
-        href: "/ddt-admin/returns",
-    },
-    {
-        icon: MoneyIcon,
-        label: "Faturamento",
-        href: "/ddt-admin/billing",
-        submenu: [
-            { label: "Dashboard", href: "/ddt-admin/billing" },
-            { label: "Compras", href: "/ddt-admin/billing/purchases" },
-            { label: "Assinaturas", href: "/ddt-admin/billing/subscriptions" },
-            { label: "Pagamentos", href: "/ddt-admin/billing/payments" },
-            { label: "Faturas", href: "/ddt-admin/billing/invoices" },
-            { label: "Reembolsos", href: "/ddt-admin/billing/reembolsos" },
+        title: "Visão Geral",
+        items: [
+            {
+                icon: HomeIcon,
+                label: "Visão Geral",
+                href: "/ddt-admin",
+            },
+            {
+                icon: AnalyticsIcon,
+                label: "Analytics",
+                href: "/ddt-admin/analytics",
+            },
         ],
     },
     {
-        icon: UserIcon,
-        label: "Usuários / Punições",
-        href: "/ddt-admin/users",
+        title: "Vendas & Operação",
+        items: [
+            {
+                icon: ShoppingCartIcon,
+                label: "Pedidos",
+                href: "/ddt-admin/orders",
+            },
+            {
+                icon: ReturnIcon,
+                label: "Trocas e Devoluções",
+                href: "/ddt-admin/returns",
+            },
+            {
+                icon: FileTextIcon,
+                label: "Orçamentos",
+                href: "/ddt-admin/orcamentos",
+            },
+            {
+                icon: WrenchIcon,
+                label: "Ordens de Serviço",
+                href: "/ddt-admin/ordens-de-servico",
+            },
+        ],
     },
     {
-        icon: BriefcaseIcon,
-        label: "Parceiros",
-        href: "/ddt-admin/partners",
+        title: "Marketing & Comunidade",
+        items: [
+            {
+                icon: TagIcon,
+                label: "Campanhas & Promoções",
+                href: "/ddt-admin/promocoes",
+            },
+            {
+                icon: VideoIcon,
+                label: "Vídeos da Comunidade",
+                href: "/ddt-admin/videos",
+            },
+            {
+                icon: MegaphoneIcon,
+                label: "Publicidade",
+                href: "/ddt-admin/advertising",
+            },
+        ],
     },
     {
-        icon: MotorbikeIcon,
-        label: "Entregadores",
-        href: "/ddt-admin/entregadores",
+        title: "Ecossistema & Logística",
+        items: [
+            {
+                icon: BriefcaseIcon,
+                label: "Parceiros & Lojas",
+                href: "/ddt-admin/partners",
+            },
+            {
+                icon: MotorbikeIcon,
+                label: "Entregadores",
+                href: "/ddt-admin/entregadores",
+            },
+        ],
     },
     {
-        icon: MegaphoneIcon,
-        label: "Publicidade",
-        href: "/ddt-admin/advertising",
+        title: "Financeiro & SaaS",
+        items: [
+            {
+                icon: MoneyIcon,
+                label: "Faturamento",
+                href: "/ddt-admin/billing",
+                submenu: [
+                    { label: "Dashboard", href: "/ddt-admin/billing" },
+                    { label: "Reembolsos", href: "/ddt-admin/billing/reembolsos" },
+                ],
+            },
+            {
+                icon: RepeatIcon,
+                label: "Assinaturas & Planos",
+                href: "/ddt-admin/subscriptions",
+                submenu: [
+                    { label: "Assinaturas SaaS (Lojas)", href: "/ddt-admin/subscriptions" },
+                    { label: "Planos Recorrentes", href: "/ddt-admin/catalog/plans" },
+                ],
+            },
+        ],
     },
     {
-        icon: FlagIcon,
-        label: "Denúncias",
-        href: "/ddt-admin/reports",
+        title: "Segurança & Moderação",
+        items: [
+            {
+                icon: ShieldIcon,
+                label: "Moderação",
+                href: "/ddt-admin/moderation",
+            },
+            {
+                icon: FlagIcon,
+                label: "Denúncias",
+                href: "/ddt-admin/reports",
+            },
+            {
+                icon: UserIcon,
+                label: "Usuários / Punições",
+                href: "/ddt-admin/users",
+            },
+            {
+                icon: FileIcon,
+                label: "Logs de Auditoria",
+                href: "/ddt-admin/audit",
+            },
+        ],
     },
     {
-        icon: FileIcon,
-        label: "Audit Logs",
-        href: "/ddt-admin/audit",
+        title: "Sistema",
+        items: [
+            {
+                icon: SettingsConfigIcon,
+                label: "Sistema & Manutenção",
+                href: "/ddt-admin/system",
+            },
+        ],
     },
 ]
 
+const allNavItems = navSections.flatMap((section) => section.items)
+
 import { useSidebar } from "@/lib/sidebar-context"
+import { getAdminSidebarBadgesAction } from "@/app/actions/admin/badges"
 
 interface AdminSidebarProps {
     initialExpanded?: boolean
@@ -124,6 +215,11 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
+    const [badges, setBadges] = useState<{ moderation: number; reports: number; returns: number }>({
+        moderation: 0,
+        reports: 0,
+        returns: 0,
+    })
 
     // Controle de Hover com Delay
     const [hoveredItem, setHoveredItem] = useState<string | null>(null)
@@ -139,16 +235,30 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
         return pathname === href || pathname?.startsWith(href + "/")
     }, [pathname])
 
-    const filteredNavItems = navItems
-
     useEffect(() => {
         setIsMounted(true)
     }, [])
 
     useEffect(() => {
+        let isCancelled = false
+        getAdminSidebarBadgesAction().then((res) => {
+            if (!isCancelled && res) setBadges(res)
+        }).catch(() => {})
+        return () => { isCancelled = true }
+    }, [pathname])
+
+    const getItemBadge = useCallback((href?: string) => {
+        if (!href) return null
+        if (href === "/ddt-admin/moderation" && badges.moderation > 0) return badges.moderation
+        if (href === "/ddt-admin/reports" && badges.reports > 0) return badges.reports
+        if (href === "/ddt-admin/returns" && badges.returns > 0) return badges.returns
+        return null
+    }, [badges])
+
+    useEffect(() => {
         if (isCollapsed) return
 
-        const activeItem = navItems.find((item) =>
+        const activeItem = allNavItems.find((item) =>
             item.submenu?.some((sub) => isActivePath(sub.href)),
         )
         if (activeItem && openSubmenu !== activeItem.label) {
@@ -204,7 +314,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                 )}
             >
                 <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
-                    <Link href="/" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
+                    <Link href="/ddt-admin" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
                         <div className="flex items-center justify-center shrink-0 w-[44px]">
                             <img
                                 src="https://img.dudit.com.br/static/Icon.png"
@@ -253,167 +363,198 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                     )}
                     style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                 >
-                    <ul className="space-y-1">
-                        {filteredNavItems.map((item) => {
-                            const Icon = item.icon
-                            const hasSubmenu = item.submenu && item.submenu.length > 0
-                            const isMenuExpanded = openSubmenu === item.label
-
-                            const isDirectActive = item.href ? isActivePath(item.href) : false
-                            const isSubActive = hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href))
-                            const isActiveGroup = isDirectActive || isSubActive
-
+                    <div className="space-y-4">
+                        {navSections.map((section, sIndex) => {
                             return (
-                                <li
-                                    key={item.label}
-                                    className="relative group w-full"
-                                    onMouseEnter={() => handleMouseEnter(item.label)}
-                                    onMouseLeave={handleMouseLeave}
-                                >
-                                    <div className="w-full">
-                                        <button
-                                            onClick={(e) => {
-                                                if (!isCollapsed && hasSubmenu) {
-                                                    toggleSubmenu(item.label)
-                                                }
-                                            }}
-                                            className={cn(
-                                                "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
-                                                isActiveGroup ? activeClasses : inactiveClasses
-                                            )}
-                                        >
-                                            {item.href && !hasSubmenu ? (
-                                                <Link href={item.href} prefetch={false} className="absolute inset-0 z-10" />
-                                            ) : null}
+                                <div key={section.title || sIndex} className="space-y-1">
+                                    {!isCollapsed && section.title && (
+                                        <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
+                                            {section.title}
+                                        </div>
+                                    )}
+                                    {isCollapsed && sIndex > 0 && (
+                                        <div className="my-2 mx-2 border-t border-dark-border/40" />
+                                    )}
+                                    <ul className="space-y-1">
+                                        {section.items.map((item) => {
+                                            const Icon = item.icon
+                                            const hasSubmenu = item.submenu && item.submenu.length > 0
+                                            const isMenuExpanded = openSubmenu === item.label
 
-                                            <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
-                                                <Icon
-                                                    className={cn(
-                                                        "w-[20px] h-[20px] transition-colors",
-                                                        isActiveGroup ? "text-brand-green" : "text-current"
-                                                    )}
-                                                />
-                                            </div>
+                                            const isDirectActive = item.href ? isActivePath(item.href) : false
+                                            const isSubActive = hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href))
+                                            const isActiveGroup = isDirectActive || isSubActive
+                                            const badge = getItemBadge(item.href)
 
-                                            <span
-                                                className={cn(
-                                                    "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
-                                                    isCollapsed
-                                                        ? "max-w-0 opacity-0 translate-x-[-10px]"
-                                                        : "max-w-[150px] opacity-100 translate-x-0",
-                                                )}
-                                            >
-                                                {item.label}
-                                            </span>
+                                            return (
+                                                <li
+                                                    key={item.label}
+                                                    className="relative group w-full"
+                                                    onMouseEnter={() => handleMouseEnter(item.label)}
+                                                    onMouseLeave={handleMouseLeave}
+                                                >
+                                                    <div className="w-full">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                if (!isCollapsed && hasSubmenu) {
+                                                                    toggleSubmenu(item.label)
+                                                                }
+                                                            }}
+                                                            className={cn(
+                                                                "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
+                                                                isActiveGroup ? activeClasses : inactiveClasses
+                                                            )}
+                                                        >
+                                                            {item.href && !hasSubmenu ? (
+                                                                <Link href={item.href} prefetch={false} className="absolute inset-0 z-10" />
+                                                            ) : null}
 
-                                            {hasSubmenu && !isCollapsed && (
-                                                <ChevronDownIcon
-                                                    className={cn(
-                                                        "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
-                                                        isMenuExpanded ? "rotate-180" : "rotate-0",
-                                                    )}
-                                                />
-                                            )}
-                                        </button>
+                                                            <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0 relative">
+                                                                <Icon
+                                                                    className={cn(
+                                                                        "w-[20px] h-[20px] transition-colors",
+                                                                        isActiveGroup ? "text-brand-green" : "text-current"
+                                                                    )}
+                                                                />
+                                                                {badge && isCollapsed && (
+                                                                    <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-brand-red ring-2 ring-dark-surface" />
+                                                                )}
+                                                            </div>
 
-                                        {/* SUBMENU - MODO EXPANDIDO */}
-                                        {hasSubmenu && !isCollapsed && (
-                                            <div
-                                                className={cn(
-                                                    "overflow-hidden transition-all duration-300 ease-in-out",
-                                                    isMenuExpanded ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0",
-                                                )}
-                                            >
-                                                <div className="relative ml-[22px]">
-                                                    <ul className="space-y-1">
-                                                        {item.submenu!.map((subItem, index) => {
-                                                            const isActive = isActivePath(subItem.href)
-                                                            const isLast = index === item.submenu!.length - 1
+                                                            <span
+                                                                className={cn(
+                                                                    "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
+                                                                    isCollapsed
+                                                                        ? "max-w-0 opacity-0 translate-x-[-10px]"
+                                                                        : "max-w-[150px] opacity-100 translate-x-0",
+                                                                )}
+                                                            >
+                                                                {item.label}
+                                                            </span>
 
-                                                            return (
-                                                                <li key={subItem.href} className="relative pl-6">
-                                                                    <div className="absolute left-0 top-0 bottom-0 w-6 pointer-events-none">
-                                                                        <div
-                                                                            className={cn(
-                                                                                "absolute left-0 top-0 w-[12px] h-[calc(50%)]",
-                                                                                "border-l border-b border-white/10 border-dark-border",
-                                                                                "rounded-bl-[8px]",
-                                                                            )}
-                                                                        />
-                                                                        {!isLast && (
-                                                                            <div
-                                                                                className={cn(
-                                                                                    "absolute left-0 top-[50%] bottom-[-4px] w-0",
-                                                                                    "border-l border-dark-border",
-                                                                                )}
-                                                                            />
+                                                            {badge && !isCollapsed && (
+                                                                <span className="mr-2 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-brand-red text-white leading-none">
+                                                                    {badge}
+                                                                </span>
+                                                            )}
+
+                                                            {hasSubmenu && !isCollapsed && (
+                                                                <ChevronDownIcon
+                                                                    className={cn(
+                                                                        "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
+                                                                        isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                                    )}
+                                                                />
+                                                            )}
+                                                        </button>
+
+                                                        {/* SUBMENU - MODO EXPANDIDO */}
+                                                        {hasSubmenu && !isCollapsed && (
+                                                            <div
+                                                                className={cn(
+                                                                    "overflow-hidden transition-all duration-300 ease-in-out",
+                                                                    isMenuExpanded ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0",
+                                                                )}
+                                                            >
+                                                                <div className="relative ml-[22px]">
+                                                                    <ul className="space-y-1">
+                                                                        {item.submenu!.map((subItem, index) => {
+                                                                            const isActive = isActivePath(subItem.href)
+                                                                            const isLast = index === item.submenu!.length - 1
+
+                                                                            return (
+                                                                                <li key={subItem.href} className="relative pl-6">
+                                                                                    <div className="absolute left-0 top-0 bottom-0 w-6 pointer-events-none">
+                                                                                        <div
+                                                                                            className={cn(
+                                                                                                "absolute left-0 top-0 w-[12px] h-[calc(50%)]",
+                                                                                                "border-l border-b border-white/10 border-dark-border",
+                                                                                                "rounded-bl-[8px]",
+                                                                                            )}
+                                                                                        />
+                                                                                        {!isLast && (
+                                                                                            <div
+                                                                                                className={cn(
+                                                                                                    "absolute left-0 top-[50%] bottom-[-4px] w-0",
+                                                                                                    "border-l border-dark-border",
+                                                                                                )}
+                                                                                            />
+                                                                                        )}
+                                                                                    </div>
+
+                                                                                    <Link
+                                                                                        href={subItem.href}
+                                                                                        prefetch={false}
+                                                                                        className={cn(
+                                                                                            "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
+                                                                                            isActive ? activeClasses : inactiveClasses
+                                                                                        )}
+                                                                                    >
+                                                                                        {subItem.label}
+                                                                                    </Link>
+                                                                                </li>
+                                                                            )
+                                                                        })}
+                                                                    </ul>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* SUBMENU - MODO COLAPSADO (CARD ANIMADO COM FRAMER MOTION) */}
+                                                        <AnimatePresence>
+                                                            {isCollapsed && hoveredItem === item.label && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, x: 10, scale: 0.95 }}
+                                                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                                                    exit={{ opacity: 0, x: 5, scale: 0.95 }}
+                                                                    transition={{ duration: 0.15, ease: "easeOut" }}
+                                                                    className="absolute left-[calc(100%+16px)] top-0 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl min-w-[200px] overflow-hidden"
+                                                                >
+                                                                    <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50 flex items-center justify-between">
+                                                                        <span className="text-sm font-bold text-white block">{item.label}</span>
+                                                                        {badge && (
+                                                                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-brand-red text-white leading-none">
+                                                                                {badge}
+                                                                            </span>
                                                                         )}
                                                                     </div>
 
-                                                                    <Link
-                                                                        href={subItem.href}
-                                                                        prefetch={false}
-                                                                        className={cn(
-                                                                            "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
-                                                                            isActive ? activeClasses : inactiveClasses
+                                                                    <div className="py-1 bg-dark-background">
+                                                                        {hasSubmenu ? (
+                                                                            item.submenu!.map((subItem) => {
+                                                                                const isActive = isActivePath(subItem.href)
+                                                                                return (
+                                                                                    <Link
+                                                                                        key={subItem.href}
+                                                                                        href={subItem.href}
+                                                                                        prefetch={false}
+                                                                                        className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
+                                                                                    >
+                                                                                        <span className={isActive ? "text-brand-green font-medium" : ""}>
+                                                                                            {subItem.label}
+                                                                                        </span>
+                                                                                    </Link>
+                                                                                )
+                                                                            })
+                                                                        ) : (
+                                                                            <div className="p-2">
+                                                                                <div className="text-xs text-brand-inactive-text px-2 pb-1">Navegar para {item.label}</div>
+                                                                            </div>
                                                                         )}
-                                                                    >
-                                                                        {subItem.label}
-                                                                    </Link>
-                                                                </li>
-                                                            )
-                                                        })}
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        )}
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
 
-                                        {/* SUBMENU - MODO COLAPSADO (CARD ANIMADO COM FRAMER MOTION) */}
-                                        <AnimatePresence>
-                                            {isCollapsed && hoveredItem === item.label && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, x: 10, scale: 0.95 }}
-                                                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                                                    exit={{ opacity: 0, x: 5, scale: 0.95 }}
-                                                    transition={{ duration: 0.15, ease: "easeOut" }}
-                                                    className="absolute left-[calc(100%+16px)] top-0 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl min-w-[200px] overflow-hidden"
-                                                >
-                                                    <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50">
-                                                        <span className="text-sm font-bold text-white block">{item.label}</span>
                                                     </div>
-
-                                                    <div className="py-1 bg-dark-background">
-                                                        {hasSubmenu ? (
-                                                            item.submenu!.map((subItem) => {
-                                                                const isActive = isActivePath(subItem.href)
-                                                                return (
-                                                                    <Link
-                                                                        key={subItem.href}
-                                                                        href={subItem.href}
-                                                                        prefetch={false}
-                                                                        className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
-                                                                    >
-                                                                        <span className={isActive ? "text-brand-green font-medium" : ""}>
-                                                                            {subItem.label}
-                                                                        </span>
-                                                                    </Link>
-                                                                )
-                                                            })
-                                                        ) : (
-                                                            <div className="p-2">
-                                                                <div className="text-xs text-brand-inactive-text px-2 pb-1">Navegar para {item.label}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-
-                                    </div>
-                                </li>
+                                                </li>
+                                            )
+                                        })}
+                                    </ul>
+                                </div>
                             )
                         })}
-                    </ul>
+                    </div>
                 </nav>
             </div>
 
@@ -468,66 +609,86 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                         </div>
 
                         <div className="p-4 pt-1 flex-1 overflow-y-auto no-scrollbar">
-                            <nav className="flex flex-col gap-1">
-                                {filteredNavItems.map((item) => {
-                                    const Icon = item.icon
-                                    const hasSubmenu = item.submenu && item.submenu.length > 0
-                                    const isMenuExpanded = openSubmenu === item.label
-                                    const isActive = item.href ? isActivePath(item.href) : (hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href)))
+                            <nav className="flex flex-col gap-3">
+                                {navSections.map((section, sIndex) => (
+                                    <div key={section.title || sIndex} className="flex flex-col gap-1">
+                                        {section.title && (
+                                            <div className="px-3 pt-2 pb-0.5 text-[11px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 select-none">
+                                                {section.title}
+                                            </div>
+                                        )}
+                                        {section.items.map((item) => {
+                                            const Icon = item.icon
+                                            const hasSubmenu = item.submenu && item.submenu.length > 0
+                                            const isMenuExpanded = openSubmenu === item.label
+                                            const isActive = item.href ? isActivePath(item.href) : (hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href)))
+                                            const badge = getItemBadge(item.href)
 
-                                    return (
-                                        <div key={item.label} className="flex flex-col">
-                                            {item.href && !hasSubmenu ? (
-                                                <Link
-                                                    href={item.href}
-                                                    prefetch={false}
-                                                    className={cn(
-                                                        "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
-                                                        isActive ? activeClasses : inactiveClasses
-                                                    )}
-                                                    onClick={() => setIsMobileOpen(false)}
-                                                >
-                                                    <Icon size={20} className={isActive ? "text-brand-green" : ""} />
-                                                    <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
-                                                </Link>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => hasSubmenu ? toggleSubmenu(item.label) : null}
-                                                    className={cn(
-                                                        "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
-                                                        isActive ? activeClasses : inactiveClasses
-                                                    )}
-                                                >
-                                                    <Icon size={20} className={isActive ? "text-brand-green" : ""} />
-                                                    <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
-                                                    {hasSubmenu && (
-                                                        <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
-                                                    )}
-                                                </button>
-                                            )}
-
-                                            {hasSubmenu && isMenuExpanded && (
-                                                <div className="flex flex-col gap-1 pl-11 pr-3 pb-2">
-                                                    {item.submenu!.map((sub) => (
+                                            return (
+                                                <div key={item.label} className="flex flex-col">
+                                                    {item.href && !hasSubmenu ? (
                                                         <Link
-                                                            key={sub.href}
-                                                            href={sub.href}
+                                                            href={item.href}
                                                             prefetch={false}
                                                             className={cn(
-                                                                "py-2 px-3 rounded-lg text-sm transition-colors",
-                                                                isActivePath(sub.href) ? activeClasses : inactiveClasses
+                                                                "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                                isActive ? activeClasses : inactiveClasses
                                                             )}
                                                             onClick={() => setIsMobileOpen(false)}
                                                         >
-                                                            {sub.label}
+                                                            <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                            <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                            {badge && (
+                                                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-brand-red text-white leading-none">
+                                                                    {badge}
+                                                                </span>
+                                                            )}
                                                         </Link>
-                                                    ))}
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => hasSubmenu ? toggleSubmenu(item.label) : null}
+                                                            className={cn(
+                                                                "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                                isActive ? activeClasses : inactiveClasses
+                                                            )}
+                                                        >
+                                                            <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                            <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                            {badge && (
+                                                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-brand-red text-white leading-none mr-2">
+                                                                    {badge}
+                                                                </span>
+                                                            )}
+                                                            {hasSubmenu && (
+                                                                <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
+                                                            )}
+                                                        </button>
+                                                    )}
+
+                                                    {hasSubmenu && isMenuExpanded && (
+                                                        <div className="flex flex-col gap-1 pl-11 pr-3 pb-2">
+                                                            {item.submenu!.map((sub) => (
+                                                                <Link
+                                                                    key={sub.href}
+                                                                    href={sub.href}
+                                                                    prefetch={false}
+                                                                    className={cn(
+                                                                        "py-2 px-3 rounded-lg text-sm transition-colors",
+                                                                        isActivePath(sub.href) ? activeClasses : inactiveClasses
+                                                                    )}
+                                                                    onClick={() => setIsMobileOpen(false)}
+                                                                >
+                                                                    {sub.label}
+                                                                </Link>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    )
-                                })}
+                                            )
+                                        })}
+                                    </div>
+                                ))}
                             </nav>
                         </div>
                     </Drawer.Content>

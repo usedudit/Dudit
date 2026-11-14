@@ -96,6 +96,9 @@ async function enrichAuditLogs(admin: any, items: AuditLogRow[]) {
     const partnerIds = items.filter(i => (i.target_type === 'partner' || i.target_type === 'store') && i.target_id).map(i => i.target_id!)
     const userIds = items.filter(i => (i.target_type === 'user') && i.target_id).map(i => i.target_id!)
     const orderIds = items.filter(i => (i.target_type === 'order') && i.target_id).map(i => i.target_id!)
+    const soIds = items.filter(i => (i.target_type === 'service_order') && i.target_id).map(i => i.target_id!)
+    const quoteIds = items.filter(i => (i.target_type === 'quote') && i.target_id).map(i => i.target_id!)
+    const promoIds = items.filter(i => (i.target_type === 'promotion') && i.target_id).map(i => i.target_id!)
 
     const targetMap = new Map<string, string>()
 
@@ -143,6 +146,30 @@ async function enrichAuditLogs(admin: any, items: AuditLogRow[]) {
         fetches.push(
             admin.from("orders").select("id, order_number").in("id", orderIds).then(({ data }: any) => {
                 ;(data || []).forEach((o: any) => targetMap.set(`order:${o.id}`, `#${o.order_number || o.id.slice(0, 8)}`))
+            })
+        )
+    }
+
+    if (soIds.length > 0) {
+        fetches.push(
+            admin.from("service_orders").select("id, os_number").in("id", soIds).then(({ data }: any) => {
+                ;(data || []).forEach((s: any) => targetMap.set(`service_order:${s.id}`, `OS #${s.os_number}`))
+            })
+        )
+    }
+
+    if (quoteIds.length > 0) {
+        fetches.push(
+            admin.from("quotes").select("id, quote_number").in("id", quoteIds).then(({ data }: any) => {
+                ;(data || []).forEach((q: any) => targetMap.set(`quote:${q.id}`, `Orçamento #${q.quote_number}`))
+            })
+        )
+    }
+
+    if (promoIds.length > 0) {
+        fetches.push(
+            admin.from("promotions").select("id, name, code").in("id", promoIds).then(({ data }: any) => {
+                ;(data || []).forEach((p: any) => targetMap.set(`promotion:${p.id}`, p.code ? `Cupom ${p.code}` : p.name))
             })
         )
     }
@@ -256,7 +283,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     const admin = getAdminClient()
 
     // Parallel fetch for dashboard
-    const [moderationCount, bannedCount, mpCount, recentLogs] = await Promise.all([
+    const [moderationCount, bannedCount, mpCount, reportsCount, returnsCount, serviceOrdersCount, quotesCount, recentLogs] = await Promise.all([
         // Pending moderation
         admin
             .from("products")
@@ -277,6 +304,30 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
             .eq("provider_slug", MERCADOPAGO_PROVIDER)
             .eq("status", "connected"),
 
+        // Pending reports
+        admin
+            .from("reports")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "pending"),
+
+        // Pending return requests
+        admin
+            .from("return_requests")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["requested", "under_review", "disputed"]),
+
+        // Open service orders
+        admin
+            .from("service_orders")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["open", "budget_pending", "budget_approved", "in_analysis", "waiting_parts", "in_repair"]),
+
+        // Open quotes
+        admin
+            .from("quotes")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["pending", "sent", "draft"]),
+
         // Recent audit logs
         admin
             .from("admin_audit_logs")
@@ -292,6 +343,10 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
         pendingModeration: moderationCount.count || 0,
         bannedUsers: bannedCount.count || 0,
         activeSubscriptions: mpCount.count || 0,
+        pendingReports: reportsCount.count || 0,
+        pendingReturns: returnsCount.count || 0,
+        openServiceOrders: serviceOrdersCount.count || 0,
+        openQuotes: quotesCount.count || 0,
         recentAuditLogs: items,
     }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback, useTransition } from "react"
+import React, { useState, useEffect, useRef, useCallback, useTransition, useMemo } from "react"
 import {
     ChevronLeftIcon,
     CheckCircleIcon,
@@ -11,6 +11,8 @@ import {
     ClockIcon,
     ThreeDotsIcon,
     XIcon,
+    AlertTriangleIcon,
+    EyeIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -33,13 +35,14 @@ import {
     approveModeration,
     rejectModeration,
     removeModerationImage,
+    removeModerationImagesBatch,
     getAdminEntityTimeline,
 } from "@/app/actions/admin/moderation"
+import { extractFlaggedImages, isImageFlagged } from "@/lib/utils/product-display-images"
 import { useAdminActionModal } from "../AdminActionModal"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import type { ModerationItem } from "@/lib/admin/types"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 import { useModalLayer } from "@/lib/modal-stack"
 
@@ -82,6 +85,24 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
     // Admin Action Modal
     const { modal: actionModal, runAction } = useAdminActionModal()
     const [removedImages, setRemovedImages] = useState<Set<string>>(new Set())
+    const [selectedToRemove, setSelectedToRemove] = useState<Set<string>>(new Set())
+
+    // Flagged by AI
+    const flaggedByAi = useMemo(() => {
+        return extractFlaggedImages(item.moderation_reason)
+    }, [item.moderation_reason])
+
+    useEffect(() => {
+        const flaggedSet = new Set<string>()
+        if (flaggedByAi.length > 0 && Array.isArray(item.images)) {
+            for (const img of item.images) {
+                if (isImageFlagged(img, flaggedByAi)) {
+                    flaggedSet.add(img)
+                }
+            }
+        }
+        setSelectedToRemove(flaggedSet)
+    }, [item.images, flaggedByAi])
 
     // Timeline entries
     const [timelineEntries, setTimelineEntries] = useState<HistoryEntry[]>([])
@@ -168,6 +189,82 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                     } else if (index >= visibleImages.length - 1) {
                         setLightboxIndex(Math.max(0, visibleImages.length - 2))
                     }
+                    loadTimeline()
+                    return { success: true }
+                }
+                return { success: false, error: result.error }
+            },
+        })
+    }
+
+    const toggleSelectImage = (url: string) => {
+        setSelectedToRemove((prev) => {
+            const next = new Set(prev)
+            if (next.has(url)) next.delete(url)
+            else next.add(url)
+            return next
+        })
+    }
+
+    const handleBatchRemoveAndApprove = async () => {
+        const toRemove = Array.from(selectedToRemove).filter((u) => !removedImages.has(u))
+        if (toRemove.length === 0) return
+        const remaining = visibleImages.length - toRemove.length
+        if (remaining === 0) {
+            toast.error("Não é possível aprovar um item sem nenhuma imagem restante.")
+            return
+        }
+
+        await runAction({
+            title: `Remover ${toRemove.length} imagem(ns) e Aprovar`,
+            description: `Deseja remover as ${toRemove.length} imagem(ns) selecionada(s) e aprovar o ${typeLabel.toLowerCase()} imediatamente?`,
+            changedFields: [`${toRemove.length} imagem(ns) removida(s)`, "Status de moderação: Aprovado"],
+            force: true,
+            confirmLabel: "Remover e Aprovar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await removeModerationImagesBatch(item.id, toRemove, item.type as any, {
+                    autoApproveRemaining: true,
+                    reason: payload.reason || null,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success(`${toRemove.length} imagem(ns) removida(s) e ${typeLabel.toLowerCase()} aprovado!`)
+                    onBack()
+                    return { success: true }
+                }
+                return { success: false, error: result.error }
+            },
+        })
+    }
+
+    const handleBatchRemoveOnly = async () => {
+        const toRemove = Array.from(selectedToRemove).filter((u) => !removedImages.has(u))
+        if (toRemove.length === 0) return
+
+        await runAction({
+            title: `Remover ${toRemove.length} imagem(ns)`,
+            description: `Deseja remover as ${toRemove.length} imagem(ns) selecionada(s) do ${typeLabel.toLowerCase()}?`,
+            changedFields: [`${toRemove.length} imagem(ns) removida(s)`],
+            force: true,
+            confirmLabel: "Remover Imagens",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await removeModerationImagesBatch(item.id, toRemove, item.type as any, {
+                    autoApproveRemaining: false,
+                    reason: payload.reason || null,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success(`${toRemove.length} imagem(ns) removida(s) com sucesso!`)
+                    setRemovedImages((prev) => {
+                        const next = new Set(prev)
+                        toRemove.forEach((u) => next.add(u))
+                        return next
+                    })
+                    setSelectedToRemove(new Set())
                     loadTimeline()
                     return { success: true }
                 }
@@ -544,25 +641,46 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                     {/* Images Tab */}
                                     <TabsContent value="images" className="mt-0">
                                         <FadeIn key="images">
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between">
+                                            <div className="space-y-5">
+                                                <div className="flex items-center justify-between flex-wrap gap-3">
                                                     <div>
                                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                                                             Imagens do {typeLabel} ({visibleImages.length})
                                                         </h3>
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                            Clique em qualquer imagem para inspecioná-la em tela cheia e moderar.
+                                                            Clique nas imagens que deseja <strong className="text-brand-red">remover</strong> antes de aprovar.
                                                         </p>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        {item.moderation_status !== "approved" && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={handleApprove}
-                                                                className="bg-brand-green hover:bg-brand-green/90 text-white flex items-center gap-1.5 h-8 px-3 text-xs font-semibold"
-                                                            >
-                                                                <CheckCircleIcon size={14} /> Aprovar {typeLabel}
-                                                            </Button>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        {selectedToRemove.size > 0 ? (
+                                                            <>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={handleBatchRemoveOnly}
+                                                                    className="border-brand-red text-brand-red hover:bg-brand-red/10 text-xs font-semibold h-8"
+                                                                >
+                                                                    <TrashIcon size={14} /> Remover ({selectedToRemove.size})
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={handleBatchRemoveAndApprove}
+                                                                    disabled={visibleImages.length - selectedToRemove.size === 0}
+                                                                    className="bg-brand-green hover:bg-brand-green/90 text-white flex items-center gap-1.5 h-8 px-3 text-xs font-semibold"
+                                                                >
+                                                                    <CheckCircleIcon size={14} /> Remover ({selectedToRemove.size}) e Aprovar
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            item.moderation_status !== "approved" && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={handleApprove}
+                                                                    className="bg-brand-green hover:bg-brand-green/90 text-white flex items-center gap-1.5 h-8 px-3 text-xs font-semibold"
+                                                                >
+                                                                    <CheckCircleIcon size={14} /> Aprovar {typeLabel}
+                                                                </Button>
+                                                            )
                                                         )}
                                                         <Button
                                                             size="sm"
@@ -574,15 +692,76 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                         </Button>
                                                     </div>
                                                 </div>
-                                                <ProductImagesSection
-                                                    images={visibleImages}
-                                                    onImageUpload={() => { }}
-                                                    onRemoveImage={handleRemoveImageByIndex}
-                                                    onSetPrimaryImage={() => { }}
-                                                    isEditing={true}
-                                                    moderationStatus={item.moderation_status as any}
-                                                    onImageClick={openLightbox}
-                                                />
+
+                                                {/* Grid de seleção interativa */}
+                                                {visibleImages.length === 0 ? (
+                                                    <div className="p-8 text-center border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl">
+                                                        <p className="text-sm font-medium text-brand-inactive-text">
+                                                            Nenhuma imagem restante no {typeLabel.toLowerCase()}.
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                                        {visibleImages.map((imgUrl, idx) => {
+                                                            const isSelected = selectedToRemove.has(imgUrl)
+                                                            const isAiFlagged = isImageFlagged(imgUrl, flaggedByAi)
+                                                            const fullUrl = getR2ImageUrl(imgUrl)
+
+                                                            return (
+                                                                <div
+                                                                    key={imgUrl}
+                                                                    onClick={() => toggleSelectImage(imgUrl)}
+                                                                    className={`group relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-200 select-none ${isSelected
+                                                                            ? "ring-3 ring-brand-red border-2 border-brand-red shadow-lg shadow-brand-red/10 scale-[0.98]"
+                                                                            : "border border-brand-border dark:border-dark-border hover:border-brand-dark/50 dark:hover:border-white/50"
+                                                                        }`}
+                                                                >
+                                                                    <img
+                                                                        src={fullUrl}
+                                                                        alt={`Foto ${idx + 1}`}
+                                                                        className={`w-full h-full object-cover transition-transform duration-200 ${isSelected ? "opacity-40 grayscale-50 scale-95" : "group-hover:scale-105"
+                                                                            }`}
+                                                                        loading="lazy"
+                                                                    />
+
+                                                                    {isAiFlagged && (
+                                                                        <span className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-red text-white shadow-xs flex items-center gap-1">
+                                                                            <AlertTriangleIcon size={10} /> IA Flagged
+                                                                        </span>
+                                                                    )}
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            openLightbox(idx)
+                                                                        }}
+                                                                        className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                                                                        title="Ampliar foto"
+                                                                    >
+                                                                        <EyeIcon size={13} />
+                                                                    </button>
+
+                                                                    {isSelected ? (
+                                                                        <div className="absolute inset-0 bg-red-600/20 flex flex-col items-center justify-center gap-1 text-brand-red font-bold p-2 text-center">
+                                                                            <div className="w-8 h-8 rounded-full bg-brand-red text-white flex items-center justify-center shadow-md">
+                                                                                <TrashIcon size={16} />
+                                                                            </div>
+                                                                            <span className="text-[11px] uppercase tracking-wide bg-white/90 dark:bg-black/80 px-2 py-0.5 rounded font-black text-brand-red shadow-xs">
+                                                                                Remover
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between text-white text-[11px]">
+                                                                            <span>Foto #{idx + 1}</span>
+                                                                            <span className="text-white/80 text-[10px]">Clique p/ remover</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         </FadeIn>
                                     </TabsContent>

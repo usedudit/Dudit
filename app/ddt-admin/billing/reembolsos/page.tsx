@@ -13,7 +13,7 @@ export default async function AdminBillingRefundsPage() {
 
     return (
         <>
-            <AdminHeader pageTitle="Solicitacoes de Reembolso" />
+            <AdminHeader pageTitle="Solicitações de Reembolso" />
             <RefundsList
                 initialData={initialData}
                 initialStats={initialStats}

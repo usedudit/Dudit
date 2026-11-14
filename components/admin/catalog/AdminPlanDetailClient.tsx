@@ -39,7 +39,7 @@ export default function AdminPlanDetailClient({
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { modal: actionModal, runAction } = useAdminActionModal()
 
-    const handleBack = () => router.push("/ddt-admin/moderation")
+    const handleBack = () => router.push("/ddt-admin/catalog/plans")
 
     const handleSave = async (payload: any): Promise<{ success?: boolean; error?: string; cancelled?: boolean } | void> => {
         const changedFields = diffChangedFields(plan, payload)

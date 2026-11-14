@@ -69,6 +69,16 @@ export enum AdminActionType {
     // Returns (admin editing seller return requests)
     RETURN_UPDATE = "return.update",
 
+    // Service Orders (admin editing seller service orders)
+    SERVICE_ORDER_UPDATE = "service_order.update",
+
+    // Quotes (admin editing seller quotes)
+    QUOTE_UPDATE = "quote.update",
+
+    // Promotions & Community Videos
+    PROMOTION_UPDATE = "promotion.update",
+    COMMUNITY_VIDEO_UPDATE = "community_video.update",
+
     // Catalog admin editing (admin acting on seller catalog)
     CATALOG_PRODUCT_UPDATE = "catalog.product_update",
     CATALOG_PRODUCT_CREATE = "catalog.product_create",
@@ -124,6 +134,9 @@ export type AuditTargetType =
     | "marketplace_synonym_term"
     | "community_video"
     | "collection"
+    | "service_order"
+    | "quote"
+    | "promotion"
 
 export interface AdminAuditLogEntry {
     adminUserId: string
@@ -375,5 +388,9 @@ export interface AdminDashboardStats {
     pendingModeration: number
     bannedUsers: number
     activeSubscriptions: number
+    pendingReports?: number
+    pendingReturns?: number
+    openServiceOrders?: number
+    openQuotes?: number
     recentAuditLogs: AuditLogRow[]
 }

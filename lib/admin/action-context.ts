@@ -29,7 +29,7 @@ type ApplyAdminActionContextParams = {
     partnerId?: string | null
     /** Loja do item. Se null, usa a loja sede do parceiro; sem loja, o parceiro. */
     storeId?: string | null
-    targetType: "product" | "service" | "recurring_plan" | "order" | "return_request"
+    targetType: "product" | "service" | "recurring_plan" | "order" | "return_request" | "service_order" | "quote" | "community_video" | "promotion"
     targetId: string
     /** Título da notificação enviada ao vendedor. */
     actionTitle: string

@@ -13,14 +13,14 @@ export default async function AdminBillingPage() {
     const user = await getCurrentUser()
     const supabase = await createClient()
     const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", user?.id)
-        .single()
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", user?.id)
+        .maybeSingle()
 
     const userProfile = profile ? {
         fullName: profile.full_name || "Admin",
-        email: profile.email || "",
+        email: user?.email || "",
         initials: profile.full_name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) || "A",
         avatarColor: "bg-brand-green"
     } : undefined
