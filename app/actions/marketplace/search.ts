@@ -340,26 +340,27 @@ export const searchMarketplaceDirectFull = cache(async (
         radius?: number;
         latitude?: number;
         longitude?: number;
+        centerCoords?: { lat: number; lng: number } | null;
         section?: string;
     } = {}
 ) => {
     const isCity = limits.cidade && limits.cidade !== "brasil" && !limits.cidade.startsWith("estado-")
     const shouldFetchDistant = isCity && !limits.cursor && !limits.lastId && query && query.trim() !== ""
 
-    // Coordenadas conhecidas sem rede (repassadoras pelo cliente) - usadas direto quando possível.
-    const immediateCoords = limits.latitude && limits.longitude
+    // Coordenadas conhecidas sem rede (repassadoras pelo cliente ou coordenadas de cidade já resolvidas)
+    const immediateCoords = limits.centerCoords || (limits.latitude && limits.longitude
         ? { lat: limits.latitude, lng: limits.longitude }
-        : null
+        : null)
 
     // Sessão/coords só são obrigatórias antes da busca quando há filtro de raio
     // (o cálculo de distância usa o resultado ao final, não o início).
     const sessionCoordsPromise = (async () => {
+        if (immediateCoords) return immediateCoords
         const user = await getCurrentUser()
         const sessionData = user ? await getUserSessionData(user.id) : null
         if (sessionData?.profile?.latitude && sessionData?.profile?.longitude) {
             return { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
         }
-        if (immediateCoords) return immediateCoords
         if (limits.cidade) return await resolveCityCoordsFromSlug(limits.cidade)
         return null
     })()
@@ -396,7 +397,7 @@ export const searchMarketplaceDirectFull = cache(async (
         localScopePromise,
     ])
 
-    const localResults = (localRes.results || []).filter((item) =>
+    const localResults = (localRes.results || []).filter((item: any) =>
         isItemWithinSearchScope(item, {
             city: localScopeCity?.city ?? null,
             state: localScopeCity?.state ?? null,
@@ -411,16 +412,16 @@ export const searchMarketplaceDirectFull = cache(async (
     let moreDistantItems: any[] = []
 
     if (shouldFetchDistant && distantRes.results && distantRes.results.length > 0) {
-        const localIds = new Set(localResults.map(r => `${r.itemType}:${r.id}`))
-        const distantFiltered = distantRes.results.filter(r => !localIds.has(`${r.itemType}:${r.id}`))
+        const localIds = new Set(localResults.map((r: any) => `${r.itemType}:${r.id}`))
+        const distantFiltered = distantRes.results.filter((r: any) => !localIds.has(`${r.itemType}:${r.id}`))
 
         const enrichedDistant = enrichMarketplaceDistance(distantFiltered, finalCoords)
 
         moreDistantSellers = sortDistantByRankAndDistance(
-            enrichedDistant.filter(r => r.itemType === 'loja')
+            enrichedDistant.filter((r: any) => r.itemType === 'loja')
         ).slice(0, 20)
         moreDistantItems = sortDistantByRankAndDistance(
-            enrichedDistant.filter(r => r.itemType !== 'loja')
+            enrichedDistant.filter((r: any) => r.itemType !== 'loja')
         ).slice(0, 20)
     }
 

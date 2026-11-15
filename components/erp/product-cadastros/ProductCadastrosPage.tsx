@@ -294,8 +294,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button onClick={handleAdd} disabled={!!planGate} className="w-full">
-                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                        <Button onClick={handleAdd} disabled={!!planGate} className="w-full" leftIcon={<PlusIcon size={18} />}>
                             {getAddButtonLabel()}
                         </Button>
 

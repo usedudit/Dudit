@@ -72,9 +72,10 @@ interface VitrineCardProps {
     userCoords?: { lat: number; lng: number } | null
     preferCityLabel?: boolean
     locationOnly?: boolean
+    priority?: boolean
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null, preferCityLabel = false, locationOnly = false }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null, preferCityLabel = false, locationOnly = false, priority = false }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -89,7 +90,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const fallbackBanner = hasPartnerLogo
         ? getDefaultBannerSeeded(vitrine.id || storeName)
         : getBannerUrlByColor(getAvatarColor(storeName))
-    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "large") : fallbackBanner
+    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "medium") : fallbackBanner
     const city = vitrine.city || ""
     const state = vitrine.state || ""
     const category = vitrine.category || null
@@ -158,8 +159,9 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                     src={bannerImage}
                     alt={storeName}
                     className="w-full h-full object-cover object-center transition-transform duration-500"
-                    loading="lazy"
-                    decoding="async"
+                    loading={priority ? "eager" : "lazy"}
+                    decoding={priority ? "sync" : "async"}
+                    fetchPriority={priority ? "high" : "auto"}
                 />
                 <div className="absolute inset-0" />
             </div>
@@ -345,11 +347,48 @@ interface ItemCardProps {
     locationContext?: LocationContext | null
     preferCityLabel?: boolean
     locationOnly?: boolean
+    priority?: boolean
 }
 
 // Simple client-side cache for partner promotions to avoid redundant network requests
 const promotionsCache: Record<string, Promise<any[]>> = {}
 const promotionsValueCache: Record<string, any[]> = {}
+
+// Isolamento do botão de favorito em componente folha para evitar re-render dos cards
+interface CardFavoriteButtonProps {
+    productId: string
+    itemType: "produto" | "servico"
+    partnerUserId?: string | null
+}
+
+const CardFavoriteButton = memo(({ productId, itemType, partnerUserId }: CardFavoriteButtonProps) => {
+    const { user } = useSupabase()
+    const router = useRouter()
+    const { isFavorited, toggleFavorite } = useFavorites()
+    const isOwner = !!(user && partnerUserId && user.id === partnerUserId)
+    const favorited = isFavorited(productId, itemType)
+
+    const handleFavoriteClick = useCallback(async (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isOwner) return
+        if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
+        await toggleFavorite(productId, itemType)
+    }, [user, router, toggleFavorite, productId, itemType, isOwner])
+
+    return (
+        <button
+            onClick={handleFavoriteClick}
+            className={`absolute top-2 right-2 z-10 transition-opacity w-8 h-8 rounded-full flex items-center justify-center
+                ${favorited ? "opacity-100 bg-white dark:bg-dark-border" : "opacity-0 group-hover/card:opacity-100 bg-white/90 hover:bg-white dark:bg-dark-border/90 dark:hover:bg-dark-border"}`}
+            aria-label={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            title={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+        >
+            <HeartIcon size={16}
+                className={`transition-colors duration-200 ${favorited ? "text-brand-green fill-brand-green" : "text-brand-green"}`} />
+        </button>
+    )
+})
 
 // Todos os cards montados no mesmo commit pedem promoções ao mesmo tempo; em vez de
 // uma Server Action por parceiro (N POSTs concorrentes na abertura da busca), agrupamos
@@ -391,26 +430,13 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null, preferCityLabel = false, locationOnly = false }) => {
-    const { user } = useSupabase()
-    const router = useRouter()
-    const { isFavorited, toggleFavorite } = useFavorites()
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null, preferCityLabel = false, locationOnly = false, priority = false }) => {
     const imageUrl = getPrimaryProductDisplayImage(product, "medium")
     const rawDistance = product.partners?.distance_km_formatted || null
     const distance = rawDistance && !rawDistance.includes("Infinity") ? rawDistance : null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
     const partnerUserId = (partner as any)?.user_id
-    const isOwner = !!(user && partnerUserId && user.id === partnerUserId)
     const itemType = (product as any).itemType === "plano" ? "plano" : ((product as any).itemType === "servico" ? "servico" : "produto")
-    const favorited = itemType !== "plano" ? isFavorited(product.id, itemType) : false
-    const handleFavoriteClick = useCallback(async (e: React.MouseEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        if (isOwner) return
-        if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
-        if (itemType === "plano") return
-        await toggleFavorite(product.id, itemType as "produto" | "servico")
-    }, [user, router, toggleFavorite, product.id, itemType, isOwner])
 
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage, "thumb") : null
@@ -587,8 +613,9 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         src={imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
                         alt={product.name}
                         className="w-full h-full object-cover transition-transform duration-500"
-                        loading="lazy"
-                        decoding="async"
+                        loading={priority ? "eager" : "lazy"}
+                        decoding={priority ? "sync" : "async"}
+                        fetchPriority={priority ? "high" : "auto"}
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
@@ -625,16 +652,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         )}
                     </div>
                     {itemType !== "plano" && (
-                        <button
-                            onClick={handleFavoriteClick}
-                            className={`absolute top-2 right-2 z-10 transition-opacity w-8 h-8 rounded-full flex items-center justify-center
-                                ${favorited ? "opacity-100 bg-white dark:bg-dark-border" : "opacity-0 group-hover/card:opacity-100 bg-white/90 hover:bg-white dark:bg-dark-border/90 dark:hover:bg-dark-border"}`}
-                            aria-label={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                            title={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                        >
-                            <HeartIcon size={16}
-                                className={`transition-colors duration-200 ${favorited ? "text-brand-green fill-brand-green" : "text-brand-green"}`} />
-                        </button>
+                        <CardFavoriteButton productId={product.id} itemType={itemType} partnerUserId={partnerUserId} />
                     )}
                 </div>
 

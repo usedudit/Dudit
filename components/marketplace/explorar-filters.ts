@@ -58,7 +58,7 @@ export const DISTANCE_OPTIONS: { value: number; label: string }[] = [
     { value: 2, label: "Até 2 km" },
     { value: 5, label: "Até 5 km" },
     { value: 10, label: "Até 10 km" },
-    { value: 25, label: "Até 25 km" },
+    { value: 20, label: "Até 20 km" },
 ]
 
 export const CONDITION_OPTIONS: { value: string; label: string }[] = [

@@ -78,43 +78,43 @@ export default function AutonomosEPrestadoresSegmentPage() {
             }
             description="Crie sua vitrine de serviços, envie orçamentos em PDF, organize a agenda e acompanhe seus clientes. Na Dudit, o valor do serviço é seu."
             heroMockup={
-                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm space-y-4">
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-dark-border">
                             <div>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase">Orçamento</span>
-                                <h3 className="font-bold text-brand-dark text-lg">Pintura Residencial</h3>
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase">Orçamento</span>
+                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-lg">Pintura Residencial</h3>
                             </div>
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
                                 Aprovado
                             </span>
                         </div>
 
                         <div className="space-y-2 text-xs">
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Cliente:</span>
-                                <strong className="text-brand-dark">Mariana Costa</strong>
+                                <strong className="text-brand-dark dark:text-dark-heading">Mariana Costa</strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Serviço:</span>
-                                <span className="text-brand-dark font-medium">2 quartos + sala</span>
+                                <span className="text-brand-dark dark:text-dark-heading font-medium">2 quartos + sala</span>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Prazo:</span>
-                                <span className="text-brand-dark font-medium">4 dias úteis</span>
+                                <span className="text-brand-dark dark:text-dark-heading font-medium">4 dias úteis</span>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Pagamento:</span>
-                                <span className="text-brand-dark font-medium">50% na aprovação</span>
+                                <span className="text-brand-dark dark:text-dark-heading font-medium">50% na aprovação</span>
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
+                        <div className="pt-4 border-t border-gray-100 dark:border-dark-border flex justify-between items-center">
                             <div>
-                                <span className="text-[10px] text-gray-400 block">Valor do serviço</span>
-                                <strong className="text-base text-brand-dark font-extrabold">R$ 1.850,00</strong>
+                                <span className="text-[10px] text-gray-400 dark:text-dark-body block">Valor do serviço</span>
+                                <strong className="text-base text-brand-dark dark:text-dark-heading font-extrabold">R$ 1.850,00</strong>
                             </div>
-                            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium flex items-center gap-1">
+                            <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-medium flex items-center gap-1">
                                 <Send className="w-3 h-3" /> Enviado
                             </span>
                         </div>
@@ -132,23 +132,23 @@ export default function AutonomosEPrestadoresSegmentPage() {
                         description:
                             "Cadastre seus serviços, fotos, preços e formas de atendimento. Compartilhe um link único na bio do Instagram e no WhatsApp para clientes da sua cidade e de todo o Brasil.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex items-center gap-3 mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex items-center gap-3 mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <div className="w-9 h-9 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
                                         <UserIcon size={16} />
                                     </div>
                                     <div>
-                                        <div className="text-[10px] font-bold text-brand-dark">Seu Perfil Profissional</div>
+                                        <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Seu Perfil Profissional</div>
                                         <div className="text-[8px] text-brand-inactive-text">dudit.com.br/seuperfil</div>
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-dark">Pintura residencial</span>
+                                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Pintura residencial</span>
                                         <span className="text-[9px] font-bold text-brand-green">A partir de R$ 800</span>
                                     </div>
-                                    <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-dark">Pequenos reparos</span>
+                                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Pequenos reparos</span>
                                         <span className="text-[9px] font-bold text-brand-green">Sob orçamento</span>
                                     </div>
                                 </div>
@@ -161,18 +161,18 @@ export default function AutonomosEPrestadoresSegmentPage() {
                         description:
                             "Monte o orçamento com itens, fotos e condições, gere o PDF e envie pelo WhatsApp. O cliente aprova pelo link e você acompanha cada status.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs relative overflow-hidden">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs relative overflow-hidden">
                                 <div className="absolute top-0 right-0 bg-brand-dark text-white text-[8px] px-2 py-1 rounded-bl-lg">PDF</div>
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="w-6 h-6 bg-brand-green/10 rounded flex items-center justify-center text-brand-green">
                                         <FileTextIcon size={12} />
                                     </div>
-                                    <span className="text-[10px] font-bold text-brand-dark">Proposta Comercial</span>
+                                    <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Proposta Comercial</span>
                                 </div>
                                 <div className="space-y-1 mb-3">
-                                    <div className="h-1.5 w-full bg-brand-gray rounded-full"></div>
-                                    <div className="h-1.5 w-3/4 bg-brand-gray rounded-full"></div>
-                                    <div className="h-1.5 w-1/2 bg-brand-gray rounded-full"></div>
+                                    <div className="h-1.5 w-full bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
+                                    <div className="h-1.5 w-3/4 bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
+                                    <div className="h-1.5 w-1/2 bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
                                 </div>
                                 <div className="bg-brand-green text-white text-[9px] font-bold py-1.5 rounded text-center">
                                     Enviar por WhatsApp
@@ -186,23 +186,23 @@ export default function AutonomosEPrestadoresSegmentPage() {
                         description:
                             "Os agendamentos entram direto na sua agenda, com o serviço, o cliente e o horário. O histórico fica salvo para você acompanhar cada atendimento.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda de hoje</span>
                                     <CalendarIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                                        <div className="text-[10px] font-bold text-blue-700">09:00</div>
+                                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/40 p-2 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                                        <div className="text-[10px] font-bold text-blue-700 dark:text-blue-300">09:00</div>
                                         <div className="flex-1">
-                                            <div className="text-[10px] font-bold text-gray-900">Pintura - Sala</div>
-                                            <div className="text-[8px] text-gray-500">Cliente: Mariana</div>
+                                            <div className="text-[10px] font-bold text-gray-900 dark:text-dark-heading">Pintura - Sala</div>
+                                            <div className="text-[8px] text-gray-500 dark:text-dark-body">Cliente: Mariana</div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 bg-brand-gray p-2 rounded-lg border border-brand-border">
+                                    <div className="flex items-center gap-3 bg-brand-gray dark:bg-dark-border/40 p-2 rounded-lg border border-brand-border">
                                         <div className="text-[10px] font-bold text-brand-inactive-text">14:00</div>
                                         <div className="flex-1">
-                                            <div className="text-[10px] font-bold text-brand-dark">Reparo hidráulico</div>
+                                            <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Reparo hidráulico</div>
                                             <div className="text-[8px] text-brand-green font-bold">Confirmado</div>
                                         </div>
                                     </div>

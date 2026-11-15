@@ -56,19 +56,19 @@ const SegmentMockup = ({ type }: { type: string }) => {
   switch (type) {
     case 'confectionery':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-brand-gray">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
             <div className="w-6 h-6 bg-brand-green rounded-full flex items-center justify-center text-white">
               <PhoneIcon size={12} color="white" />
             </div>
             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">WhatsApp</span>
           </div>
-          <div className="bg-brand-gray p-2 rounded-lg mb-3">
+          <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded-lg mb-3">
             <p className="text-[10px] text-brand-inactive-text italic">"Quero encomendar um bolo de pote para amanhã!"</p>
           </div>
           <div className="flex justify-between items-center">
             <div>
-              <div className="text-[10px] font-bold text-brand-dark">Bolo de Pote</div>
+              <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Bolo de Pote</div>
               <div className="text-[12px] font-bold text-brand-green">R$ 15,00</div>
             </div>
             <div className="bg-brand-green text-white text-[8px] font-bold px-2 py-1 rounded">PAGO</div>
@@ -77,20 +77,20 @@ const SegmentMockup = ({ type }: { type: string }) => {
       );
     case 'beauty':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
           <div className="flex justify-between items-center mb-3">
             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
             <ClockIcon size={12} className="text-brand-inactive-text" />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center gap-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
-              <div className="text-[10px] font-bold text-blue-700">14:00</div>
+            <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/40 p-2 rounded-lg border border-blue-100 dark:border-blue-900/50">
+              <div className="text-[10px] font-bold text-blue-700 dark:text-blue-300">14:00</div>
               <div className="flex-1">
-                <div className="text-[10px] font-bold text-gray-900">Corte Masculino</div>
-                <div className="text-[8px] text-gray-500">Cliente: Marcos</div>
+                <div className="text-[10px] font-bold text-gray-900 dark:text-dark-heading">Corte Masculino</div>
+                <div className="text-[8px] text-gray-500 dark:text-dark-body">Cliente: Marcos</div>
               </div>
             </div>
-            <div className="flex items-center gap-3 bg-brand-gray p-2 rounded-lg border border-brand-border opacity-50">
+            <div className="flex items-center gap-3 bg-brand-gray dark:bg-dark-border/40 p-2 rounded-lg border border-brand-border opacity-50">
               <div className="text-[10px] font-bold text-brand-inactive-text">15:00</div>
               <div className="flex-1">
                 <div className="text-[10px] font-bold text-brand-inactive-text">Barba</div>
@@ -101,45 +101,45 @@ const SegmentMockup = ({ type }: { type: string }) => {
       );
     case 'technical':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
           <div className="flex justify-between items-center mb-3">
             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ordem de Serviço</span>
             <FileIcon size={12} className="text-brand-inactive-text" />
           </div>
           <div className="border-2 border-dashed border-brand-border rounded-lg p-3">
-            <div className="text-[10px] font-bold text-brand-dark mb-1">OS #1284</div>
+            <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading mb-1">OS #1284</div>
             <div className="text-[8px] text-brand-inactive-text mb-3">Troca de Óleo + Filtro</div>
             <div className="flex justify-between items-center">
-              <div className="text-[10px] font-bold text-brand-dark">R$ 250,00</div>
-              <div className="bg-brand-orange-light text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
+              <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 250,00</div>
+              <div className="bg-brand-orange-light dark:bg-brand-orange/20 text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
             </div>
           </div>
         </div>
       );
     case 'assistance':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
           <div className="flex justify-between items-center mb-3">
             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ordem de Serviço</span>
             <FileIcon size={12} className="text-brand-inactive-text" />
           </div>
           <div className="border-2 border-dashed border-brand-border rounded-lg p-3">
-            <div className="text-[10px] font-bold text-brand-dark mb-1">OS #1284</div>
+            <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading mb-1">OS #1284</div>
             <div className="text-[8px] text-brand-inactive-text mb-3">Troca de tela - iPhone 12</div>
             <div className="flex justify-between items-center">
-              <div className="text-[10px] font-bold text-brand-dark">R$ 380,00</div>
-              <div className="bg-brand-orange-light text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
+              <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 380,00</div>
+              <div className="bg-brand-orange-light dark:bg-brand-orange/20 text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
             </div>
           </div>
         </div>
       );
     case 'fashion':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
           <div className="flex gap-3 mb-3">
-            <div className="w-12 h-12 bg-brand-gray rounded-lg"></div>
+            <div className="w-12 h-12 bg-brand-gray dark:bg-dark-border/40 rounded-lg"></div>
             <div className="flex-1">
-              <div className="text-[10px] font-bold text-brand-dark">Camiseta Básica</div>
+              <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Camiseta Básica</div>
               <div className="text-[12px] font-bold text-brand-green">R$ 59,90</div>
             </div>
           </div>
@@ -156,31 +156,31 @@ const SegmentMockup = ({ type }: { type: string }) => {
       );
     case 'freelance':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border relative overflow-hidden">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border relative overflow-hidden">
           <div className="absolute top-0 right-0 bg-brand-dark text-white text-[8px] px-2 py-1 rounded-bl-lg">PDF</div>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-6 h-6 bg-brand-green/10 rounded flex items-center justify-center text-brand-green">
               <FileIcon size={12} />
             </div>
-            <span className="text-[10px] font-bold text-brand-dark">Orçamento Profissional</span>
+            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Orçamento Profissional</span>
           </div>
           <div className="space-y-1 mb-4">
-            <div className="h-1.5 w-full bg-brand-gray rounded-full"></div>
-            <div className="h-1.5 w-3/4 bg-brand-gray rounded-full"></div>
-            <div className="h-1.5 w-1/2 bg-brand-gray rounded-full"></div>
+            <div className="h-1.5 w-full bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
+            <div className="h-1.5 w-3/4 bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
+            <div className="h-1.5 w-1/2 bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
           </div>
           <Button variant="default" className="w-full py-1.5 text-[8px] h-auto bg-brand-green text-white">Enviar por WhatsApp</Button>
         </div>
       );
     case 'home':
       return (
-        <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
+        <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
           <div className="flex justify-between items-center mb-3">
             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Serviço Residencial</span>
             <CheckCircleIcon size={12} className="text-brand-green" />
           </div>
-          <div className="bg-brand-gray p-2.5 rounded-lg mb-2">
-            <div className="text-[10px] font-bold text-brand-dark">Instalação Elétrica</div>
+          <div className="bg-brand-gray dark:bg-dark-border/40 p-2.5 rounded-lg mb-2">
+            <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Instalação Elétrica</div>
             <div className="text-[8px] text-brand-inactive-text">Atendimento local e nacional</div>
           </div>
           <div className="flex justify-between items-center text-[8px]">
@@ -194,7 +194,7 @@ const SegmentMockup = ({ type }: { type: string }) => {
 };
 
 const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
-  <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+  <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
     <GridLines />
     <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
       <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -203,7 +203,7 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-5xl font-bold text-brand-dark mb-6">
+          <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
             Produtos, serviços e negócios de todos os tipos.
           </h1>
           <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
@@ -229,7 +229,7 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
             />
           </div>
 
-          <div className="absolute inset-0 bg-brand-gray/50 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
+          <div className="absolute inset-0 bg-brand-gray/50 dark:bg-dark-border/30 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
           <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10"></div>
         </motion.div>
       </div>
@@ -238,7 +238,7 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
 );
 
 const SegmentsGrid = () => (
-  <section className="py-24 bg-white relative border-t border-brand-border">
+  <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
     <GridLines />
     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
       <SectionHeader
@@ -259,12 +259,12 @@ const SegmentsGrid = () => (
             transition={{ delay: idx * 0.1 }}
           >
             <Link href={segment.href} className="group block h-full">
-              <div className="bg-brand-gray border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6 group-hover:border-brand-green/40 transition-colors">
+              <div className="bg-brand-gray dark:bg-dark-border/40 border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6 group-hover:border-brand-green/40 transition-colors">
                 <SegmentMockup type={segment.type} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xl font-bold text-brand-dark hover:text-brand-green transition-colors">{segment.title}</h4>
+                  <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors">{segment.title}</h4>
                 </div>
                 <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
               </div>
@@ -292,7 +292,7 @@ export default function SegmentsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-dark-surface">
       <Navbar onNavigate={onNavigate} />
       <main>
         <SegmentsHero onNavigate={onNavigate} />

@@ -81,7 +81,7 @@ export default function CalculadoraMargemLucroPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqLd) }}
@@ -100,7 +100,7 @@ export default function CalculadoraMargemLucroPage() {
                     description="Calcule o preço de venda ideal pelo markup divisor para nunca mais ter prejuízo nas suas vendas."
                 />
 
-                <section className="py-24 bg-white relative border-t border-brand-border">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -111,10 +111,10 @@ export default function CalculadoraMargemLucroPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
+                                <Card className="bg-white dark:bg-dark-surface border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
-                                            <h2 className="text-xl font-bold text-brand-dark">Custos e despesas</h2>
+                                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Custos e despesas</h2>
                                             <p className="text-sm text-brand-inactive-text mt-1">
                                                 Informe o custo do item e quanto a venda consome em impostos e despesas.
                                             </p>
@@ -187,7 +187,7 @@ export default function CalculadoraMargemLucroPage() {
                                             <p className="text-4xl font-bold text-brand-green mt-1">
                                                 {formatBRL(precoVendaCalculado)}
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-2">
+                                            <p className="text-xs text-gray-400 dark:text-dark-body mt-2">
                                                 Markup de <span className="font-semibold text-white">{markupMultiplicador.toFixed(2)}x</span> sobre o custo
                                             </p>
                                         </div>
@@ -218,7 +218,7 @@ export default function CalculadoraMargemLucroPage() {
                                                     <ArrowRight className="w-4 h-4" />
                                                 </Link>
                                             </Button>
-                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                            <p className="text-center text-xs text-gray-400 dark:text-dark-body mt-3">
                                                 Controle de estoque, vendas no PDV e catálogo online gratuito
                                             </p>
                                         </div>

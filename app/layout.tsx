@@ -253,7 +253,7 @@ export default async function RootLayout({
         return (
             <html lang="pt-BR" suppressHydrationWarning className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>
                 <head>
-                    <title>Conta Suspensa | Dudit</title>
+                    <title>Conta Suspensa</title>
                     <meta name="robots" content="noindex, nofollow" />
                 </head>
                 <body className="font-sans">

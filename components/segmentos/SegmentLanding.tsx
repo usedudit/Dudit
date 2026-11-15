@@ -86,7 +86,7 @@ export default function SegmentLanding({
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schema) }}
@@ -95,9 +95,9 @@ export default function SegmentLanding({
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+                <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+                    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid lg:grid-cols-2 gap-12 items-center">
                             <motion.div
                                 initial={{ opacity: 0, y: 30 }}
@@ -108,7 +108,7 @@ export default function SegmentLanding({
                                     {badge.text}
                                 </Badge>
 
-                                <h1 className="text-5xl font-bold text-brand-dark mb-6 leading-tight">
+                                <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6 leading-tight">
                                     {title}
                                 </h1>
 
@@ -144,9 +144,9 @@ export default function SegmentLanding({
                     </div>
                 </section>
 
-                <section className="py-24 bg-white relative border-t border-gray-100">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <SectionHeader subtitle={features.subtitle} title={features.title} />
                         <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
                             {features.lead}
@@ -162,14 +162,14 @@ export default function SegmentLanding({
                                     viewport={{ once: true }}
                                     className="group flex flex-col justify-between"
                                 >
-                                    <div className="bg-brand-slate border border-gray-100 h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
+                                    <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
                                         {feature.mockup}
                                     </div>
                                     <div className="pt-5">
                                         <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block mb-1">
                                             {feature.label}
                                         </span>
-                                        <h4 className="text-lg font-bold text-brand-dark mb-1">
+                                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
                                             {feature.title}
                                         </h4>
                                         <p className="text-brand-inactive-text text-sm leading-relaxed">
@@ -182,9 +182,9 @@ export default function SegmentLanding({
                     </div>
                 </section>
 
-                <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
+                <section className="relative py-24 bg-white dark:bg-dark-surface overflow-hidden border-t border-gray-100 dark:border-dark-border">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <SectionHeader subtitle={benefits.subtitle} title={benefits.title} />
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mt-8">
@@ -201,7 +201,7 @@ export default function SegmentLanding({
                                         <div className="w-10 h-10 bg-brand-dark rounded-full flex items-center justify-center shrink-0">
                                             {item.icon}
                                         </div>
-                                        <h4 className="text-lg font-bold text-brand-dark">{item.title}</h4>
+                                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{item.title}</h4>
                                     </div>
                                     <p className="text-brand-inactive-text text-sm leading-relaxed">
                                         {item.description}

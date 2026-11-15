@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     if (!isValidCitySlug(cidadeUf)) {
         return {
-            title: "Página não encontrada | Dudit",
+            title: "Página não encontrada",
             robots: { index: false, follow: false },
         }
     }

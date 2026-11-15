@@ -1,8 +1,10 @@
-export type CanonicalPaymentType = "pix" | "credit_card" | "debit_card" | "cash" | "other" | "bank_transfer" | "store_credit" | "vale_compra" | "vale-compra"
+export type CanonicalPaymentType = "pix" | "credit_card" | "debit_card" | "cash" | "other" | "bank_transfer" | "store_credit" | "vale_compra" | "vale-compra" | "subscription_credits"
 
 export function toCanonicalPaymentType(value: string | null | undefined): CanonicalPaymentType {
   const raw = String(value || "").trim().toLowerCase()
   if (raw === "pix") return "pix"
+  if (raw.includes("assinatura") || raw.includes("subscription")) return "subscription_credits"
+  if (isStoreCreditMethod(raw)) return "store_credit"
   if (["credit_card", "credito", "cartao_credito", "cartão", "cartao", "cartão de crédito", "cartao de credito", "credit", "card"].includes(raw)) return "credit_card"
   if (["debit_card", "debito", "cartao_debito", "cartão de débito", "cartao de debito", "debit"].includes(raw)) return "debit_card"
   if (["cash", "dinheiro"].includes(raw)) return "cash"
@@ -53,13 +55,23 @@ export function isStoreCreditMethod(value?: string | null): boolean {
     raw.includes("crédito de loja") ||
     raw.includes("credito de loja") ||
     raw.includes("crédito do cliente") ||
-    raw.includes("credito do cliente")
+    raw.includes("credito do cliente") ||
+    raw.includes("crédito de cliente") ||
+    raw.includes("credito de cliente") ||
+    raw.includes("crédito cliente") ||
+    raw.includes("credito cliente")
   )
 }
 
 export function formatPaymentMethodLabel(value?: string | null): string {
   const normalized = String(value || "").trim().toLowerCase()
   if (!normalized || normalized === "pendente" || normalized === "método não definido") return "Método não definido"
+  if (normalized.includes("assinatura") || normalized.includes("subscription")) return "Assinatura (Créditos)"
+  if (isStoreCreditMethod(normalized)) {
+    if (normalized.includes("vale-compra") || normalized.includes("vale_compra") || normalized.includes("vale compra")) return "Vale-compra"
+    if (normalized === "exchange" || normalized.includes("crédito de troca") || normalized.includes("credito de troca")) return "Crédito de troca"
+    return "Crédito do cliente"
+  }
   if (normalized === "cash" || normalized === "dinheiro" || normalized === "money") return "Dinheiro"
   if (normalized === "pix") return "Pix"
   if (normalized === "credito" || normalized === "credit_card" || normalized === "cartao_credito") return "Cartão de Crédito"

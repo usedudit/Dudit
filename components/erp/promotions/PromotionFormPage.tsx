@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon, GiftIcon } from "@/lib/icons"
@@ -19,6 +19,7 @@ import SelectPromotionCategoriesSheet from "./SelectPromotionCategoriesSheet"
 import SelectPromotionServicesSheet from "./SelectPromotionServicesSheet"
 import SelectPromotionGiftSheet from "./SelectPromotionGiftSheet"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import CampaignMetricsTab from "./CampaignMetricsTab"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -165,6 +166,12 @@ export default function PromotionFormPage({
         const activeStores = (scopeData.stores || []).filter((s: any) => s.isActive)
         return activeStores.length > 0 ? activeStores[0].id : null
     }, [storeId, scopeData.stores])
+
+    const campaignPromotions = useMemo(() => {
+        const targetId = campaign?.id || createdCampaignId
+        if (!targetId) return []
+        return promotions.filter((p: any) => p.campaign_id === targetId)
+    }, [campaign?.id, createdCampaignId, promotions])
 
 
 
@@ -1198,6 +1205,13 @@ export default function PromotionFormPage({
                                             Regra de promoção
                                             {getTabErrorCount("rules") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
+                                        {(campaign?.id || createdCampaignId) && (
+                                            <TabsTrigger value="metrics">
+                                                <span className="inline-flex items-center gap-2">
+                                                    Métricas
+                                                </span>
+                                            </TabsTrigger>
+                                        )}
                                     </TabsList>
                                 </div>
 
@@ -1687,6 +1701,18 @@ export default function PromotionFormPage({
                                                 </div>
                                             )}
                                         </div>
+                                    </FadeIn>
+                                )}
+
+                                {/* Metrics Tab */}
+                                {activeTab === "metrics" && (campaign?.id || createdCampaignId) && (
+                                    <FadeIn key="metrics" className="block">
+                                        <CampaignMetricsTab
+                                            campaign={campaign || { id: createdCampaignId, name: campName, starts_at: campStarts, ends_at: campEnds, is_active: campActive }}
+                                            promotions={campaignPromotions}
+                                            partnerId={partnerId}
+                                            scopeData={scopeData}
+                                        />
                                     </FadeIn>
                                 )}
                             </AnimatePresence>

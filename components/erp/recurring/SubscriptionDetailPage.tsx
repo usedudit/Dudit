@@ -1092,9 +1092,6 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                               description={
                                 credit.quantity > 0 ? (
                                   <>
-                                    {credit.expiresAt
-                                      ? `Válido até ${formatFullDate(credit.expiresAt)}`
-                                      : "Sem validade"}
                                     {` • ${credit.consumed} consumidos`}
                                   </>
                                 ) : (
@@ -1328,11 +1325,11 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
             preselectedClient={
               detail?.customer
                 ? {
-                    id: detail.customer.id,
-                    name: detail.customer.name,
-                    phone: detail.customer.phone,
-                    email: detail.customer.email,
-                  }
+                  id: detail.customer.id,
+                  name: detail.customer.name,
+                  phone: detail.customer.phone,
+                  email: detail.customer.email,
+                }
                 : null
             }
             allowedOrderServices={[
@@ -1381,7 +1378,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                           alt={credit.itemName}
                           loading="lazy"
                           decoding="async"
-                          className="w-12 h-12 rounded-xl object-cover border border-brand-border dark:border-dark-border shrink-0"
+                          className="w-12 h-12 rounded-full object-cover border border-brand-border dark:border-dark-border shrink-0"
                           onError={(e) => {
                             e.currentTarget.src = PLACEHOLDER_IMAGE
                           }}
@@ -1392,7 +1389,6 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                           </p>
                           <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
                             {credit.remaining} crédito(s) disponível(is)
-                            {credit.expiresAt ? ` • Válido até ${formatFullDate(credit.expiresAt)}` : ""}
                           </p>
                         </div>
                       </div>

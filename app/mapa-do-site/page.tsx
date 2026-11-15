@@ -121,18 +121,18 @@ export default function MapaDoSitePage() {
     };
 
     return (
-        <div className="min-h-screen bg-white flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-dark-surface flex flex-col">
             <Navbar onNavigate={onNavigate} />
 
             <main className="flex-1 pt-28 pb-20">
                 {/* Hero */}
-                <section className="relative bg-white py-12 border-b border-gray-100">
+                <section className="relative bg-white dark:bg-dark-surface py-12 border-b border-gray-100 dark:border-dark-border">
                     <GridLines />
                     <div className="max-w-[1400px] mx-auto px-4 relative z-10 text-center">
                         <span className="text-xs font-bold text-brand-green uppercase tracking-widest mb-3 block">
                             ESTRUTURA DE CONTEÚDO
                         </span>
-                        <h1 className="text-4xl md:text-5xl font-bold text-brand-dark mb-4 tracking-tight">
+                        <h1 className="text-4xl md:text-5xl font-bold text-brand-dark dark:text-dark-heading mb-4 tracking-tight">
                             Mapa do Site
                         </h1>
                         <p className="text-brand-inactive-text text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
@@ -149,22 +149,22 @@ export default function MapaDoSitePage() {
                             return (
                                 <div
                                     key={idx}
-                                    className="bg-brand-slate/40 border border-gray-100 rounded-3xl p-8 hover:border-brand-green/30 transition-colors flex flex-col justify-between"
+                                    className="bg-brand-slate/40 dark:bg-dark-border/20 border border-gray-100 dark:border-dark-border rounded-3xl p-8 hover:border-brand-green/30 transition-colors flex flex-col justify-between"
                                 >
                                     <div>
                                         {/* Header da seção */}
                                         <div className="flex items-center gap-3 mb-3">
-                                            <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-dark">
+                                            <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-dark dark:text-dark-heading">
                                                 <IconComponent className="w-5 h-5 text-brand-green" />
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold text-brand-dark">{section.title}</h2>
+                                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{section.title}</h2>
                                                 <p className="text-xs text-brand-inactive-text">{section.description}</p>
                                             </div>
                                         </div>
 
                                         {/* Links da seção */}
-                                        <ul className="divide-y divide-gray-100 mt-6">
+                                        <ul className="divide-y divide-gray-100 dark:divide-dark-border mt-6">
                                             {section.links.map((link, linkIdx) => (
                                                 <li key={linkIdx} className="py-3.5 first:pt-0 last:pb-0">
                                                     <Link
@@ -173,7 +173,7 @@ export default function MapaDoSitePage() {
                                                     >
                                                         <div className="flex-1">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-semibold text-brand-dark group-hover:text-brand-green transition-colors">
+                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
                                                                     {link.label}
                                                                 </span>
                                                                 {link.badge && (

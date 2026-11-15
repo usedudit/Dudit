@@ -22,6 +22,7 @@ import {
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter } from "@/lib/utils/filter-date-period"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 interface DeliveryFiltersState {
     status: string[]
@@ -136,6 +137,7 @@ interface DeliveryPageControlsProps {
     tabCounts?: { Delivery: number; Transportadora: number }
     viewMode?: "list" | "grid" | "kanban"
     onViewModeChange?: (mode: "list" | "grid" | "kanban") => void
+    isTabletOrMobile?: boolean
 }
 
 const TAB_CONFIG: Record<DeliveryPageControlsProps["mode"], { label: string; icon: typeof MotorbikeIcon; variant: "gray" | "green" | "red" | "blue" }> = {
@@ -160,7 +162,10 @@ export default function DeliveryPageControls({
     tabCounts,
     viewMode,
     onViewModeChange,
+    isTabletOrMobile: propIsTabletOrMobile,
 }: DeliveryPageControlsProps) {
+    const hookIsTabletOrMobile = useMediaQuery("(max-width: 1023px)")
+    const isTabletOrMobile = propIsTabletOrMobile ?? hookIsTabletOrMobile
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
 
@@ -231,7 +236,7 @@ export default function DeliveryPageControls({
                     >
                         <FilterIcon className="w-4 h-4" />
                     </Button>
-                    {onViewModeChange && viewMode && (
+                    {!isTabletOrMobile && onViewModeChange && viewMode && (
                         <Dropdown
                             trigger={
                                 <Button variant="outline" className="w-[42px] h-[42px] p-0">
@@ -316,7 +321,7 @@ export default function DeliveryPageControls({
                     </div>
 
                     {/* View Toggles */}
-                    {onViewModeChange && viewMode && (
+                    {!isTabletOrMobile && onViewModeChange && viewMode && (
                         <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
                             <button
                                 type="button"

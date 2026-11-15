@@ -185,6 +185,11 @@ function getReceiptMethodTypeLabel(value?: string | null): string {
   const raw = String(value || "").trim();
   if (!raw) return "Método não definido";
 
+  const lower = raw.toLowerCase();
+  if (lower.includes("assinatura") || lower.includes("subscription")) {
+    return "Assinatura (Créditos)";
+  }
+
   // Ignora o que vier entre parênteses para obter apenas o tipo do método
   // Ex.: "Pix (Pix 2%)" -> "Pix", "Cartão de Crédito (Visa) (2x)" -> "Cartão de Crédito"
   const base = raw.split(/[()]/)[0].trim();
@@ -194,18 +199,30 @@ function getReceiptMethodTypeLabel(value?: string | null): string {
     return formatPaymentMethodLabel(canonical);
   }
 
-  const lower = raw.toLowerCase();
   if (
     lower.includes("store_credit") ||
     lower.includes("store-credit") ||
+    lower.includes("store credit") ||
+    lower.includes("credito do cliente") ||
+    lower.includes("crédito do cliente") ||
+    lower.includes("credito de cliente") ||
+    lower.includes("crédito de cliente") ||
+    lower.includes("credito cliente") ||
+    lower.includes("crédito cliente") ||
+    lower.includes("credito em loja") ||
+    lower.includes("crédito em loja")
+  ) {
+    return "Crédito do cliente";
+  }
+  if (lower.includes("exchange") || lower.includes("troca")) {
+    return "Crédito de troca";
+  }
+  if (
     lower.includes("vale-compra") ||
     lower.includes("vale_compra") ||
     lower.includes("vale")
   ) {
     return "Vale-compra";
-  }
-  if (lower.includes("exchange") || lower.includes("troca")) {
-    return "Crédito de troca";
   }
   if (base) {
     return base.charAt(0).toUpperCase() + base.slice(1);

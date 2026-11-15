@@ -471,9 +471,12 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
 
     return items.map((item) => {
         const partner = item?.partners
+        const partnerAddr = Array.isArray(partner?.addresses) ? partner.addresses[0] : partner?.addresses
+        const itemAddr = Array.isArray((item as any)?.addresses) ? (item as any).addresses[0] : (item as any)?.addresses
+
         const normalizedPartner = normalizePoint({
-            lat: partner?.latitude ?? (item as any)?.latitude,
-            lng: partner?.longitude ?? (item as any)?.longitude,
+            lat: partner?.latitude ?? (item as any)?.latitude ?? partnerAddr?.latitude ?? itemAddr?.latitude,
+            lng: partner?.longitude ?? (item as any)?.longitude ?? partnerAddr?.longitude ?? itemAddr?.longitude,
         })
         if (!normalizedPartner) return item
 
@@ -495,8 +498,14 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
 
         return {
             ...item,
-            partners: {
+            distance_km: distanceKm,
+            partners: partner ? {
                 ...partner,
+                distance_km: distanceKm,
+                distance_km_formatted: distanceFormatted,
+                delivery_time_formatted: deliveryTimeFormatted,
+                delivery_fee_formatted: deliveryFeeFormatted,
+            } : {
                 distance_km: distanceKm,
                 distance_km_formatted: distanceFormatted,
                 delivery_time_formatted: deliveryTimeFormatted,

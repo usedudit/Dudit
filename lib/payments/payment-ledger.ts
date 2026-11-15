@@ -79,6 +79,7 @@ export function normalizePaymentMethodKey(value?: string | null): string {
   if (!raw) return ""
 
   if (raw.includes("pix")) return "pix"
+  if (raw.includes("assinatura") || raw.includes("subscription")) return "subscription_credits"
   if (
     raw.includes("dinheiro") ||
     raw.includes("cash") ||
@@ -225,37 +226,33 @@ export function dedupeReceivedLegs(
 
     const key = leg.mpPaymentId
       ? `mp:${String(leg.mpPaymentId)}`
-      : [
-          normalizePaymentMethodKey(String(leg.method || "")),
-          roundPaymentAmount(received).toFixed(2),
-          leg.paymentMethodId || "",
-          String(leg.installmentNumber || 1),
-        ].join(":")
+      : (leg as any).id
+        ? `id:${String((leg as any).id)}`
+        : null
 
-    if (seen.has(key)) {
-      const existingIndex = result.findIndex((entry) => {
-        const existingKey = entry.mpPaymentId
-          ? `mp:${String(entry.mpPaymentId)}`
-          : [
-              normalizePaymentMethodKey(String(entry.method || "")),
-              roundPaymentAmount(getLegReceivedAmount(entry)).toFixed(2),
-              entry.paymentMethodId || "",
-              String(entry.installmentNumber || 1),
-            ].join(":")
-        return existingKey === key
-      })
-      if (existingIndex >= 0) {
-        const existing = result[existingIndex]
-        if (
-          getLegReceivedAmount(leg) > getLegReceivedAmount(existing) + 0.009
-        ) {
-          result[existingIndex] = { ...existing, ...leg }
+    if (key) {
+      if (seen.has(key)) {
+        const existingIndex = result.findIndex((entry) => {
+          const existingKey = entry.mpPaymentId
+            ? `mp:${String(entry.mpPaymentId)}`
+            : (entry as any).id
+              ? `id:${String((entry as any).id)}`
+              : null
+          return existingKey === key
+        })
+        if (existingIndex >= 0) {
+          const existing = result[existingIndex]
+          if (
+            getLegReceivedAmount(leg) > getLegReceivedAmount(existing) + 0.009
+          ) {
+            result[existingIndex] = { ...existing, ...leg }
+          }
+          continue
         }
-        continue
       }
+      seen.add(key)
     }
 
-    seen.add(key)
     result.push({ ...leg })
   }
 

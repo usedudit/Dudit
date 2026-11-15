@@ -3,6 +3,7 @@ import { useRealtimeRecord } from '@/hooks/use-realtime-record';
 import { useTheme } from 'next-themes';
 import {
     XIcon,
+    PlusIcon,
     ChevronLeftIcon,
     CreditCardIcon,
     MoneyIcon,
@@ -41,12 +42,29 @@ import { usePlanUpgrade } from '@/components/erp/subscription/PlanUpgradeModal';
 import { useModalLayer } from '@/lib/modal-stack';
 import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
 import { calculatePaymentAmounts } from '@/lib/payments/calculation';
+import { isStoreCreditMethod } from '@/lib/payments/payment-method';
 
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
 
 const normalizePaymentMethodLabel = (value?: string | null) => {
     const normalized = String(value || '').trim().toLowerCase();
     if (!normalized) return '';
+    if (normalized.includes('assinatura') || normalized.includes('subscription')) return 'Assinatura (Créditos)';
+    if (normalized.includes('exchange')) return 'Crédito de troca';
+    if (
+        normalized.includes('store_credit') ||
+        normalized.includes('store-credit') ||
+        normalized.includes('store credit') ||
+        normalized.includes('credito do cliente') ||
+        normalized.includes('crédito do cliente') ||
+        normalized.includes('credito de cliente') ||
+        normalized.includes('crédito de cliente') ||
+        normalized.includes('credito cliente') ||
+        normalized.includes('crédito cliente') ||
+        normalized.includes('credito em loja') ||
+        normalized.includes('crédito em loja')
+    ) return 'Crédito do cliente';
+    if (normalized.includes('vale-compra') || normalized.includes('vale_compra')) return 'Vale-compra';
     if (normalized.includes('dinheiro') || normalized.includes('cash') || normalized.includes('money')) return 'Dinheiro';
     if (normalized.includes('pix')) return 'Pix';
     if (normalized.includes('cartão de crédito') || normalized.includes('cartao de credito') || normalized.includes('credito') || normalized.includes('crédito') || normalized.includes('credit')) return 'Cartão de Crédito';
@@ -299,6 +317,7 @@ function calculatePaymentDetailsLocally(
 
 const normalizeMethodType = (value?: string | null) => {
     const raw = String(value || "").toLowerCase().trim();
+    if (raw.includes("assinatura") || raw.includes("subscription")) return "subscription_credits";
     if (raw === "cash" || raw === "dinheiro") return "cash";
     if (raw === "pix") return "pix";
     if (["credit_card", "credito", "cartao_credito", "cartão de crédito"].includes(raw)) return "credit_card";
@@ -2195,10 +2214,10 @@ const PaymentModal = ({
     const displayTransactionTotal = (paymentStatus === "success" || paymentStatus === "processing") && successSnapshot
         ? successSnapshot.displayOrderTotal
         : view === 'split'
-            ? (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : chargeTarget)
+            ? (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : (useStoreCredit && effectiveCreditApplied > 0 ? netChargeTarget : chargeTarget))
             : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
                 ? finalTotalWithMethodPricing
-                : total;
+                : (useStoreCredit && effectiveCreditApplied > 0 ? netChargeTarget : total);
 
     const receiptPricingDetails = useMemo(() => {
         const source = paymentStatus === "success" && successSnapshot
@@ -3004,7 +3023,8 @@ const PaymentModal = ({
         const snapshotBreakdown: Array<{ method: string; amount: number }> = []
         if (payload?.paymentBreakdown) {
             payload.paymentBreakdown.forEach((p: any) => {
-                snapshotBreakdown.push({ method: p.method || '', amount: p.amount })
+                const label = formatPaymentMethodToFullLabel(p.method) || p.method || ''
+                snapshotBreakdown.push({ method: label, amount: p.amount })
             })
         }
 
@@ -3022,9 +3042,9 @@ const PaymentModal = ({
         const pricingCustomerInterest = (!isMerchantFee ? Math.max(0, Number(currentPricingTotals.interestAmount || 0) - Number(currentPricingTotals.installmentCostAmount || 0)) : 0)
             + (!isMerchantInstallment ? Number(currentPricingTotals.installmentCostAmount || 0) : 0);
         const expectedFinalOrderTotal = view === 'split'
-            ? existingPaidAmount + (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : chargeTarget)
-            : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
-                ? existingPaidAmount + finalTotalWithMethodPricing
+            ? existingPaidAmount + effectiveCreditApplied + (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : Math.max(0, chargeTarget - effectiveCreditApplied))
+            : (view === 'money' || view === 'card' || view === 'pix')
+                ? existingPaidAmount + effectiveCreditApplied + finalTotalWithMethodPricing
                 : Math.max(0, fullOrderTotal - pricingDiscount + pricingCustomerFee + pricingCustomerInterest);
 
         const snapshotIsUnderpaid = isPendingPayment
@@ -3155,6 +3175,7 @@ const PaymentModal = ({
         if (['credit_card', 'debit_card'].includes(resolvedType)) return CreditCardIcon;
         if (resolvedType === 'bank_transfer') return FileIcon;
         const label = (method || '').toLowerCase();
+        if (label.includes('assinatura') || label.includes('subscription')) return TagIcon;
         if (label.includes('pix')) return QRCodeIcon;
         if (label.includes('dinheiro')) return MoneyIcon;
         if (label.includes('credito') || label.includes('cartão') || label.includes('cartao') || label.includes('débito') || label.includes('debito')) return CreditCardIcon;
@@ -3209,6 +3230,16 @@ const PaymentModal = ({
                             itemCount={receiptView.itemCount}
                             pricingDetails={receiptPricingDetails}
                             deliveryBreakdown={deliveryBreakdown}
+                            storeCreditAmount={
+                                paymentStatus === "success" && successSnapshot
+                                    ? (successSnapshot.paymentBreakdown
+                                        ?.filter((p: any) => isStoreCreditMethod(p.method))
+                                        .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) || 0)
+                                    : effectiveCreditApplied
+                            }
+                            isSuccess={paymentStatus === "success"}
+                            paymentBreakdown={successSnapshot?.paymentBreakdown}
+                            totalPaid={successSnapshot?.totalPaid}
                         />
                     </div>
                 </div>
@@ -3447,7 +3478,7 @@ const PaymentModal = ({
                                                                 )}
                                                             </div>
                                                             {useStoreCredit && (
-                                                                <div className="mt-3 pt-2.5 border-t border-brand-green flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                                <div className="mt-3 pt-2.5 border-t border-brand-border dark:broder-dark-border flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
                                                                     <span>Abatido no crédito: <strong className="text-brand-green">{formatCurrency(effectiveCreditApplied)}</strong></span>
                                                                     <span>Restante a pagar: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(netChargeTarget)}</strong></span>
                                                                 </div>
@@ -3455,8 +3486,7 @@ const PaymentModal = ({
                                                             {useStoreCredit && netChargeTarget <= 0.009 && (
                                                                 <div className="mt-3">
                                                                     <Button
-                                                                        variant="filled"
-                                                                        className="w-full h-11 text-sm font-bold bg-brand-green text-white hover:bg-brand-green/90"
+                                                                        className="w-full h-11"
                                                                         onClick={() => handleStartProcessing()}
                                                                     >
                                                                         Confirmar Pagamento com Crédito ({formatCurrency(effectiveCreditApplied)})
@@ -3906,9 +3936,24 @@ const PaymentModal = ({
                                                         return (
                                                             <div key={p.id} onClick={() => { if (isLockedMarketplace || existingPaidAmount > 0.009) return; setEditingPaymentIndex(idx); setSplitSelectedType(null); setView('split_method_select'); }}
                                                                 className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors">
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    {getIconForMethod(p.method, p.paymentMethodId)({})}
-                                                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{p.method || "Selecionar método"}</span>
+                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {getIconForMethod(p.method, p.paymentMethodId)({})}
+                                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{p.method || `Selecionar método ${idx + 1}`}</span>
+                                                                    </div>
+                                                                    {payments.length > 2 && !isLockedMarketplace && existingPaidAmount <= 0.009 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setPayments((prev) => prev.filter((_, i) => i !== idx));
+                                                                            }}
+                                                                            className="p-1 rounded-full text-brand-inactive-text hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                                            title="Remover este método"
+                                                                        >
+                                                                            <XIcon size={14} />
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                                                                     <span className="text-brand-inactive-text">Recebido:</span>
@@ -3936,6 +3981,29 @@ const PaymentModal = ({
                                                         );
                                                     })}
                                                 </div>
+
+                                                {!isLockedMarketplace && existingPaidAmount <= 0.009 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="w-full h-10 border-dashed text-xs mt-3 flex items-center justify-center gap-1.5"
+                                                        onClick={() => {
+                                                            setPayments((prev) => [
+                                                                ...prev,
+                                                                {
+                                                                    id: Date.now() + Math.floor(Math.random() * 1000),
+                                                                    method: null,
+                                                                    paymentMethodId: null,
+                                                                    amount: 0,
+                                                                    installmentNumber: 1,
+                                                                },
+                                                            ]);
+                                                        }}
+                                                    >
+                                                        <PlusIcon size={14} />
+                                                        Adicionar outro meio de pagamento
+                                                    </Button>
+                                                )}
                                                 {splitPreview && 'success' in splitPreview && splitPreview.success && (
                                                     <div className="mt-4 flex flex-col gap-2 border-t border-brand-border dark:border-dark-border pt-4">
                                                         <div className="flex justify-between items-baseline text-sm">
@@ -4376,14 +4444,20 @@ const PaymentModal = ({
                                     </div>
 
                                     {/* Payment method breakdown */}
-                                    {successSnapshot?.paymentBreakdown && successSnapshot.paymentBreakdown.length > 1 && (
+                                    {successSnapshot?.paymentBreakdown && successSnapshot.paymentBreakdown.length > 0 && (
                                         <div className="mb-6 border-t border-brand-border dark:border-dark-border pt-4">
-                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-3">Formas de pagamento</span>
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-3">
+                                                {successSnapshot.paymentBreakdown.length > 1 ? "Formas de pagamento" : "Forma de pagamento"}
+                                            </span>
                                             <div className="space-y-2">
                                                 {successSnapshot.paymentBreakdown.map((entry, i) => (
                                                     <div key={i} className="flex justify-between items-center py-1">
-                                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{entry.method}</span>
-                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(entry.amount)}</span>
+                                                        <span className="text-sm text-brand-dark dark:text-dark-heading">
+                                                            {formatPaymentMethodToFullLabel(entry.method) || entry.method}
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(entry.amount)}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -4519,6 +4593,16 @@ const PaymentModal = ({
                         customerName={customer?.name}
                         pricingDetails={receiptPricingDetails}
                         deliveryBreakdown={deliveryBreakdown}
+                        storeCreditAmount={
+                            paymentStatus === "success" && successSnapshot
+                                ? (successSnapshot.paymentBreakdown
+                                    ?.filter((p: any) => isStoreCreditMethod(p.method))
+                                    .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) || 0)
+                                : effectiveCreditApplied
+                        }
+                        isSuccess={paymentStatus === "success"}
+                        paymentBreakdown={successSnapshot?.paymentBreakdown}
+                        totalPaid={successSnapshot?.totalPaid}
                     />
                 </BottomSheet>
             </div>

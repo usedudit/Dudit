@@ -33,12 +33,15 @@ import {
 
 type BalancePaymentCollectorProps = {
   partnerId: string
+  storeId?: string | null
   remainingBalance: number
   disabled?: boolean
   onLegsReady: (legs: PaymentBreakdownLeg[]) => void
   onValidityChange?: (valid: boolean) => void
   lockedMethodLabel?: string | null
   lockedInstallments?: number | null
+  targetLeg?: PaymentBreakdownLeg | null
+  onClearTargetLeg?: () => void
   onConfirmPayment?: () => void
   onHeaderStateChange?: (state: { title: string; canGoBack: boolean; onGoBack: () => void }) => void
 }
@@ -50,7 +53,7 @@ function buildFlatLeg(method: PartnerPaymentMethod, amount: number, installmentN
     amount,
     effectiveAmount: amount,
     amountReceived: amount,
-    paymentMethodId: method.id,
+    paymentMethodId: method.id || null,
     installmentNumber,
     adjustmentType: "none",
     adjustmentPercent: 0,
@@ -60,12 +63,15 @@ function buildFlatLeg(method: PartnerPaymentMethod, amount: number, installmentN
 
 export function BalancePaymentCollector({
   partnerId,
+  storeId,
   remainingBalance,
   disabled = false,
   onLegsReady,
   onValidityChange,
   lockedMethodLabel,
   lockedInstallments,
+  targetLeg,
+  onClearTargetLeg,
   onConfirmPayment,
   onHeaderStateChange,
 }: BalancePaymentCollectorProps) {
@@ -73,7 +79,8 @@ export function BalancePaymentCollector({
   const { planSlug } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
   const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
-  const { methods, isLoading } = usePaymentMethods(partnerId, selectedStore?.id)
+  const effectiveStoreId = storeId !== undefined ? storeId : selectedStore?.id
+  const { methods, isLoading } = usePaymentMethods(partnerId, effectiveStoreId)
   const activeMethods = useMemo(
     () => (methods || []).filter((m: PartnerPaymentMethod) => m.is_active !== false),
     [methods],
@@ -111,11 +118,11 @@ export function BalancePaymentCollector({
     if (isLocked) {
       return `Receber saldo (${selectedMethod?.name || lockedMethodLabel})`
     }
-    if (view === "methods") return "Método de Pagamento"
+    if (view === "methods") return "Receber saldo"
     if (view === "method_type_select") return "Selecionar Método"
     if (view === "split") return "Dividir Pagamento"
     if (view === "split_method_select") return "Selecionar Método"
-    return selectedMethod?.name || "Registrar"
+    return selectedMethod?.name || "Receber saldo"
   }, [isLocked, selectedMethod, lockedMethodLabel, view])
 
   const canGoBack = !isLocked && view !== "methods"
@@ -127,8 +134,9 @@ export function BalancePaymentCollector({
     }
     setView("methods")
     setSelectedMethod(null)
+    onClearTargetLeg?.()
     onValidityChange?.(false)
-  }, [view, onValidityChange])
+  }, [view, onClearTargetLeg, onValidityChange])
 
   useEffect(() => {
     onHeaderStateChange?.({
@@ -180,6 +188,32 @@ export function BalancePaymentCollector({
       selectSingleMethod(matches[0])
     }
   }, [lockedMethodLabel, activeMethods, isLoading])
+
+  useEffect(() => {
+    if (!targetLeg || activeMethods.length === 0 || isLoading) return
+    const normalizedLabel = normalizePaymentMethodLabel(targetLeg.method)
+    const methodType = normalizeMethodType(normalizedLabel)
+    const matches = activeMethods.filter((m: PartnerPaymentMethod) => {
+      if (targetLeg.paymentMethodId && m.id === targetLeg.paymentMethodId) return true
+      if (normalizeMethodType(m.type) === methodType) return true
+      if (normalizePaymentMethodLabel(m.name) === normalizedLabel) return true
+      return false
+    })
+    if (matches.length > 0) {
+      selectSingleMethod(matches[0])
+    } else {
+      const dummy: PartnerPaymentMethod = {
+        id: targetLeg.paymentMethodId || "",
+        name: targetLeg.method || (methodType === "cash" ? "Dinheiro" : methodType === "pix" ? "Pix" : "Outros"),
+        type: methodType,
+        is_active: true,
+      }
+      setSelectedMethod(dummy)
+      setAmount(remainingBalance)
+      setView(getTargetViewForMethodType(methodType) as PaymentFlowView)
+      emitLegs([buildFlatLeg(dummy, remainingBalance, 1)])
+    }
+  }, [targetLeg, activeMethods, isLoading, remainingBalance])
 
   // Effect to load Pix key details when method is selected and view goes to "pix"
   useEffect(() => {
@@ -260,7 +294,7 @@ export function BalancePaymentCollector({
     setSplitLegs((prev) =>
       prev.map((leg, idx) =>
         idx === editingSplitIndex
-          ? { ...leg, method: method.name, paymentMethodId: method.id, amount: leg.amount || 0 }
+          ? { ...leg, method: method.name, paymentMethodId: method.id || null, amount: leg.amount || 0 }
           : leg,
       ),
     )
@@ -392,18 +426,23 @@ export function BalancePaymentCollector({
   return (
     <div className="space-y-4">
       {!isLocked && view === "methods" && (
-        <PaymentMethodSelector
-          availableMethodTypes={availableMethodTypes}
-          isLoading={isLoading}
-          disabled={disabled}
-          onSelectCash={() => openMethodType("cash")}
-          onSelectPix={() => openMethodType("pix")}
-          onSelectCreditCard={() => openMethodType("credit_card")}
-          onSelectDebitCard={() => openMethodType("debit_card")}
-          onSelectBankTransfer={() => openMethodType("bank_transfer")}
-          onSelectOther={() => openMethodType("other")}
-          onSelectSplit={() => setView("split")}
-        />
+        <div className="space-y-3">
+          <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+            Ou escolha outro método de pagamento:
+          </h4>
+          <PaymentMethodSelector
+            availableMethodTypes={availableMethodTypes}
+            isLoading={isLoading}
+            disabled={disabled}
+            onSelectCash={() => openMethodType("cash")}
+            onSelectPix={() => openMethodType("pix")}
+            onSelectCreditCard={() => openMethodType("credit_card")}
+            onSelectDebitCard={() => openMethodType("debit_card")}
+            onSelectBankTransfer={() => openMethodType("bank_transfer")}
+            onSelectOther={() => openMethodType("other")}
+            onSelectSplit={() => setView("split")}
+          />
+        </div>
       )}
 
       {!isLocked && view === "method_type_select" && selectedMethodType && (
@@ -464,8 +503,8 @@ export function BalancePaymentCollector({
           flatAmount
           installments={installments}
           onInstallmentsChange={setInstallments}
-          maxInstallments={lockedInstallments || 1}
-          readOnlyInstallments
+          maxInstallments={selectedMethod.max_installments || lockedInstallments || 12}
+          readOnlyInstallments={false}
           hideInstallments={isFreePlan || normalizeMethodType(selectedMethod.type) === "debit_card"}
           totalPaid={amount}
           totalNeed={remainingBalance}
@@ -479,12 +518,42 @@ export function BalancePaymentCollector({
             chargeTarget={remainingBalance}
             flatAmount
             onLegClick={handleSplitLegClick}
+            onAddLeg={() => {
+              setSplitLegs((prev) => [
+                ...prev,
+                {
+                  id: Date.now() + Math.floor(Math.random() * 1000),
+                  method: null,
+                  paymentMethodId: null,
+                  amount: 0,
+                  installmentNumber: 1,
+                },
+              ])
+            }}
+            onRemoveLeg={(idxToRemove) => {
+              setSplitLegs((prev) => prev.filter((_, i) => i !== idxToRemove))
+            }}
           />
           {splitLegs.map((leg, idx) => (
             <div key={leg.id} className="space-y-2">
-              <label className="text-xs font-bold text-brand-inactive-text uppercase">
-                {leg.method || `Método ${idx + 1}`} - valor
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-brand-inactive-text uppercase">
+                  {leg.method || `Método ${idx + 1}`} - valor
+                </label>
+                {splitLegs.length > 2 && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="text-xs text-red-500 hover:text-red-600 p-0 h-auto"
+                    onClick={() => {
+                      setSplitLegs((prev) => prev.filter((_, i) => i !== idx))
+                    }}
+                  >
+                    Remover
+                  </Button>
+                )}
+              </div>
               <MoneyPaymentView
                 amount={leg.amount}
                 onAmountChange={(val) => {

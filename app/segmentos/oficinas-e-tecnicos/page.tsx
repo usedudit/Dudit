@@ -70,35 +70,35 @@ export default function OficinasETecnicosSegmentPage() {
             }
             description="Chega de blocos de papel e discussões com clientes. Emita OS digital no celular, envie orçamentos com aprovação pelo WhatsApp e controle suas peças com precisão."
             heroMockup={
-                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm space-y-4">
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-dark-border">
                             <div>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase">Ordem de Serviço</span>
-                                <h3 className="font-bold text-brand-dark text-lg">OS #1042</h3>
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase">Ordem de Serviço</span>
+                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-lg">OS #1042</h3>
                             </div>
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
                                 Aprovada
                             </span>
                         </div>
 
                         <div className="space-y-2 text-xs">
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Veículo:</span>
-                                <strong className="text-brand-dark">Honda Civic 2020 - Placa ABC-1234</strong>
+                                <strong className="text-brand-dark dark:text-dark-heading">Honda Civic 2020 - Placa ABC-1234</strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Cliente:</span>
-                                <strong className="text-brand-dark">Marcos Silva</strong>
+                                <strong className="text-brand-dark dark:text-dark-heading">Marcos Silva</strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Serviço:</span>
                                 <span>Troca de Pastilhas + Disco</span>
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                            <span className="text-xs text-gray-500 font-medium">Valor Total:</span>
+                        <div className="pt-4 border-t border-gray-100 dark:border-dark-border flex justify-between items-center">
+                            <span className="text-xs text-gray-500 dark:text-dark-body font-medium">Valor Total:</span>
                             <span className="text-2xl font-bold text-brand-green">R$ 580,00</span>
                         </div>
                     </div>
@@ -115,19 +115,19 @@ export default function OficinasETecnicosSegmentPage() {
                         description:
                             "Envie propostas pelo WhatsApp com fotos e valores. O cliente aprova pelo link e a OS é gerada automaticamente.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Orçamento</span>
                                     <FileTextIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="space-y-1.5 mb-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-brand-dark">Troca de pastilhas</span>
-                                        <span className="text-[10px] font-bold text-brand-dark">R$ 180,00</span>
+                                        <span className="text-[10px] text-brand-dark dark:text-dark-heading">Troca de pastilhas</span>
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 180,00</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-brand-dark">Disco de freio</span>
-                                        <span className="text-[10px] font-bold text-brand-dark">R$ 400,00</span>
+                                        <span className="text-[10px] text-brand-dark dark:text-dark-heading">Disco de freio</span>
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 400,00</span>
                                     </div>
                                 </div>
                                 <div className="bg-brand-green text-white text-[9px] font-bold py-1.5 rounded text-center">
@@ -142,21 +142,21 @@ export default function OficinasETecnicosSegmentPage() {
                         description:
                             "Acompanhe cada OS (aguardando peças, em andamento, concluída) e mantenha o histórico completo do veículo.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ordens de Serviço</span>
                                     <ServiceIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-dark">OS #1042</span>
-                                        <span className="text-[8px] font-bold text-brand-orange bg-brand-orange-light px-1.5 py-0.5 rounded">EM ANDAMENTO</span>
+                                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">OS #1042</span>
+                                        <span className="text-[8px] font-bold text-brand-orange bg-brand-orange-light dark:bg-brand-orange/20 px-1.5 py-0.5 rounded">EM ANDAMENTO</span>
                                     </div>
-                                    <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-brand-dark">OS #1041</span>
+                                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">OS #1041</span>
                                         <span className="text-[8px] font-bold text-brand-green">CONCLUÍDA</span>
                                     </div>
-                                    <div className="bg-brand-gray p-2 rounded flex justify-between items-center">
+                                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded flex justify-between items-center">
                                         <span className="text-[10px] font-bold text-brand-inactive-text">OS #1040</span>
                                         <span className="text-[8px] font-bold text-brand-inactive-text">AGUARD. PEÇAS</span>
                                     </div>
@@ -170,19 +170,19 @@ export default function OficinasETecnicosSegmentPage() {
                         description:
                             "Calcule a comissão de cada profissional por serviço realizado, com relatório detalhado e integração ao fluxo de caixa.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Comissões do mês</span>
                                     <MoneyIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="space-y-1.5 mb-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-brand-dark">Carlos</span>
-                                        <span className="text-[10px] font-bold text-brand-dark">R$ 620,00</span>
+                                        <span className="text-[10px] text-brand-dark dark:text-dark-heading">Carlos</span>
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 620,00</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-brand-dark">Rafael</span>
-                                        <span className="text-[10px] font-bold text-brand-dark">R$ 480,00</span>
+                                        <span className="text-[10px] text-brand-dark dark:text-dark-heading">Rafael</span>
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 480,00</span>
                                     </div>
                                 </div>
                                 <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">

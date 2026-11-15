@@ -256,12 +256,11 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
 
                     {isEditing && resources.length > 0 && (
                         <Button
-                            type="button"
                             variant="link"
                             onClick={addResource}
                             className="mt-2"
                         >
-                            <PlusIcon size={14} strokeWidth={3} className="mr-1" />
+                            <PlusIcon size={14} className="mr-1" />
                             Adicionar item manual
                         </Button>
                     )}

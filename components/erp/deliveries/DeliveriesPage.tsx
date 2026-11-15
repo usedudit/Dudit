@@ -34,6 +34,7 @@ import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
 
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { useMediaQuery } from "@/components/erp/hooks"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { formatDistance } from "@/lib/services/location.service"
 import { toast } from "@/hooks/use-notification"
@@ -134,8 +135,10 @@ export default function DeliveriesPage({
         feeMax: "",
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<"list" | "grid" | "kanban">("list")
+    const [viewMode, setViewMode] = useState<"list" | "grid" | "kanban">(isTabletOrMobile ? "grid" : "list")
+    const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
 
     const [mode, setMode] = useState<"deliveries" | "carriers">("deliveries")
     const carrierEnabled = initialCarrierEnabled
@@ -282,7 +285,7 @@ export default function DeliveriesPage({
         checkScroll()
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
-    }, [viewMode, items, carrierShipments])
+    }, [effectiveViewMode, items, carrierShipments])
 
     const carrierOptions = useMemo(() => {
         const set = new Set<string>()
@@ -557,7 +560,7 @@ export default function DeliveriesPage({
         return { Delivery: deliveriesCount, Transportadora: carriersCount }
     }, [items, carrierShipments])
 
-    const PAGE_SIZE = 20
+    const PAGE_SIZE = 8
     const [page, setPage] = useState(1)
     const [carrierPage, setCarrierPage] = useState(1)
 
@@ -807,8 +810,9 @@ export default function DeliveriesPage({
                                 mode={mode}
                                 setMode={setMode}
                                 tabCounts={tabCounts}
-                                viewMode={viewMode}
+                                viewMode={effectiveViewMode}
                                 onViewModeChange={setViewMode}
+                                isTabletOrMobile={isTabletOrMobile}
                             />
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
@@ -831,7 +835,7 @@ export default function DeliveriesPage({
                                                     }
                                                 />
                                             </FadeIn>
-                                        ) : viewMode === "kanban" ? (
+                                        ) : effectiveViewMode === "kanban" ? (
                                             <FadeIn key="carrier-kanban" className="w-full">
                                                 <CarrierDeliveryBoard
                                                     shipments={filteredCarrierShipments}
@@ -842,7 +846,7 @@ export default function DeliveriesPage({
                                                     }}
                                                 />
                                             </FadeIn>
-                                        ) : viewMode === "grid" ? (
+                                        ) : effectiveViewMode === "grid" ? (
                                             <FadeIn key="carrier-grid" className="w-full">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginatedCarriers.map((shipment: any) => (
@@ -997,7 +1001,7 @@ export default function DeliveriesPage({
                                             </FadeIn>
                                         )}
                                     </AnimatePresence>
-                                    {viewMode !== "kanban" && filteredCarrierShipments.length > 0 && carrierTotalPages > 1 && (
+                                    {effectiveViewMode !== "kanban" && filteredCarrierShipments.length > 0 && carrierTotalPages > 1 && (
                                         <div className="mt-4 pb-2">
                                             <Pagination
                                                 currentPage={carrierPage}
@@ -1052,7 +1056,7 @@ export default function DeliveriesPage({
                                                     }
                                                 />
                                             </FadeIn>
-                                        ) : viewMode === "kanban" ? (
+                                        ) : effectiveViewMode === "kanban" ? (
                                             <FadeIn key="kanban" className="w-full">
                                                 <DeliveryKanbanBoard
                                                     deliveries={mapped}
@@ -1061,7 +1065,7 @@ export default function DeliveriesPage({
                                                     onQuickStatusChange={handleQuickStatusChange}
                                                 />
                                             </FadeIn>
-                                        ) : viewMode === "grid" ? (
+                                        ) : effectiveViewMode === "grid" ? (
                                             <FadeIn key="grid" className="w-full">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginated.map((delivery: any) => (
@@ -1138,7 +1142,7 @@ export default function DeliveriesPage({
                                             </FadeIn>
                                         )}
                                     </AnimatePresence>
-                                    {viewMode !== "kanban" && mapped.length > 0 && totalPages > 1 && (
+                                    {effectiveViewMode !== "kanban" && mapped.length > 0 && totalPages > 1 && (
                                         <div className="mt-4 pb-2">
                                             <Pagination
                                                 currentPage={page}

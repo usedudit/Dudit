@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
@@ -32,11 +33,20 @@ import { fetchAllMarketplaceCategoriesClient } from "@/lib/data/marketplace-cate
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
-import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
-import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
 import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES, ESTADO_MAP } from "./explorar-constants"
 import type { SortOption } from "./explorar-constants"
+
+// Code-splitting para os bottom sheets pesados (evita carregar Framer Motion e swipe hooks na carga inicial)
+const ExplorarFiltersBottomSheet = dynamic(
+    () => import("./ExplorarFiltersBottomSheet").then((mod) => mod.ExplorarFiltersBottomSheet),
+    { ssr: false }
+)
+
+const ExplorarSortBottomSheet = dynamic(
+    () => import("./ExplorarSortBottomSheet").then((mod) => mod.ExplorarSortBottomSheet),
+    { ssr: false }
+)
 import {
     DELIVERY_OPTIONS,
     EMPTY_FILTER_STATE,
@@ -232,11 +242,13 @@ export function ExplorarPageClient({
             city = resolvedCityName.split(" - ")[0] || null
         }
         if (!city) {
-            const formatted = formatCitySlug(currentCity)
-            city = formatted.includes(" - ") ? formatted.split(" - ")[0] : formatted
+            const parts = currentCity.split("-")
+            parts.pop()
+            const cityKey = parts.join("-")
+            city = COMMON_CITY_ACCENTS[cityKey] || parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ")
         }
         return { scope: "city", city, state }
-    }, [selectedCitySlug, pathCity, cidade, resolvedCityName, formatCitySlug])
+    }, [selectedCitySlug, pathCity, cidade, resolvedCityName])
 
     const userCoords = useMemo(() => {
         return userProfile?.latitude && userProfile?.longitude
@@ -281,7 +293,6 @@ export function ExplorarPageClient({
     const stateDropdownRef = useRef<HTMLDivElement>(null)
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
-    const [isMobileScrolled, setIsMobileScrolled] = useState(false)
 
     // Demand modal states
     const [isDemandModalOpen, setIsDemandModalOpen] = useState(false)
@@ -625,21 +636,6 @@ export function ExplorarPageClient({
                 console.error("Error querying geolocation permission:", err)
             })
         }
-    }, [])
-
-    useEffect(() => {
-        let ticking = false
-        const onScroll = () => {
-            if (ticking) return
-            window.requestAnimationFrame(() => {
-                setIsMobileScrolled(window.scrollY > 10)
-                ticking = false
-            })
-            ticking = true
-        }
-        onScroll()
-        window.addEventListener("scroll", onScroll, { passive: true })
-        return () => window.removeEventListener("scroll", onScroll)
     }, [])
 
     const limitConfig = useMemo(() => {
@@ -1131,21 +1127,6 @@ export function ExplorarPageClient({
 
     const showCategoryDiscoverySections = isCategoryMode && (subcategoriesList.length > 0 || categoryPromos.length > 0 || categoryTopRated.length > 0 || categoryStores.length > 0)
 
-    const subcategoryGroups = useMemo(() => {
-        if (selectedCategories.length === 0) return []
-        const groups: { [key: string]: any[] } = {}
-        filteredResults.forEach((item) => {
-            const subName = item.subcategoryName || "Outros"
-            if (!groups[subName]) {
-                groups[subName] = []
-            }
-            groups[subName].push(item)
-        })
-        return Object.entries(groups)
-            .map(([name, list]) => ({ name, list }))
-            .filter(g => g.list.length > 0)
-    }, [filteredResults, selectedCategories])
-
     const toggleCategory = (catName: string) => {
         triggerFilterLoading()
         // Calcula fora do updater: updateUrl pode disparar navegação
@@ -1204,34 +1185,6 @@ export function ExplorarPageClient({
             })
             .slice(0, 5)
     }, [citySearchText, citiesData, selectedStateFilter])
-
-    // Group remaining products by category for feed view
-    const categoriesWithProducts = useMemo(() => {
-        const groups: { [key: string]: any[] } = {}
-        filteredResults.forEach((item) => {
-            if (item.itemType === 'produto' || item.itemType === 'servico') {
-                const cat = item.category || "Outros"
-                if (!groups[cat]) groups[cat] = []
-                groups[cat].push(item)
-            }
-        })
-        return Object.entries(groups)
-            .map(([name, list]) => ({ name, list }))
-            .filter(g => g.list.length >= 2)
-            .slice(0, 3) // Show top 3 category carousels
-    }, [filteredResults])
-
-    // Get products not in top category carousels
-    const remainingResults = useMemo(() => {
-        if (query) {
-            return filteredResults
-        }
-        if (currentType !== 'tudo' || selectedCategories.length > 0 || categoriesWithProducts.length === 0) {
-            return filteredResults
-        }
-        const topCategoriesNames = categoriesWithProducts.map(c => c.name)
-        return filteredResults.filter(item => !topCategoriesNames.includes(item.category || "Outros"))
-    }, [filteredResults, categoriesWithProducts, currentType, selectedCategories, query])
 
     const pageTitle = useMemo(() => {
         const citySuffix = selectedCitySlug
@@ -1675,11 +1628,11 @@ export function ExplorarPageClient({
         }
     }, [contextualSortOptions, sortBy])
 
-    const renderListingItem = (item: any) => {
+    const renderListingItem = (item: any, priority = false) => {
         if (item.itemType === 'loja') {
-            return <VitrineCard key={`loja-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
+            return <VitrineCard key={`loja-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} priority={priority} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
         }
-        return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
+        return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} priority={priority} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
     }
 
     const renderDistantItem = (item: any) => {
@@ -1756,58 +1709,8 @@ export function ExplorarPageClient({
         return rawItems.length === 0 && filteredResults.length === 0
     }, [isContentLoading, isCategoryMode, rawItems.length, filteredResults.length])
 
-    // ─── Themed rotating sections ───────────────────────────────────────
-    const CATEGORY_THEMES = [
-        { id: "alimentacao", title: "Sabores da região", slug: "alimentacao", category: "Alimentação", emoji: "🍽️" },
-        { id: "casa", title: "Dando um trato na casa", slug: "casa", category: "Casa", emoji: "🏠" },
-        { id: "tecnologia", title: "Tecnologia pra facilitar", slug: "tecnologia", category: "Tecnologia", emoji: "💻" },
-        { id: "moda", title: "Renove o visual", slug: "moda-e-beleza", category: "Moda e Beleza", emoji: "👗" },
-        { id: "saude", title: "Cuide de você", slug: "saude", category: "Saúde", emoji: "💚" },
-        { id: "automotivo", title: "Hora de cuidar do veículo", slug: "automotivo", category: "Automotivo", emoji: "🚗" },
-        { id: "pet", title: "Mimos pro seu pet", slug: "pets", category: "Pets", emoji: "🐾" },
-    ]
-
-    const themedSections = useMemo(() => {
-        if (!showExploreSections) return []
-        const available: typeof CATEGORY_THEMES = []
-
-        for (const theme of CATEGORY_THEMES) {
-            const catName = theme.category
-            const items = dataToFilter.filter(item => itemMatchesCategory(item, catName))
-            if (items.length > 0) {
-                available.push(theme)
-            }
-        }
-
-        if (available.length === 0) return []
-
-        // Daily seeded pick for rotation
-        const today = new Date().toDateString()
-        const seed = (today + (selectedCitySlug || "br")).split("").reduce((a, c) => a + c.charCodeAt(0), 0)
-        const pickCount = Math.min(2, available.length)
-        const picked: typeof CATEGORY_THEMES = []
-        const used = new Set<number>()
-
-        for (let i = 0; i < pickCount; i++) {
-            let idx = (seed + i * 7) % available.length
-            let attempts = 0
-            while (used.has(idx) && attempts < available.length) {
-                idx = (idx + 1) % available.length
-                attempts++
-            }
-            if (!used.has(idx)) {
-                used.add(idx)
-                picked.push(available[idx])
-            }
-        }
-
-        return picked.map(theme => {
-            const items = dataToFilter
-                .filter(item => itemMatchesCategory(item, theme.category))
-                .slice(0, 20)
-            return { ...theme, items }
-        })
-    }, [showExploreSections, dataToFilter, selectedCitySlug])
+    // ─── Themed rotating sections (desativadas temporariamente no lançamento) ───
+    const themedSections: any[] = []
 
     const showCommunityVideos = communityVideos.length > 0
 
@@ -1846,17 +1749,16 @@ export function ExplorarPageClient({
                 `}</style>
 
                 {/* MOBILE CONTROLS (Sticky bar with Filters & Sort buttons) */}
-                {!isLandingPage && rawItems.length > 0 && (
+                {rawItems.length > 0 && (
                     <ExplorarMobileControls
                         activeFiltersCount={activeFiltersCount}
                         onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
                         onOpenSort={() => setIsSortBottomSheetOpen(true)}
-                        isVisible={isMobileScrolled}
                     />
                 )}
 
                 {/* Always reserve space for sticky mobile controls */}
-                {!isLandingPage && rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
+                {rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 lg:mt-8 px-4">
@@ -2082,7 +1984,7 @@ export function ExplorarPageClient({
 
                                     {filteredResults.length > 0 ? (
                                         <div className={`grid ${currentType === 'vitrines' || currentType === 'negocios' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`}>
-                                            {filteredResults.map((item) => renderListingItem(item))}
+                                            {filteredResults.map((item, index) => renderListingItem(item, index < 6))}
 
                                             {hasNextPage && (
                                                 <div
@@ -2173,358 +2075,370 @@ export function ExplorarPageClient({
             </div>
 
             {/* FILTERS SHEET */}
-            <ExplorarFiltersBottomSheet
-                userProfile={userProfile}
-                isOpen={isFiltersBottomSheetOpen}
-                onClose={() => setIsFiltersBottomSheetOpen(false)}
-                onApply={applyFilters}
-                onClear={clearFilters}
-                selectedCitySlug={selectedCitySlug}
-                formatCitySlug={formatCitySlug}
-                onCitySelect={() => setIsCityModalOpen(true)}
-                currentType={currentType}
-                selectedCategories={selectedCategories}
-                selectedCondition={selectedCondition}
-                minPrice={minPrice}
-                maxPrice={maxPrice}
-                promoOn={promoOn}
-                shipping={onlyShipping}
-                minRating={minRating}
-                delivery={deliveryFilter}
-                maxDistanceKm={maxDistanceKm}
-                showcaseOnly={showcaseOnly}
-                typeOptions={typeOptions}
-                productCategories={productCategories}
-                serviceCategories={dbServiceCategories}
-                partnerCategories={dbPartnerCategories}
-                filterConfig={filterConfig}
-            />
+            {isFiltersBottomSheetOpen && (
+                <ExplorarFiltersBottomSheet
+                    userProfile={userProfile}
+                    isOpen={isFiltersBottomSheetOpen}
+                    onClose={() => setIsFiltersBottomSheetOpen(false)}
+                    onApply={applyFilters}
+                    onClear={clearFilters}
+                    selectedCitySlug={selectedCitySlug}
+                    formatCitySlug={formatCitySlug}
+                    onCitySelect={() => setIsCityModalOpen(true)}
+                    currentType={currentType}
+                    selectedCategories={selectedCategories}
+                    selectedCondition={selectedCondition}
+                    minPrice={minPrice}
+                    maxPrice={maxPrice}
+                    promoOn={promoOn}
+                    shipping={onlyShipping}
+                    minRating={minRating}
+                    delivery={deliveryFilter}
+                    maxDistanceKm={maxDistanceKm}
+                    showcaseOnly={showcaseOnly}
+                    typeOptions={typeOptions}
+                    productCategories={productCategories}
+                    serviceCategories={dbServiceCategories}
+                    partnerCategories={dbPartnerCategories}
+                    filterConfig={filterConfig}
+                />
+            )}
 
-            <ExplorarSortBottomSheet
-                isOpen={isSortBottomSheetOpen}
-                onClose={() => setIsSortBottomSheetOpen(false)}
-                sortBy={sortBy as any}
-                onSortChange={(val) => {
-                    patchFilters({ sortBy: val as SortOption })
-                }}
-                sortOptions={contextualSortOptions}
-            />
+            {isSortBottomSheetOpen && (
+                <ExplorarSortBottomSheet
+                    isOpen={isSortBottomSheetOpen}
+                    onClose={() => setIsSortBottomSheetOpen(false)}
+                    sortBy={sortBy as any}
+                    onSortChange={(val) => {
+                        patchFilters({ sortBy: val as SortOption })
+                    }}
+                    sortOptions={contextualSortOptions}
+                />
+            )}
 
             {/* 1. CITY SELECTOR MODAL */}
-            <DefaultModal
-                isOpen={isCityModalOpen}
-                onClose={() => setIsCityModalOpen(false)}
-                maxWidth="md"
-                hideHeader={true}
-            >
-                <div className="flex flex-col relative text-[#003229]">
-                    <button
-                        onClick={() => setIsCityModalOpen(false)}
-                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-                        title="Fechar"
-                    >
-                        <XIcon size={16} />
-                    </button>
+            {isCityModalOpen && (
+                <DefaultModal
+                    isOpen={isCityModalOpen}
+                    onClose={() => setIsCityModalOpen(false)}
+                    maxWidth="md"
+                    hideHeader={true}
+                >
+                    <div className="flex flex-col relative text-[#003229]">
+                        <button
+                            onClick={() => setIsCityModalOpen(false)}
+                            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                            title="Fechar"
+                        >
+                            <XIcon size={16} />
+                        </button>
 
-                    {/* Header with gradient and mascot */}
-                    <div
-                        className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
-                        style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
-                    >
-                        <img
-                            src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                            alt="Onde você está?"
-                            className="w-48 h-auto object-contain transform translate-y-4"
-                        />
-                    </div>
+                        {/* Header with gradient and mascot */}
+                        <div
+                            className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
+                            style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
+                        >
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                                alt="Onde você está?"
+                                className="w-48 h-auto object-contain transform translate-y-4"
+                            />
+                        </div>
 
-                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center dark:text-dark-heading">Onde você está?</h4>
-                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed dark:text-dark-body">
-                        Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
-                    </p>
+                        <h4 className="text-xl font-bold text-brand-dark mb-4 text-center dark:text-dark-heading">Onde você está?</h4>
+                        <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed dark:text-dark-body">
+                            Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
+                        </p>
 
-                    <div className="space-y-4">
-                        {/* Location scope selector: Brasil / Estado */}
-                        <div className="relative" ref={stateDropdownRef}>
-                            <button
-                                onClick={() => setShowStateDropdown(!showStateDropdown)}
-                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg border border-brand-border dark:border-dark-border"
-                            >
-                                <span className="flex items-center gap-3">
-                                    {selectedStateFilter === "brasil" ? (
-                                        <Globe className="w-4 h-4 text-brand-green" />
-                                    ) : (
-                                        <MapPin className="w-4 h-4 text-brand-green" />
-                                    )}
-                                    <span>
-                                        {selectedStateFilter === "brasil" ? "Brasil" : ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}
+                        <div className="space-y-4">
+                            {/* Location scope selector: Brasil / Estado */}
+                            <div className="relative" ref={stateDropdownRef}>
+                                <button
+                                    onClick={() => setShowStateDropdown(!showStateDropdown)}
+                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg border border-brand-border dark:border-dark-border"
+                                >
+                                    <span className="flex items-center gap-3">
+                                        {selectedStateFilter === "brasil" ? (
+                                            <Globe className="w-4 h-4 text-brand-green" />
+                                        ) : (
+                                            <MapPin className="w-4 h-4 text-brand-green" />
+                                        )}
+                                        <span>
+                                            {selectedStateFilter === "brasil" ? "Brasil" : ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}
+                                        </span>
                                     </span>
-                                </span>
-                                <ChevronDown className={`w-4 h-4 text-brand-inactive-text transition-transform ${showStateDropdown ? 'rotate-180' : ''}`} />
-                            </button>
+                                    <ChevronDown className={`w-4 h-4 text-brand-inactive-text transition-transform ${showStateDropdown ? 'rotate-180' : ''}`} />
+                                </button>
 
-                            {showStateDropdown && (
-                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedStateFilter("brasil")
-                                            setShowStateDropdown(false)
-                                            setCitySearchText("")
-                                            handleSelectCity("brasil")
-                                            setIsCityModalOpen(false)
-                                        }}
-                                        className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
-                                    >
-                                        <Globe className="w-4 h-4 text-brand-green" />
-                                        <span>Brasil (todos os estados)</span>
-                                        {selectedStateFilter === "brasil" && <Check className="w-4 h-4 text-brand-green ml-auto" />}
-                                    </button>
-                                    {Object.entries(ESTADO_MAP).map(([uf, name]) => (
+                                {showStateDropdown && (
+                                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
                                         <button
-                                            key={uf}
                                             onClick={() => {
-                                                setSelectedStateFilter(uf)
+                                                setSelectedStateFilter("brasil")
                                                 setShowStateDropdown(false)
                                                 setCitySearchText("")
-                                                handleSelectCity(`estado-${uf}`)
+                                                handleSelectCity("brasil")
                                                 setIsCityModalOpen(false)
                                             }}
-                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
+                                            className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
                                         >
-                                            <span className="flex items-center gap-3">
-                                                <MapPin className="w-4 h-4 text-brand-green" />
-                                                {name}
-                                            </span>
-                                            {selectedStateFilter === uf && <Check className="w-4 h-4 text-brand-green" />}
+                                            <Globe className="w-4 h-4 text-brand-green" />
+                                            <span>Brasil (todos os estados)</span>
+                                            {selectedStateFilter === "brasil" && <Check className="w-4 h-4 text-brand-green ml-auto" />}
                                         </button>
-                                    ))}
+                                        {Object.entries(ESTADO_MAP).map(([uf, name]) => (
+                                            <button
+                                                key={uf}
+                                                onClick={() => {
+                                                    setSelectedStateFilter(uf)
+                                                    setShowStateDropdown(false)
+                                                    setCitySearchText("")
+                                                    handleSelectCity(`estado-${uf}`)
+                                                    setIsCityModalOpen(false)
+                                                }}
+                                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
+                                            >
+                                                <span className="flex items-center gap-3">
+                                                    <MapPin className="w-4 h-4 text-brand-green" />
+                                                    {name}
+                                                </span>
+                                                {selectedStateFilter === uf && <Check className="w-4 h-4 text-brand-green" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* City search - filters by selected state */}
+                            <div className="relative">
+                                <Input
+                                    placeholder={selectedStateFilter === "brasil" ? "Buscar por cidade... (ex: São Paulo, Bauru)" : `Buscar cidade em ${ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}...`}
+                                    value={citySearchText}
+                                    onChange={(e) => setCitySearchText(e.target.value)}
+                                    className="h-[42px] w-full"
+                                    variant="full-rounded"
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                />
+                                {filteredCitiesSuggestions.length > 0 && (
+                                    <div className="flex flex-col gap-1 border-t pt-2">
+                                        {filteredCitiesSuggestions.map((slug) => (
+                                            <button
+                                                key={slug}
+                                                onClick={() => {
+                                                    handleSelectCity(slug)
+                                                    setIsCityModalOpen(false)
+                                                }}
+                                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
+                                            >
+                                                <span>{formatCitySlug(slug)}</span>
+                                                {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {citySearchText.trim().length >= 2 && filteredCitiesSuggestions.length === 0 && citiesData.length > 0 && (
+                                    <p className="text-center text-xs text-brand-inactive-text py-3">
+                                        Nenhuma cidade encontrada{selectedStateFilter !== "brasil" ? ` em ${ESTADO_MAP[selectedStateFilter]}` : ""}
+                                    </p>
+                                )}
+                            </div>
+
+                            <Button
+                                onClick={() => {
+                                    requestLocation()
+                                    setIsCityModalOpen(false)
+                                }}
+                                variant="outline"
+                                className="w-full"
+                            >
+                                <MapPin className="w-4 h-4" />
+                                <span>Usar minha localização</span>
+                            </Button>
+
+                            {/* Only show login link when user is NOT logged in */}
+                            {!userProfile && (
+                                <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Já tem uma conta cadastrada com endereço salvo?
+                                    </p>
+                                    <Button
+                                        onClick={() => {
+                                            setIsCityModalOpen(false)
+                                            router.push("/auth/login")
+                                        }}
+                                        variant="link"
+                                        className="text-sm mt-1 inline-block"
+                                    >
+                                        Entrar na minha conta
+                                    </Button>
                                 </div>
                             )}
                         </div>
+                    </div>
+                </DefaultModal>
+            )}
 
-                        {/* City search - filters by selected state */}
-                        <div className="relative">
-                            <Input
-                                placeholder={selectedStateFilter === "brasil" ? "Buscar por cidade... (ex: São Paulo, Bauru)" : `Buscar cidade em ${ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}...`}
-                                value={citySearchText}
-                                onChange={(e) => setCitySearchText(e.target.value)}
-                                className="h-[42px] w-full"
-                                variant="full-rounded"
-                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+            {/* 2. CATEGORY MODAL (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
+            {isCategoryModalOpen && (
+                <DefaultModal
+                    isOpen={isCategoryModalOpen}
+                    onClose={() => setIsCategoryModalOpen(false)}
+                    title="Filtrar por Categoria"
+                    maxWidth="md"
+                >
+                    <div className="flex flex-col gap-2 py-2 max-h-[350px] overflow-y-auto pr-1">
+                        {activeCategoriesList.map((cat) => {
+                            const isSelected = selectedCategories.includes(cat.name)
+                            return (
+                                <button
+                                    key={cat.name}
+                                    onClick={() => toggleCategory(cat.name)}
+                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {cat.icon_url ? (
+                                            <img src={cat.icon_url} alt={cat.name} className="w-6 h-6 object-contain" />
+                                        ) : (
+                                            <span className="text-lg">📦</span>
+                                        )}
+                                        <span>{cat.name}</span>
+                                    </div>
+                                    {isSelected && <Check className="w-4 h-4 text-brand-green" />}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </DefaultModal>
+            )}
+
+            {/* 3. DEMAND MODAL - "Estou procurando isso" */}
+            {isDemandModalOpen && (
+                <DefaultModal
+                    isOpen={isDemandModalOpen}
+                    onClose={() => setIsDemandModalOpen(false)}
+                    title="O que você está procurando?"
+                    maxWidth="md"
+                >
+                    <div className="flex flex-col gap-4 py-2">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Selecione o tipo de demanda e digite o que precisa. Vamos tentar encontrar alguém que possa ajudar!
+                        </p>
+
+                        <div className="flex flex-col gap-2.5">
+                            <ListItem
+                                title="Quero comprar"
+                                description="Produtos, peças, eletrônicos, roupas ou itens físicos"
+                                className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "comprar"
+                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                    : ""
+                                    }`}
+                                onClick={() => setSelectedDemandType("comprar")}
+                                right={
+                                    <RadioButton
+                                        name="demandType"
+                                        value="comprar"
+                                        checked={selectedDemandType === "comprar"}
+                                        onChange={() => setSelectedDemandType("comprar")}
+                                    />
+                                }
                             />
-                            {filteredCitiesSuggestions.length > 0 && (
-                                <div className="flex flex-col gap-1 border-t pt-2">
-                                    {filteredCitiesSuggestions.map((slug) => (
-                                        <button
-                                            key={slug}
-                                            onClick={() => {
-                                                handleSelectCity(slug)
-                                                setIsCityModalOpen(false)
-                                            }}
-                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
-                                        >
-                                            <span>{formatCitySlug(slug)}</span>
-                                            {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            {citySearchText.trim().length >= 2 && filteredCitiesSuggestions.length === 0 && citiesData.length > 0 && (
-                                <p className="text-center text-xs text-brand-inactive-text py-3">
-                                    Nenhuma cidade encontrada{selectedStateFilter !== "brasil" ? ` em ${ESTADO_MAP[selectedStateFilter]}` : ""}
-                                </p>
-                            )}
+
+                            <ListItem
+                                title="Quero contratar"
+                                description="Serviços, profissionais, reformas, assistências ou diárias"
+                                className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "contratar"
+                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                    : ""
+                                    }`}
+                                onClick={() => setSelectedDemandType("contratar")}
+                                right={
+                                    <RadioButton
+                                        name="demandType"
+                                        value="contratar"
+                                        checked={selectedDemandType === "contratar"}
+                                        onChange={() => setSelectedDemandType("contratar")}
+                                    />
+                                }
+                            />
+
+                            <ListItem
+                                title="Quero encontrar loja ou empresa"
+                                description="Estabelecimentos comerciais, empresas locais ou pontos de atendimento"
+                                className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "loja" || selectedDemandType === "encontrar"
+                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                    : ""
+                                    }`}
+                                onClick={() => setSelectedDemandType("loja")}
+                                right={
+                                    <RadioButton
+                                        name="demandType"
+                                        value="loja"
+                                        checked={selectedDemandType === "loja" || selectedDemandType === "encontrar"}
+                                        onChange={() => setSelectedDemandType("loja")}
+                                    />
+                                }
+                            />
+                        </div>
+
+                        <div className="pt-1">
+                            <Input
+                                label="O que você precisa?"
+                                placeholder={
+                                    selectedDemandType === "comprar"
+                                        ? "Ex: pneu goodyear, notebook dell, camiseta..."
+                                        : selectedDemandType === "contratar"
+                                            ? "Ex: encanador, eletricista, fotógrafo..."
+                                            : "Ex: conserto de ar condicionado, autopeças, pet shop..."
+                                }
+                                value={demandTerm}
+                                onChange={(e) => setDemandTerm(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !isSubmittingDemand && demandTerm.trim()) {
+                                        e.preventDefault()
+                                        handleSubmitDemand()
+                                    }
+                                }}
+                                disabled={isSubmittingDemand}
+                                autoFocus
+                            />
                         </div>
 
                         <Button
-                            onClick={() => {
-                                requestLocation()
-                                setIsCityModalOpen(false)
-                            }}
-                            variant="outline"
-                            className="w-full"
+                            variant="default"
+                            className="w-full font-bold"
+                            onClick={handleSubmitDemand}
+                            disabled={!demandTerm.trim() || isSubmittingDemand}
+                            isLoading={isSubmittingDemand}
                         >
-                            <MapPin className="w-4 h-4" />
-                            <span>Usar minha localização</span>
+                            {isSubmittingDemand ? "Enviando..." : "Enviar"}
                         </Button>
-
-                        {/* Only show login link when user is NOT logged in */}
-                        {!userProfile && (
-                            <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                    Já tem uma conta cadastrada com endereço salvo?
-                                </p>
-                                <Button
-                                    onClick={() => {
-                                        setIsCityModalOpen(false)
-                                        router.push("/auth/login")
-                                    }}
-                                    variant="link"
-                                    className="text-sm mt-1 inline-block"
-                                >
-                                    Entrar na minha conta
-                                </Button>
-                            </div>
-                        )}
                     </div>
-                </div>
-            </DefaultModal>
-
-            {/* 2. CATEGORY MODAL (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
-            <DefaultModal
-                isOpen={isCategoryModalOpen}
-                onClose={() => setIsCategoryModalOpen(false)}
-                title="Filtrar por Categoria"
-                maxWidth="md"
-            >
-                <div className="flex flex-col gap-2 py-2 max-h-[350px] overflow-y-auto pr-1">
-                    {activeCategoriesList.map((cat) => {
-                        const isSelected = selectedCategories.includes(cat.name)
-                        return (
-                            <button
-                                key={cat.name}
-                                onClick={() => toggleCategory(cat.name)}
-                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
-                            >
-                                <div className="flex items-center gap-3">
-                                    {cat.icon_url ? (
-                                        <img src={cat.icon_url} alt={cat.name} className="w-6 h-6 object-contain" />
-                                    ) : (
-                                        <span className="text-lg">📦</span>
-                                    )}
-                                    <span>{cat.name}</span>
-                                </div>
-                                {isSelected && <Check className="w-4 h-4 text-brand-green" />}
-                            </button>
-                        )
-                    })}
-                </div>
-            </DefaultModal>
-
-            {/* 3. DEMAND MODAL - "Estou procurando isso" */}
-            <DefaultModal
-                isOpen={isDemandModalOpen}
-                onClose={() => setIsDemandModalOpen(false)}
-                title="O que você está procurando?"
-                maxWidth="md"
-            >
-                <div className="flex flex-col gap-4 py-2">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Selecione o tipo de demanda e digite o que precisa. Vamos tentar encontrar alguém que possa ajudar!
-                    </p>
-
-                    <div className="flex flex-col gap-2.5">
-                        <ListItem
-                            title="Quero comprar"
-                            description="Produtos, peças, eletrônicos, roupas ou itens físicos"
-                            className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "comprar"
-                                ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                : ""
-                                }`}
-                            onClick={() => setSelectedDemandType("comprar")}
-                            right={
-                                <RadioButton
-                                    name="demandType"
-                                    value="comprar"
-                                    checked={selectedDemandType === "comprar"}
-                                    onChange={() => setSelectedDemandType("comprar")}
-                                />
-                            }
-                        />
-
-                        <ListItem
-                            title="Quero contratar"
-                            description="Serviços, profissionais, reformas, assistências ou diárias"
-                            className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "contratar"
-                                ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                : ""
-                                }`}
-                            onClick={() => setSelectedDemandType("contratar")}
-                            right={
-                                <RadioButton
-                                    name="demandType"
-                                    value="contratar"
-                                    checked={selectedDemandType === "contratar"}
-                                    onChange={() => setSelectedDemandType("contratar")}
-                                />
-                            }
-                        />
-
-                        <ListItem
-                            title="Quero encontrar loja ou empresa"
-                            description="Estabelecimentos comerciais, empresas locais ou pontos de atendimento"
-                            className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "loja" || selectedDemandType === "encontrar"
-                                ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                : ""
-                                }`}
-                            onClick={() => setSelectedDemandType("loja")}
-                            right={
-                                <RadioButton
-                                    name="demandType"
-                                    value="loja"
-                                    checked={selectedDemandType === "loja" || selectedDemandType === "encontrar"}
-                                    onChange={() => setSelectedDemandType("loja")}
-                                />
-                            }
-                        />
-                    </div>
-
-                    <div className="pt-1">
-                        <Input
-                            label="O que você precisa?"
-                            placeholder={
-                                selectedDemandType === "comprar"
-                                    ? "Ex: pneu goodyear, notebook dell, camiseta..."
-                                    : selectedDemandType === "contratar"
-                                        ? "Ex: encanador, eletricista, fotógrafo..."
-                                        : "Ex: conserto de ar condicionado, autopeças, pet shop..."
-                            }
-                            value={demandTerm}
-                            onChange={(e) => setDemandTerm(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" && !isSubmittingDemand && demandTerm.trim()) {
-                                    e.preventDefault()
-                                    handleSubmitDemand()
-                                }
-                            }}
-                            disabled={isSubmittingDemand}
-                            autoFocus
-                        />
-                    </div>
-
-                    <Button
-                        variant="default"
-                        className="w-full font-bold"
-                        onClick={handleSubmitDemand}
-                        disabled={!demandTerm.trim() || isSubmittingDemand}
-                        isLoading={isSubmittingDemand}
-                    >
-                        {isSubmittingDemand ? "Enviando..." : "Enviar"}
-                    </Button>
-                </div>
-            </DefaultModal>
+                </DefaultModal>
+            )}
 
             {/* 4. DEMAND THANK YOU MODAL */}
-            <DefaultModal
-                isOpen={isDemandThankYouOpen}
-                onClose={() => setIsDemandThankYouOpen(false)}
-                title=""
-                maxWidth="sm"
-                hideHeader
-            >
-                <IconPlaceholder
-                    placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/Feedback.png"
-                    imageAlt="Obrigado pelo seu feedback!"
-                    title="Obrigado!"
-                    subtitle="Recebemos sua demanda! Vamos tentar encontrar alguém que possa te ajudar com isso. Fique de olho nas novidades da Dudit!"
-                    itemButton={{
-                        text: "Entendido",
-                        action: () => setIsDemandThankYouOpen(false),
-                        variant: "default"
-                    }}
-                />
-            </DefaultModal>
+            {isDemandThankYouOpen && (
+                <DefaultModal
+                    isOpen={isDemandThankYouOpen}
+                    onClose={() => setIsDemandThankYouOpen(false)}
+                    title=""
+                    maxWidth="sm"
+                    hideHeader
+                >
+                    <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Feedback.png"
+                        imageAlt="Obrigado pelo seu feedback!"
+                        title="Obrigado!"
+                        subtitle="Recebemos sua demanda! Vamos tentar encontrar alguém que possa te ajudar com isso. Fique de olho nas novidades da Dudit!"
+                        itemButton={{
+                            text: "Entendido",
+                            action: () => setIsDemandThankYouOpen(false),
+                            variant: "default"
+                        }}
+                    />
+                </DefaultModal>
+            )}
         </>
     )
 }

@@ -1060,10 +1060,10 @@ const Header: React.FC<HeaderProps> = ({
                         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
                             <button
                                 onClick={handleCloseMobileSearch}
-                                className="shrink-0 p-1 text-brand-dark dark:text-dark-heading hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+                                className="shrink-0 text-brand-dark dark:text-dark-heading hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
                                 title="Voltar"
                             >
-                                <ChevronLeftIcon size={24} strokeWidth={2.5} />
+                                <ChevronLeftIcon size={20} />
                             </button>
 
                             <form
@@ -1089,7 +1089,7 @@ const Header: React.FC<HeaderProps> = ({
                                     autoCorrect="off"
                                     spellCheck={false}
                                     placeholder="Buscar na Dudit"
-                                    className="bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[15px] w-full placeholder-gray-400 dark:placeholder-gray-500 font-normal py-0"
+                                    className="marketplace-search-input bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[15px] w-full placeholder-gray-400 dark:placeholder-gray-500 font-normal py-0"
                                     value={searchValue}
                                     onFocus={handleSearchFocus}
                                     onChange={(e) => setSearchValue(e.target.value)}
@@ -1335,7 +1335,7 @@ const Header: React.FC<HeaderProps> = ({
                         >
                             <input
                                 type="search"
-                                className="flex-1 h-full bg-transparent border-none outline-none text-brand-dark placeholder-gray-400 text-[15px] px-5 w-full font-normal rounded-l-full"
+                                className="marketplace-search-input flex-1 h-full bg-transparent border-none outline-none text-brand-dark placeholder-gray-400 text-[15px] px-5 w-full font-normal rounded-l-full"
                                 placeholder="Buscar produtos, marcas e muito mais..."
                                 onFocus={handleSearchFocus}
                                 value={searchValue}

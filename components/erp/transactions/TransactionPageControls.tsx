@@ -272,10 +272,9 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                         <Button
                             onClick={onAddTransaction}
                             disabled={addDisabled}
-                            className={`w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green text-white shadow-sm shadow-brand-green/20 ${addDisabled ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
-                        >
-                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
-                        </Button>
+                            className={`w-[42px] h-[42px] ${addDisabled ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
+                            leftIcon={<PlusIcon size={18} />}
+                        />
                     </div>
                 </div>
 

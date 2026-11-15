@@ -171,10 +171,9 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                         </Dropdown>
                         <Button
                             onClick={onAddMovement}
-                            className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green text-white shadow-sm"
-                        >
-                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
-                        </Button>
+                            className="w-[42px] h-[42px]"
+                            leftIcon={<PlusIcon size={18} />}
+                        />
                     </div>
                 </div>
 

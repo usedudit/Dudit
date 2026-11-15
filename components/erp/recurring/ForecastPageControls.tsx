@@ -12,10 +12,11 @@ interface ForecastPageControlsProps {
   onOpenFilter: () => void
   hasActiveFilters: boolean
   chips?: React.ReactNode
+  placeholder?: string
 }
 
 /**
- * Barra de controles da seção Calendário & Demanda:
+ * Barra de controles da seção Demanda de Estoque:
  * busca + botão "Filtros" + chips + toggle lista/grid (mesmo padrão das outras seções).
  */
 export const ForecastPageControls: React.FC<ForecastPageControlsProps> = ({
@@ -26,6 +27,7 @@ export const ForecastPageControls: React.FC<ForecastPageControlsProps> = ({
   onOpenFilter,
   hasActiveFilters,
   chips,
+  placeholder = "Buscar produto...",
 }) => {
   return (
     <SectionFilterBar
@@ -35,7 +37,7 @@ export const ForecastPageControls: React.FC<ForecastPageControlsProps> = ({
       search={{
         value: search,
         onChange: onSearchChange,
-        placeholder: "Buscar cliente ou plano...",
+        placeholder,
       }}
       extraRight={
         <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">

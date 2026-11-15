@@ -573,11 +573,10 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         {/* Add Item Link (When list has items) */}
                         {!itemsLocked && props.quoteItems.length > 0 && (
                             <Button
-                                type="button"
                                 variant="link"
                                 onClick={props.addBlankItem}
                             >
-                                <PlusIcon size={14} strokeWidth={3} />
+                                <PlusIcon size={14} />
                                 Adicionar item manual
                             </Button>
                         )}

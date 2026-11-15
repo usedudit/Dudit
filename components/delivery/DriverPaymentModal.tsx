@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Button,
@@ -9,22 +9,18 @@ import {
   InfoCard,
   Input,
   Barcode,
-  Tooltip,
   IconPlaceholder,
 } from "@/components/reusable"
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CheckCircleIcon,
   XIcon,
   MoneyIcon,
   QRCodeIcon,
   CreditCardIcon,
-  FileIcon,
   CopyIcon,
   PrinterIcon,
 } from "@/lib/icons"
-import { formatCurrency, formatDateTime } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
 import QRCode from "qrcode"
 import { useToast } from "@/components/ui/use-toast"
@@ -688,8 +684,7 @@ export default function DriverPaymentModal({
 
                         <div className="pt-2">
                           <Button
-                            variant="default"
-                            className="w-full h-11 font-bold"
+                            className="w-full h-11"
                             onClick={() => handleConfirmReceipt("Pix Mercado Pago")}
                           >
                             Confirmar Recebimento do Cliente
@@ -738,7 +733,7 @@ export default function DriverPaymentModal({
                                   variant="full-rounded"
                                   readOnly
                                   value={storePixKey}
-                                  className="flex-1 h-10 truncate text-xs"
+                                  className="flex-1 h-10 truncate"
                                 />
                                 <Button
                                   variant="outline"
@@ -774,7 +769,7 @@ export default function DriverPaymentModal({
                                   variant="full-rounded"
                                   readOnly
                                   value={storePixKey}
-                                  className="flex-1 h-10 truncate text-xs"
+                                  className="flex-1 h-10 truncate"
                                 />
                                 <Button
                                   variant="outline"
@@ -800,8 +795,7 @@ export default function DriverPaymentModal({
                         />
 
                         <Button
-                          variant="default"
-                          className="w-full h-11 font-bold"
+                          className="w-full h-11"
                           onClick={() => handleConfirmReceipt("Pix")}
                         >
                           Confirmar Recebimento do Pix

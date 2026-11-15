@@ -1,9 +1,14 @@
 "use client"
 
 import React, { useState, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { HorizontalCarousel } from "./shared-components"
 import { CommunityVideoCard } from "./CommunityVideoCard"
-import { VideoModal } from "./VideoModal"
+
+const VideoModal = dynamic(
+  () => import("./VideoModal").then((m) => m.VideoModal),
+  { ssr: false }
+)
 
 interface CommunityVideosCarouselProps {
   videos: any[]

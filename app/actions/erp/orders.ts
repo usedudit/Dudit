@@ -5613,7 +5613,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         String(leg.method).length > 120 ||
         ["amount", "amountReceived", "effectiveAmount", "netAmount", "adjustmentAmount", "adjustmentPercent", "paymentMethodDiscountAmount", "interestAmount", "feeAmount", "fixedFeeAmount", "installmentCostAmount", "installmentAmount"]
           .some((key) => leg[key] != null && (!Number.isFinite(leg[key]) || leg[key] < 0)) ||
-        (leg.paymentMethodId != null &&
+        (Boolean(leg.paymentMethodId) &&
           !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(leg.paymentMethodId))) ||
         (leg.mpPaymentId != null && String(leg.mpPaymentId).length > 100)
       ))
@@ -6273,10 +6273,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
       Array.isArray(payload.paymentBreakdown) &&
       payload.paymentBreakdown.length > 0;
     const overrideRequested = Boolean(payload.manualBalanceOverride);
-    const roleKey = String(access.roleId || "").toLowerCase();
-    const canOverrideManualBalance = ["owner", "admin", "manager"].includes(
-      roleKey,
-    );
+    const roleKey = String(
+      access?.roleId || (isAdmin ? "admin" : ""),
+    ).toLowerCase();
+    const canOverrideManualBalance =
+      isAdmin || ["owner", "admin", "manager"].includes(roleKey);
     if (overrideRequested && !canOverrideManualBalance) {
       return {
         error:

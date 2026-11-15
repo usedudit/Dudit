@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const product = await getMarketplaceProduct(id)
 
   if (!product) {
-    return { title: 'Produto não encontrado | Dudit' }
+    return { title: 'Produto não encontrado' }
   }
 
   const p = Array.isArray(product.partners) ? product.partners[0] : product.partners

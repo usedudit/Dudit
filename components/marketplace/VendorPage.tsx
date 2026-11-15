@@ -24,6 +24,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { Button, DefaultModal, Input, FormSection, InfoCard, RadioButton, Spinner } from "@/components/reusable"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
+import { DUDIT_ACTIVE_ADDRESS_STORAGE_KEY, useAddressSync } from "@/lib/utils/address-sync"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
@@ -909,6 +910,8 @@ function DeliveryCalculatorBottomSheet({
     partner,
     userProfile,
     currentAddressLabel,
+    initialCoords,
+    initialDeliveryInfo,
     onApplyLocation,
 }: {
     isOpen: boolean
@@ -916,6 +919,14 @@ function DeliveryCalculatorBottomSheet({
     partner: any
     userProfile: any
     currentAddressLabel: string | null
+    initialCoords?: { lat: number; lng: number } | null
+    initialDeliveryInfo?: {
+        distanceKm: number | null
+        deliveryTime: string | null
+        feeLabel: string | null
+        isFreeDelivery: boolean
+        outOfRadius: boolean
+    } | null
     onApplyLocation: (data: { lat: number; lng: number; label: string; cep?: string | null }) => void
 }) {
     const [calcCep, setCalcCep] = useState("")
@@ -935,6 +946,25 @@ function DeliveryCalculatorBottomSheet({
 
     const [savedAddresses, setSavedAddresses] = useState<any[]>([])
     const [loadingSavedAddresses, setLoadingSavedAddresses] = useState(false)
+
+    // Preenche o resultado inicial se já houver endereço ativo ou cálculo
+    useEffect(() => {
+        if (!isOpen) return
+        setCalcError(null)
+
+        if (currentAddressLabel && (initialCoords || initialDeliveryInfo)) {
+            setCalcResult({
+                distanceKm: initialDeliveryInfo?.distanceKm ?? null,
+                deliveryTime: initialDeliveryInfo?.deliveryTime ?? null,
+                feeLabel: initialDeliveryInfo?.feeLabel ?? (initialDeliveryInfo?.outOfRadius ? "A combinar" : "A consultar"),
+                isFree: Boolean(initialDeliveryInfo?.isFreeDelivery),
+                outOfRadius: Boolean(initialDeliveryInfo?.outOfRadius),
+                addressLabel: currentAddressLabel,
+                lat: initialCoords?.lat ?? null,
+                lng: initialCoords?.lng ?? null,
+            })
+        }
+    }, [isOpen, currentAddressLabel, initialCoords, initialDeliveryInfo])
 
     // Carrega endereços salvos do usuário se estiver logado
     useEffect(() => {
@@ -1183,9 +1213,9 @@ function DeliveryCalculatorBottomSheet({
                         <Button
                             onClick={() => handleCalculateByCep()}
                             disabled={calcLoading || calcCep.replace(/\D/g, "").length !== 8}
-                            className="px-4 shrink-0 font-semibold"
+                            className="w-[42px] h-[42px]"
                         >
-                            {calcLoading ? <Spinner size={16} /> : "Calcular"}
+                            {calcLoading ? <Spinner /> : "Calcular"}
                         </Button>
                     </div>
                 </div>
@@ -1258,46 +1288,73 @@ function DeliveryCalculatorBottomSheet({
                             </span>
                         </div>
 
-                        {calcResult.outOfRadius ? (
-                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[12px] text-amber-800 dark:text-amber-300">
-                                <p className="font-semibold mb-0.5">Fora da área de entrega</p>
-                                <p>Este endereço está a ~{calcResult.distanceKm} km da loja, fora do raio máximo configurado pelo vendedor. Você ainda pode optar por retirar seu pedido no local.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <div className="p-3 rounded-xl bg-white dark:bg-dark-card border border-brand-border/60 dark:border-dark-border">
-                                    <div className="flex items-center gap-1.5 text-brand-inactive-text dark:text-dark-body mb-1">
-                                        <EnergyIcon size={14} className="text-brand-green shrink-0" />
-                                        <span className="text-[10px] uppercase font-semibold">Tempo Estimado</span>
-                                    </div>
-                                    <p className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                        {calcResult.deliveryTime}
-                                    </p>
-                                    <p className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        {calcResult.distanceKm != null ? `~${calcResult.distanceKm} km da loja` : "Estimado"}
-                                    </p>
-                                </div>
-
-                                <div className="p-3 rounded-xl bg-white dark:bg-dark-card border border-brand-border/60 dark:border-dark-border">
-                                    <div className="flex items-center gap-1.5 text-brand-inactive-text dark:text-dark-body mb-1">
-                                        <MotorbikeIcon size={14} className={calcResult.isFree ? "text-brand-green shrink-0" : "text-brand-dark dark:text-dark-heading shrink-0"} />
-                                        <span className="text-[10px] uppercase font-semibold">Taxa de Entrega</span>
-                                    </div>
-                                    <p className={`text-[15px] font-bold ${calcResult.isFree ? "text-brand-green dark:text-emerald-400" : "text-brand-dark dark:text-dark-heading"}`}>
-                                        {calcResult.feeLabel}
-                                    </p>
-                                    <p className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        {calcResult.isFree ? "Entrega gratuita" : "Taxa de entrega"}
-                                    </p>
-                                </div>
+                        {calcResult.outOfRadius && (
+                            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300">
+                                Endereço fora do raio de entrega configurado pela loja (~{calcResult.distanceKm} km).
                             </div>
                         )}
+
+                        {/* Cards de Entrega e Tempo Estimado exatamente iguais ao card da página */}
+                        <div className="bg-white dark:bg-dark-card border border-brand-border dark:border-dark-border rounded-lg p-3">
+                            <div className="grid grid-cols-2 divide-x divide-brand-border dark:divide-dark-border">
+                                {/* Entrega */}
+                                <div className="flex flex-col items-center justify-center text-center px-1 py-0.5 min-w-0">
+                                    <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
+                                        {!calcResult.outOfRadius && calcResult.distanceKm != null ? (
+                                            <MotorbikeIcon
+                                                size={15}
+                                                className={
+                                                    calcResult.isFree
+                                                        ? "text-brand-green shrink-0"
+                                                        : "text-brand-dark dark:text-dark-heading shrink-0"
+                                                }
+                                            />
+                                        ) : null}
+                                        <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${
+                                            calcResult.outOfRadius || calcResult.distanceKm == null
+                                                ? "text-brand-dark dark:text-dark-heading"
+                                                : calcResult.isFree
+                                                    ? "text-brand-green"
+                                                    : "text-brand-dark dark:text-dark-heading"
+                                        }`}>
+                                            {!calcResult.outOfRadius && calcResult.distanceKm != null
+                                                ? (calcResult.feeLabel || "A consultar")
+                                                : "A combinar"}
+                                        </span>
+                                    </div>
+                                    <span className="text-[11px] sm:text-[12px] text-brand-inactive-text dark:text-dark-body flex items-center justify-center gap-0.5 mt-0.5">
+                                        Entrega
+                                    </span>
+                                </div>
+
+                                {/* Tempo est. */}
+                                <div className="flex flex-col items-center justify-center text-center px-1 py-0.5 min-w-0">
+                                    <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
+                                        {!calcResult.outOfRadius && calcResult.distanceKm != null && calcResult.deliveryTime ? (
+                                            <>
+                                                <EnergyIcon size={13} className="text-brand-green shrink-0" />
+                                                <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                                    {calcResult.deliveryTime}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                                A Consultar
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[11px] sm:text-[12px] text-brand-inactive-text dark:text-dark-body flex items-center justify-center gap-0.5 mt-0.5">
+                                        Tempo est.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
 
                         <Button
                             onClick={handleConfirm}
                             className="w-full mt-2 font-semibold"
                         >
-                            Usar este Endereço
+                            Usar meu endereço
                         </Button>
                     </div>
                 )}
@@ -1314,10 +1371,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return getOpenNowStatus(partner?.openingHours, undefined, partner?.timezone || "America/Sao_Paulo")
     }, [partner?.openingHours, partner?.timezone])
 
+    const { user } = useSupabase()
+
     // Delivery calculation states
     const [isDeliveryCalculatorOpen, setIsDeliveryCalculatorOpen] = useState(false)
     const [customCoords, setCustomCoords] = useState<{ lat: number; lng: number } | null>(null)
     const [customAddressLabel, setCustomAddressLabel] = useState<string | null>(null)
+    const [userAddressCoords, setUserAddressCoords] = useState<{ lat: number; lng: number } | null>(null)
+    const [userAddressLabel, setUserAddressLabel] = useState<string | null>(null)
+    const [serverDelivery, setServerDelivery] = useState<{
+        distanceKm: number | null
+        feeLabel: string | null
+        isFreeDelivery: boolean
+        outOfRadius: boolean
+    } | null>(null)
 
     // Recupera cálculo persistido anteriormente em localStorage
     useEffect(() => {
@@ -1333,19 +1400,116 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         } catch { }
     }, [])
 
+    // Busca endereço ativo/padrão do usuário e resolve coordenadas automaticamente ao entrar na página
+    const loadUserActiveAddress = useCallback(async () => {
+        const userId = user?.id || userProfile?.userId || userProfile?.user_id
+        if (!userId) return
+
+        try {
+            const res = await getAddressesAction(userId, "user")
+            if (!res?.addresses || res.addresses.length === 0) return
+
+            const list = res.addresses as any[]
+            const storedActiveId = typeof window !== "undefined"
+                ? localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY)
+                : null
+
+            const activeAddr = (storedActiveId && list.find((a: any) => a.id === storedActiveId))
+                || list.find((a: any) => a.is_default)
+                || list[0]
+
+            if (!activeAddr) return
+
+            const labelParts = [
+                activeAddr.street ? `${activeAddr.street}${activeAddr.number ? `, ${activeAddr.number}` : ""}` : "",
+                activeAddr.neighborhood,
+                `${activeAddr.city}/${activeAddr.state}`
+            ].filter(Boolean)
+            const label = labelParts.length > 0 ? labelParts.join(" - ") : (activeAddr.label || "Endereço cadastrado")
+
+            if (activeAddr.latitude && activeAddr.longitude && !isNaN(Number(activeAddr.latitude)) && !isNaN(Number(activeAddr.longitude))) {
+                setUserAddressCoords({ lat: Number(activeAddr.latitude), lng: Number(activeAddr.longitude) })
+                setUserAddressLabel(label)
+            } else if (activeAddr.zip_code) {
+                const cleanCep = activeAddr.zip_code.replace(/\D/g, "")
+                if (cleanCep.length === 8) {
+                    try {
+                        const cepRes = await fetch(`/api/cep?cep=${cleanCep}`)
+                        if (cepRes.ok) {
+                            const cepData = await cepRes.json()
+                            if (cepData.latitude && cepData.longitude) {
+                                setUserAddressCoords({ lat: Number(cepData.latitude), lng: Number(cepData.longitude) })
+                                setUserAddressLabel(label)
+                            }
+                        }
+                    } catch { }
+                }
+            }
+        } catch { }
+    }, [user?.id, userProfile?.userId, userProfile?.user_id])
+
+    useEffect(() => {
+        void loadUserActiveAddress()
+    }, [loadUserActiveAddress])
+
+    // Sincroniza se o endereço mudar em outra parte da aplicação (header, modal, etc.)
+    useAddressSync(useCallback(() => {
+        void loadUserActiveAddress()
+    }, [loadUserActiveAddress]))
+
     const userCoords = useMemo(() => {
+        if (userAddressCoords) return userAddressCoords
         return userProfile?.latitude && userProfile?.longitude
             ? { lat: Number(userProfile.latitude), lng: Number(userProfile.longitude) }
             : null
-    }, [userProfile?.latitude, userProfile?.longitude])
+    }, [userAddressCoords, userProfile?.latitude, userProfile?.longitude])
 
     const effectiveCoords = useMemo(() => {
         return customCoords || userCoords
     }, [customCoords, userCoords])
 
     const effectiveAddressLabel = useMemo(() => {
-        return customAddressLabel || userProfile?.address || null
-    }, [customAddressLabel, userProfile?.address])
+        return customAddressLabel || userAddressLabel || userProfile?.address || null
+    }, [customAddressLabel, userAddressLabel, userProfile?.address])
+
+    // Resolve cálculo no servidor se a loja não tiver latitude/longitude direta
+    useEffect(() => {
+        if (!effectiveCoords) {
+            setServerDelivery(null)
+            return
+        }
+        const storeLat = partner?.lat ?? partner?.latitude ?? null
+        const storeLng = partner?.lng ?? partner?.longitude ?? null
+
+        if (storeLat == null || storeLng == null || isNaN(Number(storeLat)) || isNaN(Number(storeLng))) {
+            const partnerId = partner?.partner_id || partner?.partnerId || partner?.id
+            if (!partnerId) return
+
+            let active = true
+            void quoteDeliveryFeeAction({
+                partnerId,
+                storeId: partner?.id,
+                destinationAddress: effectiveAddressLabel || "",
+                destinationCoords: effectiveCoords,
+            }).then((quoteRes: any) => {
+                if (active && quoteRes?.success) {
+                    const dist = quoteRes.distanceKm != null ? Number(quoteRes.distanceKm.toFixed(1)) : null
+                    const fee = Number(quoteRes.fee || 0)
+                    const isOutside = Boolean(quoteRes.isOutsideRadius || (quoteRes.maxDeliveryKm != null && dist != null && dist > quoteRes.maxDeliveryKm))
+                    setServerDelivery({
+                        distanceKm: dist,
+                        feeLabel: fee === 0 ? "Grátis" : formatCurrency(fee),
+                        isFreeDelivery: fee === 0,
+                        outOfRadius: isOutside,
+                    })
+                }
+            }).catch(() => { })
+
+            return () => { active = false }
+        } else {
+            setServerDelivery(null)
+        }
+    }, [effectiveCoords, effectiveAddressLabel, partner?.lat, partner?.latitude, partner?.lng, partner?.longitude, partner?.partner_id, partner?.partnerId, partner?.id])
 
     const deliveryInfo = useMemo(() => {
         const rawSettings = partner?.delivery_settings || null
@@ -1358,20 +1522,22 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         let distanceKm: number | null = null
         if (effectiveCoords && storeLat != null && storeLng != null && !isNaN(Number(storeLat)) && !isNaN(Number(storeLng))) {
             distanceKm = Number(calculateDistance(effectiveCoords, { lat: Number(storeLat), lng: Number(storeLng) }).toFixed(1))
+        } else if (serverDelivery?.distanceKm != null) {
+            distanceKm = serverDelivery.distanceKm
         }
 
         const maxDeliveryKmRaw = settings?.max_delivery_km ?? settings?.maxDeliveryKm
         const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
         const outOfRadius = isDeliveryEnabled
-            && distanceKm != null
-            && maxDeliveryKm != null
-            && maxDeliveryKm > 0
-            && distanceKm > maxDeliveryKm
+            && (
+                serverDelivery?.outOfRadius ??
+                (distanceKm != null && maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm)
+            )
 
         // Formata o tempo estimado como faixa "20 a 30 min", estilo da imagem do usuário
         let deliveryTimeRange: string | null = null
         if (distanceKm != null && !outOfRadius) {
-            const rawRange = estimateDeliveryTimeRange(distanceKm)
+            const rawRange = estimateDeliveryTimeRange(Math.max(0.1, distanceKm))
             if (rawRange) {
                 deliveryTimeRange = rawRange.replace("-", " a ")
             }
@@ -1385,17 +1551,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         const deliveryTime = deliveryTimeRange || fallbackDeliveryTime
 
         const baseFee = Number(settings?.base_fee ?? settings?.baseFee ?? 0)
-        const feeLabel = outOfRadius ? null : estimateDeliveryFeeLabel({
-            distanceKm,
-            baseFee: settings?.base_fee ?? settings?.baseFee,
-            includedKm: settings?.included_km ?? settings?.includedKm,
-            extraKmPrice: settings?.extra_km_price ?? settings?.extraKmPrice,
-            maxDeliveryKm,
-            isDeliveryEnabled,
-            deliveryPayer: settings?.delivery_payer ?? settings?.deliveryPayer,
-        })
+        let feeLabel = serverDelivery?.feeLabel || null
+        if (!feeLabel && !outOfRadius) {
+            feeLabel = estimateDeliveryFeeLabel({
+                distanceKm,
+                baseFee: settings?.base_fee ?? settings?.baseFee,
+                includedKm: settings?.included_km ?? settings?.includedKm,
+                extraKmPrice: settings?.extra_km_price ?? settings?.extraKmPrice,
+                maxDeliveryKm,
+                isDeliveryEnabled,
+                deliveryPayer: settings?.delivery_payer ?? settings?.deliveryPayer,
+            })
+        }
 
-        const isFreeDelivery = feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller")
+        const isFreeDelivery = serverDelivery?.isFreeDelivery ?? (feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller"))
 
         return {
             isDeliveryEnabled,
@@ -1409,7 +1578,15 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             maxDeliveryKm,
             settings,
         }
-    }, [partner?.delivery_settings, partner?.lat, partner?.latitude, partner?.lng, partner?.longitude, partner?.offeringType, partner?.delivery_time_formatted, products, effectiveCoords])
+    }, [partner?.delivery_settings, partner?.lat, partner?.latitude, partner?.lng, partner?.longitude, partner?.offeringType, partner?.delivery_time_formatted, products, effectiveCoords, serverDelivery])
+
+    const hasDeliveryCalculation = Boolean(
+        effectiveCoords &&
+        deliveryInfo.distanceKm != null &&
+        !deliveryInfo.outOfRadius &&
+        deliveryInfo.isDeliveryEnabled !== false &&
+        deliveryInfo.sellsProducts !== false
+    )
 
     const deliveryNode = useMemo<ReactNode | null>(() => {
         if (deliveryInfo.outOfRadius) {
@@ -1433,7 +1610,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             <span className="flex flex-wrap items-center gap-x-1.5">
                 <span className="font-medium text-brand-dark dark:text-dark-heading">{mainLabel}</span>
                 <span aria-hidden className="text-brand-inactive-text dark:text-dark-body">•</span>
-                <span className={`font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400" : "text-brand-dark dark:text-dark-heading"}`}>{feeLabel}</span>
+                <span className={`font-semibold ${isFreeDelivery ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{feeLabel}</span>
             </span>
         )
     }, [deliveryInfo])
@@ -1515,7 +1692,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const tabsScrollRef = useRef<HTMLDivElement>(null)
     const mobileTabsRef = useRef<HTMLDivElement>(null)
     const topRef = useRef<HTMLDivElement>(null)
-    const { user } = useSupabase()
     const isStoreOwner = Boolean(user?.id && ((partner?.userId && user.id === partner.userId) || (partner?.user_id && user.id === partner.user_id)))
 
     const displayProducts = useMemo(() => {
@@ -2261,8 +2437,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             {/* Tablet / Mobile (lg:hidden): Card de Horário, Entrega e Cálculo de Tempo Estimado no estilo da imagem */}
             <div className="lg:hidden px-4 md:px-6 mb-4">
                 {/* 3-Column Pill Card */}
-                <div className="bg-white dark:bg-dark-card border border-brand-border/70 dark:border-dark-border rounded-2xl shadow-sm p-3">
-                    <div className="grid grid-cols-3 divide-x divide-brand-border/40 dark:divide-dark-border/40">
+                <div className="bg-white dark:bg-dark-card border border-brand-border dark:border-dark-border rounded-lg p-3">
+                    <div className="grid grid-cols-3 divide-x divide-brand-border dark:divide-dark-border">
                         {/* 1. Coisa de horário ali primeiro */}
                         <button
                             type="button"
@@ -2280,7 +2456,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         openStatus?.status === "open"
                                             ? "text-brand-green shrink-0"
                                             : openStatus?.status === "closing_soon"
-                                                ? "text-brand-yellow shrink-0"
+                                                ? "text-brand-orange shrink-0"
                                                 : "text-brand-red shrink-0"
                                     }
                                 />
@@ -2307,29 +2483,32 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             title="Opções e taxa de entrega"
                         >
                             <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
-                                <MotorbikeIcon
-                                    size={15}
-                                    className={
-                                        deliveryInfo.isFreeDelivery
-                                            ? "text-brand-green dark:text-emerald-400 shrink-0"
-                                            : "text-brand-dark dark:text-dark-heading shrink-0"
-                                    }
-                                />
-                                <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${deliveryInfo.outOfRadius
-                                    ? "text-brand-red font-semibold text-[12px]"
-                                    : deliveryInfo.isFreeDelivery
-                                        ? "text-brand-green dark:text-emerald-400"
-                                        : "text-brand-dark dark:text-dark-heading"
-                                    }`}>
-                                    {deliveryInfo.outOfRadius
-                                        ? "Fora da área"
-                                        : !deliveryInfo.isDeliveryEnabled || !deliveryInfo.sellsProducts
-                                            ? "Retirada"
-                                            : deliveryInfo.feeLabel || "A consultar"}
-                                </span>
+                                {hasDeliveryCalculation ? (
+                                    <>
+                                        <MotorbikeIcon
+                                            size={15}
+                                            className={
+                                                deliveryInfo.isFreeDelivery
+                                                    ? "text-brand-green shrink-0"
+                                                    : "text-brand-dark dark:text-dark-heading shrink-0"
+                                            }
+                                        />
+                                        <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${
+                                            deliveryInfo.isFreeDelivery
+                                                ? "text-brand-green"
+                                                : "text-brand-dark dark:text-dark-heading"
+                                        }`}>
+                                            {deliveryInfo.feeLabel || "A consultar"}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                        A combinar
+                                    </span>
+                                )}
                             </div>
                             <span className="text-[11px] sm:text-[12px] text-brand-inactive-text dark:text-dark-body flex items-center justify-center gap-0.5 mt-0.5 group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors">
-                                {deliveryInfo.isFreeDelivery && deliveryInfo.baseFee > 0 ? (
+                                {hasDeliveryCalculation && deliveryInfo.isFreeDelivery && deliveryInfo.baseFee > 0 ? (
                                     <span className="line-through">{formatCurrency(deliveryInfo.baseFee)}</span>
                                 ) : (
                                     <span>Entrega</span>
@@ -2343,19 +2522,19 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             type="button"
                             onClick={() => setIsDeliveryCalculatorOpen(true)}
                             className="flex flex-col items-center justify-center text-center px-1 py-0.5 hover:opacity-80 active:scale-[0.98] transition-all group min-w-0"
-                            title="Calcular tempo estimado de entrega"
+                            title="Tempo estimado de entrega"
                         >
                             <div className="flex items-center justify-center gap-1 min-w-0 max-w-full">
-                                {deliveryInfo.deliveryTime ? (
+                                {hasDeliveryCalculation && deliveryInfo.deliveryTime ? (
                                     <>
-                                        <EnergyIcon size={13} className="text-brand-green dark:text-emerald-400 shrink-0" />
+                                        <EnergyIcon size={13} className="text-brand-green shrink-0" />
                                         <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
                                             {deliveryInfo.deliveryTime}
                                         </span>
                                     </>
                                 ) : (
-                                    <span className="font-bold text-[13px] sm:text-[14px] text-brand-green dark:text-emerald-400 truncate leading-tight">
-                                        Calcular
+                                    <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                        A Consultar
                                     </span>
                                 )}
                             </div>
@@ -2364,64 +2543,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             </span>
                         </button>
                     </div>
-                </div>
-
-                {/* Ai abaixo ali se der pra calcular o tempo estimado de entrega tbm */}
-                <div className="mt-2">
-                    {effectiveCoords ? (
-                        <button
-                            type="button"
-                            onClick={() => setIsDeliveryCalculatorOpen(true)}
-                            className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-gray-50/90 dark:bg-dark-surface/60 border border-brand-border/60 dark:border-dark-border text-left hover:bg-gray-100/70 dark:hover:bg-dark-border/30 transition-colors"
-                        >
-                            <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-6 h-6 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
-                                    <MapPinIcon size={13} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading">
-                                            {deliveryInfo.deliveryTime ? `Tempo estimado: ${deliveryInfo.deliveryTime}` : "Tempo estimado de entrega"}
-                                        </span>
-                                        {deliveryInfo.distanceKm != null && (
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                • ~{deliveryInfo.distanceKm} km
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {effectiveAddressLabel ? `Entregar em: ${effectiveAddressLabel}` : "Endereço selecionado"}
-                                    </p>
-                                </div>
-                            </div>
-                            <span className="text-[11px] font-medium text-brand-green shrink-0 flex items-center gap-0.5">
-                                Alterar <ChevronRightIcon size={11} />
-                            </span>
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setIsDeliveryCalculatorOpen(true)}
-                            className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-colors text-left"
-                        >
-                            <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-6 h-6 rounded-full bg-brand-green/15 flex items-center justify-center text-brand-green shrink-0">
-                                    <MapPinIcon size={13} />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading leading-tight">
-                                        Calcular tempo estimado de entrega
-                                    </p>
-                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        Informe seu CEP para calcular o prazo e taxa
-                                    </p>
-                                </div>
-                            </div>
-                            <span className="text-[11px] font-semibold text-brand-green shrink-0 flex items-center gap-0.5">
-                                Calcular <ChevronRightIcon size={11} />
-                            </span>
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -2489,7 +2610,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             </div>
 
-            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md transition-all duration-200 ${mobileTabsScrolledOut && !categoryView ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-2 opacity-0 pointer-events-none"}`}>
+            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 transition-all duration-200 ${mobileTabsScrolledOut && !categoryView ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-2 opacity-0 pointer-events-none"}`}>
                 <div className="flex items-center gap-2 px-3 h-full">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
@@ -2797,6 +2918,14 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 partner={partner}
                 userProfile={userProfile}
                 currentAddressLabel={effectiveAddressLabel}
+                initialCoords={effectiveCoords}
+                initialDeliveryInfo={{
+                    distanceKm: deliveryInfo.distanceKm,
+                    deliveryTime: deliveryInfo.deliveryTime,
+                    feeLabel: deliveryInfo.feeLabel,
+                    isFreeDelivery: deliveryInfo.isFreeDelivery,
+                    outOfRadius: deliveryInfo.outOfRadius,
+                }}
                 onApplyLocation={(data) => {
                     if (data.lat && data.lng) {
                         setCustomCoords({ lat: data.lat, lng: data.lng })

@@ -21,7 +21,6 @@ import {
   TabsContent,
   ThreeDotsLoader,
 } from "@/components/reusable"
-import { ReportTableCard } from "@/components/erp/reports/widgets"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 
 // Specific components
@@ -80,21 +79,21 @@ import {
 } from "@/lib/utils/filter-date-period"
 
 const COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
-  { id: "customer", label: "Cliente", align: "left" as const, width: "250px" },
-  { id: "plan", label: "Plano / Frequência", align: "left" as const, width: "250px" },
-  { id: "status", label: "Situação", align: "center" as const, width: "150px" },
-  { id: "nextExecution", label: "Próxima Execução", align: "left" as const, width: "200px" },
-  { id: "shipping", label: "Frete", align: "left" as const, width: "150px" },
-  { id: "actions", label: "Ações", align: "center" as const, width: "250px" },
+  { id: "customer", label: "Cliente", align: "left" as const, width: "240px" },
+  { id: "plan", label: "Plano / Frequência", align: "left" as const, width: "220px" },
+  { id: "nextExecution", label: "Próxima Execução", align: "left" as const, width: "170px" },
+  { id: "billing", label: "Próxima Cobrança", align: "right" as const, width: "160px" },
+  { id: "delivery", label: "Entrega", align: "left" as const, width: "200px" },
+  { id: "status", label: "Situação", align: "center" as const, width: "140px" },
+  { id: "actions", label: "Ações", align: "center" as const, width: "100px" },
 ]
 
-const FORECAST_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
-  { id: "customer", label: "Cliente", align: "left" as const, width: "250px" },
-  { id: "plan", label: "Plano / Frequência", align: "left" as const, width: "230px" },
-  { id: "scheduledFor", label: "Previsão", align: "left" as const, width: "170px" },
-  { id: "value", label: "Próxima Cobrança", align: "right" as const, width: "170px" },
-  { id: "modality", label: "Entrega", align: "left" as const, width: "190px" },
-  { id: "actions", label: "Ações", align: "center" as const, width: "120px" },
+const DEMAND_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
+  { id: "product", label: "Produto", align: "left" as const, width: "380px" },
+  { id: "quantity", label: "Qtd. Prevista", align: "center" as const, width: "160px" },
+  { id: "stock", label: "Estoque Atual", align: "center" as const, width: "160px" },
+  { id: "status", label: "Status", align: "center" as const, width: "150px" },
+  { id: "actions", label: "Ações", align: "center" as const, width: "100px" },
 ]
 
 const BILLING_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
@@ -132,8 +131,8 @@ const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
     subtitle: "Pedidos gerados por assinaturas e situação dos pagamentos.",
   },
   forecast: {
-    title: "Demanda & Execuções",
-    subtitle: "Previsão de itens, estoque e execuções para os próximos 30 dias.",
+    title: "Demanda de Estoque",
+    subtitle: "Previsão de itens e estoque necessário para as próximas execuções.",
   },
 }
 
@@ -143,10 +142,14 @@ const SECTION_SLUGS: Record<Exclude<SectionKey, "home">, string> = {
   forecast: "calendario",
 }
 
-const SLUG_TO_SECTION: Record<string, SectionKey> = Object.entries(SECTION_SLUGS).reduce(
-  (acc, [key, slug]) => ({ ...acc, [slug]: key as SectionKey }),
-  {} as Record<string, SectionKey>,
-)
+const SLUG_TO_SECTION: Record<string, SectionKey> = {
+  ...Object.entries(SECTION_SLUGS).reduce(
+    (acc, [key, slug]) => ({ ...acc, [slug]: key as SectionKey }),
+    {} as Record<string, SectionKey>,
+  ),
+  demanda: "forecast",
+  forecast: "forecast",
+}
 
 const DELINQUENT_STATUSES = ["past_due", "payment_failed"]
 
@@ -165,8 +168,8 @@ const SECTIONS: { key: Exclude<SectionKey, "home">; title: string; description: 
   },
   {
     key: "forecast",
-    title: "Demanda & Execuções",
-    description: "Itens necessários, estoque e próximas execuções.",
+    title: "Demanda de Estoque",
+    description: "Previsão de produtos e estoque necessário para as próximas execuções.",
     icon: CalendarIcon,
   },
 ]
@@ -909,31 +912,7 @@ export default function RecurringSubscriptionsPage({
     ]
   }, [filteredBillingData])
 
-  const filteredForecastData = useMemo(() => {
-    const term = forecastSearch.trim().toLowerCase()
-    return forecastData.filter((row: any) => {
-      if (!matchesHorizon(row.scheduledFor, forecastFilters.horizon)) return false
-      if (!term) return true
-      return (
-        (row.customerName || "").toLowerCase().includes(term) ||
-        (row.customerEmail || "").toLowerCase().includes(term) ||
-        (row.planName || "").toLowerCase().includes(term)
-      )
-    })
-  }, [forecastData, forecastFilters, forecastSearch])
-
-  const forecastTotalPages = Math.max(1, Math.ceil(filteredForecastData.length / itemsPerPage))
-  const safeForecastPage = Math.min(forecastPage, forecastTotalPages)
-  const forecastPaginated = filteredForecastData.slice(
-    (safeForecastPage - 1) * itemsPerPage,
-    safeForecastPage * itemsPerPage,
-  )
-
-  useEffect(() => {
-    setForecastPage(1)
-  }, [forecastSearch, forecastFilters, currentTab])
-
-  // Demanda agregada por produto (próximo ciclo) das assinaturas visíveis
+  // Demanda agregada por produto (próximo ciclo) das assinaturas visíveis no horizonte selecionado
   const demandRows = useMemo(() => {
     const byProduct = new Map<
       string,
@@ -941,12 +920,14 @@ export default function RecurringSubscriptionsPage({
         id: string
         name: string
         unit: string | null
+        images: string[] | null
         quantity: number
         stockAvailable: number
         minStock: number
       }
     >()
-    for (const row of filteredForecastData) {
+    for (const row of forecastData) {
+      if (!matchesHorizon(row.scheduledFor, forecastFilters.horizon)) continue
       for (const item of row.items || []) {
         if (!item.productId) continue
         const existing = byProduct.get(item.productId)
@@ -957,6 +938,7 @@ export default function RecurringSubscriptionsPage({
             id: item.productId,
             name: item.name,
             unit: item.unit ?? null,
+            images: item.images ?? null,
             quantity: item.quantity,
             stockAvailable: item.stockAvailable,
             minStock: item.minStock,
@@ -965,43 +947,29 @@ export default function RecurringSubscriptionsPage({
       }
     }
     return [...byProduct.values()].sort((a, b) => b.quantity - a.quantity)
-  }, [filteredForecastData])
+  }, [forecastData, forecastFilters.horizon])
+
+  const filteredDemandRows = useMemo(() => {
+    const term = forecastSearch.trim().toLowerCase()
+    if (!term) return demandRows
+    return demandRows.filter((p) => p.name.toLowerCase().includes(term))
+  }, [demandRows, forecastSearch])
 
   const demandShortages = useMemo(
-    () => demandRows.filter((row) => row.quantity > row.stockAvailable),
-    [demandRows],
+    () => filteredDemandRows.filter((row) => row.quantity > row.stockAvailable),
+    [filteredDemandRows],
   )
 
-  const demandColumns = useMemo(
-    () => [
-      { key: "name", header: "Produto" },
-      {
-        key: "quantity",
-        header: "Qtd. Prevista",
-        align: "center" as const,
-        render: (value: number, row: any) => (
-          <span className="font-bold">
-            {value}
-            {row.unit ? ` ${row.unit}` : ""}
-          </span>
-        ),
-      },
-      { key: "stockAvailable", header: "Estoque Atual", align: "center" as const },
-      {
-        key: "id",
-        header: "Status",
-        align: "center" as const,
-        render: (_value: any, row: any) => {
-          const missing = row.quantity - row.stockAvailable
-          const isLow = row.minStock > 0 && row.stockAvailable <= row.minStock
-          if (missing > 0) return <Badge variant="red">{`Falta ${missing}`}</Badge>
-          if (isLow) return <Badge variant="orange">Baixo</Badge>
-          return <Badge variant="green">Normal</Badge>
-        },
-      },
-    ],
-    [],
+  const forecastTotalPages = Math.max(1, Math.ceil(filteredDemandRows.length / itemsPerPage))
+  const safeForecastPage = Math.min(forecastPage, forecastTotalPages)
+  const forecastPaginated = filteredDemandRows.slice(
+    (safeForecastPage - 1) * itemsPerPage,
+    safeForecastPage * itemsPerPage,
   )
+
+  useEffect(() => {
+    setForecastPage(1)
+  }, [forecastSearch, forecastFilters, currentTab])
 
   return (
     <FadeIn className="w-full">
@@ -1037,7 +1005,7 @@ export default function RecurringSubscriptionsPage({
               <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
                   {currentTab !== "home" && (
-                    <div className="hidden md:flex shrink-0 mt-5">
+                    <div className="hidden md:flex shrink-0 mt-2">
                       <Button
                         variant="filled"
                         onClick={() => navigateToSection("home")}
@@ -1344,11 +1312,12 @@ export default function RecurringSubscriptionsPage({
                   )}
                 </TabsContent>
 
-                {/* Tab 3: Forecast / Demanda & Execuções */}
+                {/* Tab 3: Demanda de Estoque */}
                 <TabsContent value="forecast">
                   <ForecastPageControls
                     search={forecastSearch}
                     onSearchChange={setForecastSearch}
+                    placeholder="Buscar produto..."
                     viewMode={effectiveViewMode}
                     onViewModeChange={setViewModeState}
                     onOpenFilter={() => setFilterTarget("forecast")}
@@ -1361,32 +1330,20 @@ export default function RecurringSubscriptionsPage({
                     }
                   />
 
-                  {!loadingForecast && demandRows.length > 0 && (
-                    <div className="mt-4 space-y-4">
-                      {demandShortages.length > 0 && (
-                        <div className="flex items-center gap-3 rounded-xl border border-brand-orange/40 bg-brand-orange/10 px-4 py-3">
-                          <AlertTriangleIcon size={20} className="text-brand-orange shrink-0" />
-                          <p className="text-sm font-bold text-brand-orange">
-                            {demandShortages.length === 1
-                              ? "1 produto com estoque insuficiente"
-                              : `${demandShortages.length} produtos com estoque insuficiente`}{" "}
-                            para as próximas execuções:{" "}
-                            {demandShortages
-                              .slice(0, 5)
-                              .map((r) => r.name)
-                              .join(", ")}
-                            {demandShortages.length > 5 ? ` e outros ${demandShortages.length - 5}` : ""}.
-                          </p>
-                        </div>
-                      )}
-                      <ReportTableCard
-                        title="Demanda Prevista de Produtos"
-                        icon={CalendarIcon}
-                        columns={demandColumns}
-                        data={demandRows}
-                        pageSize={6}
-                        emptyMessage="Nenhum produto previsto para o período selecionado."
-                      />
+                  {!loadingForecast && demandShortages.length > 0 && (
+                    <div className="mt-4 flex items-center gap-3 rounded-xl border border-brand-orange/40 bg-brand-orange/10 px-4 py-3">
+                      <AlertTriangleIcon size={20} className="text-brand-orange shrink-0" />
+                      <p className="text-sm font-bold text-brand-orange">
+                        {demandShortages.length === 1
+                          ? "1 produto com estoque insuficiente"
+                          : `${demandShortages.length} produtos com estoque insuficiente`}{" "}
+                        para as próximas execuções:{" "}
+                        {demandShortages
+                          .slice(0, 5)
+                          .map((r) => r.name)
+                          .join(", ")}
+                        {demandShortages.length > 5 ? ` e outros ${demandShortages.length - 5}` : ""}.
+                      </p>
                     </div>
                   )}
 
@@ -1395,23 +1352,23 @@ export default function RecurringSubscriptionsPage({
                       <FadeIn key="loading" className="w-full flex items-center justify-center py-20">
                         <ThreeDotsLoader />
                       </FadeIn>
-                    ) : forecastData.length === 0 ? (
+                    ) : demandRows.length === 0 ? (
                       <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
                         <IconPlaceholder
                           placeholderType="image"
                           imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
-                          imageAlt="Nenhuma previsão"
-                          title="Nenhuma execução prevista"
-                          subtitle="As próximas execuções e entregas das suas assinaturas ativas aparecerão aqui."
+                          imageAlt="Nenhuma demanda prevista"
+                          title="Nenhuma demanda de produtos prevista"
+                          subtitle="Os produtos necessários para as próximas execuções das suas assinaturas aparecerão aqui."
                         />
                       </FadeIn>
-                    ) : filteredForecastData.length === 0 ? (
+                    ) : filteredDemandRows.length === 0 ? (
                       <FadeIn key="empty-results" className="w-full flex items-center justify-center min-h-[400px]">
                         <IconPlaceholder
                           placeholderType="image"
                           imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                          imageAlt="Nenhuma previsão encontrada"
-                          title="Nenhuma previsão encontrada"
+                          imageAlt="Nenhum produto encontrado"
+                          title="Nenhum produto encontrado"
                           subtitle="Tente ajustar a busca ou o período da previsão."
                           itemButton={{
                             text: "Limpar busca e filtros",
@@ -1424,16 +1381,14 @@ export default function RecurringSubscriptionsPage({
                         />
                       </FadeIn>
                     ) : (
-                      <FadeIn key={effectiveViewMode} className="w-full">
+                      <FadeIn key={effectiveViewMode} className="w-full mt-4">
                         {effectiveViewMode === "grid" ? (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                            {forecastPaginated.map((f: any) => (
+                            {forecastPaginated.map((row: any) => (
                               <ForecastGridCard
-                                key={f.id}
-                                row={f}
-                                canManage={canManage}
-                                onOpen={openDetail}
-                                onRunAction={handleForecastAction}
+                                key={row.id}
+                                row={row}
+                                onOpenProduct={(productId) => router.push(`/erp/produtos?view=${productId}`)}
                               />
                             ))}
                           </div>
@@ -1443,10 +1398,10 @@ export default function RecurringSubscriptionsPage({
                             <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                             <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                              <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                              <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
                                 <thead>
                                   <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                    {FORECAST_COLUMNS.map((col, index) => (
+                                    {DEMAND_COLUMNS.map((col, index) => (
                                       <th
                                         key={col.id}
                                         className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "actions" ? "rounded-r-lg pr-6" : ""}`}
@@ -1460,14 +1415,12 @@ export default function RecurringSubscriptionsPage({
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {forecastPaginated.map((f: any) => (
+                                  {forecastPaginated.map((row: any) => (
                                     <ForecastListRow
-                                      key={f.id}
-                                      row={f}
-                                      columns={FORECAST_COLUMNS}
-                                      canManage={canManage}
-                                      onOpen={openDetail}
-                                      onRunAction={handleForecastAction}
+                                      key={row.id}
+                                      row={row}
+                                      columns={DEMAND_COLUMNS}
+                                      onOpenProduct={(productId) => router.push(`/erp/produtos?view=${productId}`)}
                                     />
                                   ))}
                                 </tbody>
@@ -1479,7 +1432,7 @@ export default function RecurringSubscriptionsPage({
                     )}
                   </AnimatePresence>
 
-                  {filteredForecastData.length > 0 && (
+                  {filteredDemandRows.length > 0 && (
                     <Pagination
                       currentPage={safeForecastPage}
                       totalPages={forecastTotalPages}

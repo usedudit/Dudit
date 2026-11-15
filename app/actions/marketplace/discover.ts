@@ -164,8 +164,8 @@ function sectionDisplay(
     const MAP: Record<string, Record<string, [string, string?]>> = {
         trending: {
             country: ["Produtos na Dudit"],
-            state: [`Produtos em ${stateName}`],
-            city: [`Produtos em ${cityName}`],
+            state: ["Produtos pertinho de você!"],
+            city: ["Produtos pertinho de você!"],
         },
         endingSoon: {
             country: ["Acabando hoje", "Ofertas que terminam em breve"],
@@ -214,13 +214,13 @@ function sectionDisplay(
         },
         services: {
             country: ["Serviços e profissionais"],
-            state: [`Serviços em ${stateName}`],
-            city: [`Serviços em ${cityName}`],
+            state: ["Serviços pertinho de você!"],
+            city: ["Serviços pertinho de você!"],
         },
         topVitrines: {
             country: ["Lojas e vitrines locais"],
-            state: [`Lojas e vitrines em ${stateName}`],
-            city: [`Lojas e vitrines em ${cityName}`],
+            state: ["Lojas e vitrines pertinho de você!"],
+            city: ["Lojas e vitrines pertinho de você!"],
         },
         popular: {
             country: ["Populares na Dudit", "O que está bombando por aqui"],
@@ -1703,8 +1703,8 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const isCountry = displayScope === "country"
-    const title = isCountry ? "Produtos na Dudit" : "Produtos disponíveis"
-    const subtitle = isCountry ? "Variedade para você" : "Variedade para você"
+    const title = isCountry ? "Produtos na Dudit" : "Produtos pertinho de você!"
+    const subtitle = isCountry ? "Variedade para você" : "Disponíveis na sua região"
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
@@ -1967,6 +1967,47 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         for (const section of sections) {
             if (section.items && section.items.length > 0) {
                 section.items = enrichMarketplaceDistance(section.items, ctx.coords)
+            }
+            if (section._allItems && section._allItems.length > 0) {
+                section._allItems = enrichMarketplaceDistance(section._allItems, ctx.coords)
+            }
+        }
+    }
+
+    // Filtrar itens até 5km para Produtos, Serviços e Lojas/Vitrines
+    // Fallback gracioso para os itens da cidade/região caso não dê para calcular ou não encontre nada em 5km
+    for (const section of sections) {
+        const isProductSection = section.id === "trending" || section.id === "allProducts"
+        const isServiceSection = section.id === "services"
+        const isVitrineSection = section.id === "topVitrines"
+
+        if (isProductSection || isServiceSection || isVitrineSection) {
+            const typeParam = isServiceSection ? "servicos" : isVitrineSection ? "vitrines" : "produtos"
+            const sectionName = isServiceSection ? "Serviços" : isVitrineSection ? "Lojas e vitrines" : "Produtos"
+
+            let filteredBy5km: any[] = []
+            if (ctx.coords) {
+                const candidates = (section._allItems && section._allItems.length > 0)
+                    ? section._allItems
+                    : section.items
+
+                filteredBy5km = candidates.filter((item: any) => {
+                    const d = item.distance_km ?? item.partners?.distance_km
+                    return typeof d === "number" && !isNaN(d) && d <= 5
+                })
+            }
+
+            if (filteredBy5km.length > 0) {
+                section.items = filteredBy5km.slice(0, 20)
+                section.title = `${sectionName} pertinho de você!`
+                section.subtitle = "Até 5km do seu endereço"
+                section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=5`
+            } else {
+                if (ctx.scope === "city" || ctx.scope === "state") {
+                    section.title = `${sectionName} pertinho de você!`
+                    section.subtitle = "Disponíveis na sua região"
+                    section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}`
+                }
             }
         }
     }

@@ -278,7 +278,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                                 {/* This background success state is just for a moment transition or fallback */}
                                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center absolute inset-0 z-10">
                                     <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-[#a855f7] to-[#d946ef] flex items-center justify-center mb-6 shadow-2xl shadow-purple-200 dark:shadow-none">
-                                        <Check size={64} className="text-white" strokeWidth={3} />
+                                        <Check size={64} className="text-white" />
                                     </div>
                                     <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-8">Venda concluída</h2>
                                 </div>
@@ -288,7 +288,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                                     <div className="p-6 h-full overflow-y-auto">
                                         <div className="flex justify-between items-start mb-6">
                                             <Badge variant="green" className="bg-[#15803d] text-white border-none text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                                                <Check size={12} strokeWidth={3} /> Concluído
+                                                <Check size={12} /> Concluído
                                             </Badge>
 
                                             <div className="flex gap-3">

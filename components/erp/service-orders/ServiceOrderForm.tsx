@@ -1668,7 +1668,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         className="pl-0 mt-2"
                                                         disabled={isLocked}
                                                     >
-                                                        <PlusIcon size={14} strokeWidth={3} />
+                                                        <PlusIcon size={14} />
                                                         Adicionar serviço manual
                                                     </Button>
 
@@ -1996,12 +1996,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
 
                                                     {/* Add Item Link at the bottom of the list */}
                                                     <Button
-                                                        type="button"
                                                         variant="link"
                                                         onClick={addBlankProduct}
                                                         className="pl-0 mt-2"
                                                     >
-                                                        <PlusIcon size={14} strokeWidth={3} />
+                                                        <PlusIcon size={14} />
                                                         Adicionar produto manual
                                                     </Button>
 

@@ -492,7 +492,13 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 
 // NO unstable_cache - Redis is the single source of truth.
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
-export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType, cidade?: string, section?: string) => {
+export const getCachedExploreProducts = async (
+  query: string,
+  type: MarketplaceSearchType,
+  cidade?: string,
+  section?: string,
+  coords?: { lat: number; lng: number } | null
+) => {
   const { results, moreDistantSellers, moreDistantItems } = await searchMarketplaceDirectFull(query, type, {
     vitrines: type === 'vitrines' ? 40 : 4,
     produtos: 40,
@@ -500,7 +506,10 @@ export const getCachedExploreProducts = async (query: string, type: MarketplaceS
     planos: 40,
     geral: 40,
     cidade,
-    section
+    section,
+    latitude: coords?.lat,
+    longitude: coords?.lng,
+    centerCoords: coords,
   })
   return { items: results, moreDistantSellers, moreDistantItems }
 }

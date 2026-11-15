@@ -12,7 +12,7 @@ import {
   getRecurringStatusVariant,
 } from "@/lib/types/recurring"
 import { formatDate, formatCurrency } from "@/lib/utils"
-import type { SubscriptionRowTab } from "./SubscriptionListRow"
+import { getForecastLabel, getForecastLabelVariant, type SubscriptionRowTab } from "./SubscriptionListRow"
 
 interface SubscriptionGridCardProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
@@ -91,29 +91,48 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
 
       {/* Área do Rodapé */}
       <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-        {/* Linha A: Próxima Execução e Frete */}
+        {/* Linha A: Próxima Execução e Próxima Cobrança */}
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-0.5 min-w-0">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Próxima Execução</span>
             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
               {formatDate(sub.nextExecutionAt) || "-"}
             </span>
+            {sub.nextExecutionAt && (
+              <div className="mt-0.5">
+                <Badge variant={getForecastLabelVariant(sub.nextExecutionAt)} className="scale-90 origin-left">
+                  {getForecastLabel(sub.nextExecutionAt)}
+                </Badge>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-0.5 items-end min-w-0">
-            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Frete</span>
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Próxima Cobrança</span>
             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
-              {formatCurrency(Number(sub.shippingAmount || 0))}
+              {formatCurrency(
+                (sub.contractedAmount != null
+                  ? Number(sub.contractedAmount)
+                  : Number(sub.plan?.price || 0)) + Number(sub.shippingAmount || 0)
+              )}
+            </span>
+            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+              {sub.billingMode === "auto_mercado_pago" ? "Mercado Pago" : "Manual"}
             </span>
           </div>
         </div>
 
-        {/* Linha B: Modalidade e Ações */}
+        {/* Linha B: Entrega e Ações */}
         <div className="flex items-end justify-between mt-1">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Modalidade</span>
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Entrega</span>
             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
               {sub.deliveryType === "delivery" ? "Entrega" : "Retirada no local"}
+            </span>
+            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[180px]">
+              {sub.deliveryType === "delivery"
+                ? sub.deliveryAddress || "Endereço não informado"
+                : (Number(sub.shippingAmount || 0) > 0 ? formatCurrency(Number(sub.shippingAmount)) : "Sem custo")}
             </span>
           </div>
 

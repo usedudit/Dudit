@@ -11,7 +11,9 @@ export interface FilterConfig {
     showShipping?: boolean
     /** Avaliação mínima (nota) - vale para produtos, serviços e lojas. */
     showRating?: boolean
-    /** Filtros exclusivos de vitrines (entrega, raio, vitrine online ativa). */
+    /** Filtro de distância (raio em km). */
+    showDistance?: boolean
+    /** Filtros exclusivos de vitrines (entrega, vitrine online ativa). */
     showStoreFilters?: boolean
     /** Condição (novo/usado) - faz sentido só para produtos. */
     showCondition?: boolean

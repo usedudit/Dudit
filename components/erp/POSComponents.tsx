@@ -1,6 +1,7 @@
 import { TrashIcon, InfoIcon } from '@/lib/icons';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Tooltip, Badge } from '@/components/reusable';
+import { formatPaymentMethodToFullLabel } from '@/components/erp/payments/shared/payment-utils';
 
 // Scalloped edge specifically for the receipt bottom
 export const ReceiptScallopEdge = () => (
@@ -86,6 +87,11 @@ export const ReceiptContent = ({
     itemCount,
     pricingDetails = [],
     deliveryBreakdown,
+    storeCreditAmount = 0,
+    totalLabel,
+    paymentBreakdown,
+    totalPaid,
+    isSuccess = false,
 }: any) => (
     <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:dark-border dark:border-dark-border border-b-0">
         {/* Receipt Header */}
@@ -201,14 +207,48 @@ export const ReceiptContent = ({
                         </span>
                     </div>
                 ))}
+                {storeCreditAmount > 0 && !isSuccess && (
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Crédito do cliente</span>
+                        <span className="font-bold text-brand-green">
+                            -{formatCurrency(storeCreditAmount)}
+                        </span>
+                    </div>
+                )}
             </div>
 
             <div className="flex justify-between items-center">
-                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total a Cobrar</span>
+                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">
+                    {totalLabel || (isSuccess ? "Total da Venda" : "Total a Cobrar")}
+                </span>
                 <span className="font-black text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
                     {formatCurrency(total)}
                 </span>
             </div>
+
+            {isSuccess && paymentBreakdown && paymentBreakdown.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-dashed border-brand-border dark:border-dark-border space-y-1.5">
+                    <span className="block text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                        {paymentBreakdown.length > 1 ? "Formas de pagamento" : "Forma de pagamento"}
+                    </span>
+                    {paymentBreakdown.map((leg: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                            <span className="text-brand-dark dark:text-dark-heading font-medium">
+                                {formatPaymentMethodToFullLabel(leg.method) || leg.method}
+                            </span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(leg.amount)}
+                            </span>
+                        </div>
+                    ))}
+                    {totalPaid !== undefined && totalPaid > 0 && (
+                        <div className="flex justify-between items-center text-xs pt-1 border-t border-brand-border/40 dark:border-dark-border/40 font-bold">
+                            <span className="text-brand-dark dark:text-dark-heading">Total recebido</span>
+                            <span className="text-brand-green">{formatCurrency(totalPaid)}</span>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
 
         {/* Bottom Scallop Edge */}

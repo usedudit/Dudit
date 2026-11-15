@@ -808,9 +808,9 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                             <Button
                                 onClick={() => setIsSheetOpen(true)}
                                 disabled={!isEditing}
-                                className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm shadow-brand-green/20"
+                                className="w-[42px] h-[42px] p-0"
                             >
-                                <PlusIcon className="w-5 h-5" strokeWidth={3} />
+                                <PlusIcon className="w-5 h-5" />
                             </Button>
                         </div>
                     </div>

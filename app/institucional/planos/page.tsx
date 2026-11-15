@@ -18,7 +18,7 @@ import { Badge } from '@/components/reusable/Badge';
 
 const PricingHero = () => {
    return (
-      <section className="relative bg-white pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
+      <section className="relative bg-white dark:bg-dark-surface pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
          <GridLines />
          <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
             <motion.div
@@ -30,7 +30,7 @@ const PricingHero = () => {
                   Nossos Planos
                </Badge>
 
-               <h1 className="text-5xl font-bold text-brand-dark leading-tight mb-6">
+               <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading leading-tight mb-6">
                   Venda na sua cidade ou envie para todo o Brasil. Com 0% de comissão.
                </h1>
 
@@ -128,7 +128,7 @@ const PricingCards = () => {
    ];
 
    return (
-      <section className="bg-white pb-24 relative">
+      <section className="bg-white dark:bg-dark-surface pb-24 relative">
          <div className="max-w-[1400px] w-full mx-auto px-4">
             <div className="grid md:grid-cols-3 gap-8 items-stretch pt-8">
                {plans.map((plan, index) => (
@@ -141,8 +141,8 @@ const PricingCards = () => {
                      className={`rounded-3xl p-8 flex flex-col h-full relative border overflow-hidden transition-all duration-300 ${plan.isDark
                         ? 'bg-brand-dark border-brand-dark md:-translate-y-4 shadow-xl'
                         : plan.popular
-                           ? 'bg-white border-2 border-brand-green md:-translate-y-2 shadow-lg'
-                           : 'bg-white border-brand-border hover:border-brand-green/30'
+                           ? 'bg-white dark:bg-dark-surface border-2 border-brand-green md:-translate-y-2 shadow-lg'
+                           : 'bg-white dark:bg-dark-surface border-brand-border hover:border-brand-green/30'
                         }`}
                   >
                      {plan.popular && (
@@ -153,7 +153,7 @@ const PricingCards = () => {
 
                      {/* Header */}
                      <div className="mb-8">
-                        <h3 className={`text-xl font-bold mb-1 ${plan.isDark ? 'text-white' : 'text-brand-dark'}`}>
+                        <h3 className={`text-xl font-bold mb-1 ${plan.isDark ? 'text-white' : 'text-brand-dark dark:text-dark-heading'}`}>
                            {plan.name}
                         </h3>
                         <p className="text-[11px] font-bold mb-6 text-brand-green">
@@ -161,7 +161,7 @@ const PricingCards = () => {
                         </p>
                         <div className="flex items-baseline gap-1">
                            <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>R$</span>
-                           <span className={`text-5xl font-bold ${plan.isDark ? 'text-white' : 'text-brand-dark'}`}>{plan.price}</span>
+                           <span className={`text-5xl font-bold ${plan.isDark ? 'text-white' : 'text-brand-dark dark:text-dark-heading'}`}>{plan.price}</span>
                            <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>/mês</span>
                         </div>
                      </div>
@@ -176,7 +176,7 @@ const PricingCards = () => {
                               {plan.features.map((feature, i) => (
                                  <li key={i} className="flex items-start gap-3 text-sm">
                                     <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
-                                    <span className={plan.isDark ? 'text-gray-300' : 'text-gray-600'}>
+                                    <span className={plan.isDark ? 'text-gray-300' : 'text-gray-600 dark:text-dark-body'}>
                                        {feature}
                                     </span>
                                  </li>
@@ -186,7 +186,7 @@ const PricingCards = () => {
 
                         {/* Seção de Limites
                         <div className={`pt-6 border-t ${plan.isDark ? 'border-white/10' : 'border-brand-border'}`}>
-                           <p className={`text-xs font-bold uppercase mb-3 ${plan.isDark ? 'text-gray-400' : 'text-brand-inactive-text'}`}>
+                           <p className={`text-xs font-bold uppercase mb-3 ${plan.isDark ? 'text-gray-400 dark:text-dark-body' : 'text-brand-inactive-text'}`}>
                               Limites do plano:
                            </p>
                            <ul className="space-y-2">
@@ -288,11 +288,11 @@ const ComparisonTable = () => {
    const renderValue = (val: string) => {
       if (val === "check") return <CheckCircleIcon size={20} className="text-brand-green mx-auto" />;
       if (val === "x") return <XIcon size={20} className="text-brand-inactive-text/30 mx-auto" />;
-      return <span className="text-sm font-semibold text-brand-dark">{val}</span>;
+      return <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{val}</span>;
    };
 
    return (
-      <section className="py-24 bg-brand-gray/30 relative">
+      <section className="py-24 bg-brand-gray/30 dark:bg-dark-border/20 relative">
          <div className="max-w-[1400px] w-full mx-auto px-4">
             <motion.div
                initial={{ opacity: 0, y: 20 }}
@@ -300,7 +300,7 @@ const ComparisonTable = () => {
                viewport={{ once: true }}
                className="text-center mb-16"
             >
-               <h2 className="text-4xl font-bold text-brand-dark mb-4">Compare os Planos</h2>
+               <h2 className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-4">Compare os Planos</h2>
                <p className="text-brand-inactive-text">Escolha o nível de controle que seu negócio precisa hoje.</p>
             </motion.div>
 
@@ -311,11 +311,11 @@ const ComparisonTable = () => {
                         <th className="py-6 px-4 text-left bg-transparent w-1/3">
                            <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Recurso</span>
                         </th>
-                        <th className="py-6 px-4 text-center bg-white/50 rounded-t-2xl">
-                           <span className="text-base font-bold text-brand-dark">Começar</span>
+                        <th className="py-6 px-4 text-center bg-white/50 dark:bg-dark-border/40 rounded-t-2xl">
+                           <span className="text-base font-bold text-brand-dark dark:text-dark-heading">Começar</span>
                         </th>
-                        <th className="py-6 px-4 text-center bg-white/50 rounded-t-2xl">
-                           <span className="text-base font-bold text-brand-dark">Crescer</span>
+                        <th className="py-6 px-4 text-center bg-white/50 dark:bg-dark-border/40 rounded-t-2xl">
+                           <span className="text-base font-bold text-brand-dark dark:text-dark-heading">Crescer</span>
                         </th>
                         <th className="py-6 px-4 text-center bg-brand-dark rounded-t-2xl">
                            <span className="text-base font-bold text-white">Escalar</span>
@@ -325,14 +325,14 @@ const ComparisonTable = () => {
                   <tbody>
                      {categories.map((cat, idx) => (
                         <React.Fragment key={idx}>
-                           <tr className="bg-brand-gray/50">
+                           <tr className="bg-brand-gray/50 dark:bg-dark-border/30">
                               <td colSpan={4} className="py-3 px-4 text-xs font-bold text-brand-green uppercase tracking-widest">
                                  {cat.title}
                               </td>
                            </tr>
                            {cat.items.map((item, i) => (
-                              <tr key={i} className="border-b border-brand-border hover:bg-white/40 transition-colors">
-                                 <td className="py-4 px-4 text-sm font-medium text-gray-600">
+                              <tr key={i} className="border-b border-brand-border hover:bg-white/40 dark:hover:bg-dark-border/40 transition-colors">
+                                 <td className="py-4 px-4 text-sm font-medium text-gray-600 dark:text-dark-body">
                                     {item.name}
                                  </td>
                                  <td className="py-4 px-4 text-center">
@@ -341,7 +341,7 @@ const ComparisonTable = () => {
                                  <td className="py-4 px-4 text-center">
                                     {renderValue(item.v)}
                                  </td>
-                                 <td className="py-4 px-4 text-center bg-brand-dark/5">
+                                 <td className="py-4 px-4 text-center bg-brand-dark/5 dark:bg-white/5">
                                     {renderValue(item.c)}
                                  </td>
                               </tr>
@@ -387,7 +387,7 @@ const FAQ = () => {
    };
 
    return (
-      <section className="bg-white py-24 relative border-t border-brand-border">
+      <section className="bg-white dark:bg-dark-surface py-24 relative border-t border-brand-border">
          <GridLines />
          <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
             <motion.div
@@ -396,7 +396,7 @@ const FAQ = () => {
                viewport={{ once: true }}
                className="text-center mb-16"
             >
-               <h2 className="text-4xl font-bold text-brand-dark mb-4">Dúvidas Frequentes</h2>
+               <h2 className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-4">Dúvidas Frequentes</h2>
                <p className="text-brand-inactive-text">Tudo o que você precisa saber para começar a vender com a Dudit.</p>
             </motion.div>
 
@@ -408,13 +408,13 @@ const FAQ = () => {
                      whileInView={{ opacity: 1, y: 0 }}
                      viewport={{ once: true }}
                      transition={{ delay: i * 0.1 }}
-                     className="border border-brand-border rounded-2xl overflow-hidden bg-white hover:border-brand-green/30 transition-colors"
+                     className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface hover:border-brand-green/30 transition-colors"
                   >
                      <button
                         onClick={() => toggle(i)}
-                        className="w-full flex items-center justify-between p-6 text-left hover:bg-brand-gray transition-colors"
+                        className="w-full flex items-center justify-between p-6 text-left hover:bg-brand-gray dark:hover:bg-dark-border/40 transition-colors"
                      >
-                        <span className="font-semibold text-brand-dark text-lg">{item.q}</span>
+                        <span className="font-semibold text-brand-dark dark:text-dark-heading text-lg">{item.q}</span>
                         <motion.div
                            animate={{ rotate: openIndex === i ? 180 : 0 }}
                            transition={{ duration: 0.2 }}
@@ -441,7 +441,7 @@ const FAQ = () => {
             </div>
 
             <div className="mt-12 text-center">
-               <Button asChild variant="outline" className="text-brand-dark hover:text-brand-green border-brand-border">
+               <Button asChild variant="outline" className="text-brand-dark dark:text-dark-heading hover:text-brand-green border-brand-border">
                   <Link href="/ajuda" prefetch={false}>
                      Ver todas as dúvidas <ArrowRightIcon size={16} />
                   </Link>
@@ -515,7 +515,7 @@ export default function PricingPage() {
    };
 
    return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white dark:bg-dark-surface">
          <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqLd) }}

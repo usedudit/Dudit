@@ -75,6 +75,8 @@ const DEFAULT_FILTER_CONFIG: FilterConfig = {
     showShipping: true,
     showCondition: true,
     showRating: true,
+    showDistance: true,
+    showStoreFilters: true,
     showBrands: false,
 }
 
@@ -433,7 +435,63 @@ export function ExplorarFiltersBottomSheet({
                 </section>
             )}
 
-            {/* Store filters (entrega / raio / vitrine ativa) */}
+            {/* Distância máxima (slider até 20km e opções rápidas) */}
+            {filterConfig.showDistance !== false && (
+                <section>
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Distância máxima</h4>
+                        <span className="text-xs font-semibold text-brand-green">
+                            {draftMaxDistance ? `Até ${draftMaxDistance} km` : "Qualquer distância"}
+                        </span>
+                    </div>
+
+                    <div className="space-y-2 py-2">
+                        <input
+                            type="range"
+                            min="1"
+                            max="20"
+                            step="1"
+                            value={draftMaxDistance || 20}
+                            onChange={(e) => setDraftMaxDistance(Number(e.target.value))}
+                            className="w-full h-2 bg-gray-200 dark:bg-dark-border rounded-lg appearance-none cursor-pointer accent-brand-green"
+                        />
+                        <div className="flex justify-between text-[11px] text-brand-inactive-text">
+                            <span>1 km</span>
+                            <span>5 km</span>
+                            <span>10 km</span>
+                            <span>20 km</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                        {[
+                            { value: null, label: "Qualquer" },
+                            { value: 2, label: "2 km" },
+                            { value: 5, label: "5 km" },
+                            { value: 10, label: "10 km" },
+                            { value: 20, label: "20 km" },
+                        ].map((opt) => {
+                            const isSelected = opt.value === null ? !draftMaxDistance : draftMaxDistance === opt.value
+                            return (
+                                <button
+                                    key={opt.label}
+                                    type="button"
+                                    onClick={() => setDraftMaxDistance(opt.value)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                                        isSelected
+                                            ? "bg-brand-green text-white border-brand-green"
+                                            : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading border-gray-200 dark:border-dark-border hover:border-brand-green"
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </section>
+            )}
+
+            {/* Store filters (entrega / vitrine ativa) */}
             {filterConfig.showStoreFilters !== false && isStoreMode && (
                 <>
                     <section>
@@ -445,27 +503,6 @@ export function ExplorarFiltersBottomSheet({
                                     <button
                                         key={option.value || "todas"}
                                         onClick={() => setDraftDelivery(option.value)}
-                                        className={optionRowClass(isSelected)}
-                                    >
-                                        <span>{option.label}</span>
-                                        {isSelected && (
-                                            <Check className="h-4 w-4" />
-                                        )}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </section>
-
-                    <section>
-                        <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Distância</h4>
-                        <div className="space-y-2">
-                            {DISTANCE_OPTIONS.map((option) => {
-                                const isSelected = (draftMaxDistance || 0) === option.value
-                                return (
-                                    <button
-                                        key={option.value || "qualquer"}
-                                        onClick={() => setDraftMaxDistance(option.value > 0 ? option.value : null)}
                                         className={optionRowClass(isSelected)}
                                     >
                                         <span>{option.label}</span>

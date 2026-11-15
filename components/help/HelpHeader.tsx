@@ -1,14 +1,18 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { MenuIcon, XIcon, SearchIcon, MoonIcon, SunIcon, ChevronRightIcon } from "@/lib/icons"
-import { Button, Input } from "@/components/reusable"
+import { MenuIcon, XIcon, SearchIcon, MoonIcon, SunIcon, ChevronRightIcon, ChevronLeftIcon } from "@/lib/icons"
+import { Button, Input, IconPlaceholder } from "@/components/reusable"
 import { helpCategories } from "@/lib/help-data"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
+import { useModalLayer } from "@/lib/modal-stack"
+
+const normalizeText = (text: string) =>
+    text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
 
 export default function HelpHeader({
     onToggleMenu,
@@ -28,10 +32,20 @@ export default function HelpHeader({
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
     const router = useRouter()
+    const zIndex = useModalLayer(isMobileSearchOpen)
 
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    useEffect(() => {
+        if (!isMobileSearchOpen) return
+        const originalOverflow = document.body.style.overflow
+        document.body.style.overflow = "hidden"
+        return () => {
+            document.body.style.overflow = originalOverflow
+        }
+    }, [isMobileSearchOpen])
 
     const handleThemeChange = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (isTransitioning) return
@@ -70,15 +84,43 @@ export default function HelpHeader({
         })
     }
 
-    // Filter results for the dropdown
-    const filteredResults = searchQuery.trim() ? helpCategories.flatMap(cat =>
-        cat.articles.filter(art =>
-            art.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            art.description.toLowerCase().includes(searchQuery.toLowerCase())
-        ).map(art => ({ ...art, categoryTitle: cat.title }))
-    ).slice(0, 5) : []
+    // Filter results for the dropdown & mobile search
+    const filteredResults = useMemo(() => {
+        const trimmed = searchQuery.trim()
+        if (!trimmed) return []
+        const normQuery = normalizeText(trimmed)
 
-    const showDropdown = isSearchFocused && searchQuery.length > 0 && filteredResults.length > 0
+        const matches: { id: string; title: string; category: string; slug: string; categoryTitle: string }[] = []
+
+        for (const cat of helpCategories) {
+            const catTitleMatch = normalizeText(cat.title).includes(normQuery)
+            for (const art of cat.articles) {
+                const titleMatch = normalizeText(art.title).includes(normQuery)
+                const descMatch = art.description ? normalizeText(art.description).includes(normQuery) : false
+                if (titleMatch || descMatch || catTitleMatch) {
+                    matches.push({
+                        ...art,
+                        categoryTitle: cat.title,
+                    })
+                }
+            }
+        }
+
+        matches.sort((a, b) => {
+            const aStarts = normalizeText(a.title).startsWith(normQuery)
+            const bStarts = normalizeText(b.title).startsWith(normQuery)
+            if (aStarts && !bStarts) return -1
+            if (!aStarts && bStarts) return 1
+            return 0
+        })
+
+        return matches
+    }, [searchQuery])
+
+    const desktopResults = useMemo(() => filteredResults.slice(0, 5), [filteredResults])
+    const mobileResults = useMemo(() => filteredResults.slice(0, 20), [filteredResults])
+
+    const showDropdown = isSearchFocused && searchQuery.length > 0 && desktopResults.length > 0
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -95,6 +137,22 @@ export default function HelpHeader({
         setIsSearchFocused(false)
         setIsMobileSearchOpen(false)
         router.push(`/ajuda/${category}/${slug}`)
+    }
+
+    const handleCloseMobileSearch = () => {
+        setIsMobileSearchOpen(false)
+        setIsSearchFocused(false)
+        setSearchQuery("")
+    }
+
+    const handleSearch = (query: string) => {
+        const trimmed = query.trim()
+        if (!trimmed) return
+        if (filteredResults.length > 0) {
+            handleResultClick(filteredResults[0].category, filteredResults[0].slug)
+        } else {
+            handleCloseMobileSearch()
+        }
     }
 
     return (
@@ -129,7 +187,7 @@ export default function HelpHeader({
                         </Link>
                     </div>
 
-                    {/* Middle Section: Search (Desktop) or Context Title/Search (Mobile) */}
+                    {/* Middle Section: Search (Desktop) or Title (Mobile) */}
                     <div className="flex-1 flex items-center justify-center relative h-full">
 
                         {/* Desktop Search Center */}
@@ -154,7 +212,7 @@ export default function HelpHeader({
                                         className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-dark-surface rounded-2xl shadow-xl border border-gray-100 dark:border-dark-border overflow-hidden z-[60]"
                                     >
                                         <div className="p-2">
-                                            {filteredResults.map((result) => (
+                                            {desktopResults.map((result) => (
                                                 <button
                                                     key={result.id}
                                                     onClick={() => handleResultClick(result.category, result.slug)}
@@ -176,33 +234,11 @@ export default function HelpHeader({
                             </AnimatePresence>
                         </div>
 
-                        {/* Mobile Header Logic (Vendor Profile Style) */}
+                        {/* Mobile Header Title */}
                         <div className="lg:hidden flex-1 flex items-center justify-center h-[38px] relative mx-2">
-                            {/* Title - Fades out when search is open */}
-                            <div className={cn(
-                                "absolute inset-0 flex items-center justify-center transition-all duration-300",
-                                isMobileSearchOpen ? "opacity-0 -translate-x-6 pointer-events-none" : "opacity-100 translate-x-0"
-                            )}>
-                                <h1 className="text-brand-dark dark:text-dark-heading font-bold text-[15px] truncate px-2 whitespace-nowrap">
-                                    Central de Ajuda
-                                </h1>
-                            </div>
-
-                            {/* Expandable Search Bar - Slides in from the right */}
-                            <div className={cn(
-                                "absolute inset-y-0 right-0 z-20 bg-white dark:bg-dark-surface rounded-full flex items-center px-4 border border-brand-border dark:border-dark-border transition-all duration-300 ease-out",
-                                isMobileSearchOpen ? "-left-[52px] opacity-100" : "left-full opacity-0 pointer-events-none"
-                            )}>
-                                <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar ajuda..."
-                                    className="bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[14px] w-full placeholder-gray-400 font-normal py-0"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    autoFocus={isMobileSearchOpen}
-                                />
-                            </div>
+                            <h1 className="text-brand-dark dark:text-dark-heading font-bold text-[15px] truncate px-2 whitespace-nowrap">
+                                Central de Ajuda
+                            </h1>
                         </div>
                     </div>
 
@@ -210,10 +246,11 @@ export default function HelpHeader({
                     <div className="flex items-center gap-2 shrink-0 z-10">
                         {/* Mobile Search Toggle */}
                         <button
-                            onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-                            className="lg:hidden w-10 h-10 flex items-center justify-center text-brand-inactive-text dark:text-dark-body"
+                            onClick={() => setIsMobileSearchOpen(true)}
+                            className="lg:hidden w-10 h-10 flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+                            title="Buscar na Central de Ajuda"
                         >
-                            {isMobileSearchOpen ? <span className="text-[22px] leading-none text-brand-dark dark:text-dark-heading">×</span> : <SearchIcon size={22} />}
+                            <SearchIcon size={22} />
                         </button>
 
                         {/* Theme Toggle - Desktop & Mobile */}
@@ -227,6 +264,130 @@ export default function HelpHeader({
                     </div>
                 </div>
             </header>
+
+            {/* Mobile Full-Screen Search Overlay */}
+            {isMobileSearchOpen && (
+                <div
+                    className="lg:hidden fixed inset-0 z-[200] bg-white dark:bg-dark-surface flex flex-col"
+                    style={{ zIndex }}
+                >
+                    <div className="w-full max-w-3xl mx-auto flex flex-col h-full">
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
+                            <button
+                                onClick={handleCloseMobileSearch}
+                                className="shrink-0 text-brand-dark dark:text-dark-heading hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+                                title="Voltar"
+                            >
+                                <ChevronLeftIcon size={20} />
+                            </button>
+
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault()
+                                    handleSearch(searchQuery)
+                                }}
+                                className="flex-1 flex items-center h-[40px] bg-brand-gray dark:bg-dark-border/30 rounded-full px-3"
+                            >
+                                <button
+                                    type="submit"
+                                    className="text-brand-green dark:text-brand-green shrink-0 p-1 mr-1 hover:opacity-80 transition-opacity"
+                                    title="Buscar"
+                                >
+                                    <SearchIcon size={18} />
+                                </button>
+
+                                <input
+                                    type="search"
+                                    autoFocus
+                                    enterKeyHint="search"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    placeholder="Buscar na Central de Ajuda"
+                                    className="marketplace-search-input bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[15px] w-full placeholder-gray-400 dark:placeholder-gray-500 font-normal py-0"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault()
+                                            handleSearch(searchQuery)
+                                        }
+                                    }}
+                                />
+
+                                {searchQuery.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery("")}
+                                        className="shrink-0 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                        title="Limpar busca"
+                                    >
+                                        <XIcon size={18} />
+                                    </button>
+                                )}
+                            </form>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto">
+                            {/* Linha de ação rápida: Buscar pelo termo digitado */}
+                            {searchQuery.trim().length > 0 && (
+                                <button
+                                    type="button"
+                                    className="w-full flex items-center gap-3 px-5 py-3.5 bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 transition-colors text-left border-b border-gray-100 dark:border-dark-border"
+                                    onClick={() => handleSearch(searchQuery)}
+                                >
+                                    <SearchIcon size={18} className="text-brand-green shrink-0" />
+                                    <span className="text-[15px] font-medium text-brand-green flex-1 min-w-0 truncate">
+                                        Buscar por &ldquo;{searchQuery.trim()}&rdquo;
+                                    </span>
+                                    <ChevronRightIcon size={16} className="text-brand-green shrink-0" />
+                                </button>
+                            )}
+
+                            {mobileResults.length > 0 ? (
+                                <div className="divide-y divide-gray-50 dark:divide-dark-border">
+                                    {mobileResults.map((result) => (
+                                        <button
+                                            key={result.id}
+                                            type="button"
+                                            className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors text-left"
+                                            onClick={() => handleResultClick(result.category, result.slug)}
+                                        >
+                                            <SearchIcon
+                                                size={18}
+                                                className="text-brand-inactive-text dark:text-dark-body shrink-0"
+                                            />
+
+                                            <span className="text-[15px] text-brand-dark dark:text-dark-heading flex-1 min-w-0 truncate">
+                                                {result.title}
+                                            </span>
+
+                                            <ChevronRightIcon
+                                                size={16}
+                                                className="text-brand-inactive-text dark:text-dark-body shrink-0"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : searchQuery.trim().length >= 2 ? (
+                                <div className="flex flex-col items-center justify-center py-16 px-6">
+                                    <IconPlaceholder
+                                        icon={SearchIcon}
+                                        title={`Nenhuma sugestão para "${searchQuery}"`}
+                                        itemButton={{
+                                            text: "Ver todos os tópicos",
+                                            action: () => {
+                                                handleCloseMobileSearch()
+                                                router.push("/ajuda")
+                                            },
+                                        }}
+                                    />
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

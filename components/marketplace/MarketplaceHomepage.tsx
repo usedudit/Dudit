@@ -5,6 +5,8 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
 import { HeroBanner, HorizontalCarousel, ItemCard, VitrineCard } from "./shared-components"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
+import { HomeCategoryBar } from "./HomeCategoryBar"
+import { HomeSellerBanner } from "./HomeSellerBanner"
 import type { SponsoredAd } from "@/lib/ads/types"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
 import { useRouter } from "next/navigation"
@@ -690,6 +692,9 @@ export default function MarketplaceHome({
                 <HeroBanner href={exploreHref} />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
+                    {/* Categorias (estilo Explorar, sem título "Categorias") */}
+                    <HomeCategoryBar selectedCitySlug={selectedCitySlug} />
+
                     {/* 1. Seção de Produtos */}
                     {productSection && productSection.items.length > 0 && (
                         <HorizontalCarousel
@@ -703,7 +708,7 @@ export default function MarketplaceHome({
                         />
                     )}
 
-                    {/* 3. Seção de Serviços */}
+                    {/* 2. Seção de Serviços */}
                     {serviceSection && serviceSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={serviceSection.id}
@@ -715,6 +720,9 @@ export default function MarketplaceHome({
                             itemWidthClass="w-[190px] sm:w-[210px]"
                         />
                     )}
+
+                    {/* 3. Banner Chamada para Vender / Usar a Dudit */}
+                    <HomeSellerBanner />
 
                     {/* 4. Seção de Lojas e Vitrines */}
                     {vitrineSection && vitrineSection.items.length > 0 && (

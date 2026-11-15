@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
+import { Badge, ActionsDropdown, DropdownItem, Tooltip } from "@/components/reusable"
 import { formatCurrency, formatDeliveryDaysRange, formatDate } from "@/lib/utils"
 import { getCarrierStatusLabel, getCarrierStatusVariant } from "@/lib/orders/carrier-status"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
@@ -67,13 +67,13 @@ export default function CarrierDeliveryCard({ shipment, onOpenOrder }: CarrierDe
                 {shipment.orderNumber}
               </h3>
               <div className="flex items-center shrink-0">
-                <Badge
-                  variant={statusVariant}
-                  icon={brandIcon ? <img src={brandIcon} alt="Transportadora" className="w-3.5 h-3.5 object-contain" /> : <TruckIcon size={12} />}
-                  className="whitespace-nowrap"
-                >
-                  {statusLabel}
-                </Badge>
+                <Tooltip text={statusLabel}>
+                  <Badge
+                    variant={statusVariant}
+                    icon={brandIcon ? <img src={brandIcon} alt="Transportadora" className="w-3.5 h-3.5 object-contain" /> : <TruckIcon size={12} />}
+                    className="whitespace-nowrap"
+                  />
+                </Tooltip>
               </div>
             </div>
           </div>

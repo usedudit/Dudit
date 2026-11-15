@@ -18,11 +18,11 @@ export default function PrivacyPage() {
     };
 
     return (
-        <div className="bg-white min-h-screen">
+        <div className="bg-white dark:bg-dark-surface min-h-screen">
             <Navbar onNavigate={onNavigate} />
 
             <div className="pt-32 pb-24">
-                <section className="relative bg-white pb-20 overflow-hidden">
+                <section className="relative bg-white dark:bg-dark-surface pb-20 overflow-hidden">
                     <GridLines />
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
                         <motion.div
@@ -30,10 +30,10 @@ export default function PrivacyPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
                         >
-                            <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark mb-8 bg-brand-gray tracking-wider font-bold uppercase">
+                            <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark dark:text-dark-heading mb-8 bg-brand-gray dark:bg-dark-border/40 tracking-wider font-bold uppercase">
                                 Privacidade e Segurança
                             </div>
-                            <h1 className="text-5xl md:text-6xl font-bold text-brand-dark mb-6">
+                            <h1 className="text-5xl md:text-6xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                                 Política de Privacidade
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
@@ -44,14 +44,14 @@ export default function PrivacyPage() {
                 </section>
 
                 <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                    <div className="prose prose-lg max-w-none text-brand-dark leading-relaxed space-y-12">
-                        <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
+                    <div className="prose prose-lg max-w-none text-brand-dark dark:text-dark-heading leading-relaxed space-y-12">
+                        <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray dark:bg-dark-border/40 rounded-r-xl">
                             Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong> e o <strong>Marco Civil da Internet (Lei 12.965/2014)</strong>.
                         </p>
 
-                        <div className="bg-brand-gray p-8 rounded-2xl border border-brand-border shadow-sm">
-                            <h3 className="text-brand-dark text-lg font-bold mb-4 uppercase tracking-wide">Controlador dos Dados</h3>
-                            <p className="mb-0 font-bold text-brand-dark text-xl">[NOME CIVIL COMPLETO DA OPERADORA]</p>
+                        <div className="bg-brand-gray dark:bg-dark-border/40 p-8 rounded-2xl border border-brand-border shadow-sm">
+                            <h3 className="text-brand-dark dark:text-dark-heading text-lg font-bold mb-4 uppercase tracking-wide">Controlador dos Dados</h3>
+                            <p className="mb-0 font-bold text-brand-dark dark:text-dark-heading text-xl">[NOME CIVIL COMPLETO DA OPERADORA]</p>
                             <div className="mt-4 space-y-1 text-brand-inactive-text">
                                 <p className="mb-0">CPF da operadora: [INFORMAR CPF OU VALIDAR COM ADVOGADO A FORMA DE DIVULGAÇÃO]</p>
                                 <p className="mb-0">E-mail de contato: <span className="text-brand-green font-medium">[E-MAIL VÁLIDO DE PRIVACIDADE]</span></p>
@@ -67,13 +67,13 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                <span className="text-brand-dark">1.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">1.</span>
                                 DADOS COLETADOS
                             </h2>
 
                             <div className="space-y-12">
                                 <div>
-                                    <h3 className="text-xl font-bold mb-6 text-brand-dark flex items-center gap-3">
+                                    <h3 className="text-xl font-bold mb-6 text-brand-dark dark:text-dark-heading flex items-center gap-3">
                                         <div className="w-2 h-2 bg-brand-green rounded-full"></div>
                                         1.1. Dados fornecidos pelo Parceiro (Vendedor)
                                     </h3>
@@ -108,7 +108,7 @@ export default function PrivacyPage() {
                                 </div>
 
                                 <div>
-                                    <h3 className="text-xl font-bold mb-6 text-brand-dark flex items-center gap-3">
+                                    <h3 className="text-xl font-bold mb-6 text-brand-dark dark:text-dark-heading flex items-center gap-3">
                                         <div className="w-2 h-2 bg-brand-green rounded-full"></div>
                                         1.2. Dados fornecidos pelo Usuário (Comprador)
                                     </h3>
@@ -142,7 +142,7 @@ export default function PrivacyPage() {
                                 </div>
 
                                 <div>
-                                    <h3 className="text-xl font-bold mb-6 text-brand-dark flex items-center gap-3">
+                                    <h3 className="text-xl font-bold mb-6 text-brand-dark dark:text-dark-heading flex items-center gap-3">
                                         <div className="w-2 h-2 bg-brand-green rounded-full"></div>
                                         1.3. Dados coletados automaticamente
                                     </h3>
@@ -177,36 +177,36 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">2.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">2.</span>
                                 COMO USAMOS OS DADOS
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
                                 <p>Os dados coletados são utilizados exclusivamente para as seguintes finalidades:</p>
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
-                                    <li><strong className="text-brand-dark">Execução do contrato:</strong> identificação, autenticação, processamento de pedidos, exibição na vitrine digital, comunicações operacionais e suporte ao Parceiro e ao Usuário.</li>
-                                    <li><strong className="text-brand-dark">Segurança e prevenção de fraudes:</strong> verificação de identidade, análise de logs de acesso, detecção automatizada e manual de comportamentos suspeitos, e colaboração com autoridades competentes quando necessário e previsto em lei.</li>
-                                    <li><strong className="text-brand-dark">Logística:</strong> repasse de dados de endereço e contato a transportadoras para viabilizar a entrega de pedidos.</li>
-                                    <li><strong className="text-brand-dark">Melhoria da plataforma:</strong> análise de comportamento pelo PostHog somente após aceite, de forma agregada e não identificável sempre que possível.</li>
-                                    <li><strong className="text-brand-dark">Obrigações legais:</strong> manutenção de registros de acesso (Marco Civil da Internet) e de transações financeiras (legislação fiscal), pelo prazo exigido por lei.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Execução do contrato:</strong> identificação, autenticação, processamento de pedidos, exibição na vitrine digital, comunicações operacionais e suporte ao Parceiro e ao Usuário.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Segurança e prevenção de fraudes:</strong> verificação de identidade, análise de logs de acesso, detecção automatizada e manual de comportamentos suspeitos, e colaboração com autoridades competentes quando necessário e previsto em lei.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Logística:</strong> repasse de dados de endereço e contato a transportadoras para viabilizar a entrega de pedidos.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Melhoria da plataforma:</strong> análise de comportamento pelo PostHog somente após aceite, de forma agregada e não identificável sempre que possível.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Obrigações legais:</strong> manutenção de registros de acesso (Marco Civil da Internet) e de transações financeiras (legislação fiscal), pelo prazo exigido por lei.</li>
                                 </ul>
-                                <p className="bg-brand-gray p-4 rounded-xl font-medium text-brand-dark">A DUDIT <strong>não utiliza dados pessoais para fins publicitários</strong> e <strong>não vende dados a terceiros</strong>.</p>
+                                <p className="bg-brand-gray dark:bg-dark-border/40 p-4 rounded-xl font-medium text-brand-dark dark:text-dark-heading">A DUDIT <strong>não utiliza dados pessoais para fins publicitários</strong> e <strong>não vende dados a terceiros</strong>.</p>
                             </div>
                         </div>
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">3.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">3.</span>
                                 COMPARTILHAMENTO DE DADOS
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
                                 <p>A DUDIT atua como controladora dos dados usados no marketplace e como operadora quando processa dados no ERP conforme instruções do Parceiro. A DUDIT <strong>não vende dados pessoais</strong> a terceiros. Os dados são compartilhados apenas nas seguintes situações:</p>
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
-                                    <li><strong className="text-brand-dark">Mercado Pago:</strong> dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);</li>
-                                    <li><strong className="text-brand-dark">Superfrete / Transportadoras:</strong> nome, endereço e telefone do destinatário para geração de etiquetas de envio;</li>
-                                    <li><strong className="text-brand-dark">Entregadores participantes:</strong> quando houver solicitação de entrega local, as ofertas disponíveis no painel do entregador exibem os dados de rota de forma restrita e mascarada (bairro e cidade/UF), ocultando nome completo, telefone e endereço exato com número. Somente após a aceitação formal da corrida pelo entregador participante é que os dados necessários para a execução (nome do destinatário, telefone de contato e endereço completo de entrega) são revelados ao entregador responsável;</li>
-                                    <li><strong className="text-brand-dark">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques, incluindo o serviço <strong>Turnstile</strong>, e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);</li>
-                                    <li><strong className="text-brand-dark">Supabase e hospedagem (Railway):</strong> autenticação, banco de dados e execução da plataforma; <strong>Sentry:</strong> diagnóstico de erros; <strong>PostHog:</strong> métricas e gravação de sessão somente após aceite; <strong>SMTP2GO:</strong> e-mails operacionais; <strong>ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap:</strong> consulta de CEP e geocodificação de endereços para obter coordenadas aproximadas.</li>
-                                    <li><strong className="text-brand-dark">Autoridades competentes, mediante obrigação legal ou ordem judicial:</strong> quando exigido por lei, decisão judicial ou outra hipótese autorizada pela LGPD, para apuração de fraudes, ilícitos ou proteção de direitos, conforme item 2.4 dos Termos de Uso.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Mercado Pago:</strong> dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Superfrete / Transportadoras:</strong> nome, endereço e telefone do destinatário para geração de etiquetas de envio;</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Entregadores participantes:</strong> quando houver solicitação de entrega local, as ofertas disponíveis no painel do entregador exibem os dados de rota de forma restrita e mascarada (bairro e cidade/UF), ocultando nome completo, telefone e endereço exato com número. Somente após a aceitação formal da corrida pelo entregador participante é que os dados necessários para a execução (nome do destinatário, telefone de contato e endereço completo de entrega) são revelados ao entregador responsável;</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques, incluindo o serviço <strong>Turnstile</strong>, e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Supabase e hospedagem (Railway):</strong> autenticação, banco de dados e execução da plataforma; <strong>Sentry:</strong> diagnóstico de erros; <strong>PostHog:</strong> métricas e gravação de sessão somente após aceite; <strong>SMTP2GO:</strong> e-mails operacionais; <strong>ViaCEP, BrasilAPI, AwesomeAPI e Nominatim/OpenStreetMap:</strong> consulta de CEP e geocodificação de endereços para obter coordenadas aproximadas.</li>
+                                    <li><strong className="text-brand-dark dark:text-dark-heading">Autoridades competentes, mediante obrigação legal ou ordem judicial:</strong> quando exigido por lei, decisão judicial ou outra hipótese autorizada pela LGPD, para apuração de fraudes, ilícitos ou proteção de direitos, conforme item 2.4 dos Termos de Uso.</li>
                                 </ul>
                                 <p className="mt-4"><strong>3.1. Cloudflare Turnstile:</strong> utilizamos o Cloudflare Turnstile para proteger nossos formulários e o processo de autenticação contra acessos automatizados (bots). Ao utilizar esses recursos, a Cloudflare pode coletar e processar dados técnicos e de uso para operar e aprimorar o serviço, conforme o <a href="https://www.cloudflare.com/pt-br/turnstile-privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-brand-green font-medium underline underline-offset-4">Adendo de Privacidade do Turnstile da Cloudflare</a>, que é incorporado a esta Política de Privacidade e aplica-se especificamente ao serviço Turnstile.</p>
                                 <p className="mt-4">A DUDIT não compartilha dados cadastrais de Parceiros diretamente com Usuários (ou vice-versa) que aleguem ter sido lesados, exceto quando amparada por obrigação legal, ordem judicial ou outra hipótese prevista na legislação aplicável.</p>
@@ -215,7 +215,7 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">4.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">4.</span>
                                 COOKIES E RASTREAMENTO
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
@@ -227,7 +227,7 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">5.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">5.</span>
                                 LOGS E SEGURANÇA
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
@@ -245,10 +245,10 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">6.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">6.</span>
                                 RETENÇÃO DOS DADOS
                             </h2>
-                            <div className="overflow-x-auto md:pl-14 pl-6 border-l-2 border-brand-gray mb-8">
+                            <div className="overflow-x-auto md:pl-14 pl-6 border-l-2 border-brand-gray dark:border-dark-border mb-8">
                                 <div className="border border-brand-border dark:border-dark-border rounded-xl">
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
@@ -280,7 +280,7 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">7.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">7.</span>
                                 DIREITOS LGPD
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
@@ -294,9 +294,9 @@ export default function PrivacyPage() {
                                     <li><strong>Oposição:</strong> opor-se a tratamentos baseados em legítimo interesse;</li>
                                     <li><strong>Informação:</strong> ser informado sobre com quem seus dados são compartilhados.</li>
                                 </ul>
-                                <p className="mt-8 p-6 bg-brand-gray rounded-2xl border border-brand-border">
+                                <p className="mt-8 p-6 bg-brand-gray dark:bg-dark-border/40 rounded-2xl border border-brand-border">
                                     Para exercer qualquer um desses direitos, entre em contato pelo e-mail: <br />
-                                    <strong className="text-brand-dark text-lg">[contato@dudit.com.br]</strong><br />
+                                    <strong className="text-brand-dark dark:text-dark-heading text-lg">[contato@dudit.com.br]</strong><br />
                                     <span className="text-sm text-brand-inactive-text italic">As solicitações serão respondidas nos prazos legais. A declaração completa prevista no art. 19, II, da LGPD pode levar até 15 dias.</span>
                                 </p>
                             </div>
@@ -304,7 +304,7 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">8.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">8.</span>
                                 EXCLUSÃO E ANONIMIZAÇÃO
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
@@ -317,17 +317,17 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">9.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">9.</span>
                                 TRANSFERÊNCIA INTERNACIONAL DE DADOS
                             </h2>
-                            <div className="md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="md:pl-14 pl-6 border-l-2 border-brand-gray dark:border-dark-border">
                                 <p>Provedores usados na operação, como Supabase, Cloudflare, PostHog (se você aceitar métricas), Sentry, Mercado Pago, SMTP2GO, ViaCEP, BrasilAPI, AwesomeAPI, Nominatim/OpenStreetMap e serviços de hospedagem e mensageria configurados, podem processar dados no exterior. A transferência será realizada conforme os mecanismos e garantias previstos na LGPD e nas normas da ANPD aplicáveis.</p>
                             </div>
                         </div>
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">10.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">10.</span>
                                 CONTATO E ENCARREGADO (DPO)
                             </h2>
                             <div className="space-y-6 md:pl-12 pl-6">
@@ -342,10 +342,10 @@ export default function PrivacyPage() {
 
                         <div>
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-4">
-                                <span className="text-brand-dark">11.</span>
+                                <span className="text-brand-dark dark:text-dark-heading">11.</span>
                                 ALTERAÇÕES DESTA POLÍTICA
                             </h2>
-                            <div className="md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="md:pl-14 pl-6 border-l-2 border-brand-gray dark:border-dark-border">
                                 <p>Esta Política pode ser atualizada periodicamente. A data da última atualização estará sempre indicada no topo do documento. O uso continuado da plataforma após alterações implica aceitação da nova versão.</p>
                             </div>
                         </div>

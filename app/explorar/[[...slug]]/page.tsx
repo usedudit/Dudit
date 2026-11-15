@@ -14,8 +14,6 @@ import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
-import { QueryClient, dehydrate } from "@tanstack/react-query"
-import { HydrationBoundary } from "@tanstack/react-query"
 import { cookies } from "next/headers"
 import { FALLBACK_CATEGORIES, ESTADO_MAP, CATEGORY_SLUG_MAP } from "@/components/marketplace/explorar-constants"
 import { FormSection } from "@/components/reusable/FormSection"
@@ -43,7 +41,7 @@ export async function generateMetadata({
     const slug = resolvedParams.slug || []
     if (slug.length > 2) {
         return {
-            title: "Página não encontrada | Dudit",
+            title: "Página não encontrada",
             robots: { index: false, follow: false },
         }
     }
@@ -52,14 +50,14 @@ export async function generateMetadata({
 
     if (location && !isValidLocationSlug(location)) {
         return {
-            title: "Página não encontrada | Dudit",
+            title: "Página não encontrada",
             robots: { index: false, follow: false },
         }
     }
 
     if (category && !CATEGORY_SLUG_MAP[category]) {
         return {
-            title: "Página não encontrada | Dudit",
+            title: "Página não encontrada",
             robots: { index: false, follow: false },
         }
     }
@@ -279,28 +277,6 @@ export default async function ExplorarPage({
         notFound()
     }
 
-    const user = await getCurrentUser()
-    const sessionData = user
-        ? await getUserSessionData(user.id)
-        : null
-
-    const userProfile = sessionData?.profile
-        ? {
-            full_name: sessionData.profile.full_name,
-            latitude: sessionData.profile.latitude,
-            longitude: sessionData.profile.longitude,
-            address: sessionData.profile.city
-                ? `${sessionData.profile.city} - ${sessionData.profile.state}`
-                : null,
-            city: sessionData.profile.city || null,
-            state: sessionData.profile.state || null,
-            avatar_url: sessionData.profile.avatar_url || null,
-            userId: user?.id || null,
-        }
-        : null
-
-    const cartCount = sessionData?.cartCount || 0
-
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
     const section = typeof resolvedSearchParams.section === "string" ? resolvedSearchParams.section : undefined
@@ -325,8 +301,38 @@ export default async function ExplorarPage({
         return `${normCity}-${state.toLowerCase()}`
     }
 
+    // Inicia a sessão do usuário em segundo plano de forma paralela
+    const userSessionPromise = getCurrentUser()
+        .then(async (user) => {
+            if (!user) return null
+            const sessionData = await getUserSessionData(user.id)
+            return { user, sessionData }
+        })
+        .catch(() => null)
+
     // Landing page: sem slug na rota e sem intenção de busca → renderiza cards de categorias
     if (!routeFirstSlug && !hasSearchIntent) {
+        const sessionResult = await userSessionPromise
+        const user = sessionResult?.user || null
+        const sessionData = sessionResult?.sessionData || null
+
+        const userProfile = sessionData?.profile
+            ? {
+                full_name: sessionData.profile.full_name,
+                latitude: sessionData.profile.latitude,
+                longitude: sessionData.profile.longitude,
+                address: sessionData.profile.city
+                    ? `${sessionData.profile.city} - ${sessionData.profile.state}`
+                    : null,
+                city: sessionData.profile.city || null,
+                state: sessionData.profile.state || null,
+                avatar_url: sessionData.profile.avatar_url || null,
+                userId: user?.id || null,
+            }
+            : null
+
+        const cartCount = sessionData?.cartCount || 0
+
         // Resolve city for category links (profile → cookie → brasil)
         let landingCitySlug = "brasil"
         if (userProfile?.city && userProfile?.state) {
@@ -434,8 +440,31 @@ export default async function ExplorarPage({
     // cidade do usuário (perfil → cookie → Brasil), mantendo o ?q= na URL.
     let slug = routeSlugs
     let firstSlug = routeFirstSlug
+    let initialUserProfilePromise = userSessionPromise.then((res) => {
+        const user = res?.user || null
+        const sessionData = res?.sessionData || null
+        return {
+            userProfile: sessionData?.profile
+                ? {
+                    full_name: sessionData.profile.full_name,
+                    latitude: sessionData.profile.latitude,
+                    longitude: sessionData.profile.longitude,
+                    address: sessionData.profile.city
+                        ? `${sessionData.profile.city} - ${sessionData.profile.state}`
+                        : null,
+                    city: sessionData.profile.city || null,
+                    state: sessionData.profile.state || null,
+                    avatar_url: sessionData.profile.avatar_url || null,
+                    userId: user?.id || null,
+                }
+                : null,
+            cartCount: sessionData?.cartCount || 0,
+        }
+    })
+
     if (!firstSlug) {
         let scopeSlug: string | null = null
+        const { userProfile } = await initialUserProfilePromise
 
         if (userProfile?.city && userProfile?.state) {
             scopeSlug = normalizeCityToSlug(userProfile.city, userProfile.state)
@@ -458,8 +487,6 @@ export default async function ExplorarPage({
 
     const categorySlug = slug[1] || ""
     const categoriaFromPath = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
-    // A categoria também pode vir pela query (?categoria=xxx) - nesse caso o
-    // servidor precisa repassá-la para o cliente já filtrar no primeiro paint.
     const categoriaFromQuery = typeof resolvedSearchParams.categoria === "string" ? resolvedSearchParams.categoria : ""
     const categoria = categoriaFromPath || categoriaFromQuery
 
@@ -491,9 +518,13 @@ export default async function ExplorarPage({
     const searchSlug = stateSlug ? stateSlug : cidade
     const isSpecificCityRoute = cidade && cidade !== "brasil" && !cidade.startsWith("estado-")
 
+    // Coordenadas preliminares da cidade da rota (sem bloquear a busca de produtos)
+    const cityCoordsPromise = searchSlug && isSpecificCityRoute
+        ? resolveCityCoordsFromSlug(searchSlug).catch(() => null)
+        : Promise.resolve(null)
+
     // Tudo que não depende um do outro sobe em paralelo: busca, nome da cidade,
-    // coordenadas, escopo do cookie e vídeos da comunidade. Só os anúncios esperam,
-    // porque precisam da localização já resolvida.
+    // coordenadas, escopo do cookie e vídeos da comunidade.
     const explorePromise = getCachedExploreProducts(query, serverFetchType, searchSlug, section)
         .then((fetched) => ({
             items: fetched.items || [],
@@ -509,11 +540,10 @@ export default async function ExplorarPage({
         ? resolveCityAndStateFromSlug(cidade).catch(() => null)
         : Promise.resolve(null)
 
-    const coordsPromise = (userProfile?.latitude && userProfile?.longitude)
-        ? Promise.resolve({ lat: userProfile.latitude, lng: userProfile.longitude })
-        : (searchSlug ? resolveCityCoordsFromSlug(searchSlug).catch(() => null) : Promise.resolve(null))
-
     const cookieScopePromise = (async () => {
+        // Se a rota já for uma cidade específica ou estado, escopo de cookie não é necessário para a listagem
+        if (isSpecificCityRoute || isStateRoute) return null
+        const { userProfile } = await initialUserProfilePromise
         if (userProfile?.city && userProfile?.state) return null
         const cookieStore = await cookies()
         const cookieCity = cookieStore.get("dudit_city")?.value
@@ -532,13 +562,24 @@ export default async function ExplorarPage({
             return { items: [] as Awaited<ReturnType<typeof getCommunityVideos>>["items"], nextCursor: null, hasMore: false }
         })
 
-    const [fetched, resolvedCity, coordsResolved, cookieScope, communityVideosData] = await Promise.all([
+    const [
+        fetched,
+        resolvedCity,
+        cityCoordsResolved,
+        cookieScope,
+        communityVideosData,
+        userSessionRes,
+    ] = await Promise.all([
         explorePromise,
         cityPromise,
-        coordsPromise,
+        cityCoordsPromise,
         cookieScopePromise,
         videosPromise,
+        initialUserProfilePromise,
     ])
+
+    const userProfile = userSessionRes.userProfile
+    const cartCount = userSessionRes.cartCount
 
     let exploreItems: any[] = fetched.items
     let moreDistantSellers: any[] = fetched.moreDistantSellers
@@ -546,25 +587,27 @@ export default async function ExplorarPage({
 
     let resolvedCityName: string | null = resolvedCity ? `${resolvedCity.city} - ${resolvedCity.state}` : null
 
-    let refCoords = coordsResolved
+    // Coordenadas de referência: perfil do usuário tem prioridade, depois coordenadas da cidade da rota
+    const refCoords = (userProfile?.latitude && userProfile?.longitude)
+        ? { lat: userProfile.latitude, lng: userProfile.longitude }
+        : cityCoordsResolved
 
     let productsWithDistance = exploreItems
     let moreDistantSellersWithDistance = moreDistantSellers
     let moreDistantItemsWithDistance = moreDistantItems
 
-    try {
-        productsWithDistance = enrichMarketplaceDistance(exploreItems || [], refCoords)
-        moreDistantSellersWithDistance = enrichMarketplaceDistance(moreDistantSellers || [], refCoords)
-        moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
-    } catch (err) {
-        console.error("[ExplorarPage] Error enriching distances:", err)
+    // Se o backend não tiver calculado distância ou novas coordenadas de perfil estiverem disponíveis:
+    if (refCoords && productsWithDistance.length > 0 && productsWithDistance[0]?.partners?.distance_km == null) {
+        try {
+            productsWithDistance = enrichMarketplaceDistance(exploreItems || [], refCoords)
+            moreDistantSellersWithDistance = enrichMarketplaceDistance(moreDistantSellers || [], refCoords)
+            moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
+        } catch (err) {
+            console.error("[ExplorarPage] Error enriching distances:", err)
+        }
     }
 
-
     // Resolução de localização para anúncios:
-    // 1. Se a rota for uma cidade específica (ex: /explorar/franca-sp), prioriza a cidade da rota.
-    // 2. Se for estado (ex: /explorar/estado-sp), filtra pelo estado.
-    // 3. Se for busca nacional / Brasil (/explorar/brasil ou /explorar), usa a localização real do usuário (perfil ou cookie dudit_city).
     let userCitySlug: string | null = null
     let userCityName: string | null = userProfile?.city || null
     let userStateName: string | null = userProfile?.state || null
@@ -572,13 +615,7 @@ export default async function ExplorarPage({
     let userLng: number | null = userProfile?.longitude ?? null
 
     if (userProfile?.city && userProfile?.state) {
-        const normCity = userProfile.city
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "")
-        userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
+        userCitySlug = normalizeCityToSlug(userProfile.city, userProfile.state)
     } else if (cookieScope) {
         userCitySlug = cookieScope.cookieCity
         if (cookieScope.resolved) {
@@ -677,21 +714,6 @@ export default async function ExplorarPage({
         })),
     }
 
-    // TanStack Query Hydration: pre-populate cache with server data
-    const queryClient = new QueryClient()
-    const queryKey = ["explore", query, serverFetchType, searchSlug, section]
-
-    queryClient.setQueryData(queryKey, {
-        pages: [{
-            items: productsWithDistance || [],
-            nextCursor: (productsWithDistance && productsWithDistance.length > 0) ? productsWithDistance[productsWithDistance.length - 1]?.id : null,
-            hasMore: (productsWithDistance && productsWithDistance.length >= 40)
-        }],
-        pageParams: [null]
-    })
-
-    const dehydratedState = dehydrate(queryClient)
-
     return (
         <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <script
@@ -700,33 +722,31 @@ export default async function ExplorarPage({
             />
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-            <HydrationBoundary state={dehydratedState}>
-                <Suspense fallback={
-                    <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
-                        <ThreeDotsLoader />
-                    </div>
-                }>
-                    <ExplorarPageClient
-                        initialResults={productsWithDistance}
-                        initialMoreDistantSellers={moreDistantSellersWithDistance}
-                        initialMoreDistantItems={moreDistantItemsWithDistance}
-                        initialSection={section}
-                        query={query}
-                        type={type}
-                        cidade={searchSlug}
-                        resolvedCityName={resolvedCityName}
-                        categoria={categoria}
-                        sectionTitle={sectionTitle}
-                        userProfile={userProfile}
-                        cartCount={cartCount}
-                        hideHeaderAndFooter={true}
-                        exploreAds={exploreAds}
-                        searchAds={searchAds}
-                        isStateRoute={isStateRoute}
-                        communityVideos={communityVideosData.items}
-                    />
-                </Suspense>
-            </HydrationBoundary>
+            <Suspense fallback={
+                <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                    <ThreeDotsLoader />
+                </div>
+            }>
+                <ExplorarPageClient
+                    initialResults={productsWithDistance}
+                    initialMoreDistantSellers={moreDistantSellersWithDistance}
+                    initialMoreDistantItems={moreDistantItemsWithDistance}
+                    initialSection={section}
+                    query={query}
+                    type={type}
+                    cidade={searchSlug}
+                    resolvedCityName={resolvedCityName}
+                    categoria={categoria}
+                    sectionTitle={sectionTitle}
+                    userProfile={userProfile}
+                    cartCount={cartCount}
+                    hideHeaderAndFooter={true}
+                    exploreAds={exploreAds}
+                    searchAds={searchAds}
+                    isStateRoute={isStateRoute}
+                    communityVideos={communityVideosData.items}
+                />
+            </Suspense>
 
             <MarketplaceFooter />
         </div>

@@ -2567,7 +2567,7 @@ export const AppointmentSheet = ({
                                                     variant="link"
                                                     onClick={() => setIsAddItemSheetOpen(true)}
                                                 >
-                                                    <PlusIcon size={14} strokeWidth={3} />
+                                                    <PlusIcon size={14} />
                                                     Adicionar item
                                                 </Button>
                                             )}

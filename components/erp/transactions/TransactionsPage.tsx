@@ -38,7 +38,6 @@ import { UndoGracePeriodToast } from "@/components/reusable/UndoGracePeriodToast
 import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId, findMercadoPagoAccountId, isMercadoPagoPaymentType } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-import { useSidebar } from "@/lib/sidebar-context"
 import { useNotification } from "@/hooks/use-notification"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -1201,8 +1200,6 @@ export default function TransactionsPage({
         closeEntity()
     }, [closeEntity])
 
-    const { setHeaderOverride } = useSidebar()
-
     const refreshInstallmentDetail = useCallback(async (groupId?: string | null) => {
         const gid = groupId
         if (!gid) return
@@ -2307,9 +2304,7 @@ export default function TransactionsPage({
                     editRecurringTemplateId={entityState.entityType === "recurring" ? (entityState.entityId || undefined) : undefined}
                     editRecurringTemplate={entityState.entityType === "recurring" ? recurringTemplates?.find((t: any) => t.id === entityState.entityId) : undefined}
                     forcedTab={forcedTab}
-                    onBack={() => {
-                        closeEntity()
-                    }}
+                    onBack={handleCloseTransactionDetail}
                     onSuccess={() => {
                         // afterMutation already refreshes the entity once.
                         afterMutation(entityState.entityId || undefined)

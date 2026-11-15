@@ -21,11 +21,11 @@ export default function DpaPage() {
     };
 
     return (
-        <div className="bg-white min-h-screen">
+        <div className="bg-white dark:bg-dark-surface min-h-screen">
             <Navbar onNavigate={onNavigate} />
 
             <div className="pt-32 pb-24">
-                <section className="relative bg-white pb-20 overflow-hidden">
+                <section className="relative bg-white dark:bg-dark-surface pb-20 overflow-hidden">
                     <GridLines />
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
                         <motion.div
@@ -33,10 +33,10 @@ export default function DpaPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
                         >
-                            <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark mb-8 bg-brand-gray tracking-wider font-bold uppercase">
+                            <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark dark:text-dark-heading mb-8 bg-brand-gray dark:bg-dark-border/40 tracking-wider font-bold uppercase">
                                 Documentos Legais — ERP
                             </div>
-                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark mb-6">
+                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                                 Acordo de Tratamento de Dados Pessoais (DPA)
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
@@ -47,31 +47,31 @@ export default function DpaPage() {
                 </section>
 
                 <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                    <div className="prose prose-lg max-w-none text-brand-dark leading-relaxed space-y-12">
-                        <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
+                    <div className="prose prose-lg max-w-none text-brand-dark dark:text-dark-heading leading-relaxed space-y-12">
+                        <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray dark:bg-dark-border/40 rounded-r-xl">
                             Este Acordo de Tratamento de Dados Pessoais (&quot;DPA&quot; ou &quot;Acordo&quot;) integra e complementa os{" "}
-                            <Link href="/institucional/termos" className="text-brand-dark font-bold underline">Termos de Uso</Link>{" "}
+                            <Link href="/institucional/termos" className="text-brand-dark dark:text-dark-heading font-bold underline">Termos de Uso</Link>{" "}
                             e a{" "}
-                            <Link href="/institucional/privacidade" className="text-brand-dark font-bold underline">Política de Privacidade</Link>{" "}
+                            <Link href="/institucional/privacidade" className="text-brand-dark dark:text-dark-heading font-bold underline">Política de Privacidade</Link>{" "}
                             da DUDIT, disciplinando as regras e salvaguardas aplicáveis ao tratamento de dados pessoais no âmbito dos módulos de gestão empresarial (ERP) disponibilizados aos Parceiros.
                         </p>
 
-                        <div className="bg-brand-gray p-8 rounded-2xl border border-brand-border shadow-sm">
-                            <h3 className="text-brand-dark text-lg font-bold mb-4 uppercase tracking-wide">Qualificação das Partes</h3>
+                        <div className="bg-brand-gray dark:bg-dark-border/40 p-8 rounded-2xl border border-brand-border shadow-sm">
+                            <h3 className="text-brand-dark dark:text-dark-heading text-lg font-bold mb-4 uppercase tracking-wide">Qualificação das Partes</h3>
                             <div className="space-y-4 text-brand-inactive-text">
                                 <div>
-                                    <p className="font-bold text-brand-dark text-base mb-1">DUDIT (Operadora no ERP / Controladora Independente em operações próprias):</p>
+                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-base mb-1">DUDIT (Operadora no ERP / Controladora Independente em operações próprias):</p>
                                     <p className="mb-0 text-sm">[RAZÃO SOCIAL OU NOME CIVIL COMPLETO DA OPERADORA], pessoa jurídica/física inscrita no [CNPJ ou CPF, conforme a estrutura jurídica aplicável], com sede/endereço para contato em [ENDEREÇO COMPLETO] e e-mail de privacidade <span className="text-brand-green font-medium">[E-MAIL VÁLIDO DE PRIVACIDADE]</span>.</p>
                                 </div>
                                 <div>
-                                    <p className="font-bold text-brand-dark text-base mb-1">PARCEIRO (Controlador dos dados de clientes e equipe no ERP):</p>
+                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-base mb-1">PARCEIRO (Controlador dos dados de clientes e equipe no ERP):</p>
                                     <p className="mb-0 text-sm">A pessoa física ou jurídica devidamente cadastrada na plataforma como Vendedor ou Prestador de Serviços que utiliza os recursos de gestão (ERP).</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">Preâmbulo</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Preâmbulo</h2>
                             <p>
                                 <strong>CONSIDERANDO QUE:</strong>
                             </p>
@@ -83,7 +83,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">1. Objeto e Separação dos Papéis Legais (LGPD)</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">1. Objeto e Separação dos Papéis Legais (LGPD)</h2>
                             <p>
                                 <strong>1.1. Objeto:</strong> Este DPA disciplina as condições e salvaguardas em que a DUDIT realiza operações de tratamento de dados pessoais inseridos, integrados ou disponibilizados pelo PARCEIRO nas ferramentas de gestão (ERP) da plataforma.
                             </p>
@@ -110,7 +110,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">2. Instruções de Tratamento e Limitação de Finalidade</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">2. Instruções de Tratamento e Limitação de Finalidade</h2>
                             <p>
                                 <strong>2.1.</strong> A DUDIT processará os dados pessoais submetidos pelo PARCEIRO ao ERP estritamente para as seguintes finalidades operacionais:
                             </p>
@@ -130,7 +130,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">3. Obrigações e Declarações do Controlador (Parceiro)</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">3. Obrigações e Declarações do Controlador (Parceiro)</h2>
                             <p>
                                 <strong>3.1.</strong> O PARCEIRO declara e garante que:
                             </p>
@@ -147,7 +147,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">4. Obrigações, Medidas de Segurança e Responsabilidade da Operadora (DUDIT)</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">4. Obrigações, Medidas de Segurança e Responsabilidade da Operadora (DUDIT)</h2>
                             <p>
                                 <strong>4.1.</strong> A DUDIT compromete-se a tratar os dados pessoais sob sua custódia técnica com padrão de segurança compatível com a natureza das informações e o porte da operação, adotando medidas técnicas e organizacionais proporcionais destinadas a proteger os dados contra destruição acidental ou ilícita, perda, alteração, acesso não autorizado ou qualquer forma de tratamento inadequado.
                             </p>
@@ -161,19 +161,19 @@ export default function DpaPage() {
                                 <li><strong>Armazenamento de Senhas:</strong> Senhas de usuários gerenciadas em formato de hash criptográfico irreversível (algoritmo bcrypt provido pela camada de autenticação do Supabase Auth), complementadas por limitação de taxa de requisições (<code>lib/rate-limiter.ts</code>) para mitigação de ataques de força bruta;</li>
                                 <li><strong>Isolamento Lógico Multi-tenant:</strong> Segregação de dados entre diferentes Parceiros mediante associação obrigatória ao identificador de parceiro (<code>partner_id</code>), regras de controle de acesso em nível de linha (Row Level Security - RLS) na camada de dados e verificação programática nas ações de backend (<code>lib/services/authorized-customer-access.ts</code>);</li>
                                 <li><strong>Controle de Permissões de Equipe (RBAC):</strong> Módulo de controle de acessos da equipe interna do Parceiro permitindo restringir privilégios por loja, tela e operação (proprietário, administrador, gestor, operador e entregador em <code>lib/permissions/</code>);</li>
-                                <li><strong>Mecanismo de Backups Criptografados:</strong> Mecanismo técnico e utilitários de decodificação e restauração de dumps PostgreSQL criptografados em fluxo com algoritmo AES-256-GCM (<code>scripts/decrypt-database-backup.mjs</code> e <code>scripts/restore-database.mjs</code>), ressalvando-se que a frequência, execução de rotina contínua e ciclo de expurgo de cópias em produção dependem de parametrização e auditoria da infraestrutura do ambiente produtivo <span className="text-xs text-amber-600 font-semibold">[CONTROLE EM FASE DE CONFIGURAÇÃO / PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>;</li>
+                                <li><strong>Mecanismo de Backups Criptografados:</strong> Mecanismo técnico e utilitários de decodificação e restauração de dumps PostgreSQL criptografados em fluxo com algoritmo AES-256-GCM (<code>scripts/decrypt-database-backup.mjs</code> e <code>scripts/restore-database.mjs</code>), ressalvando-se que a frequência, execução de rotina contínua e ciclo de expurgo de cópias em produção dependem de parametrização e auditoria da infraestrutura do ambiente produtivo <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[CONTROLE EM FASE DE CONFIGURAÇÃO / PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>;</li>
                                 <li><strong>Sanitização de Registros Técnicos:</strong> Rotinas de mascaramento preventivo em código (<code>lib/secure-logger.ts</code>) para substituição de dados confidenciais (senhas, tokens, chaves e dados bancários) pelo marcador <code>[REDACTED]</code> nos logs tratados pela aplicação;</li>
                                 <li><strong>Proteção de Borda e Perímetro:</strong> Uso de rede de distribuição de conteúdo (CDN) e proteção contra ataques DDoS via Cloudflare, com desafios anti-bot no frontend por meio do Cloudflare Turnstile.</li>
                             </ul>
-                            <div className="bg-brand-gray p-6 rounded-xl border border-brand-border">
-                                <p className="text-sm text-brand-dark font-medium mb-0 leading-relaxed">
+                            <div className="bg-brand-gray dark:bg-dark-border/40 p-6 rounded-xl border border-brand-border">
+                                <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mb-0 leading-relaxed">
                                     <strong>4.3. Regime de Responsabilidade da DUDIT:</strong> Sem prejuízo das salvaguardas técnicas adotadas, a responsabilidade civil da DUDIT e as hipóteses de reparação por eventuais danos causados a titulares de dados ou terceiros em decorrência do tratamento observarão estritamente o regime legal estabelecido na LGPD, em especial o art. 42 e seus parágrafos, bem como as causas de exclusão de responsabilidade previstas no art. 43 da referida Lei, não se limitando esta responsabilidade à comprovação exclusiva de culpa caso configurada a responsabilidade legal objetiva ou solidária nos termos da legislação aplicável.
                                 </p>
                             </div>
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">5. Confidencialidade e Requisitos de Pessoal</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">5. Confidencialidade e Requisitos de Pessoal</h2>
                             <p>
                                 <strong>5.1.</strong> A DUDIT assegura que todas as pessoas sob sua subordinação autorizadas a acessar dados pessoais no âmbito do suporte técnico, infraestrutura ou manutenção estão vinculadas a obrigações formais de sigilo e confidencialidade, as quais subsistem mesmo após o término de suas funções.
                             </p>
@@ -183,7 +183,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">6. Fornecedores e Suboperadores</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">6. Fornecedores e Suboperadores</h2>
                             <p>
                                 <strong>6.1. Autorização Geral:</strong> O PARCEIRO expressamente autoriza a DUDIT a contratar fornecedores terceirizados de infraestrutura, hospedagem, tecnologia e serviços especializados estritamente necessários para a execução e disponibilização das ferramentas contratadas.
                             </p>
@@ -193,74 +193,74 @@ export default function DpaPage() {
 
                             <div className="overflow-x-auto my-6 border border-brand-border rounded-xl">
                                 <table className="w-full text-left text-sm border-collapse">
-                                    <thead className="bg-brand-gray border-b border-brand-border">
+                                    <thead className="bg-brand-gray dark:bg-dark-border/40 border-b border-brand-border">
                                         <tr>
-                                            <th className="p-3 font-semibold text-brand-dark">Fornecedor</th>
-                                            <th className="p-3 font-semibold text-brand-dark">Função / Escopo</th>
-                                            <th className="p-3 font-semibold text-brand-dark">Dados Pessoais Acessados</th>
-                                            <th className="p-3 font-semibold text-brand-dark">País</th>
-                                            <th className="p-3 font-semibold text-brand-dark">Instrumento de Privacidade</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Fornecedor</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Função / Escopo</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Dados Pessoais Acessados</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading">País</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Instrumento de Privacidade</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-brand-border text-brand-inactive-text">
+                                    <tbody className="divide-y divide-brand-border dark:divide-dark-border text-brand-inactive-text">
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Supabase (Supabase Inc. / AWS)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Supabase (Supabase Inc. / AWS)</td>
                                             <td className="p-3">Banco de dados relacional e infraestrutura de autenticação</td>
                                             <td className="p-3">Dados cadastrais, pedidos, registros de ERP e logs de acesso</td>
                                             <td className="p-3">EUA / América do Sul</td>
                                             <td className="p-3">Termos de Serviço / DPA Online de Adesão</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Cloudflare (Cloudflare Inc.)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Cloudflare (Cloudflare Inc.)</td>
                                             <td className="p-3">CDN, proteção WAF/DDoS, Turnstile e armazenamento de arquivos (R2)</td>
                                             <td className="p-3">Imagens de catálogo, documentos anexos, tráfego e IPs</td>
                                             <td className="p-3">EUA / Global</td>
                                             <td className="p-3">Cloudflare Data Processing Addendum (Online)</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Railway (Railway Corp.)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Railway (Railway Corp.)</td>
                                             <td className="p-3">Hospedagem da aplicação web, backend/API e instância de mensageria</td>
                                             <td className="p-3">Tráfego de requisições web e metadados de execução transitórios</td>
                                             <td className="p-3">EUA</td>
                                             <td className="p-3">Railway Terms of Service / DPA Online de Adesão</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">SMTP2GO (Sandev Limited)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">SMTP2GO (Sandev Limited)</td>
                                             <td className="p-3">Disparo de e-mails transacionais (ativações, redefinições de senha)</td>
                                             <td className="p-3">E-mail do destinatário, nome e conteúdo da mensagem</td>
                                             <td className="p-3">Nova Zelândia / EUA / UE</td>
                                             <td className="p-3">Termos de Serviço e Política de Privacidade</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Trigger.dev (Trigger.dev Inc.)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Trigger.dev (Trigger.dev Inc.)</td>
                                             <td className="p-3">Orquestração de tarefas assíncronas em segundo plano</td>
                                             <td className="p-3">Identificadores técnicos de tarefas e metadados transitórios</td>
                                             <td className="p-3">EUA</td>
                                             <td className="p-3">Termos de Serviço / DPA Online de Adesão</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Sightengine (Sightengine SAS)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Sightengine (Sightengine SAS)</td>
                                             <td className="p-3">Moderação automatizada de imagens contra fraudes e ilícitos</td>
                                             <td className="p-3">Buffers/URLs transitórias de imagens enviadas para catálogo</td>
                                             <td className="p-3">França / UE</td>
                                             <td className="p-3">Termos de Serviço sob legislação GDPR / DPA Online</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Sentry (Functional Software Inc.)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Sentry (Functional Software Inc.)</td>
                                             <td className="p-3">Diagnóstico de erros de código e desempenho</td>
                                             <td className="p-3">Registros técnicos de exceções e metadados sanitizados</td>
                                             <td className="p-3">EUA</td>
                                             <td className="p-3">Sentry Data Processing Addendum (Online)</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">PostHog (PostHog Inc.)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">PostHog (PostHog Inc.)</td>
                                             <td className="p-3">Telemetria de usabilidade (somente mediante consentimento prévio)</td>
                                             <td className="p-3">Eventos agregados de navegação e interface</td>
                                             <td className="p-3">EUA</td>
                                             <td className="p-3">PostHog Data Processing Addendum (Online)</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Gateway WhatsApp (Evolution API no Railway)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Gateway WhatsApp (Evolution API no Railway)</td>
                                             <td className="p-3">Disparo de mensagens e avisos automáticos de pedidos</td>
                                             <td className="p-3">Telefone de destino e texto da notificação do pedido</td>
                                             <td className="p-3">EUA (Railway)</td>
@@ -276,7 +276,7 @@ export default function DpaPage() {
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
                                 <li><strong>Mercado Pago (Mercado Pago Instituição de Pagamento Ltda.):</strong> Atua na qualidade de <strong>Controlador Independente</strong>. Como instituição de pagamento regulada pelo Banco Central do Brasil (Bacen), o Mercado Pago determina autonomamente os meios e finalidades relativos à liquidação financeira, prevenção a fraudes, compliance bancário e combate à lavagem de dinheiro (AML), possuindo política de privacidade própria e obrigações regulatórias autônomas;</li>
                                 <li><strong>SuperFrete (SuperFrete Tecnologia Ltda.) e Transportadoras Integradas:</strong> Atuam na qualidade de <strong>Controladores Independentes</strong> no tocante à cotação, emissão de Conhecimento de Transporte Eletrônico (CT-e), despacho e transporte físico de mercadorias, determinando os dados indispensáveis para o cumprimento das normas postais e regulatórias da ANTT;</li>
-                                <li><strong>Serviços Públicos de Apoio e Geocodificação (ViaCEP, BrasilAPI, OpenStreetMap):</strong> Serviços utilitários abertos de localização que recebem consultas pontuais de CEP ou coordenadas geográficas. A DUDIT não controla o armazenamento técnico de logs HTTP nos servidores desses prestadores, sendo suas práticas regidas por suas respectivas políticas operacionais <span className="text-xs text-amber-600 font-semibold">[PENDENTE DE VALIDAÇÃO DOCUMENTAL]</span>.</li>
+                                <li><strong>Serviços Públicos de Apoio e Geocodificação (ViaCEP, BrasilAPI, OpenStreetMap):</strong> Serviços utilitários abertos de localização que recebem consultas pontuais de CEP ou coordenadas geográficas. A DUDIT não controla o armazenamento técnico de logs HTTP nos servidores desses prestadores, sendo suas práticas regidas por suas respectivas políticas operacionais <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE VALIDAÇÃO DOCUMENTAL]</span>.</li>
                             </ul>
 
                             <p>
@@ -285,7 +285,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">7. Transferência Internacional de Dados e Resolução CD/ANPD nº 19/2024</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">7. Transferência Internacional de Dados e Resolução CD/ANPD nº 19/2024</h2>
                             <p>
                                 <strong>7.1. Fluxos Internacionais Reais:</strong> Tendo em vista a utilização de serviços de infraestrutura em nuvem globais descritos na Cláusula 6, os dados tratados no ERP poderão ser transferidos para armazenamento ou processamento em servidores localizados fora do território brasileiro. Nesse fluxo:
                             </p>
@@ -299,13 +299,13 @@ export default function DpaPage() {
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
                                 <li>O tratamento internacional de dados decorre da contratação necessária de infraestrutura em nuvem para a disponibilização do serviço SaaS solicitado pelo Parceiro (art. 33, IX, da LGPD);</li>
                                 <li>No âmbito operacional, os fornecedores internacionais disponibilizam aditivos de processamento de dados (DPAs online) e termos de serviço padrão de mercado que preveem medidas técnicas de segurança da informação e confidencialidade;</li>
-                                <li><strong>Adequação à Resolução CD/ANPD nº 19/2024:</strong> Tendo em vista que o prazo regulamentar transitório da referida Resolução já se encerrou, a DUDIT declara que a celebração formal de contratos bilaterais específicos com fornecedores estrangeiros contendo o texto das Cláusulas-Padrão Contratuais da ANPD encontra-se em fase de avaliação jurídica e operacional <span className="text-xs text-amber-600 font-semibold">[PENDENTE DE FORMALIZAÇÃO BILATERAL DE CLÁUSULAS-PADRÃO DA ANPD COM FORNECEDORES ESTRANGEIROS]</span>;</li>
+                                <li><strong>Adequação à Resolução CD/ANPD nº 19/2024:</strong> Tendo em vista que o prazo regulamentar transitório da referida Resolução já se encerrou, a DUDIT declara que a celebração formal de contratos bilaterais específicos com fornecedores estrangeiros contendo o texto das Cláusulas-Padrão Contratuais da ANPD encontra-se em fase de avaliação jurídica e operacional <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE FORMALIZAÇÃO BILATERAL DE CLÁUSULAS-PADRÃO DA ANPD COM FORNECEDORES ESTRANGEIROS]</span>;</li>
                                 <li><strong>Compromisso de Integralidade:</strong> Fica expressamente estipulado que, sempre que for adotado formalmente o mecanismo de Cláusulas-Padrão Contratuais aprovado pela ANPD entre as Partes ou com os suboperadores, será incorporado o <strong>texto oficial integral e sem alterações</strong>, conforme publicado no Anexo da Resolução CD/ANPD nº 19/2024.</li>
                             </ul>
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">8. Gestão e Notificação de Incidentes de Segurança</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">8. Gestão e Notificação de Incidentes de Segurança</h2>
                             <div className="bg-brand-dark text-white p-8 rounded-2xl shadow-xl space-y-4">
                                 <h3 className="text-white text-xl font-bold uppercase tracking-wide">Comunicação Contratual em até 24 Horas</h3>
                                 <p className="text-gray-300 leading-relaxed mb-0">
@@ -324,7 +324,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">9. Atendimento aos Direitos dos Titulares de Dados</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">9. Atendimento aos Direitos dos Titulares de Dados</h2>
                             <p>
                                 <strong>9.1. Regra Geral:</strong> Em relação aos dados tratados no âmbito do ERP, cabe ao PARCEIRO, na condição de Controlador, analisar, deliberar e responder diretamente às solicitações de exercício de direitos dos titulares (confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação ou revogação de consentimento).
                             </p>
@@ -345,22 +345,22 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">10. Cooperação, Auditorias e Preservação dos Poderes da ANPD</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">10. Cooperação, Auditorias e Preservação dos Poderes da ANPD</h2>
                             <p>
                                 <strong>10.1.</strong> A DUDIT prestará cooperação razoável e juridicamente cabível ao PARCEIRO para que este cumpra suas obrigações legais perante a ANPD e os titulares de dados, incluindo o fornecimento de informações técnicas sobre a arquitetura dos sistemas para elaboração de Relatórios de Impacto à Proteção de Dados Pessoais (RIPD/DPIA), respeitados os segredos comercial e industrial da plataforma.
                             </p>
                             <p>
                                 <strong>10.2. Auditorias e Verificações:</strong> A verificação de conformidade da DUDIT poderá ser realizada mediante o fornecimento de declarações técnicas, relatórios de segurança e respostas a questionários de privacidade razoáveis. Caso auditoria adicional seja expressamente exigida por autoridade competente ou legalmente cabível, as Partes acordarão previamente cronograma, escopo e salvaguardas de confidencialidade, de modo a preservar a segurança e o sigilo de dados de outros clientes e parceiros da plataforma.
                             </p>
-                            <div className="bg-brand-gray p-6 rounded-xl border border-brand-border">
-                                <p className="text-sm text-brand-dark font-medium mb-0 leading-relaxed">
+                            <div className="bg-brand-gray dark:bg-dark-border/40 p-6 rounded-xl border border-brand-border">
+                                <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mb-0 leading-relaxed">
                                     <strong>10.3. Poderes de Fiscalização da ANPD:</strong> Nenhuma disposição deste Acordo restringe, limita ou prejudica os poderes legais de fiscalização, requisição de informações, auditoria, monitoramento e aplicação de sanções administrativas atribuídos à Autoridade Nacional de Proteção de Dados (ANPD) nos termos da LGPD e de suas regulamentações, comprometendo-se as Partes a cumprir prontamente as determinações e solicitações expedidas pela autoridade.
                                 </p>
                             </div>
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">11. Encerramento, Exportação e Descarte de Dados</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">11. Encerramento, Exportação e Descarte de Dados</h2>
                             <p>
                                 <strong>11.1. Exportação Prévia:</strong> Antes de requerer o encerramento de sua conta ou do módulo de ERP, o PARCEIRO poderá exportar os dados operacionais de seus clientes, pedidos e produtos por meio dos recursos disponíveis na plataforma.
                             </p>
@@ -368,7 +368,7 @@ export default function DpaPage() {
                                 <strong>11.2. Procedimentos de Descarte na Base Ativa:</strong> Após a solicitação definitiva de encerramento da conta pelo PARCEIRO:
                             </p>
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
-                                <li>A DUDIT iniciará os procedimentos técnicos para a exclusão lógica e anonimização dos registros operacionais da base ativa do ERP no prazo razoável estimado em até 30 (trinta) dias úteis <span className="text-xs text-amber-600 font-semibold">[PENDENTE DE VALIDAÇÃO DE CRONOGRAMA EM PRODUÇÃO]</span>;</li>
+                                <li>A DUDIT iniciará os procedimentos técnicos para a exclusão lógica e anonimização dos registros operacionais da base ativa do ERP no prazo razoável estimado em até 30 (trinta) dias úteis <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE VALIDAÇÃO DE CRONOGRAMA EM PRODUÇÃO]</span>;</li>
                                 <li>Eventuais pendências financeiras ou comerciais entre as Partes não autorizam a retenção indiscriminada de dados pessoais do ERP. A retenção pela DUDIT limitar-se-á estritamente aos documentos cadastrais e registros fiscais indispensáveis à cobrança legal ou ao cumprimento de obrigações tributárias e contábeis próprias (art. 16, I e II, da LGPD);</li>
                                 <li>Registros transacionais e de pedidos poderão ter seus dados pessoais anonimizados, preservando-se apenas valores contábeis e fiscais exigidos pela legislação.</li>
                             </ul>
@@ -376,17 +376,17 @@ export default function DpaPage() {
                                 <strong>11.3. Retenções Legalmente Justificadas:</strong> A DUDIT conservará os dados e registros estritamente necessários para:
                             </p>
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
-                                <li>O cumprimento de deveres legais de guarda de registros previstos na legislação brasileira, inclusive a retenção de registros de acesso a aplicações de internet quando e na medida em que o art. 15 da Lei nº 12.965/2014 for legalmente exigível da DUDIT <span className="text-xs text-amber-600 font-semibold">[PENDENTE DE VALIDAÇÃO JURÍDICA QUANTO AO ENQUADRAMENTO DA OPERADORA]</span>, não se aplicando essa retenção aos cadastros gerais do ERP;</li>
+                                <li>O cumprimento de deveres legais de guarda de registros previstos na legislação brasileira, inclusive a retenção de registros de acesso a aplicações de internet quando e na medida em que o art. 15 da Lei nº 12.965/2014 for legalmente exigível da DUDIT <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE VALIDAÇÃO JURÍDICA QUANTO AO ENQUADRAMENTO DA OPERADORA]</span>, não se aplicando essa retenção aos cadastros gerais do ERP;</li>
                                 <li>O exercício regular de direitos em processos judiciais, administrativos ou arbitrais;</li>
                                 <li>O cumprimento de ordens emanadas de autoridades competentes.</li>
                             </ul>
                             <p>
-                                <strong>11.4. Cópias de Segurança (Backups Residuais):</strong> O PARCEIRO reconhece que cópias de segurança geradas para fins de integridade e recuperação de desastres não são passíveis de expurgo individualizado imediato devido à natureza compactada e criptografada dos snapshots globais do banco de dados. Tais cópias permanecem isoladas, seguras e inacessíveis para o uso operacional corrente, sendo descontinuadas e sobrescritas de forma automatizada ao longo do ciclo técnico regular de rotação de backups adotado pela infraestrutura <span className="text-xs text-amber-600 font-semibold">[PRAZO EXATO DE RETENÇÃO TÉCNICA DE BACKUPS: PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>.
+                                <strong>11.4. Cópias de Segurança (Backups Residuais):</strong> O PARCEIRO reconhece que cópias de segurança geradas para fins de integridade e recuperação de desastres não são passíveis de expurgo individualizado imediato devido à natureza compactada e criptografada dos snapshots globais do banco de dados. Tais cópias permanecem isoladas, seguras e inacessíveis para o uso operacional corrente, sendo descontinuadas e sobrescritas de forma automatizada ao longo do ciclo técnico regular de rotação de backups adotado pela infraestrutura <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PRAZO EXATO DE RETENÇÃO TÉCNICA DE BACKUPS: PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>.
                             </p>
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">12. Responsabilidades e Indenização</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">12. Responsabilidades e Indenização</h2>
                             <p>
                                 <strong>12.1. Regime Legal da LGPD:</strong> A responsabilidade civil das Partes por danos patrimoniais, morais, individuais ou coletivos causados em virtude do tratamento de dados pessoais observará integralmente os artigos 42 e 43 da LGPD:
                             </p>
@@ -413,7 +413,7 @@ export default function DpaPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-brand-dark">13. Disposições Gerais, Vigência e Aceite Eletrônico</h2>
+                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">13. Disposições Gerais, Vigência e Aceite Eletrônico</h2>
                             <p>
                                 <strong>13.1. Vigência:</strong> Este DPA entra em vigor na data de seu aceite eletrônico pelo PARCEIRO e permanecerá válido enquanto a conta do PARCEIRO estiver ativa e a DUDIT mantiver a custódia técnica de dados pessoais em nome do PARCEIRO.
                             </p>
@@ -439,29 +439,29 @@ export default function DpaPage() {
                             <div className="inline-flex items-center gap-2 border border-brand-green/30 bg-brand-green/10 text-brand-green rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider">
                                 Anexo Técnico
                             </div>
-                            <h2 className="text-3xl font-bold text-brand-dark">
+                            <h2 className="text-3xl font-bold text-brand-dark dark:text-dark-heading">
                                 ANEXO I — Quadro de Escopo do Tratamento de Dados Pessoais no ERP
                             </h2>
 
                             <div className="overflow-x-auto my-6 border border-brand-border rounded-xl">
                                 <table className="w-full text-left text-sm border-collapse">
-                                    <thead className="bg-brand-gray border-b border-brand-border">
+                                    <thead className="bg-brand-gray dark:bg-dark-border/40 border-b border-brand-border">
                                         <tr>
-                                            <th className="p-3 font-semibold text-brand-dark w-1/4">Parâmetro</th>
-                                            <th className="p-3 font-semibold text-brand-dark">Detalhamento Técnico e Operacional</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading w-1/4">Parâmetro</th>
+                                            <th className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Detalhamento Técnico e Operacional</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-brand-border text-brand-inactive-text">
+                                    <tbody className="divide-y divide-brand-border dark:divide-dark-border text-brand-inactive-text">
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Papel do PARCEIRO</td>
-                                            <td className="p-3 font-semibold text-brand-dark">Controlador de Dados Pessoais</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Papel do PARCEIRO</td>
+                                            <td className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Controlador de Dados Pessoais</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Papel da DUDIT</td>
-                                            <td className="p-3 font-semibold text-brand-dark">Operadora de Dados Pessoais (provedora de infraestrutura de software SaaS)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Papel da DUDIT</td>
+                                            <td className="p-3 font-semibold text-brand-dark dark:text-dark-heading">Operadora de Dados Pessoais (provedora de infraestrutura de software SaaS)</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Categorias de Titulares</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Categorias de Titulares</td>
                                             <td className="p-3 space-y-1">
                                                 <p className="mb-1">• Clientes e compradores do Parceiro</p>
                                                 <p className="mb-1">• Colaboradores, funcionários e equipe interna do Parceiro (<code>partner_users</code>)</p>
@@ -470,10 +470,10 @@ export default function DpaPage() {
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Classificação Legal dos Dados Tratados</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Classificação Legal dos Dados Tratados</td>
                                             <td className="p-3 space-y-4">
                                                 <div>
-                                                    <p className="font-semibold text-brand-dark mb-1">A) DADOS PESSOAIS COMUNS (art. 5º, I, LGPD):</p>
+                                                    <p className="font-semibold text-brand-dark dark:text-dark-heading mb-1">A) DADOS PESSOAIS COMUNS (art. 5º, I, LGPD):</p>
                                                     <p className="mb-1">• <strong>Identificação e Contato:</strong> Nome completo, CPF, CNPJ, e-mail, telefone/WhatsApp, endereço residencial ou de entrega.</p>
                                                     <p className="mb-1">• <strong>Pedidos e Consumo:</strong> Histórico de compras, produtos e serviços contratados, quantidades, valores, forma de pagamento, status de preparo e entrega.</p>
                                                     <p className="mb-1">• <strong>Colaboradores e Equipe:</strong> Nome, e-mail comercial, telefone, cargo/função, loja associada, permissões de acesso atribuídas e registros de auditoria interna (<code>audit_logs</code>).</p>
@@ -490,11 +490,11 @@ export default function DpaPage() {
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Operações Realizadas</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Operações Realizadas</td>
                                             <td className="p-3">Coleta (via inserção pelo Parceiro ou integração de pedido), registro, armazenamento em nuvem, organização, estruturação, consulta no painel, processamento de cálculos, transmissão criptografada com suboperadores autorizados, anonimização e eliminação.</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Finalidades do Tratamento</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Finalidades do Tratamento</td>
                                             <td className="p-3 space-y-1">
                                                 <p className="mb-1">• Gestão operacional de pedidos, vendas e orçamentos;</p>
                                                 <p className="mb-1">• Controle de estoque de produtos e catálogo de serviços;</p>
@@ -505,11 +505,11 @@ export default function DpaPage() {
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Duração do Tratamento</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Duração do Tratamento</td>
                                             <td className="p-3">Durante a vigência da conta e contratação do ERP pelo Parceiro, acrescida do prazo técnico de exclusão da base ativa e dos períodos de retenção legalmente justificados.</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark">Instruções do Controlador</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Instruções do Controlador</td>
                                             <td className="p-3">Os dados pessoais devem ser tratados unicamente para disponibilizar e manter as funcionalidades do software de gestão conforme os comandos, cadastros e parametrizações configurados pelo Parceiro na interface da DUDIT.</td>
                                         </tr>
                                     </tbody>

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export const metadata: Metadata = {
-  title: "Plataforma em Manutenção | Dudit",
+  title: "Plataforma em Manutenção",
   description: "Estamos realizando melhorias programadas na plataforma Dudit. Voltaremos em breve!",
   robots: {
     index: false,

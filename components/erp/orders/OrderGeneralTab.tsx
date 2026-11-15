@@ -697,7 +697,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     variant="link"
                                     onClick={addBlankItem}
                                 >
-                                    <PlusIcon size={14} strokeWidth={3} />
+                                    <PlusIcon size={14} />
                                     Adicionar item manual
                                 </Button>
                             )}
@@ -904,7 +904,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <PaymentRow
                                         label={
                                             originalPaymentMethod === "exchange" ? "Crédito de troca" :
-                                                originalPaymentMethod === "store_credit" ? "Vale-compra" :
+                                                originalPaymentMethod === "store_credit" ? "Crédito do cliente" :
                                                     "Desconto do Método"
                                         }
                                         value={<span className="text-brand-green">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
@@ -1376,7 +1376,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     onClick={addBlankItem}
                                     className="p-0 h-auto"
                                 >
-                                    <PlusIcon size={14} strokeWidth={3} />
+                                    <PlusIcon size={14} />
                                     Adicionar item manual
                                 </Button>
                             )}
@@ -1586,7 +1586,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <PaymentRow
                                     label={
                                         originalPaymentMethod === "exchange" ? "Crédito de troca" :
-                                            originalPaymentMethod === "store_credit" ? "Vale-compra" :
+                                            originalPaymentMethod === "store_credit" ? "Crédito do cliente" :
                                                 "Desconto do Método"
                                     }
                                     value={<span className="text-brand-green">- {formatCurrency(paymentMethodDiscountAmount)}</span>}

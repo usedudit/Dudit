@@ -19,11 +19,11 @@ export default function TermsPage() {
     };
 
     return (
-        <div className="bg-white min-h-screen">
+        <div className="bg-white dark:bg-dark-surface min-h-screen">
             <Navbar onNavigate={onNavigate} />
 
             <div className="pt-32 pb-24">
-                <section className="relative bg-white pb-20 overflow-hidden">
+                <section className="relative bg-white dark:bg-dark-surface pb-20 overflow-hidden">
                     <GridLines />
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
                         <motion.div
@@ -31,10 +31,10 @@ export default function TermsPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
                         >
-                            <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark mb-8 bg-brand-gray tracking-wider font-bold uppercase">
+                            <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark dark:text-dark-heading mb-8 bg-brand-gray dark:bg-dark-border/40 tracking-wider font-bold uppercase">
                                 Documentos Legais
                             </div>
-                            <h1 className="text-5xl md:text-6xl font-bold text-brand-dark mb-6">
+                            <h1 className="text-5xl md:text-6xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                                 Termos de Uso
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
@@ -45,8 +45,8 @@ export default function TermsPage() {
                 </section>
 
                 <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                    <div className="prose prose-lg max-w-none text-brand-dark leading-relaxed space-y-12">
-                        <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
+                    <div className="prose prose-lg max-w-none text-brand-dark dark:text-dark-heading leading-relaxed space-y-12">
+                        <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray dark:bg-dark-border/40 rounded-r-xl">
                             Estes Termos de Uso (“Termos”) regem o acesso e a utilização da plataforma DUDIT, operada por <strong>[RAZÃO SOCIAL OU NOME CIVIL COMPLETO DA OPERADORA]</strong>, inscrita no <strong>[CNPJ ou CPF, conforme a estrutura jurídica aplicável]</strong>, com endereço para contato em <strong>[ENDEREÇO COMPLETO]</strong> e e-mail <strong>[E-MAIL OFICIAL DE CONTATO]</strong>, doravante denominada “DUDIT”.
                         </p>
 
@@ -71,7 +71,7 @@ export default function TermsPage() {
                             {/* Seção 1 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">1.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">1.</span>
                                     DEFINIÇÕES
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -97,7 +97,7 @@ export default function TermsPage() {
                             {/* Seção 2 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">2.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">2.</span>
                                     CADASTRO E ACESSO
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -115,7 +115,7 @@ export default function TermsPage() {
                             {/* Seção 3 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">3.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">3.</span>
                                     USO DA PLATAFORMA
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -142,7 +142,7 @@ export default function TermsPage() {
                                     <p><strong>3.9. Arquivos e Anexos entre Parceiro e Usuário:</strong> Arquivos, documentos e anexos trocados entre Parceiro e Usuário por meio da plataforma, como comprovantes, especificações e documentos relacionados a pedidos, poderão ter acesso restrito aos participantes autorizados, conforme as funcionalidades e permissões do sistema. A DUDIT poderá utilizar infraestrutura de terceiros para armazenamento e processamento desses arquivos. O fato de não realizar monitoramento individual e contínuo de todos os arquivos não significa que a DUDIT esteja impedida de adotar medidas de segurança, apurar denúncias, cumprir ordens legais ou restringir conteúdos que apresentem indícios de ilegalidade, fraude ou risco. O acesso aos arquivos deverá respeitar a legislação, as finalidades informadas e os controles de acesso aplicáveis.</p>
                                     <p><strong>3.10. Uso Opcional das Ferramentas de Gestão:</strong> As ferramentas de ERP, cadastro de clientes, estoque, pedidos e organização financeira são disponibilizadas como recursos de apoio à gestão do Parceiro. O Parceiro permanece responsável por conferir os registros, validar informações e manter os controles necessários ao seu negócio. A DUDIT não substitui serviços contábeis, jurídicos, fiscais ou profissionais especializados.</p>
                                     <p><strong>3.11. Documentos Fiscais:</strong> A DUDIT não substitui os sistemas fiscais do Parceiro e não emite, por meio de simples recibos, comprovantes ou cupons não fiscais, documentos fiscais que sejam legalmente exigidos. O Parceiro deverá emitir notas fiscais e demais documentos fiscais quando obrigado pela legislação aplicável à sua atividade.</p>
-                                    <p className="bg-brand-gray p-5 rounded-xl border border-brand-border">
+                                    <p className="bg-brand-gray dark:bg-dark-border/40 p-5 rounded-xl border border-brand-border">
                                         <strong>3.12. Tratamento de Dados no Módulo de Gestão (ERP) e Acordo de Tratamento de Dados (DPA):</strong> Quando o Parceiro utiliza as ferramentas de gestão empresarial (ERP) da DUDIT para armazenar e processar dados de seus próprios clientes, colaboradores ou fornecedores, o Parceiro atua como Controlador e a DUDIT atua como Operadora desses dados, nos termos da Lei Geral de Proteção de Dados (LGPD). As obrigações e salvaguardas técnicas e jurídicas aplicáveis a esse tratamento são disciplinadas no <a href="/institucional/dpa" className="text-brand-green font-medium underline underline-offset-4">Acordo de Tratamento de Dados (DPA)</a> da DUDIT, o qual complementa estes Termos de Uso e integra o vínculo contratual entre as partes.
                                     </p>
                                 </div>
@@ -151,7 +151,7 @@ export default function TermsPage() {
                             {/* Seção 4 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">4.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">4.</span>
                                     POLÍTICA DE CONTEÚDO
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -196,7 +196,7 @@ export default function TermsPage() {
                             {/* Seção 5 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">5.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">5.</span>
                                     MARKETPLACE E ANÚNCIOS
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -219,7 +219,7 @@ export default function TermsPage() {
                             {/* Seção 6 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">6.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">6.</span>
                                     PAGAMENTOS E INTEGRAÇÕES
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -237,7 +237,7 @@ export default function TermsPage() {
                             {/* Seção 7 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">7.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">7.</span>
                                     PLANOS E COBRANÇAS
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -255,7 +255,7 @@ export default function TermsPage() {
                             {/* Seção 8 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">8.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">8.</span>
                                     MODERAÇÃO, PENALIDADES E PREVENÇÃO A FRAUDES
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -284,14 +284,14 @@ export default function TermsPage() {
                             {/* Seção 9 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">9.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">9.</span>
                                     DISPONIBILIDADE DA PLATAFORMA E FORÇA MAIOR
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
                                     <p><strong>9.1. Disponibilidade:</strong> A DUDIT envidará esforços razoáveis para manter a plataforma disponível e funcional, mas não garante disponibilidade ininterrupta ou ausência absoluta de falhas. Poderão ocorrer interrupções temporárias para manutenção, atualização, correção, melhorias técnicas ou em razão de fatores externos.</p>
                                     <p><strong>9.2. Natureza Tecnológica do Serviço:</strong> A plataforma é disponibilizada conforme suas características técnicas, funcionalidades implementadas e condições de disponibilidade. A DUDIT não garante que todos os recursos funcionarão sem erros em qualquer dispositivo, navegador, sistema operacional ou ambiente de rede. Eventuais falhas deverão ser tratadas conforme a natureza do serviço, as obrigações assumidas e a legislação aplicável.</p>
                                     <p><strong>9.3. Entregas e Logística Local:</strong> A DUDIT poderá disponibilizar recursos para que Parceiros solicitem entregas locais a entregadores previamente convidados ou habilitados. O entregador poderá aceitar ou recusar cada solicitação, não existindo garantia de disponibilidade, cobertura ou conclusão de entrega. Quando a solicitação for aceita, as partes envolvidas deverão observar as informações e condições apresentadas, incluindo retirada, destino, valores, forma de pagamento e instruções necessárias.</p>
-                                    <p className="bg-brand-gray p-4 rounded-xl border border-brand-border text-sm">
+                                    <p className="bg-brand-gray dark:bg-dark-border/40 p-4 rounded-xl border border-brand-border text-sm">
                                         <strong>Privacidade no Módulo de Entregas:</strong> Para fins de privacidade e segurança dos titulares (consumidores e destinatários), a plataforma adota mecanismos de minimização de dados: antes do aceite da corrida pelo entregador, são exibidos apenas dados aproximados e estritamente necessários para a tomada de decisão (como bairro, cidade, distância estimada, taxa de entrega e modalidade de pagamento), mantendo-se mascarados o endereço completo (número e complemento), o nome completo e o telefone de contato. Somente após a confirmação do aceite pelo entregador responsável, os dados necessários à execução da entrega e ao contato indispensável são revelados. Concluída a entrega, o acesso aos dados é restrito ao histórico estritamente necessário à prestação de contas.
                                     </p>
                                     <p>A execução material da entrega será realizada pelo entregador que aceitar a solicitação, conforme as condições acordadas e a legislação aplicável. O Parceiro deverá preparar e disponibilizar corretamente o produto, enquanto o Usuário deverá fornecer informações adequadas de recebimento. A DUDIT atua na disponibilização da ferramenta tecnológica e na organização das solicitações, sem garantir a disponibilidade de entregadores ou o resultado de cada entrega. Essa delimitação não afasta eventual responsabilidade legal da DUDIT por falhas próprias de seus serviços ou por obrigações que a legislação lhe atribua.</p>
@@ -303,7 +303,7 @@ export default function TermsPage() {
                             {/* Seção 10 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">10.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">10.</span>
                                     LIMITAÇÃO DE RESPONSABILIDADE
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -318,7 +318,7 @@ export default function TermsPage() {
                             {/* Seção 11 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">11.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">11.</span>
                                     PROPRIEDADE INTELECTUAL
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -333,7 +333,7 @@ export default function TermsPage() {
                             {/* Seção 12 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">12.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">12.</span>
                                     ENCERRAMENTO E SUSPENSÃO
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -349,7 +349,7 @@ export default function TermsPage() {
                             {/* Seção 13 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">13.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">13.</span>
                                     ALTERAÇÕES NOS TERMOS
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
@@ -363,7 +363,7 @@ export default function TermsPage() {
                             {/* Seção 14 */}
                             <div>
                                 <h2 className="text-3xl font-bold mb-8 flex items-center gap-4">
-                                    <span className="text-brand-dark">14.</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">14.</span>
                                     FORO E LEGISLAÇÃO APLICÁVEL
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">

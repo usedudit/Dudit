@@ -81,7 +81,7 @@ export default function GeradorLinkWhatsAppPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqLd) }}
@@ -100,7 +100,7 @@ export default function GeradorLinkWhatsAppPage() {
                     description="Crie seu link personalizado com mensagem pronta para usar na bio do Instagram, nas redes sociais ou em anúncios."
                 />
 
-                <section className="py-24 bg-white relative border-t border-brand-border">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -111,10 +111,10 @@ export default function GeradorLinkWhatsAppPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
+                                <Card className="bg-white dark:bg-dark-surface border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
-                                            <h2 className="text-xl font-bold text-brand-dark">Configure seu link</h2>
+                                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Configure seu link</h2>
                                             <p className="text-sm text-brand-inactive-text mt-1">
                                                 Informe o número e a mensagem que o cliente vai enviar ao clicar.
                                             </p>
@@ -165,7 +165,7 @@ export default function GeradorLinkWhatsAppPage() {
                                         </p>
 
                                         <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-4">
-                                            <p className="text-xs text-gray-400 break-all font-mono mb-3">
+                                            <p className="text-xs text-gray-400 dark:text-dark-body break-all font-mono mb-3">
                                                 {linkGerado}
                                             </p>
 
@@ -198,7 +198,7 @@ export default function GeradorLinkWhatsAppPage() {
                                             <p className="text-sm font-semibold text-white mb-1">
                                                 Suba de nível com a Vitrine Dudit
                                             </p>
-                                            <p className="text-xs text-gray-400 leading-relaxed">
+                                            <p className="text-xs text-gray-400 dark:text-dark-body leading-relaxed">
                                                 Em vez de responder 50 perguntas sobre preço e fotos, coloque sua Vitrine Dudit na bio. O cliente vê fotos, escolhe produtos e envia o pedido pronto no seu WhatsApp.
                                             </p>
                                         </div>
@@ -210,7 +210,7 @@ export default function GeradorLinkWhatsAppPage() {
                                                     <ArrowRight className="w-4 h-4" />
                                                 </Link>
                                             </Button>
-                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                            <p className="text-center text-xs text-gray-400 dark:text-dark-body mt-3">
                                                 Link único na bio com todos os seus produtos e 0% de comissão
                                             </p>
                                         </div>

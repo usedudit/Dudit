@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Button } from "@/components/reusable"
 import { SlidersHorizontal, ListOrdered } from "lucide-react"
 import { Badge } from "@/components/reusable/Badge"
@@ -17,9 +18,29 @@ export function ExplorarMobileControls({
     activeFiltersCount,
     onOpenFilters,
     onOpenSort,
-    isVisible = true,
+    isVisible: explicitIsVisible,
     topClassName = "top-[52px]",
 }: ExplorarMobileControlsProps) {
+    const [scrolled, setScrolled] = useState(false)
+
+    useEffect(() => {
+        if (explicitIsVisible !== undefined) return
+        let ticking = false
+        const onScroll = () => {
+            if (ticking) return
+            window.requestAnimationFrame(() => {
+                setScrolled(window.scrollY > 10)
+                ticking = false
+            })
+            ticking = true
+        }
+        onScroll()
+        window.addEventListener("scroll", onScroll, { passive: true })
+        return () => window.removeEventListener("scroll", onScroll)
+    }, [explicitIsVisible])
+
+    const isVisible = explicitIsVisible !== undefined ? explicitIsVisible : scrolled
+
     return (
         <div
             className={`lg:hidden fixed ${topClassName} left-0 right-0 h-[46px] z-40 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border shadow-sm flex items-center px-4 gap-2 transition-all duration-200 ${

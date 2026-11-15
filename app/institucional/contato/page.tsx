@@ -93,12 +93,12 @@ export default function ContatoPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <Navbar onNavigate={onNavigate} />
 
             <main>
                 {/* Hero Section */}
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+                <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
                     <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -108,7 +108,7 @@ export default function ContatoPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.6 }}
                             >
-                                <h1 className="text-5xl font-bold text-brand-dark mb-6">
+                                <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                                     Fale com a gente
                                 </h1>
                                 <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
@@ -194,7 +194,7 @@ export default function ContatoPage() {
                                         className="w-full h-auto object-contain"
                                     />
                                 </div>
-                                <div className="absolute inset-0 bg-brand-gray/50 rounded-[4rem] transform rotate-6 scale-90 -z-10" />
+                                <div className="absolute inset-0 bg-brand-gray/50 dark:bg-dark-border/30 rounded-[4rem] transform rotate-6 scale-90 -z-10" />
                                 <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10" />
                             </motion.div>
                         </div>
@@ -202,14 +202,14 @@ export default function ContatoPage() {
                 </section>
 
                 {/* Canais de Atendimento */}
-                <section className="py-24 bg-white relative border-t border-gray-100">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="text-center mb-16">
                             <span className="text-sm font-medium tracking-wider uppercase mb-4 block text-brand-inactive-text">
                                 CANAIS DE ATENDIMENTO
                             </span>
-                            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-brand-dark">
+                            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-brand-dark dark:text-dark-heading">
                                 Como prefere falar conosco?
                             </h2>
                         </div>
@@ -220,12 +220,12 @@ export default function ContatoPage() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0 }}
                                 viewport={{ once: true }}
-                                className="bg-brand-slate border border-gray-100 rounded-2xl p-8 text-center"
+                                className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-2xl p-8 text-center"
                             >
-                                <div className="w-14 h-14 mx-auto bg-blue-100 rounded-2xl flex items-center justify-center mb-6">
-                                    <MailIcon className="w-7 h-7 text-blue-600" />
+                                <div className="w-14 h-14 mx-auto bg-blue-100 dark:bg-blue-900/40 rounded-2xl flex items-center justify-center mb-6">
+                                    <MailIcon className="w-7 h-7 text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <h3 className="text-lg font-bold text-brand-dark mb-2">E-mail</h3>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">E-mail</h3>
                                 <p className="text-brand-inactive-text text-sm mb-4">
                                     Envie sua mensagem e respondemos em até 24h.
                                 </p>
@@ -242,12 +242,12 @@ export default function ContatoPage() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.1 }}
                                 viewport={{ once: true }}
-                                className="bg-brand-slate border border-gray-100 rounded-2xl p-8 text-center"
+                                className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-2xl p-8 text-center"
                             >
-                                <div className="w-14 h-14 mx-auto bg-green-100 rounded-2xl flex items-center justify-center mb-6">
-                                    <PhoneIcon className="w-7 h-7 text-green-600" />
+                                <div className="w-14 h-14 mx-auto bg-green-100 dark:bg-green-900/40 rounded-2xl flex items-center justify-center mb-6">
+                                    <PhoneIcon className="w-7 h-7 text-green-600 dark:text-green-400" />
                                 </div>
-                                <h3 className="text-lg font-bold text-brand-dark mb-2">WhatsApp</h3>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">WhatsApp</h3>
                                 <p className="text-brand-inactive-text text-sm mb-4">
                                     Para assinantes dos planos Crescer e Escalar.
                                 </p>
@@ -266,12 +266,12 @@ export default function ContatoPage() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
                                 viewport={{ once: true }}
-                                className="bg-brand-slate border border-gray-100 rounded-2xl p-8 text-center"
+                                className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-2xl p-8 text-center"
                             >
-                                <div className="w-14 h-14 mx-auto bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
-                                    <ClockIcon className="w-7 h-7 text-purple-600" />
+                                <div className="w-14 h-14 mx-auto bg-purple-100 dark:bg-purple-900/40 rounded-2xl flex items-center justify-center mb-6">
+                                    <ClockIcon className="w-7 h-7 text-purple-600 dark:text-purple-400" />
                                 </div>
-                                <h3 className="text-lg font-bold text-brand-dark mb-2">Horário</h3>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Horário</h3>
                                 <p className="text-brand-inactive-text text-sm mb-4">
                                     Atendimento de segunda a sexta.
                                 </p>

@@ -81,7 +81,7 @@ export default function CalculadoraTaxasMarketplacePage() {
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqLd) }}
@@ -100,7 +100,7 @@ export default function CalculadoraTaxasMarketplacePage() {
                     description="Veja quanto dinheiro você está deixando na mesa com comissões de 12% a 27% e descubra quanto economizaria vendendo direto."
                 />
 
-                <section className="py-24 bg-white relative border-t border-brand-border">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -111,10 +111,10 @@ export default function CalculadoraTaxasMarketplacePage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
+                                <Card className="bg-white dark:bg-dark-surface border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
-                                            <h2 className="text-xl font-bold text-brand-dark">Dados da sua operação</h2>
+                                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Dados da sua operação</h2>
                                             <p className="text-sm text-brand-inactive-text mt-1">
                                                 Preencha os valores e o resultado é atualizado na hora.
                                             </p>
@@ -188,7 +188,7 @@ export default function CalculadoraTaxasMarketplacePage() {
                                         <p className="text-4xl font-bold text-white mt-1">
                                             {formatBRL(custoTotalMarketplaceMensal)}
                                         </p>
-                                        <p className="text-sm text-gray-400 mt-2">
+                                        <p className="text-sm text-gray-400 dark:text-dark-body mt-2">
                                             Isso equivale a <span className="font-semibold text-white">{formatBRL(custoTotalMarketplaceAnual)}</span> por ano em comissões.
                                         </p>
 
@@ -214,7 +214,7 @@ export default function CalculadoraTaxasMarketplacePage() {
                                             <p className="text-3xl font-bold text-brand-green mt-1">
                                                 {formatBRL(economiaAnual)}
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                                            <p className="text-xs text-gray-400 dark:text-dark-body mt-2 leading-relaxed">
                                                 Sem porcentagem sobre as vendas: o valor de cada pedido cai inteiro na sua conta.
                                             </p>
                                         </div>
@@ -226,7 +226,7 @@ export default function CalculadoraTaxasMarketplacePage() {
                                                     <ArrowRight className="w-4 h-4" />
                                                 </Link>
                                             </Button>
-                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                            <p className="text-center text-xs text-gray-400 dark:text-dark-body mt-3">
                                                 Plano gratuito disponível, sem fidelidade ou contrato preso
                                             </p>
                                         </div>

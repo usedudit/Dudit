@@ -36,6 +36,16 @@
   }
 }
 
+/* Hide the browser's native search-clear button in marketplace search fields. */
+.marketplace-search-input::-webkit-search-cancel-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.marketplace-search-input::-moz-search-clear {
+  display: none;
+}
+
 /* Using exact brand colors from design system instead of shadcn defaults */
 @custom-variant dark (&:is(.dark *));
 

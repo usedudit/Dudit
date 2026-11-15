@@ -106,9 +106,30 @@ function resolveIcons(normalized: string, providerIsMP: boolean): { icons: React
     }
 
     // Then add the specific payment method icon
-    if (normalized.includes("vale-compra") || normalized.includes("vale_compra") || normalized.includes("store_credit") || normalized.includes("store credit") || normalized.includes("voucher")) {
+    if (normalized.includes("assinatura") || normalized.includes("subscription")) {
         icons.push(
-            <img key="method" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-3.5 h-3.5 object-contain" />
+            <img key="method" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Assinatura" className="w-3.5 h-3.5 object-contain" />
+        )
+        colorClass = "text-brand-dark dark:text-dark-heading"
+    } else if (
+        normalized.includes("vale-compra") ||
+        normalized.includes("vale_compra") ||
+        normalized.includes("store_credit") ||
+        normalized.includes("store credit") ||
+        normalized.includes("voucher") ||
+        normalized.includes("crédito do cliente") ||
+        normalized.includes("credito do cliente") ||
+        normalized.includes("crédito de cliente") ||
+        normalized.includes("credito de cliente") ||
+        normalized.includes("crédito cliente") ||
+        normalized.includes("credito cliente") ||
+        normalized.includes("crédito em loja") ||
+        normalized.includes("credito em loja") ||
+        normalized.includes("crédito de troca") ||
+        normalized.includes("credito de troca")
+    ) {
+        icons.push(
+            <img key="method" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Crédito / Vale-compra" className="w-3.5 h-3.5 object-contain" />
         )
         colorClass = "text-brand-dark dark:text-dark-heading"
     } else if (normalized.includes("pix")) {

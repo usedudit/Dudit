@@ -32,7 +32,7 @@ export const SectionHeader = ({ title, subtitle, light = false, center = false }
                 {subtitle}
             </span>
         )}
-        <h2 className={`text-4xl md:text-5xl font-bold tracking-tight ${light ? 'text-white' : 'text-brand-dark'}`}>
+        <h2 className={`text-4xl md:text-5xl font-bold tracking-tight ${light ? 'text-white' : 'text-brand-dark dark:text-dark-heading'}`}>
             {title}
         </h2>
     </div>
@@ -45,7 +45,7 @@ interface ToolPageHeroProps {
 }
 
 export const ToolPageHero = ({ title, description, badge = "Ferramentas Grátis" }: ToolPageHeroProps) => (
-    <section className="relative bg-white pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
+    <section className="relative bg-white dark:bg-dark-surface pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
         <GridLines />
         <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
             <motion.div
@@ -55,7 +55,7 @@ export const ToolPageHero = ({ title, description, badge = "Ferramentas Grátis"
             >
                 <Badge variant="green" icon={<SparklesIcon />}>{badge}</Badge>
 
-                <h1 className="text-4xl md:text-5xl font-bold text-brand-dark leading-tight mb-6">
+                <h1 className="text-4xl md:text-5xl font-bold text-brand-dark dark:text-dark-heading leading-tight mb-6">
                     {title}
                 </h1>
                 <p className="text-brand-inactive-text text-lg max-w-2xl mx-auto leading-relaxed">
@@ -75,7 +75,7 @@ export const FaqSection = ({ title = "Dúvidas Frequentes", description, items }
     const [openIndex, setOpenIndex] = useState<number | null>(0);
 
     return (
-        <section className="py-24 bg-white relative border-t border-brand-border">
+        <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <motion.div
@@ -84,7 +84,7 @@ export const FaqSection = ({ title = "Dúvidas Frequentes", description, items }
                     viewport={{ once: true }}
                     className="text-center mb-16"
                 >
-                    <h2 className="text-4xl font-bold text-brand-dark mb-4">{title}</h2>
+                    <h2 className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-4">{title}</h2>
                     {description && (
                         <p className="text-brand-inactive-text">{description}</p>
                     )}
@@ -100,14 +100,14 @@ export const FaqSection = ({ title = "Dúvidas Frequentes", description, items }
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
                                 transition={{ delay: idx * 0.1 }}
-                                className="border border-brand-border rounded-2xl overflow-hidden bg-white hover:border-brand-green/30 transition-colors"
+                                className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface hover:border-brand-green/30 transition-colors"
                             >
                                 <button
                                     type="button"
                                     onClick={() => setOpenIndex(isOpen ? null : idx)}
-                                    className="w-full flex items-center justify-between gap-4 p-6 text-left hover:bg-brand-gray transition-colors cursor-pointer"
+                                    className="w-full flex items-center justify-between gap-4 p-6 text-left hover:bg-brand-gray dark:hover:bg-dark-border/40 transition-colors cursor-pointer"
                                 >
-                                    <span className="font-semibold text-brand-dark text-lg">
+                                    <span className="font-semibold text-brand-dark dark:text-dark-heading text-lg">
                                         {item.question}
                                     </span>
                                     <motion.div
@@ -278,7 +278,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                                 className="h-10 w-auto object-contain"
                             />
                         </Link>
-                        <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
+                        <p className="text-gray-400 dark:text-dark-body text-sm leading-relaxed max-w-sm">
                             Compre de quem tá perto ou receba de qualquer lugar do Brasil. Uma vitrine simples para vender na sua cidade e enviar para todo o país com 0% de comissão.
                         </p>
                     </div>
@@ -290,11 +290,11 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         <div>
                             <h4 className="text-sm font-semibold text-white mb-6">Comprar e Vender</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar produtos e cidades</Link></li>
-                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Criar minha loja grátis</Link></li>
-                                <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Soluções por segmento</Link></li>
-                                <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Planos com 0% de comissão</Link></li>
-                                <li><Link href="/mapa-do-site" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Mapa do Site</Link></li>
+                                <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Explorar produtos e cidades</Link></li>
+                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Criar minha loja grátis</Link></li>
+                                <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Soluções por segmento</Link></li>
+                                <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Planos com 0% de comissão</Link></li>
+                                <li><Link href="/mapa-do-site" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Mapa do Site</Link></li>
                             </ul>
                         </div>
 
@@ -302,11 +302,11 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         <div>
                             <h4 className="text-sm font-semibold text-white mb-6">Calculadoras do Negócio</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/ferramentas/calculadora-taxas-marketplace" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Calculadora de Taxas</Link></li>
-                                <li><Link href="/ferramentas/calculadora-margem-lucro-preco-venda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Preço de Venda & Markup</Link></li>
-                                <li><Link href="/ferramentas/calculadora-ponto-equilibrio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Ponto de Equilíbrio</Link></li>
-                                <li><Link href="/ferramentas/gerador-link-whatsapp" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Link de WhatsApp para Bio</Link></li>
-                                <li><Link href="/ferramentas" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Todas as calculadoras</Link></li>
+                                <li><Link href="/ferramentas/calculadora-taxas-marketplace" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Calculadora de Taxas</Link></li>
+                                <li><Link href="/ferramentas/calculadora-margem-lucro-preco-venda" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Preço de Venda & Markup</Link></li>
+                                <li><Link href="/ferramentas/calculadora-ponto-equilibrio" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Ponto de Equilíbrio</Link></li>
+                                <li><Link href="/ferramentas/gerador-link-whatsapp" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Link de WhatsApp para Bio</Link></li>
+                                <li><Link href="/ferramentas" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Todas as calculadoras</Link></li>
                             </ul>
                         </div>
 
@@ -314,10 +314,10 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         <div>
                             <h4 className="text-sm font-semibold text-white mb-6">A Dudit</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Como a Dudit funciona</Link></li>
-                                <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Por que a Dudit existe</Link></li>
-                                <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
-                                <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale com a gente</Link></li>
+                                <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Como a Dudit funciona</Link></li>
+                                <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Por que a Dudit existe</Link></li>
+                                <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
+                                <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Fale com a gente</Link></li>
                             </ul>
                         </div>
                     </div>
@@ -326,10 +326,10 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                 {/* Barra Inferior: Legal + Redes Sociais */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
                     <div className="text-center md:text-left order-2 md:order-1 flex flex-col md:flex-row items-center gap-2 md:gap-4">
-                        <p className="text-gray-500 text-xs">
+                        <p className="text-gray-500 dark:text-dark-body text-xs">
                             © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                         </p>
-                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-dark-body">
                             <Link href="/institucional/termos" prefetch={false} className="hover:text-gray-300 transition-colors">Termos</Link>
                             <span>•</span>
                             <Link href="/institucional/privacidade" prefetch={false} className="hover:text-gray-300 transition-colors">Privacidade</Link>
@@ -349,7 +349,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                             className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
                             title="Siga a Dudit no Instagram"
                         >
-                            <InstagramIcon className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                            <InstagramIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
                         </a>
                         <a
                             href="https://twitter.com/usedudit"
@@ -358,7 +358,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                             className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
                             title="Siga a Dudit no Twitter"
                         >
-                            <TwitterIcon className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                            <TwitterIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
                         </a>
                     </div>
                 </div>
@@ -370,7 +370,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
 
 export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
-        <section className="py-10 px-4 bg-white relative">
+        <section className="py-10 px-4 bg-white dark:bg-dark-surface relative">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto relative z-10">
                 <div className="bg-brand-dark rounded-3xl p-8 md:p-10 text-center overflow-hidden relative">

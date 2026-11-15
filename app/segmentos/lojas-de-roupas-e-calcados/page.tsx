@@ -71,39 +71,39 @@ export default function LojasDeRoupasSegmentPage() {
             }
             description="Controle variações de cor e tamanho, imprima etiquetas com código de barras e venda no balcão e no WhatsApp com 0% de comissão e total controle de estoque."
             heroMockup={
-                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm space-y-4">
+                        <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-dark-border">
                             <div>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase">Grade de Estoque</span>
-                                <h3 className="font-bold text-brand-dark text-base">Camisa Linho Masculina</h3>
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase">Grade de Estoque</span>
+                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-base">Camisa Linho Masculina</h3>
                             </div>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
                                 42 em estoque
                             </span>
                         </div>
 
                         <div className="space-y-2 text-xs">
-                            <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border">
                                 <span>Cor: <strong>Branca</strong> / Tam: <strong>M</strong></span>
-                                <span className="text-emerald-700 font-bold">14 un.</span>
+                                <span className="text-emerald-700 dark:text-emerald-300 font-bold">14 un.</span>
                             </div>
-                            <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border">
                                 <span>Cor: <strong>Branca</strong> / Tam: <strong>G</strong></span>
-                                <span className="text-emerald-700 font-bold">8 un.</span>
+                                <span className="text-emerald-700 dark:text-emerald-300 font-bold">8 un.</span>
                             </div>
-                            <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border">
                                 <span>Cor: <strong>Azul Marinho</strong> / Tam: <strong>M</strong></span>
-                                <span className="text-emerald-700 font-bold">12 un.</span>
+                                <span className="text-emerald-700 dark:text-emerald-300 font-bold">12 un.</span>
                             </div>
                         </div>
 
-                        <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
-                            <span className="text-xs text-gray-400 flex items-center gap-1">
-                                <Barcode className="w-3.5 h-3.5 text-gray-500" />
+                        <div className="pt-3 border-t border-gray-100 dark:border-dark-border flex justify-between items-center">
+                            <span className="text-xs text-gray-400 dark:text-dark-body flex items-center gap-1">
+                                <Barcode className="w-3.5 h-3.5 text-gray-500 dark:text-dark-body" />
                                 78910482019
                             </span>
-                            <span className="text-sm font-extrabold text-brand-dark">R$ 139,90</span>
+                            <span className="text-sm font-extrabold text-brand-dark dark:text-dark-heading">R$ 139,90</span>
                         </div>
                     </div>
                 </div>
@@ -119,16 +119,16 @@ export default function LojasDeRoupasSegmentPage() {
                         description:
                             "Crie grades completas com tamanhos (P, M, G, calçados do 34 ao 44) e cores em segundos. Veja em tempo real quais tamanhos estão acabando.",
                         mockup: (
-                            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm space-y-3">
-                                <div className="flex items-center gap-2 text-xs font-bold text-brand-dark">
+                            <div className="bg-white dark:bg-dark-surface rounded-xl p-5 border border-gray-100 dark:border-dark-border shadow-sm space-y-3">
+                                <div className="flex items-center gap-2 text-xs font-bold text-brand-dark dark:text-dark-heading">
                                     <Shirt className="w-4 h-4 text-brand-green" />
                                     Variações de Tamanho
                                 </div>
                                 <div className="flex gap-2 text-xs">
-                                    <span className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 font-bold">P</span>
-                                    <span className="px-3 py-1.5 rounded-lg border-2 border-brand-green bg-emerald-50 text-emerald-800 font-bold">M</span>
-                                    <span className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 font-bold">G</span>
-                                    <span className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 font-bold">GG</span>
+                                    <span className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-border/30 font-bold">P</span>
+                                    <span className="px-3 py-1.5 rounded-lg border-2 border-brand-green bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold">M</span>
+                                    <span className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-border/30 font-bold">G</span>
+                                    <span className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-border/30 font-bold">GG</span>
                                 </div>
                             </div>
                         ),
@@ -139,12 +139,12 @@ export default function LojasDeRoupasSegmentPage() {
                         description:
                             "Gere etiquetas térmicas prontas para impressão com o nome da loja, preço e código de barras legível por qualquer leitor.",
                         mockup: (
-                            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm space-y-2 text-center">
-                                <span className="text-[11px] font-bold text-brand-dark block">Dudit Boutique</span>
-                                <div className="bg-gray-100 p-2 rounded flex justify-center items-center">
-                                    <Barcode className="w-28 h-8 text-brand-dark" />
+                            <div className="bg-white dark:bg-dark-surface rounded-xl p-5 border border-gray-100 dark:border-dark-border shadow-sm space-y-2 text-center">
+                                <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading block">Dudit Boutique</span>
+                                <div className="bg-gray-100 dark:bg-dark-border/40 p-2 rounded flex justify-center items-center">
+                                    <Barcode className="w-28 h-8 text-brand-dark dark:text-dark-heading" />
                                 </div>
-                                <span className="text-xs font-extrabold text-brand-dark block">R$ 89,90</span>
+                                <span className="text-xs font-extrabold text-brand-dark dark:text-dark-heading block">R$ 89,90</span>
                             </div>
                         ),
                     },
@@ -154,8 +154,8 @@ export default function LojasDeRoupasSegmentPage() {
                         description:
                             "Suas clientes navegam pelas peças organizadas por categoria, escolhem o tamanho e a cor e enviam o pedido montado no WhatsApp da loja.",
                         mockup: (
-                            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm space-y-2 text-xs">
-                                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                            <div className="bg-white dark:bg-dark-surface rounded-xl p-5 border border-gray-100 dark:border-dark-border shadow-sm space-y-2 text-xs">
+                                <div className="flex justify-between items-center py-1 border-b border-gray-100 dark:border-dark-border">
                                     <span>Coleção Verão</span>
                                     <span className="text-brand-green font-bold">24 peças</span>
                                 </div>

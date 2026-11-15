@@ -139,7 +139,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                     <div className="flex-1 min-w-0">
                         <Input
                             name="search"
-                            placeholder="Buscar..."
+                            placeholder="Buscar orçamentos..."
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
                             className="h-[42px] w-full"
@@ -178,7 +178,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                         {onAddQuote && (
                             <Button
                                 onClick={onAddQuote}
-                                leftIcon={<PlusIcon className="w-5 h-5" strokeWidth={3} />}
+                                leftIcon={<PlusIcon className="w-5 h-5" />}
                                 className="h-[42px]"
                             />
                         )}

@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const article = articleSlug ? getArticleBySlug(articleSlug) : null
 
     if (isHome) {
-        const title = "Central de Ajuda e Tutoriais | Dudit"
+        const title = "Central de Ajuda e Tutoriais"
         const description = "Aprenda a gerenciar suas vendas, controlar estoque, emitir orçamentos e ordens de serviço, e usar seu catálogo online sem comissão na Dudit."
         const canonical = "https://dudit.com.br/ajuda"
 
@@ -106,7 +106,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
 
     if (category) {
-        const title = `${category.title} - Tutoriais e Ajuda | Dudit`
+        const title = `${category.title} - Tutoriais e Ajuda`
         const description = `Confira todos os guias e tutoriais da categoria ${category.title} na Dudit.`
         const canonical = `https://dudit.com.br/ajuda/${category.id}`
 

@@ -35,7 +35,18 @@ async function getMarketplaceSessionCore(userId: string, logLabel: string): Prom
     if (cartRes.error) console.error("[SessionData] Cart fetch error:", cartRes.error)
 
     const profileData = profileRes.data || null
-    const addressData = addressRes.data || null
+    let addressData = addressRes.data || null
+
+    if (!addressData) {
+        const fallbackAddressRes = await supabase.from("addresses")
+            .select("city, state, latitude, longitude")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        addressData = fallbackAddressRes.data || null
+    }
+
     const cartItems = cartRes.data || []
 
     return {

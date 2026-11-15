@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Mapa do Site | Dudit",
+    title: "Mapa do Site",
     description: "Navegue por todas as páginas da Dudit: soluções por segmento para pequenos negócios, ferramentas e calculadoras gratuitas, páginas institucionais e marketplace.",
     openGraph: {
         title: "Mapa do Site | Dudit",

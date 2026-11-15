@@ -69,7 +69,7 @@ export default function FerramentasHubPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(hubSchema) }}
@@ -88,7 +88,7 @@ export default function FerramentasHubPage() {
                     description="Simuladores práticos e diretos ao ponto para comerciantes, autônomos e prestadores de serviços. Gratuitos e sem cadastro."
                 />
 
-                <section className="py-24 bg-white relative border-t border-brand-border">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -104,14 +104,14 @@ export default function FerramentasHubPage() {
                                     >
                                         <Link
                                             href={tool.href}
-                                            className="group h-full bg-white rounded-3xl p-8 border border-brand-border hover:border-brand-green/40 transition-colors flex flex-col justify-between"
+                                            className="group h-full bg-white dark:bg-dark-surface rounded-3xl p-8 border border-brand-border hover:border-brand-green/40 transition-colors flex flex-col justify-between"
                                         >
                                             <div>
                                                 <div className="w-10 h-10 rounded-xl bg-brand-dark flex items-center justify-center mb-5">
                                                     <IconComponent className="w-5 h-5 text-white" />
                                                 </div>
 
-                                                <h2 className="text-xl font-bold text-brand-dark mb-2 group-hover:text-brand-green transition-colors">
+                                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2 group-hover:text-brand-green transition-colors">
                                                     {tool.title}
                                                 </h2>
 

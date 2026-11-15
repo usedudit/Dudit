@@ -50,9 +50,9 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatu
                 </Tooltip>
               )}
               <div className="flex items-center shrink-0">
-                <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)} className="whitespace-nowrap">
-                  {statusMeta.label}
-                </Badge>
+                <Tooltip text={statusMeta.label}>
+                  <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)} className="whitespace-nowrap" />
+                </Tooltip>
               </div>
             </div>
           </div>

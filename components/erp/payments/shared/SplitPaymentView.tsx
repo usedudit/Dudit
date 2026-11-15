@@ -1,9 +1,10 @@
 import React from "react"
-import { CreditCardIcon, MoneyIcon, QRCodeIcon, FileIcon, TagIcon } from "@/lib/icons"
+import { CreditCardIcon, MoneyIcon, QRCodeIcon, FileIcon, TagIcon, PlusIcon, XIcon } from "@/lib/icons"
+import { Button } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { CompactPaymentStatusAlert } from "./CompactPaymentStatusAlert"
 import { PaymentMethodCard } from "@/components/erp/POSComponents"
-import { normalizeMethodType, type PartnerPaymentMethod } from "./payment-utils"
+import { normalizeMethodType, formatPaymentMethodToFullLabel, type PartnerPaymentMethod } from "./payment-utils"
 
 export type SplitPaymentLeg = {
   id: number
@@ -21,6 +22,7 @@ type SplitPaymentViewProps = {
   isLoading?: boolean
   onLegClick: (index: number) => void
   onAddLeg?: () => void
+  onRemoveLeg?: (index: number) => void
   disableLegEdit?: boolean
 }
 
@@ -31,6 +33,8 @@ export function SplitPaymentView({
   splitPreview,
   isLoading = false,
   onLegClick,
+  onAddLeg,
+  onRemoveLeg,
   disableLegEdit = false,
 }: SplitPaymentViewProps) {
   const totalAllocated = flatAmount
@@ -65,8 +69,21 @@ export function SplitPaymentView({
               }}
               className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{leg.method || "Selecionar método"}</span>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{leg.method ? formatPaymentMethodToFullLabel(leg.method) : `Selecionar método ${idx + 1}`}</span>
+                {onRemoveLeg && legs.length > 2 && !disableLegEdit && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemoveLeg(idx)
+                    }}
+                    className="p-1 rounded-full text-brand-inactive-text hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    title="Remover este método"
+                  >
+                    <XIcon size={14} />
+                  </button>
+                )}
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-brand-inactive-text">Valor:</span>
@@ -76,6 +93,19 @@ export function SplitPaymentView({
           )
         })}
       </div>
+
+      {onAddLeg && !disableLegEdit && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-10 border-dashed text-xs mt-3 flex items-center justify-center gap-1.5"
+          onClick={onAddLeg}
+        >
+          <PlusIcon size={14} />
+          Adicionar outro meio de pagamento
+        </Button>
+      )}
+
       <div className="mt-4 flex flex-col gap-2 border-t border-brand-border dark:border-dark-border pt-4">
         <div className="flex justify-between items-baseline text-sm">
           <span className="text-brand-inactive-text">Saldo a receber:</span>

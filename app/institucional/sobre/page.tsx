@@ -12,7 +12,7 @@ import { GridLines, SectionHeader, Navbar, Footer, CTA, FaqSection } from '@/com
 import { INSTITUTIONAL_FAQ } from '@/lib/constants/institutional-faq';
 
 const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
-    <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+    <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
         <GridLines />
         <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -21,7 +21,7 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
                 >
-                    <h1 className="text-5xl font-bold text-brand-dark mb-6">
+                    <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                         Um jeito mais simples de vender, gerenciar e ser encontrado em todo o Brasil.
                     </h1>
                     <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
@@ -46,7 +46,7 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                             className="w-full h-auto object-contain"
                         />
                     </div>
-                    <div className="absolute inset-0 bg-brand-gray/50 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
+                    <div className="absolute inset-0 bg-brand-gray/50 dark:bg-dark-border/30 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
                     <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10"></div>
                 </motion.div>
             </div>
@@ -56,7 +56,7 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
 
 const PorQueExiste = () => {
     return (
-        <section className="py-24 bg-white relative border-t border-gray-100">
+        <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
@@ -66,30 +66,30 @@ const PorQueExiste = () => {
 
                 <div className="grid md:grid-cols-2 gap-12 items-center">
                     <div>
-                        <p className="text-brand-dark text-lg md:text-xl font-medium leading-relaxed mb-6">
+                        <p className="text-brand-dark dark:text-dark-heading text-lg md:text-xl font-medium leading-relaxed mb-6">
                             Vender produtos, oferecer serviços ou divulgar uma empresa nem sempre é simples.
                         </p>
                         <p className="text-brand-inactive-text text-base leading-relaxed mb-6">
                             Muitas vezes as pessoas procuram no Instagram, no WhatsApp, em grupos ou dependem de marketplaces tradicionais com taxas abusivas de 12% a 20%. Por outro lado, quem vende fica refém de softwares caros ou limitados a clientes que passam na porta.
                         </p>
                         <p className="text-brand-inactive-text text-base leading-relaxed">
-                            <strong className="text-brand-dark">A Dudit nasceu para unir comércio de proximidade e alcance nacional com 0% de comissão:</strong> permitindo que clientes da sua cidade retirem no balcão ou recebam via motoboy, e que você envie pedidos para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.
+                            <strong className="text-brand-dark dark:text-dark-heading">A Dudit nasceu para unir comércio de proximidade e alcance nacional com 0% de comissão:</strong> permitindo que clientes da sua cidade retirem no balcão ou recebam via motoboy, e que você envie pedidos para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.
                         </p>
                     </div>
 
-                    <div className="bg-brand-slate border border-gray-100 p-8 rounded-2xl relative">
+                    <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border p-8 rounded-2xl relative">
                         <div className="space-y-4">
-                            <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">1</div>
-                                <div className="text-xs text-brand-dark font-semibold">Quem compra: acha produtos locais ou com entrega para todo o Brasil</div>
+                            <div className="flex items-center gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">1</div>
+                                <div className="text-xs text-brand-dark dark:text-dark-heading font-semibold">Quem compra: acha produtos locais ou com entrega para todo o Brasil</div>
                             </div>
-                            <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs">2</div>
-                                <div className="text-xs text-brand-dark font-semibold">Quem vende: ganha vitrine com 0% de comissão, entrega local e frete nacional</div>
+                            <div className="flex items-center gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
+                                <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs">2</div>
+                                <div className="text-xs text-brand-dark dark:text-dark-heading font-semibold">Quem vende: ganha vitrine com 0% de comissão, entrega local e frete nacional</div>
                             </div>
-                            <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">3</div>
-                                <div className="text-xs text-brand-dark font-semibold">Quem organiza: PDV balcão, estoque com grade, OS e agendamentos</div>
+                            <div className="flex items-center gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
+                                <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-xs">3</div>
+                                <div className="text-xs text-brand-dark dark:text-dark-heading font-semibold">Quem organiza: PDV balcão, estoque com grade, OS e agendamentos</div>
                             </div>
                         </div>
                     </div>
@@ -122,7 +122,7 @@ const BentoPillars = () => {
     ];
 
     return (
-        <section className="py-24 bg-white relative border-t border-gray-100">
+        <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
@@ -143,46 +143,46 @@ const BentoPillars = () => {
                             viewport={{ once: true }}
                             className="group flex flex-col justify-between"
                         >
-                            <div className="bg-brand-slate border border-gray-100 h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
+                            <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
                                 {card.type === 'buy' && (
-                                    <div className="bg-white p-4 w-full max-w-[240px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
                                             <Search className="w-4 h-4 text-brand-green" />
-                                            <span className="text-[10px] font-bold text-brand-dark">O que você precisa hoje</span>
+                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">O que você precisa hoje</span>
                                         </div>
                                         <div className="space-y-2 text-[10px]">
-                                            <div className="bg-gray-50 p-2 rounded flex justify-between font-medium">
+                                            <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded flex justify-between font-medium">
                                                 <span>Lojas e Mercados</span>
                                                 <span className="text-brand-green font-bold">Perto de mim</span>
                                             </div>
-                                            <div className="bg-gray-50 p-2 rounded flex justify-between font-medium">
+                                            <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded flex justify-between font-medium">
                                                 <span>Envio Nacional</span>
-                                                <span className="text-blue-600 font-bold">Todo o Brasil</span>
+                                                <span className="text-blue-600 dark:text-blue-400 font-bold">Todo o Brasil</span>
                                             </div>
                                         </div>
                                     </div>
                                 )}
                                 {card.type === 'sell' && (
-                                    <div className="bg-white p-4 w-full max-w-[240px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
-                                            <Store className="w-4 h-4 text-brand-dark" />
-                                            <span className="text-[10px] font-bold text-brand-dark">Vitrine Aberta</span>
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
+                                            <Store className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Vitrine Aberta</span>
                                         </div>
                                         <div className="text-center py-2">
-                                            <div className="text-xs font-bold text-brand-dark">dudit.com.br/sualoja</div>
+                                            <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">dudit.com.br/sualoja</div>
                                             <div className="text-[10px] text-brand-green font-semibold mt-1">0% de comissão sobre vendas</div>
                                         </div>
                                     </div>
                                 )}
                                 {card.type === 'organize' && (
-                                    <div className="bg-white p-4 w-full max-w-[240px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
-                                            <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                                            <span className="text-[10px] font-bold text-brand-dark">Gestão do seu jeito</span>
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
+                                            <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Gestão do seu jeito</span>
                                         </div>
                                         <div className="space-y-1.5 text-[10px] text-brand-inactive-text">
-                                            <div className="flex justify-between"><span>Estoque</span><span className="text-brand-dark font-bold">Organizado</span></div>
-                                            <div className="flex justify-between"><span>Agenda</span><span className="text-brand-dark font-bold">Disponível</span></div>
+                                            <div className="flex justify-between"><span>Estoque</span><span className="text-brand-dark dark:text-dark-heading font-bold">Organizado</span></div>
+                                            <div className="flex justify-between"><span>Agenda</span><span className="text-brand-dark dark:text-dark-heading font-bold">Disponível</span></div>
                                             <div className="flex justify-between"><span>Financeiro</span><span className="text-brand-green font-bold">Sob controle</span></div>
                                         </div>
                                     </div>
@@ -190,7 +190,7 @@ const BentoPillars = () => {
                             </div>
                             <div className="pt-6">
                                 <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block mb-1">{card.subtitle}</span>
-                                <h4 className="text-xl font-bold text-brand-dark mb-2">{card.title}</h4>
+                                <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">{card.title}</h4>
                                 <p className="text-brand-inactive-text text-sm leading-relaxed">{card.description}</p>
                             </div>
                         </motion.div>
@@ -203,7 +203,7 @@ const BentoPillars = () => {
 
 const SemComplicacao = () => {
     return (
-        <section className="py-24 bg-white relative border-t border-gray-100">
+        <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="flex flex-col lg:flex-row min-h-[500px] rounded-3xl overflow-hidden shadow-xl">
@@ -219,24 +219,24 @@ const SemComplicacao = () => {
 
                     <div className="flex-1 bg-brand-green relative overflow-hidden flex items-center justify-center p-12">
                         <div className="relative z-10 w-full max-w-[340px] space-y-4">
-                            <div className="bg-white rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 font-bold">📸</div>
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
+                                <div className="w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-950/40 flex items-center justify-center text-pink-600 dark:text-pink-400 font-bold">📸</div>
                                 <div>
-                                    <div className="text-xs font-bold text-brand-dark">Instagram</div>
+                                    <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Instagram</div>
                                     <div className="text-[10px] text-brand-inactive-text">Coloque seu link Dudit na bio</div>
                                 </div>
                             </div>
-                            <div className="bg-white rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 font-bold">💬</div>
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
+                                <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/40 flex items-center justify-center text-green-600 dark:text-green-400 font-bold">💬</div>
                                 <div>
-                                    <div className="text-xs font-bold text-brand-dark">WhatsApp</div>
+                                    <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">WhatsApp</div>
                                     <div className="text-[10px] text-brand-inactive-text">Receba pedidos organizados na hora</div>
                                 </div>
                             </div>
-                            <div className="bg-white rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-dark font-bold">🏪</div>
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
+                                <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-dark dark:text-dark-heading font-bold">🏪</div>
                                 <div>
-                                    <div className="text-xs font-bold text-brand-dark">Dudit</div>
+                                    <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Dudit</div>
                                     <div className="text-[10px] text-brand-inactive-text">Vendas no balcão, na cidade e em todo o Brasil</div>
                                 </div>
                             </div>
@@ -264,7 +264,7 @@ export default function SobrePage() {
     };
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <Navbar onNavigate={onNavigate} />
             <main>
                 <SobreHero onNavigate={onNavigate} />

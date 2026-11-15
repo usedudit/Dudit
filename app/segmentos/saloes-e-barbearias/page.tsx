@@ -71,36 +71,36 @@ export default function SaloesEBarbeariasSegmentPage() {
             }
             description="Coloque o link da sua agenda no Instagram e WhatsApp. Os clientes escolhem o profissional e o horário disponível sozinhos, sem confusão de horários ou ligações."
             heroMockup={
-                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm space-y-4">
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-dark-border">
                             <div className="flex items-center gap-2">
                                 <CalendarIcon size={16} className="text-brand-green" />
-                                <span className="font-bold text-brand-dark text-sm">Agenda de Hoje</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Agenda de Hoje</span>
                             </div>
-                            <span className="text-xs text-gray-400 font-medium">14:00 - 18:00</span>
+                            <span className="text-xs text-gray-400 dark:text-dark-body font-medium">14:00 - 18:00</span>
                         </div>
 
                         <div className="space-y-2.5">
-                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
+                            <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-100 dark:border-blue-900/50 text-xs">
                                 <div>
-                                    <strong className="text-blue-900 block font-bold">14:00 - Corte + Barba</strong>
-                                    <span className="text-blue-600">Cliente: Rodrigo Alves</span>
+                                    <strong className="text-blue-900 dark:text-blue-200 block font-bold">14:00 - Corte + Barba</strong>
+                                    <span className="text-blue-600 dark:text-blue-400">Cliente: Rodrigo Alves</span>
                                 </div>
-                                <span className="font-bold text-blue-900">R$ 75,00</span>
+                                <span className="font-bold text-blue-900 dark:text-blue-200">R$ 75,00</span>
                             </div>
 
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs opacity-75">
+                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-border/30 rounded-xl border border-gray-100 dark:border-dark-border text-xs opacity-75">
                                 <div>
-                                    <strong className="text-gray-800 block font-bold">15:30 - Barboterapia</strong>
-                                    <span className="text-gray-500">Cliente: Felipe Santos</span>
+                                    <strong className="text-gray-800 dark:text-dark-heading block font-bold">15:30 - Barboterapia</strong>
+                                    <span className="text-gray-500 dark:text-dark-body">Cliente: Felipe Santos</span>
                                 </div>
-                                <span className="font-bold text-gray-800">R$ 50,00</span>
+                                <span className="font-bold text-gray-800 dark:text-dark-heading">R$ 50,00</span>
                             </div>
                         </div>
 
-                        <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs">
-                            <span className="text-gray-500">Venda de Pomada no Caixa:</span>
+                        <div className="pt-3 border-t border-gray-100 dark:border-dark-border flex justify-between items-center text-xs">
+                            <span className="text-gray-500 dark:text-dark-body">Venda de Pomada no Caixa:</span>
                             <strong className="text-brand-green font-bold">+ R$ 45,00</strong>
                         </div>
                     </div>
@@ -117,23 +117,23 @@ export default function SaloesEBarbeariasSegmentPage() {
                         description:
                             "Seu link exclusivo deixa os horários livres visíveis 24h. O cliente marca o serviço em segundos, sem ligação.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
                                     <ClockIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                                        <div className="text-[10px] font-bold text-blue-700">14:00</div>
+                                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/40 p-2 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                                        <div className="text-[10px] font-bold text-blue-700 dark:text-blue-300">14:00</div>
                                         <div className="flex-1">
-                                            <div className="text-[10px] font-bold text-gray-900">Corte Masculino</div>
-                                            <div className="text-[8px] text-gray-500">Cliente: Marcos</div>
+                                            <div className="text-[10px] font-bold text-gray-900 dark:text-dark-heading">Corte Masculino</div>
+                                            <div className="text-[8px] text-gray-500 dark:text-dark-body">Cliente: Marcos</div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 bg-brand-gray p-2 rounded-lg border border-brand-border">
+                                    <div className="flex items-center gap-3 bg-brand-gray dark:bg-dark-border/40 p-2 rounded-lg border border-brand-border">
                                         <div className="text-[10px] font-bold text-brand-inactive-text">15:00</div>
                                         <div className="flex-1">
-                                            <div className="text-[10px] font-bold text-brand-dark">Barba</div>
+                                            <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Barba</div>
                                             <div className="text-[8px] text-brand-green font-bold">Agendado</div>
                                         </div>
                                     </div>
@@ -147,15 +147,15 @@ export default function SaloesEBarbeariasSegmentPage() {
                         description:
                             "Venda pomadas, shampoos e cosméticos no caixa, com baixa automática no estoque e tudo no fechamento do dia.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">PDV</span>
                                     <ShoppingBagIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex gap-3 mb-3">
-                                    <div className="w-10 h-10 bg-brand-gray rounded-lg"></div>
+                                    <div className="w-10 h-10 bg-brand-gray dark:bg-dark-border/40 rounded-lg"></div>
                                     <div className="flex-1">
-                                        <div className="text-[10px] font-bold text-brand-dark">Pomada Modeladora</div>
+                                        <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Pomada Modeladora</div>
                                         <div className="text-[12px] font-bold text-brand-green">R$ 45,00</div>
                                     </div>
                                 </div>
@@ -171,19 +171,19 @@ export default function SaloesEBarbeariasSegmentPage() {
                         description:
                             "Configure comissões diferentes por profissional ou por serviço. O fechamento financeiro do mês sai com 1 clique.",
                         mockup: (
-                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
-                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                            <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray dark:border-dark-border">
                                     <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Comissões</span>
                                     <MoneyIcon size={12} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="space-y-1.5 mb-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-brand-dark">João (barbeiro)</span>
-                                        <span className="text-[10px] font-bold text-brand-dark">R$ 890,00</span>
+                                        <span className="text-[10px] text-brand-dark dark:text-dark-heading">João (barbeiro)</span>
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 890,00</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-brand-dark">Ana (manicure)</span>
-                                        <span className="text-[10px] font-bold text-brand-dark">R$ 540,00</span>
+                                        <span className="text-[10px] text-brand-dark dark:text-dark-heading">Ana (manicure)</span>
+                                        <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 540,00</span>
                                     </div>
                                 </div>
                                 <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">

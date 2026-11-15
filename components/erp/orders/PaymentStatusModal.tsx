@@ -47,6 +47,7 @@ import {
 import { DepositReceiptsSection } from "@/components/erp/payments/shared/DepositReceiptsSection";
 import { BalancePaymentCollector } from "@/components/erp/payments/BalancePaymentCollector";
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
+import { formatPaymentMethodToFullLabel } from "@/components/erp/payments/shared/payment-utils";
 import { useModalLayer } from "@/lib/modal-stack";
 import type { PaymentBreakdownLeg } from "@/components/erp/payments/shared/payment-utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
@@ -269,12 +270,14 @@ export default function PaymentStatusModal({
   const [showMpPendingConfirm, setShowMpPendingConfirm] = useState(false);
   const [showConfirmSinalModal, setShowConfirmSinalModal] = useState(false);
   const [confirmingSinal, setConfirmingSinal] = useState(false);
+  const [selectedReceiptLeg, setSelectedReceiptLeg] = useState<PaymentBreakdownLeg | null>(null);
   const loading = paymentStatus === "processing";
 
   useEffect(() => {
     if (isOpen) {
       setCurrentOrder(order);
       setPendingLegs([]);
+      setSelectedReceiptLeg(null);
       setCanSubmitBalance(false);
       setPaymentStatus("input");
       setErrorMessage("");
@@ -495,58 +498,8 @@ export default function PaymentStatusModal({
       ? payWithAmount - Number(targetOrder?.total_amount || 0)
       : 0;
 
-  const lockedMethod = useMemo(() => {
-    if (depositSummary?.usesDeposit && totalRemaining > 0.009) {
-      return null;
-    }
-    const paidLeg = breakdown.find((leg) => {
-      const m = leg.method;
-      if (!m) return false;
-      const norm = m.toLowerCase();
-      return (
-        !norm.includes("não definido") &&
-        !norm.includes("metodo nao definido") &&
-        !norm.includes("pendente") &&
-        !norm.includes("não informado") &&
-        !norm.includes("nao informado")
-      );
-    });
-    if (paidLeg?.method) return paidLeg.method;
-
-    const mainMethod = targetOrder?.payment_method;
-    if (mainMethod) {
-      const norm = mainMethod.toLowerCase();
-      if (
-        !norm.includes("não definido") &&
-        !norm.includes("metodo nao definido") &&
-        !norm.includes("pendente") &&
-        !norm.includes("não informado") &&
-        !norm.includes("nao informado")
-      ) {
-        return mainMethod;
-      }
-    }
-    return null;
-  }, [targetOrder, breakdown, depositSummary, totalRemaining]);
-
-  const lockedInstallments = useMemo(() => {
-    if (depositSummary?.usesDeposit && totalRemaining > 0.009) {
-      return 1;
-    }
-    const matchingLeg = breakdown.find((leg) => {
-      const legMethod = leg.method;
-      if (!legMethod) return false;
-      const norm = legMethod.toLowerCase();
-      return (
-        !norm.includes("não definido") &&
-        !norm.includes("metodo nao definido") &&
-        !norm.includes("pendente") &&
-        !norm.includes("não informado") &&
-        !norm.includes("nao informado")
-      );
-    });
-    return matchingLeg?.installmentNumber || 1;
-  }, [breakdown, depositSummary, totalRemaining]);
+  const lockedMethod = null;
+  const lockedInstallments = null;
 
   const pendingNewAmount = useMemo(
     () =>
@@ -729,7 +682,7 @@ export default function PaymentStatusModal({
     if (isFullyPaid) {
       toast({
         title: "Aviso",
-        description: "Este pedido jǭ estǭ pago.",
+        description: "Este pedido já está pago.",
         variant: "warning",
       });
       return;
@@ -1423,6 +1376,8 @@ export default function PaymentStatusModal({
                         : undefined
                     }
                     syncing={syncing}
+                    onSelectLeg={(leg) => setSelectedReceiptLeg({ ...leg })}
+                    hasRemainingBalance={!isFullyPaid && totalRemaining > 0.009}
                   />
 
                   {!isFullyPaid &&
@@ -1431,12 +1386,15 @@ export default function PaymentStatusModal({
                     !isMpPaymentPendingInline ? (
                     <BalancePaymentCollector
                       partnerId={partnerId}
+                      storeId={targetOrder?.store_id}
                       remainingBalance={totalRemaining}
                       disabled={loading || syncing}
                       onLegsReady={onLegsReady}
                       onValidityChange={setCanSubmitBalance}
                       lockedMethodLabel={lockedMethod}
                       lockedInstallments={lockedInstallments}
+                      targetLeg={selectedReceiptLeg}
+                      onClearTargetLeg={() => setSelectedReceiptLeg(null)}
                       onConfirmPayment={handleSubmit}
                       onHeaderStateChange={setCollectorHeader}
                     />
@@ -1559,10 +1517,10 @@ export default function PaymentStatusModal({
                   </div>
 
                   {successSnapshot?.paymentBreakdown &&
-                    successSnapshot.paymentBreakdown.length > 1 && (
+                    successSnapshot.paymentBreakdown.length > 0 && (
                       <div className="mb-6 border-t border-brand-border dark:border-dark-border pt-4">
                         <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-3">
-                          Formas de pagamento
+                          {successSnapshot.paymentBreakdown.length > 1 ? "Formas de pagamento" : "Forma de pagamento"}
                         </span>
                         <div className="space-y-2">
                           {successSnapshot.paymentBreakdown.map(
@@ -1572,7 +1530,7 @@ export default function PaymentStatusModal({
                                 className="flex justify-between items-center py-1"
                               >
                                 <span className="text-sm text-brand-dark dark:text-dark-heading">
-                                  {entry.method}
+                                  {formatPaymentMethodToFullLabel(entry.method) || entry.method}
                                 </span>
                                 <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                   {formatCurrency(entry.amount)}

@@ -5,6 +5,17 @@ export const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"
 export function normalizePaymentMethodLabel(value?: string | null) {
   const normalized = String(value || "").trim().toLowerCase()
   if (!normalized) return ""
+  if (
+    normalized.includes("store_credit") ||
+    normalized.includes("store-credit") ||
+    normalized.includes("credito do cliente") ||
+    normalized.includes("crédito do cliente") ||
+    normalized.includes("credito de cliente") ||
+    normalized.includes("crédito de cliente") ||
+    normalized.includes("credito cliente") ||
+    normalized.includes("crédito cliente")
+  ) return "Crédito do cliente"
+  if (normalized.includes("vale-compra") || normalized.includes("vale_compra") || normalized.includes("vale compra")) return "Vale-compra"
   if (normalized.includes("dinheiro") || normalized.includes("cash") || normalized.includes("money")) return "Dinheiro"
   if (normalized.includes("pix")) return "Pix"
   if (normalized.includes("cartão de crédito") || normalized.includes("cartao de credito") || normalized.includes("credito") || normalized.includes("crédito") || normalized.includes("credit")) return "Cartão de Crédito"
@@ -24,6 +35,7 @@ export function normalizeMethodType(value?: string | null) {
   const raw = String(value || "").toLowerCase().trim()
   if (raw === "cash" || raw === "dinheiro") return "cash"
   if (raw === "pix") return "pix"
+  if (["store_credit", "store-credit", "vale-compra", "vale_compra"].includes(raw)) return "store_credit"
   if (["credit_card", "credito", "cartao_credito", "cartão de crédito"].includes(raw)) return "credit_card"
   if (["debit_card", "debito", "cartao_debito", "cartão de débito"].includes(raw)) return "debit_card"
   if (["bank_transfer", "transferencia_bancaria", "transferencia", "ted", "doc", "transferência", "transferência bancária"].includes(raw)) return "bank_transfer"
@@ -34,6 +46,7 @@ export function normalizeMethodType(value?: string | null) {
 export function getTargetViewForMethodType(type: string) {
   if (type === "cash") return "money"
   if (type === "pix") return "pix"
+  if (type === "store_credit") return "store_credit"
   return "card"
 }
 

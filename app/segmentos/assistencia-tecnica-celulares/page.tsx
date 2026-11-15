@@ -74,46 +74,46 @@ export default function AssistenciaTecnicaSegmentPage() {
             }
             description="Acabe com a desorganização de fichas de papel e o medo de acusações de danos. Registre aparelhos com fotos, envie orçamentos com aprovação no WhatsApp e dê baixa automática em peças."
             heroMockup={
-                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm space-y-4">
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-dark-border">
                             <div>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase">Ficha Técnica</span>
-                                <h3 className="font-bold text-brand-dark text-lg">OS #2088</h3>
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase">Ficha Técnica</span>
+                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-lg">OS #2088</h3>
                             </div>
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold flex items-center gap-1">
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 Aprovada
                             </span>
                         </div>
 
                         <div className="space-y-2 text-xs">
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Aparelho:</span>
-                                <strong className="text-brand-dark">iPhone 13 - 128GB Azul</strong>
+                                <strong className="text-brand-dark dark:text-dark-heading">iPhone 13 - 128GB Azul</strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Defeito:</span>
-                                <span className="text-brand-dark font-medium">Display quebrado / Touch inoperante</span>
+                                <span className="text-brand-dark dark:text-dark-heading font-medium">Display quebrado / Touch inoperante</span>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Fotos da entrada:</span>
-                                <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                     <Camera className="w-3 h-3" /> 3 fotos anexadas
                                 </span>
                             </div>
-                            <div className="flex justify-between text-gray-600">
+                            <div className="flex justify-between text-gray-600 dark:text-dark-body">
                                 <span>Peça vinculada:</span>
                                 <span>Tela OLED Original (Baixa no estoque)</span>
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
+                        <div className="pt-4 border-t border-gray-100 dark:border-dark-border flex justify-between items-center">
                             <div>
-                                <span className="text-[10px] text-gray-400 block">Total Aprovado</span>
-                                <strong className="text-base text-brand-dark font-extrabold">R$ 540,00</strong>
+                                <span className="text-[10px] text-gray-400 dark:text-dark-body block">Total Aprovado</span>
+                                <strong className="text-base text-brand-dark dark:text-dark-heading font-extrabold">R$ 540,00</strong>
                             </div>
-                            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">
+                            <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-medium">
                                 Pronto p/ retirada
                             </span>
                         </div>
@@ -131,19 +131,19 @@ export default function AssistenciaTecnicaSegmentPage() {
                         description:
                             "Tire fotos do aparelho no momento em que o cliente entregar na bancada. Registre marcas de uso, estado da tela e carcaça, e deixe tudo salvo na nuvem com data e hora.",
                         mockup: (
-                            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm space-y-3">
-                                <div className="flex items-center gap-2 text-xs font-bold text-brand-dark">
+                            <div className="bg-white dark:bg-dark-surface rounded-xl p-5 border border-gray-100 dark:border-dark-border shadow-sm space-y-3">
+                                <div className="flex items-center gap-2 text-xs font-bold text-brand-dark dark:text-dark-heading">
                                     <Smartphone className="w-4 h-4 text-brand-green" />
                                     Inspeção Visual de Entrada
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                                        <span className="text-[10px] text-gray-400 block">Traseira</span>
-                                        <strong className="text-emerald-700">Sem avarias</strong>
+                                    <div className="bg-gray-50 dark:bg-dark-border/30 p-2.5 rounded-lg border border-gray-100 dark:border-dark-border">
+                                        <span className="text-[10px] text-gray-400 dark:text-dark-body block">Traseira</span>
+                                        <strong className="text-emerald-700 dark:text-emerald-300">Sem avarias</strong>
                                     </div>
-                                    <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                                        <span className="text-[10px] text-gray-400 block">Vidro Frontal</span>
-                                        <strong className="text-amber-700">Trinca canto superior</strong>
+                                    <div className="bg-gray-50 dark:bg-dark-border/30 p-2.5 rounded-lg border border-gray-100 dark:border-dark-border">
+                                        <span className="text-[10px] text-gray-400 dark:text-dark-body block">Vidro Frontal</span>
+                                        <strong className="text-amber-700 dark:text-amber-300">Trinca canto superior</strong>
                                     </div>
                                 </div>
                             </div>
@@ -155,9 +155,9 @@ export default function AssistenciaTecnicaSegmentPage() {
                         description:
                             "Nada de mandar textos desorganizados. A Dudit gera um link profissional com o diagnóstico, fotos das peças trocadas e valores para o cliente aprovar em 1 clique.",
                         mockup: (
-                            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm space-y-3">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase">Mensagem Automática</span>
-                                <p className="text-xs text-gray-700 italic border-l-2 border-brand-green pl-2.5">
+                            <div className="bg-white dark:bg-dark-surface rounded-xl p-5 border border-gray-100 dark:border-dark-border shadow-sm space-y-3">
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase">Mensagem Automática</span>
+                                <p className="text-xs text-gray-700 dark:text-dark-body italic border-l-2 border-brand-green pl-2.5">
                                     &ldquo;Olá Carlos! Seu orçamento para o conserto do Galaxy S22 está pronto. Veja os detalhes e aprove aqui: dudit.com.br/quote/1042&rdquo;
                                 </p>
                             </div>
@@ -169,14 +169,14 @@ export default function AssistenciaTecnicaSegmentPage() {
                         description:
                             "Ao fechar a ordem de serviço, o sistema debita automaticamente as peças usadas no seu estoque e calcula o lucro real daquele conserto.",
                         mockup: (
-                            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm space-y-2 text-xs">
-                                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                            <div className="bg-white dark:bg-dark-surface rounded-xl p-5 border border-gray-100 dark:border-dark-border shadow-sm space-y-2 text-xs">
+                                <div className="flex justify-between items-center py-1 border-b border-gray-100 dark:border-dark-border">
                                     <span>Bateria iPhone 11</span>
-                                    <span className="text-emerald-600 font-bold">12 em estoque</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">12 em estoque</span>
                                 </div>
                                 <div className="flex justify-between items-center py-1">
                                     <span>Conector Tipo-C Moto G</span>
-                                    <span className="text-emerald-600 font-bold">25 em estoque</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">25 em estoque</span>
                                 </div>
                             </div>
                         ),

@@ -28,7 +28,7 @@ import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../componen
 
 const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
-        <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+        <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
             <GridLines />
             <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
                 <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -37,7 +37,7 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        <h1 className="text-5xl font-bold text-brand-dark mb-6">
+                        <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                             O que você precisa hoje pode estar na <span className="text-brand-green">Dudit.</span>
                         </h1>
                         <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
@@ -55,51 +55,51 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="relative"
                     >
-                        <div className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-xl">
-                            <div className="bg-gray-50 p-3 border-b border-gray-100 flex items-center gap-2">
+                        <div className="bg-white dark:bg-dark-surface rounded-xl overflow-hidden border border-gray-100 dark:border-dark-border shadow-xl">
+                            <div className="bg-gray-50 dark:bg-dark-border/30 p-3 border-b border-gray-100 dark:border-dark-border flex items-center gap-2">
                                 <div className="flex gap-1.5">
                                     <div className="w-2.5 h-2.5 rounded-full bg-brand-red"></div>
                                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
                                     <div className="w-2.5 h-2.5 rounded-full bg-brand-green"></div>
                                 </div>
-                                <div className="bg-white px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100">dudit.com.br</div>
+                                <div className="bg-white dark:bg-dark-surface px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100 dark:border-dark-border">dudit.com.br</div>
                             </div>
                             <div className="p-6 space-y-3">
-                                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                        <ShoppingBag className="w-4 h-4 text-blue-600" />
+                                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+                                        <ShoppingBag className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Descubra</div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Descubra</div>
                                         <div className="text-xs text-brand-inactive-text">Produtos, serviços e negócios perto de você</div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                        <Store className="w-4 h-4 text-green-600" />
+                                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/40 rounded-lg border border-green-100 dark:border-green-900/50">
+                                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-center justify-center">
+                                        <Store className="w-4 h-4 text-green-600 dark:text-green-400" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Anuncie</div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Anuncie</div>
                                         <div className="text-xs text-brand-inactive-text">Seja descoberto por mais pessoas</div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                                        <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                                <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-950/40 rounded-lg border border-purple-100 dark:border-purple-900/50">
+                                    <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-lg flex items-center justify-center">
+                                        <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Organize</div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Organize</div>
                                         <div className="text-xs text-brand-inactive-text">Gestão simples para o seu dia a dia</div>
                                     </div>
                                 </div>
-                                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                                <div className="pt-3 border-t border-gray-100 dark:border-dark-border flex items-center justify-between">
                                     <div className="text-center">
                                         <div className="text-xl font-bold text-brand-green">0%</div>
                                         <div className="text-[10px] text-brand-inactive-text">comissão</div>
                                     </div>
-                                    <div className="h-8 w-px bg-gray-100"></div>
+                                    <div className="h-8 w-px bg-gray-100 dark:bg-dark-border/40"></div>
                                     <div className="text-center">
-                                        <div className="text-xl font-bold text-brand-dark">100%</div>
+                                        <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">100%</div>
                                         <div className="text-[10px] text-brand-inactive-text">do valor da venda é seu</div>
                                     </div>
                                 </div>
@@ -107,18 +107,18 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         </div>
 
                         <motion.div
-                            className="absolute -right-4 md:-right-8 -bottom-6 w-44 bg-white rounded-2xl p-4 border border-gray-100 shadow-lg hidden md:block"
+                            className="absolute -right-4 md:-right-8 -bottom-6 w-44 bg-white dark:bg-dark-surface rounded-2xl p-4 border border-gray-100 dark:border-dark-border shadow-lg hidden md:block"
                             animate={{ y: [0, -10, 0] }}
                             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                         >
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 bg-brand-green/20 rounded-full flex items-center justify-center">
-                                    <TrendingUp className="w-4 h-4 text-brand-dark" />
+                                    <TrendingUp className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
                                 </div>
-                                <div className="text-xs font-bold text-brand-dark">Nova venda</div>
+                                <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Nova venda</div>
                             </div>
                             <div className="bg-brand-green/10 rounded-lg p-2 text-xs">
-                                <div className="flex justify-between font-bold text-brand-dark">
+                                <div className="flex justify-between font-bold text-brand-dark dark:text-dark-heading">
                                     <span>Você recebe</span>
                                     <span className="text-brand-green">R$ 150,00</span>
                                 </div>
@@ -160,7 +160,7 @@ const BentoFeaturesComoAjuda = () => {
     ];
 
     return (
-        <section className="py-24 bg-white relative border-t border-gray-100">
+        <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
@@ -181,33 +181,33 @@ const BentoFeaturesComoAjuda = () => {
                             viewport={{ once: true }}
                             className="group flex flex-col justify-between"
                         >
-                            <div className="bg-brand-slate border border-gray-100 h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
+                            <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
                                 {card.type === 'buy' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
                                             <Search className="w-3.5 h-3.5 text-brand-green" />
-                                            <span className="text-[10px] font-bold text-brand-dark">Buscar na Dudit</span>
+                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Buscar na Dudit</span>
                                         </div>
                                         <div className="space-y-2">
-                                            <div className="bg-gray-50 p-2 rounded flex items-center justify-between">
-                                                <span className="text-[10px] text-brand-dark font-medium">Bolo Caseiro</span>
+                                            <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded flex items-center justify-between">
+                                                <span className="text-[10px] text-brand-dark dark:text-dark-heading font-medium">Bolo Caseiro</span>
                                                 <span className="text-[8px] text-brand-green font-bold">600m</span>
                                             </div>
-                                            <div className="bg-gray-50 p-2 rounded flex items-center justify-between">
-                                                <span className="text-[10px] text-brand-dark font-medium">Oficina Mecânica</span>
-                                                <span className="text-[8px] text-blue-600 font-bold">1.2 km</span>
+                                            <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded flex items-center justify-between">
+                                                <span className="text-[10px] text-brand-dark dark:text-dark-heading font-medium">Oficina Mecânica</span>
+                                                <span className="text-[8px] text-blue-600 dark:text-blue-400 font-bold">1.2 km</span>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
                                 {card.type === 'sell' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex justify-between mb-3 border-b border-gray-50 pb-2">
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex justify-between mb-3 border-b border-gray-50 dark:border-dark-border pb-2">
                                             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Novo anúncio</span>
-                                            <div className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[8px] font-bold">Ativo</div>
+                                            <div className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded text-[8px] font-bold">Ativo</div>
                                         </div>
-                                        <div className="text-sm font-bold text-brand-dark mb-0.5">Violão Seminovo</div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-0.5">Violão Seminovo</div>
                                         <div className="text-brand-green font-extrabold text-xs mb-3">R$ 280,00</div>
                                         <div className="w-full bg-brand-green text-white py-1.5 rounded text-[9px] font-bold text-center flex items-center justify-center gap-1">
                                             <ShoppingBag size={10} /> Ver na Dudit
@@ -216,12 +216,12 @@ const BentoFeaturesComoAjuda = () => {
                                 )}
 
                                 {card.type === 'store' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
-                                            <Store className="w-4 h-4 text-brand-dark" />
-                                            <span className="text-[10px] font-bold text-brand-dark">Sua Vitrine Online</span>
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
+                                            <Store className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Sua Vitrine Online</span>
                                         </div>
-                                        <div className="bg-gray-50 p-2 rounded text-[9px] font-mono text-brand-inactive-text mb-2 text-center">
+                                        <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded text-[9px] font-mono text-brand-inactive-text mb-2 text-center">
                                             dudit.com.br/sualoja
                                         </div>
                                         <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
@@ -231,18 +231,18 @@ const BentoFeaturesComoAjuda = () => {
                                 )}
 
                                 {card.type === 'schedule' && (
-                                    <div className="bg-white p-4 w-full max-w-[220px] rounded-lg border border-gray-100 text-xs">
-                                        <div className="flex justify-between items-center mb-3 border-b border-gray-50 pb-2">
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex justify-between items-center mb-3 border-b border-gray-50 dark:border-dark-border pb-2">
                                             <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
                                             <Calendar size={12} className="text-brand-inactive-text" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <div className="flex justify-between items-center bg-blue-50 p-1.5 rounded text-[10px]">
-                                                <span className="font-bold text-blue-800">14:00 - Corte</span>
-                                                <span className="text-blue-600 font-semibold text-[8px]">Disponível</span>
+                                            <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-950/40 p-1.5 rounded text-[10px]">
+                                                <span className="font-bold text-blue-800 dark:text-blue-300">14:00 - Corte</span>
+                                                <span className="text-blue-600 dark:text-blue-400 font-semibold text-[8px]">Disponível</span>
                                             </div>
-                                            <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded text-[10px]">
-                                                <span className="font-bold text-brand-dark">16:30 - Manutenção</span>
+                                            <div className="flex justify-between items-center bg-gray-50 dark:bg-dark-border/30 p-1.5 rounded text-[10px]">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">16:30 - Manutenção</span>
                                                 <span className="text-brand-green font-semibold text-[8px]">Agendar</span>
                                             </div>
                                         </div>
@@ -251,7 +251,7 @@ const BentoFeaturesComoAjuda = () => {
                             </div>
                             <div className="pt-5">
                                 <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block mb-1">{card.subtitle}</span>
-                                <h4 className="text-lg font-bold text-brand-dark mb-1">{card.title}</h4>
+                                <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">{card.title}</h4>
                                 <p className="text-brand-inactive-text text-sm leading-relaxed">{card.description}</p>
                             </div>
                         </motion.div>
@@ -282,7 +282,7 @@ const ParaQuemCompra = () => {
     ];
 
     return (
-        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
+        <section className="relative py-24 bg-white dark:bg-dark-surface overflow-hidden border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
@@ -298,13 +298,13 @@ const ParaQuemCompra = () => {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: idx * 0.1 }}
-                            className={`py-8 px-8 ${idx < items.length - 1 ? 'md:border-r md:border-dashed md:border-gray-200' : ''} ${idx < items.length - 1 ? 'border-b md:border-b-0 border-dashed border-gray-200' : ''}`}
+                            className={`py-8 px-8 ${idx < items.length - 1 ? 'md:border-r md:border-dashed md:border-gray-200' : ''} ${idx < items.length - 1 ? 'border-b md:border-b-0 border-dashed border-gray-200 dark:border-dark-border' : ''}`}
                         >
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center">
                                     <item.icon className="w-5 h-5 text-white" />
                                 </div>
-                                <h4 className="text-lg font-bold text-brand-dark">{item.title}</h4>
+                                <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{item.title}</h4>
                             </div>
                             <p className="text-brand-inactive-text text-sm leading-relaxed">
                                 {item.desc}
@@ -344,7 +344,7 @@ const ParaQuemVende = () => {
     ];
 
     return (
-        <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
+        <section className="relative py-24 bg-white dark:bg-dark-surface overflow-hidden border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -356,7 +356,7 @@ const ParaQuemVende = () => {
                         transition={{ duration: 0.5 }}
                         className="relative"
                     >
-                        <div className="bg-[#eaf7f0] rounded-3xl p-6 md:p-10">
+                        <div className="bg-[#eaf7f0] dark:bg-dark-border/40 rounded-3xl p-6 md:p-10">
                             <div className="overflow-hidden">
                                 <img
                                     src="https://img.dudit.com.br/static/mascots/MaisUmaVitrine.png"
@@ -367,7 +367,7 @@ const ParaQuemVende = () => {
                                         target.style.display = 'none';
                                         const parent = target.parentElement;
                                         if (parent) {
-                                            parent.innerHTML = '<div class="w-full bg-[#eaf7f0] flex items-center justify-center"></div>';
+                                            parent.innerHTML = '<div class="w-full bg-[#eaf7f0] dark:bg-dark-border/40 flex items-center justify-center"></div>';
                                         }
                                     }}
                                 />
@@ -385,7 +385,7 @@ const ParaQuemVende = () => {
                         <span className="text-sm font-medium tracking-wider uppercase mb-4 block text-brand-inactive-text">
                             MAIS UMA PORTA ABERTA
                         </span>
-                        <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-brand-dark mb-6">
+                        <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-brand-dark dark:text-dark-heading mb-6">
                             Seu negócio também pode ser encontrado na Dudit
                         </h2>
                         <p className="text-brand-inactive-text text-lg leading-relaxed mb-10">
@@ -402,7 +402,7 @@ const ParaQuemVende = () => {
                                         whileInView={{ opacity: 1, y: 0 }}
                                         viewport={{ once: true }}
                                         transition={{ delay: idx * 0.08 }}
-                                        className={`border-t border-gray-200 ${idx === items.length - 1 ? 'border-b' : ''}`}
+                                        className={`border-t border-gray-200 dark:border-dark-border ${idx === items.length - 1 ? 'border-b' : ''}`}
                                     >
                                         <button
                                             onClick={() => setOpenIndex(isOpen ? null : idx)}
@@ -411,7 +411,7 @@ const ParaQuemVende = () => {
                                             <span className="text-sm font-medium text-brand-inactive-text w-8 shrink-0">
                                                 {item.num}.
                                             </span>
-                                            <span className={`text-lg font-bold flex-1 transition-colors ${isOpen ? 'text-brand-dark' : 'text-brand-dark group-hover:text-brand-green'}`}>
+                                            <span className={`text-lg font-bold flex-1 transition-colors ${isOpen ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-dark dark:text-dark-heading group-hover:text-brand-green'}`}>
                                                 {item.title}
                                             </span>
                                             <ChevronDown
@@ -446,7 +446,7 @@ const ParaQuemVende = () => {
 
 const GlobalScale = () => {
     return (
-        <section className="py-24 bg-white relative border-t border-gray-100">
+        <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <div className="flex flex-col lg:flex-row min-h-[600px] rounded-3xl overflow-hidden shadow-xl">
@@ -489,14 +489,14 @@ const GlobalScale = () => {
                                 whileInView={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.1, duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="absolute top-[10%] left-0 lg:left-[5%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
+                                className="absolute top-[10%] left-0 lg:left-[5%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
                             >
-                                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                                <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-dark-border/30 flex items-center justify-center shrink-0">
                                     <Store size={20} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Oficina do Seu Manoel</span> vendeu</p>
-                                    <p className="text-sm text-brand-dark font-bold mt-0.5">Troca de Óleo</p>
+                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Oficina do Seu Manoel</span> vendeu</p>
+                                    <p className="text-sm text-brand-dark dark:text-dark-heading font-bold mt-0.5">Troca de Óleo</p>
                                 </div>
                                 <div className="text-brand-green font-bold text-sm">R$ 180,00</div>
                             </motion.div>
@@ -506,14 +506,14 @@ const GlobalScale = () => {
                                 whileInView={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.3, duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="absolute top-[40%] right-0 lg:right-[5%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[320px]"
+                                className="absolute top-[40%] right-0 lg:right-[5%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[320px]"
                             >
-                                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                                <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-dark-border/30 flex items-center justify-center shrink-0">
                                     <User size={20} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Ana Bolos</span> vendeu</p>
-                                    <p className="text-sm text-brand-dark font-bold mt-0.5">Bolo de Festa</p>
+                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Ana Bolos</span> vendeu</p>
+                                    <p className="text-sm text-brand-dark dark:text-dark-heading font-bold mt-0.5">Bolo de Festa</p>
                                 </div>
                                 <div className="text-brand-green font-bold text-sm">R$ 120,00</div>
                             </motion.div>
@@ -523,14 +523,14 @@ const GlobalScale = () => {
                                 whileInView={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.5, duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="absolute bottom-[10%] left-0 lg:left-[10%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
+                                className="absolute bottom-[10%] left-0 lg:left-[10%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
                             >
-                                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                                <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-dark-border/30 flex items-center justify-center shrink-0">
                                     <ShoppingBag size={20} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Loja de Roupas</span> vendeu</p>
-                                    <p className="text-sm text-brand-dark font-bold mt-0.5">Camiseta Branca</p>
+                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Loja de Roupas</span> vendeu</p>
+                                    <p className="text-sm text-brand-dark dark:text-dark-heading font-bold mt-0.5">Camiseta Branca</p>
                                 </div>
                                 <div className="text-brand-green font-bold text-sm">R$ 59,90</div>
                             </motion.div>
@@ -562,7 +562,7 @@ export default function HomePage() {
     };
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <Navbar onNavigate={onNavigate} />
             <main>
                 <Hero onNavigate={onNavigate} />

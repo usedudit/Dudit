@@ -205,21 +205,21 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                                 >
                                                     {productBucket.isLoading ? (
                                                         <div className="p-4"><ThreeDotsLoader /></div>
-                                                     ) : productBucket.filteredResults.length > 0 ? (
-                                                         productBucket.filteredResults.map((product) => (
-                                                             <ProductSearchResultItem
-                                                                 key={product.id}
-                                                                 item={product}
-                                                                 promotions={activePromotions}
-                                                                 onClick={() => handleProductSelect(product)}
-                                                             />
-                                                         ))
-                                                     ) : (
-                                                         <div className="p-4 text-center text-sm text-brand-inactive-text">
-                                                             Nenhum produto encontrado
-                                                         </div>
-                                                     )}
-                                                 </motion.div>
+                                                    ) : productBucket.filteredResults.length > 0 ? (
+                                                        productBucket.filteredResults.map((product) => (
+                                                            <ProductSearchResultItem
+                                                                key={product.id}
+                                                                item={product}
+                                                                promotions={activePromotions}
+                                                                onClick={() => handleProductSelect(product)}
+                                                            />
+                                                        ))
+                                                    ) : (
+                                                        <div className="p-4 text-center text-sm text-brand-inactive-text">
+                                                            Nenhum produto encontrado
+                                                        </div>
+                                                    )}
+                                                </motion.div>
                                             )}
                                         </AnimatePresence>
                                     </div>
@@ -231,7 +231,7 @@ export default function AddItemSheet({ isOpen, onClose, partnerId, storeId, onCo
                                         variant="link"
                                         onClick={handleManualClick}
                                     >
-                                        <PlusIcon size={14} strokeWidth={3} />
+                                        <PlusIcon size={14} />
                                         Adicionar item manual
                                     </Button>
                                 )}

@@ -60,7 +60,7 @@ export async function listRecurringSubscriptionsAction(
       .from("recurring_subscriptions")
       .select(`
         *,
-        recurring_plans(id, name, frequency_type, frequency_interval, status),
+        recurring_plans(id, name, frequency_type, frequency_interval, status, price),
         customers:customer_id(id, name, email, image_url)
       `)
       .eq("partner_id", partnerId)
@@ -657,24 +657,27 @@ export async function getSubscriptionForecastAction(
         recurring_plans(id, name, price, frequency_type, frequency_interval),
         recurring_subscription_items(
           id, item_type, product_id, variant_id, quantity,
-          products:product_id(id, name, unit, stock_available, min_stock)
+          products:product_id(id, name, unit, stock_available, min_stock, images)
         )
       `)
       .eq("partner_id", partnerId)
-      .eq("status", "active")
+      .in("status", ["active", "awaiting_restock"])
     if (options?.storeId) query = query.eq("store_id", options.storeId)
 
     const { data: subs, error } = await query
 
     if (error) throw error
 
-    const next30Days = new Date()
-    next30Days.setDate(next30Days.getDate() + 30)
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const next30Days = new Date(startOfToday)
+    next30Days.setDate(next30Days.getDate() + 31)
 
     const forecast = ((subs || []) as any[])
       .filter(sub => {
+        if (!sub.next_execution_at) return false
         const nextRun = new Date(sub.next_execution_at)
-        return nextRun >= new Date() && nextRun <= next30Days
+        return nextRun >= startOfToday && nextRun <= next30Days
       })
       .map(sub => ({
         id: sub.id,
@@ -706,6 +709,7 @@ export async function getSubscriptionForecastAction(
             quantity: Number(item.quantity || 1),
             name: item.products?.name || "Produto",
             unit: item.products?.unit || null,
+            images: Array.isArray(item.products?.images) ? item.products.images : null,
             stockAvailable: Number(item.products?.stock_available ?? 0),
             minStock: Number(item.products?.min_stock ?? 0),
           })),
@@ -947,7 +951,16 @@ export async function scheduleSubscriptionServiceAction(input: {
         additional_costs: 0,
         notes: sanitizeNotes(input.notes),
         payment_method: "Assinatura (Créditos)",
-        payment_breakdown: [],
+        payment_breakdown: [
+          {
+            method: "Assinatura (Créditos)",
+            amount: 0,
+            effectiveAmount: 0,
+            amountReceived: 0,
+            paymentType: "subscription_credits",
+            installmentNumber: 1,
+          },
+        ],
         recurring_subscription_id: subscriptionId,
         created_by: user?.id || null,
       })
@@ -1223,7 +1236,16 @@ export async function createSubscriptionDeliveryOrderAction(input: {
         additional_costs: 0,
         notes: sanitizeNotes(input.notes),
         payment_method: "Assinatura (Créditos)",
-        payment_breakdown: [],
+        payment_breakdown: [
+          {
+            method: "Assinatura (Créditos)",
+            amount: 0,
+            effectiveAmount: 0,
+            amountReceived: 0,
+            paymentType: "subscription_credits",
+            installmentNumber: 1,
+          },
+        ],
         delivery_address: deliveryType === "delivery" ? sub.delivery_address : null,
         finance_account_id: sub.finance_account_id || null,
         recurring_subscription_id: subscriptionId,

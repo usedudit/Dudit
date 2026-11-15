@@ -436,13 +436,28 @@ export default function CreateTransactionPage({
         defaultRecurrenceNext,
     ])
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
+
+    // O header do ERP guarda este callback no contexto do Sidebar. Se a identidade
+    // de `handleBack` mudar a cada render (porque `onBack`/`isDirty` mudam), o efeito
+    // abaixo reescreve o override, o provider re-renderiza, o pai recria `onBack` e
+    // isso vira um loop infinito (React #185 "Maximum update depth exceeded").
+    // Por isso mantemos os valores voláteis em refs e expomos um callback estável.
+    const isDirtyRef = useRef(isDirty)
+    useEffect(() => {
+        isDirtyRef.current = isDirty
+    }, [isDirty])
+    const onBackRef = useRef(onBack)
+    useEffect(() => {
+        onBackRef.current = onBack
+    }, [onBack])
+
     const handleBack = useCallback(() => {
-        if (isDirty) {
+        if (isDirtyRef.current) {
             setShowDiscardModal(true)
         } else {
-            onBack()
+            onBackRef.current()
         }
-    }, [isDirty, onBack])
+    }, [])
     const { setHeaderOverride } = useSidebar()
     const pageTitle = isRecurringTemplateEdit ? "Editar recorrência" : isEditMode ? "Editar transação" : "Nova transação"
     useEffect(() => {

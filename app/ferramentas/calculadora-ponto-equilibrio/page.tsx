@@ -75,7 +75,7 @@ export default function CalculadoraPontoEquilibrioPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white dark:bg-dark-surface">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqLd) }}
@@ -94,7 +94,7 @@ export default function CalculadoraPontoEquilibrioPage() {
                     description="Descubra quantas vendas você precisa fazer por mês para cobrir seus custos fixos e começar a ter lucro."
                 />
 
-                <section className="py-24 bg-white relative border-t border-brand-border">
+                <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -105,10 +105,10 @@ export default function CalculadoraPontoEquilibrioPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
+                                <Card className="bg-white dark:bg-dark-surface border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
-                                            <h2 className="text-xl font-bold text-brand-dark">Entradas financeiras</h2>
+                                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Entradas financeiras</h2>
                                             <p className="text-sm text-brand-inactive-text mt-1">
                                                 Preencha os valores do seu negócio para descobrir a meta mensal.
                                             </p>
@@ -169,7 +169,7 @@ export default function CalculadoraPontoEquilibrioPage() {
                                             <p className="text-4xl font-bold text-brand-green mt-1">
                                                 {formatBRL(pontoEquilibrioFaturamento)}
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-2">
+                                            <p className="text-xs text-gray-400 dark:text-dark-body mt-2">
                                                 São no mínimo <span className="font-semibold text-white">{pontoEquilibrioUnidades} vendas</span> por mês
                                             </p>
                                         </div>
@@ -198,7 +198,7 @@ export default function CalculadoraPontoEquilibrioPage() {
                                                     <ArrowRight className="w-4 h-4" />
                                                 </Link>
                                             </Button>
-                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                            <p className="text-center text-xs text-gray-400 dark:text-dark-body mt-3">
                                                 DRE, fluxo de caixa e lucro por pedido direto no sistema
                                             </p>
                                         </div>

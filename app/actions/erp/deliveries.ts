@@ -68,6 +68,57 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidatePath("/erp/logistica")
 }
 
+export const DUDIT_NETWORK_EXPIRATION_MS = 15 * 60 * 1000
+
+export async function expireOldDuditNetworkRequests(adminClient: any, partnerId?: string) {
+  try {
+    const cutoffIso = new Date(Date.now() - DUDIT_NETWORK_EXPIRATION_MS).toISOString()
+    let query = adminClient
+      .from("delivery_assignments")
+      .select("id, delivery_id, order_id, assigned_at")
+      .in("status", ["available", "requested"])
+      .is("driver_id", null)
+      .lt("assigned_at", cutoffIso)
+
+    if (partnerId) {
+      query = query.eq("partner_id", partnerId)
+    }
+
+    const { data: expiredAssignments, error } = await query
+    if (error || !expiredAssignments || expiredAssignments.length === 0) return
+
+    const expiredIds = expiredAssignments.map((a: any) => a.id)
+    const expiredDeliveryIds = Array.from(new Set(expiredAssignments.map((a: any) => a.delivery_id).filter(Boolean)))
+
+    const nowIso = new Date().toISOString()
+
+    // 1. Mark assignments as cancelled
+    await adminClient
+      .from("delivery_assignments")
+      .update({
+        status: "cancelled",
+        cancelled_at: nowIso,
+        failure_reason: "Tempo limite para aceite na Rede Dudit expirado (15 min)",
+        updated_at: nowIso,
+      })
+      .in("id", expiredIds)
+
+    // 2. Revert deliveries to entrega própria (delivery_person_id: null if it was dudit_network or platform)
+    if (expiredDeliveryIds.length > 0) {
+      await adminClient
+        .from("deliveries")
+        .update({
+          delivery_person_id: null,
+          updated_at: nowIso,
+        })
+        .in("id", expiredDeliveryIds)
+        .or("delivery_person_id.is.null,delivery_person_id.eq.dudit_network,delivery_person_id.eq.platform:dudit_network")
+    }
+  } catch (err) {
+    console.warn("[expireOldDuditNetworkRequests] Error cancelling expired requests:", err)
+  }
+}
+
 function getDeliveryStatusHumanLabel(status: string): string {
   switch (status) {
     case "pending":
@@ -1711,6 +1762,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         return { success: false, error: planCheck.error }
       }
       const supabase = await getSupabaseServerClient()
+      await expireOldDuditNetworkRequests(getAdminClient(), partnerId)
 
       const cursor = options?.cursor ?? null
       const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || DEFAULT_PAGE_SIZE))))
@@ -1794,16 +1846,24 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
               : Promise.resolve([] as any[]),
           ])
 
+          const nowMs = Date.now()
           for (const ass of assignments) {
             if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
-              platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
-              if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+              const isPendingExpired = !ass.driver_id && ["available", "requested"].includes(ass.status) && (
+                !ass.assigned_at || (nowMs - new Date(ass.assigned_at).getTime() > DUDIT_NETWORK_EXPIRATION_MS)
+              )
+              if (!isPendingExpired) {
+                platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
+                if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+              }
             }
           }
 
           for (const row of rows) {
             if (row.delivery_person_id && !deliveryPersonNameById.has(String(row.delivery_person_id))) {
-              platformDriverUserIds.add(String(row.delivery_person_id))
+              if (row.delivery_person_id !== "dudit_network" && row.delivery_person_id !== "platform:dudit_network") {
+                platformDriverUserIds.add(String(row.delivery_person_id))
+              }
             }
           }
 
@@ -1885,17 +1945,22 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
                 isPendingAcceptance: false,
               }
               driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
-            } else if (row.delivery_person_id) {
+            } else if (row.delivery_person_id && row.delivery_person_id !== "dudit_network" && row.delivery_person_id !== "platform:dudit_network") {
               driverName = deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador"
             }
 
+            const cleanDeliveryPersonId = (row.delivery_person_id === "dudit_network" || row.delivery_person_id === "platform:dudit_network")
+              ? (pAss ? row.delivery_person_id : null)
+              : row.delivery_person_id
+
             return {
               ...row,
+              delivery_person_id: cleanDeliveryPersonId,
               is_platform_driver: isPlatformDriver,
               platform_driver: platformDriver,
               delivery_person_name: driverName,
               partner_users: driverName
-                ? { id: row.delivery_person_id, user_profiles: { full_name: driverName } }
+                ? { id: cleanDeliveryPersonId, user_profiles: { full_name: driverName } }
                 : null,
             }
           })
@@ -2030,17 +2095,25 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
         .order("assigned_at", { ascending: false })
 
+      const nowMs = Date.now()
       for (const ass of assignments || []) {
         if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
-          platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
-          if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+          const isPendingExpired = !ass.driver_id && ["available", "requested"].includes(ass.status) && (
+            !ass.assigned_at || (nowMs - new Date(ass.assigned_at).getTime() > DUDIT_NETWORK_EXPIRATION_MS)
+          )
+          if (!isPendingExpired) {
+            platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
+            if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+          }
         }
       }
     }
 
     for (const row of rows) {
       if (row.delivery_person_id && !deliveryPersonNameById.has(String(row.delivery_person_id))) {
-        platformDriverUserIds.add(String(row.delivery_person_id))
+        if (row.delivery_person_id !== "dudit_network" && row.delivery_person_id !== "platform:dudit_network") {
+          platformDriverUserIds.add(String(row.delivery_person_id))
+        }
       }
     }
 
@@ -2122,17 +2195,22 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           isPendingAcceptance: false,
         }
         driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
-      } else if (row.delivery_person_id) {
+      } else if (row.delivery_person_id && row.delivery_person_id !== "dudit_network" && row.delivery_person_id !== "platform:dudit_network") {
         driverName = deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador"
       }
 
+      const cleanDeliveryPersonId = (row.delivery_person_id === "dudit_network" || row.delivery_person_id === "platform:dudit_network")
+        ? (pAss ? row.delivery_person_id : null)
+        : row.delivery_person_id
+
       return {
         ...row,
+        delivery_person_id: cleanDeliveryPersonId,
         is_platform_driver: isPlatformDriver,
         platform_driver: platformDriver,
         delivery_person_name: driverName,
         partner_users: driverName
-          ? { id: row.delivery_person_id, user_profiles: { full_name: driverName } }
+          ? { id: cleanDeliveryPersonId, user_profiles: { full_name: driverName } }
           : null,
       }
     })
@@ -2151,6 +2229,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     await requirePartnerRouteAccess(partnerId, "logistics", { specificPermission: "can_view_delivery_details" })
     const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
     if (!planCheck.allowed) return { success: false as const, error: planCheck.error }
+    await expireOldDuditNetworkRequests(getAdminClient(), partnerId)
     const supabase = await getSupabaseServerClient()
 
     const { data, error } = await getCachedErpPage(
@@ -2284,10 +2363,24 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         : Promise.resolve({ data: [] }),
     ])
 
-    const platformAssignment = (platformAssignments || []).find((a: any) => a.driver_id && ["accepted", "picked_up", "out_for_delivery", "delivered"].includes(a.status))
-      || (platformAssignments || []).find((a: any) => a.driver_id)
-      || platformAssignments?.[0]
+    const nowMs = Date.now()
+    const activeAssignments = (platformAssignments || []).filter((a: any) => {
+      if (a.driver_id) return true
+      if (["available", "requested"].includes(a.status)) {
+        if (!a.assigned_at) return false
+        return nowMs - new Date(a.assigned_at).getTime() <= DUDIT_NETWORK_EXPIRATION_MS
+      }
+      return true
+    })
+
+    const platformAssignment = activeAssignments.find((a: any) => a.driver_id && ["accepted", "picked_up", "out_for_delivery", "delivered"].includes(a.status))
+      || activeAssignments.find((a: any) => a.driver_id)
+      || activeAssignments[0]
       || null
+
+    if (!platformAssignment && (data?.delivery_person_id === "dudit_network" || data?.delivery_person_id === "platform:dudit_network")) {
+      data.delivery_person_id = null
+    }
 
     let platformDriver: any = null
     let resolvedPlatformDriverId: string | null = null

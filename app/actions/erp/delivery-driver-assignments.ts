@@ -249,7 +249,7 @@ export async function cancelDuditDeliveryRequestAction(input: {
 
   const { data: assignment } = await admin
     .from("delivery_assignments")
-    .select("id, status")
+    .select("id, status, delivery_id")
     .eq("order_id", input.orderId)
     .eq("partner_id", input.partnerId)
     .in("status", ["available", "requested", "assigned", "accepted"])
@@ -272,6 +272,17 @@ export async function cancelDuditDeliveryRequestAction(input: {
 
   if (error) {
     return { success: false as const, error: "Não foi possível cancelar a solicitação." }
+  }
+
+  if (assignment.delivery_id) {
+    await admin
+      .from("deliveries")
+      .update({
+        delivery_person_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", assignment.delivery_id)
+      .or("delivery_person_id.is.null,delivery_person_id.eq.dudit_network,delivery_person_id.eq.platform:dudit_network")
   }
 
   await logAuditEvent({
@@ -306,6 +317,7 @@ export async function getDuditDeliveryRequestStatusAction(input: {
     .from("delivery_assignments")
     .select(`
       id,
+      delivery_id,
       status,
       assigned_at,
       accepted_at,
@@ -325,6 +337,36 @@ export async function getDuditDeliveryRequestStatusAction(input: {
 
   if (!assignment) {
     return { success: true as const, activeRequest: null }
+  }
+
+  // Check if expired (> 15 min)
+  if (!assignment.driver_id && ["available", "requested"].includes(assignment.status)) {
+    const assignedTime = assignment.assigned_at ? new Date(assignment.assigned_at).getTime() : 0
+    if (Date.now() - assignedTime > 15 * 60 * 1000) {
+      const nowIso = new Date().toISOString()
+      await admin
+        .from("delivery_assignments")
+        .update({
+          status: "cancelled",
+          cancelled_at: nowIso,
+          failure_reason: "Tempo limite para aceite na Rede Dudit expirado (15 min)",
+          updated_at: nowIso,
+        })
+        .eq("id", assignment.id)
+
+      if (assignment.delivery_id) {
+        await admin
+          .from("deliveries")
+          .update({
+            delivery_person_id: null,
+            updated_at: nowIso,
+          })
+          .eq("id", assignment.delivery_id)
+          .or("delivery_person_id.is.null,delivery_person_id.eq.dudit_network,delivery_person_id.eq.platform:dudit_network")
+      }
+
+      return { success: true as const, activeRequest: null }
+    }
   }
 
   let driverInfo: { name: string; phone?: string; vehicleType?: string } | null = null
