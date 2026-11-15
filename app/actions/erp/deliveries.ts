@@ -68,7 +68,7 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidatePath("/erp/logistica")
 }
 
-export const DUDIT_NETWORK_EXPIRATION_MS = 15 * 60 * 1000
+const DUDIT_NETWORK_EXPIRATION_MS = 15 * 60 * 1000
 
 export async function expireOldDuditNetworkRequests(adminClient: any, partnerId?: string) {
   try {
