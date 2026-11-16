@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ChevronLeft, ChevronRight, Store, Wrench, ShoppingBag } from "lucide-react"
+import { ChevronLeft, ChevronRight, Store, Wrench, ShoppingBag, Sparkles } from "lucide-react"
 import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 
 interface HomeCategoryBarProps {
@@ -12,7 +12,7 @@ interface NavItem {
     name: string
     href: (city: string) => string
     icon_url: string | null
-    fallbackIcon: "bag" | "wrench" | "store" | "food" | "home" | "tech" | "fashion" | "health" | "auto" | "pets"
+    fallbackIcon: "bag" | "wrench" | "store" | "sparkles"
 }
 
 const HOME_NAV_ITEMS: NavItem[] = [
@@ -35,46 +35,10 @@ const HOME_NAV_ITEMS: NavItem[] = [
         fallbackIcon: "store",
     },
     {
-        name: "Alimentação",
-        href: (city: string) => `/explorar/${city}/alimentacao`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Alimentacao.png",
-        fallbackIcon: "food",
-    },
-    {
-        name: "Casa",
-        href: (city: string) => `/explorar/${city}/casa`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png",
-        fallbackIcon: "home",
-    },
-    {
-        name: "Tecnologia",
-        href: (city: string) => `/explorar/${city}/tecnologia`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png",
-        fallbackIcon: "tech",
-    },
-    {
-        name: "Moda e Beleza",
-        href: (city: string) => `/explorar/${city}/moda-e-beleza`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png",
-        fallbackIcon: "fashion",
-    },
-    {
-        name: "Saúde",
-        href: (city: string) => `/explorar/${city}/saude`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png",
-        fallbackIcon: "health",
-    },
-    {
-        name: "Automotivo",
-        href: (city: string) => `/explorar/${city}/automotivo`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png",
-        fallbackIcon: "auto",
-    },
-    {
-        name: "Pets",
-        href: (city: string) => `/explorar/${city}/pets`,
-        icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png",
-        fallbackIcon: "pets",
+        name: "Assinaturas",
+        href: (city: string) => `/explorar/${city}?type=planos`,
+        icon_url: null,
+        fallbackIcon: "sparkles",
     },
 ]
 
@@ -135,10 +99,11 @@ export function HomeCategoryBar({ selectedCitySlug }: HomeCategoryBarProps) {
                 return <Wrench className="w-6 h-6 text-brand-green group-hover:scale-105 transition-transform" />
             case "store":
                 return <Store className="w-6 h-6 text-brand-green group-hover:scale-105 transition-transform" />
+            case "sparkles":
+                return <Sparkles className="w-6 h-6 text-brand-green group-hover:scale-105 transition-transform" />
             case "bag":
-                return <ShoppingBag className="w-6 h-6 text-brand-green group-hover:scale-105 transition-transform" />
             default:
-                return <span className="text-2xl">📦</span>
+                return <ShoppingBag className="w-6 h-6 text-brand-green group-hover:scale-105 transition-transform" />
         }
     }
 
@@ -155,10 +120,10 @@ export function HomeCategoryBar({ selectedCitySlug }: HomeCategoryBarProps) {
                 </button>
             )}
 
-            {/* Container com scroll horizontal idêntico ao de Explorar */}
+            {/* Container com as 4 categorias gerais */}
             <div
                 ref={scrollContainerRef}
-                className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2 select-none"
+                className="flex items-center justify-start sm:justify-center gap-6 sm:gap-10 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2 select-none"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
                 {HOME_NAV_ITEMS.map((item) => {
@@ -167,12 +132,12 @@ export function HomeCategoryBar({ selectedCitySlug }: HomeCategoryBarProps) {
                         <IntentPrefetchLink
                             key={item.name}
                             href={targetHref}
-                            className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
+                            className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[80px] sm:w-[90px]"
                         >
                             <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
                                 {renderIcon(item)}
                             </div>
-                            <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">
+                            <span className="text-xs font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">
                                 {item.name}
                             </span>
                         </IntentPrefetchLink>

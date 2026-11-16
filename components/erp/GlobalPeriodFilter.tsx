@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button, Dropdown, DropdownItem, InfoCard } from "@/components/reusable"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import { DatePicker } from "@/components/reusable/DatePicker"
 import type { Period, CompareMode } from "@/lib/period-types"
 import { PERIOD_LABELS, COMPARE_PRESET_LABELS, PERIOD_OPTIONS, COMPARE_PRESETS, getPeriodDateRange, getCustomMaxDate } from "@/lib/period-types"
 import { FilterIcon, SparklesIcon, DownloadIcon, XIcon, ChevronDownIcon } from "@/lib/icons"
@@ -12,14 +14,38 @@ import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 
+function formatYmdBr(ymd?: string): string {
+  if (!ymd) return ""
+  const parts = ymd.slice(0, 10).split("-")
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+  return ymd
+}
+
+function toYmdString(date: any): string {
+  if (!date) return ""
+  if (typeof date === "string") return date.slice(0, 10)
+  if (date instanceof Date && !isNaN(date.getTime())) {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }
+  return ""
+}
+
+function addDaysLocal(ymd: string, days: number) {
+  const [y, m, d] = ymd.split("-").map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days, 12)).toISOString().slice(0, 10)
+}
+
 export function GlobalPeriodFilter() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { insights, exportHandler } = useDashboard()
   const [insightSheetOpen, setInsightSheetOpen] = useState(false)
+  const [customModalOpen, setCustomModalOpen] = useState(false)
   const isMobile = useMediaQuery("(max-width: 1023px)")
-  // z-index dinâmico: este sheet abre acima de tudo que já estava aberto.
   const insightSheetZIndex = useModalLayer(insightSheetOpen)
 
   const rawPeriod = searchParams.get("period") as Period
@@ -27,6 +53,9 @@ export function GlobalPeriodFilter() {
   const compare = (searchParams.get("compare") as CompareMode) || "none"
   const compareFrom = searchParams.get("compareFrom") || ""
   const compareTo = searchParams.get("compareTo") || ""
+
+  const [tempCompareFrom, setTempCompareFrom] = useState(compareFrom)
+  const [tempCompareTo, setTempCompareTo] = useState(compareTo)
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const currentSearch = typeof window !== "undefined" && window.location.search
@@ -39,7 +68,7 @@ export function GlobalPeriodFilter() {
     }
     const query = params.toString()
     const target = query ? `${pathname}?${query}` : pathname
-    router.push(target)
+    router.push(target, { scroll: false })
   }, [router, pathname, searchParams])
 
   const handleCompareSelect = (mode: CompareMode) => {
@@ -47,17 +76,24 @@ export function GlobalPeriodFilter() {
       const { from } = getPeriodDateRange(period, new Date().toISOString().slice(0, 10))
       const today = new Date().toISOString().slice(0, 10)
       const maxDate = getCustomMaxDate(period, today)
-      updateParams({ compare: "custom", compareFrom: maxDate, compareTo: from ? addDaysLocal(from, -1) : maxDate })
+      setTempCompareFrom(compareFrom || maxDate)
+      setTempCompareTo(compareTo || (from ? addDaysLocal(from, -1) : maxDate))
+      setCustomModalOpen(true)
     } else {
       updateParams({ compare: mode, compareFrom: "", compareTo: "" })
     }
   }
 
-  const handleCustomDateChange = (key: string, value: string) => {
-    updateParams({ [key]: value })
+  const applyCustomComparison = () => {
+    if (tempCompareFrom && tempCompareTo) {
+      updateParams({
+        compare: "custom",
+        compareFrom: tempCompareFrom,
+        compareTo: tempCompareTo,
+      })
+      setCustomModalOpen(false)
+    }
   }
-
-  const maxDate = getCustomMaxDate(period, new Date().toISOString().slice(0, 10))
 
   const insightsContent = (
     <div className="space-y-4">
@@ -69,7 +105,7 @@ export function GlobalPeriodFilter() {
 
   return (
     <div className="min-w-0 -mx-4 px-4 md:mx-0 md:px-0 xl:w-fit xl:max-w-full">
-      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {insights && insights.length > 0 && (
             <>
@@ -176,49 +212,92 @@ export function GlobalPeriodFilter() {
             trigger={
               <button
                 type="button"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0 text-brand-dark transition-colors hover:bg-brand-green-light dark:text-dark-heading dark:hover:bg-dark-border cursor-pointer"
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0 transition-colors cursor-pointer ${
+                  compare !== "none"
+                    ? "bg-brand-green/20 text-brand-green dark:bg-brand-green/30"
+                    : "text-brand-dark hover:bg-brand-green-light dark:text-dark-heading dark:hover:bg-dark-border"
+                }`}
                 aria-label="Comparar com outro período"
-                title="Comparar período"
+                title={compare !== "none" ? `Comparando: ${COMPARE_PRESET_LABELS[compare] || compare}` : "Comparar período"}
               >
                 <FilterIcon size={14} />
               </button>
             }
           >
             {COMPARE_PRESETS.map((c) => (
-              <DropdownItem key={c} onClick={() => handleCompareSelect(c)}>
+              <DropdownItem
+                key={c}
+                onClick={() => handleCompareSelect(c)}
+                className={compare === c ? "font-bold text-brand-green" : ""}
+              >
                 {COMPARE_PRESET_LABELS[c]}
               </DropdownItem>
             ))}
           </Dropdown>
         </div>
+
+        {compare !== "none" && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-green/10 dark:bg-brand-green/20 border border-brand-green/30 text-xs font-semibold text-brand-dark dark:text-dark-heading">
+            <span className="truncate max-w-[220px]">
+              {compare === "custom" && compareFrom && compareTo
+                ? `Vs ${formatYmdBr(compareFrom)} - ${formatYmdBr(compareTo)}`
+                : `Vs ${COMPARE_PRESET_LABELS[compare] || "anterior"}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => updateParams({ compare: "none", compareFrom: "", compareTo: "" })}
+              className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-white transition-colors cursor-pointer p-0.5"
+              aria-label="Remover comparação"
+              title="Remover comparação"
+            >
+              <XIcon size={12} />
+            </button>
+          </div>
+        )}
       </div>
 
-      {compare === "custom" && (
-        <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 xl:flex xl:w-fit xl:justify-end">
-          <input
-            type="date"
-            value={compareFrom}
-            max={maxDate}
-            onChange={(e) => handleCustomDateChange("compareFrom", e.target.value)}
-            className="h-8 w-full min-w-0 rounded-[8px] border border-brand-border bg-transparent px-2 text-xs font-medium text-brand-dark dark:border-dark-border dark:text-dark-heading sm:w-[9.5rem]"
-            aria-label="Data inicial do período de comparação"
-          />
-          <span className="text-[11px] text-brand-inactive-text">até</span>
-          <input
-            type="date"
-            value={compareTo}
-            max={maxDate}
-            onChange={(e) => handleCustomDateChange("compareTo", e.target.value)}
-            className="h-8 w-full min-w-0 rounded-[8px] border border-brand-border bg-transparent px-2 text-xs font-medium text-brand-dark dark:border-dark-border dark:text-dark-heading sm:w-[9.5rem]"
-            aria-label="Data final do período de comparação"
-          />
+      <DefaultModal
+        isOpen={customModalOpen}
+        onClose={() => setCustomModalOpen(false)}
+        title="Comparar com Período Customizado"
+        maxWidth="md"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button variant="outline" onClick={() => setCustomModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={applyCustomComparison}
+              disabled={!tempCompareFrom || !tempCompareTo || tempCompareFrom > tempCompareTo}
+            >
+              Aplicar Comparação
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+            Selecione o intervalo de datas anterior que você deseja comparar com o período atual.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <DatePicker
+              label="Data inicial"
+              value={tempCompareFrom}
+              onChange={(d: any) => setTempCompareFrom(toYmdString(d))}
+            />
+            <DatePicker
+              label="Data final"
+              value={tempCompareTo}
+              onChange={(d: any) => setTempCompareTo(toYmdString(d))}
+            />
+          </div>
+          {tempCompareFrom && tempCompareTo && tempCompareFrom > tempCompareTo && (
+            <p className="text-xs text-brand-red font-semibold">
+              A data inicial não pode ser posterior à data final.
+            </p>
+          )}
         </div>
-      )}
+      </DefaultModal>
     </div>
   )
-}
-
-function addDaysLocal(ymd: string, days: number) {
-  const [y, m, d] = ymd.split("-").map(Number)
-  return new Date(Date.UTC(y, m - 1, d + days, 12)).toISOString().slice(0, 10)
 }

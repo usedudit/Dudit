@@ -323,7 +323,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                 )}
             >
                 <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
-                    <Link href="/ddt-admin" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
+                    <Link href="/" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
                         <div className="flex items-center justify-center shrink-0 w-[44px]">
                             <img
                                 src="https://img.dudit.com.br/static/Icon.png"

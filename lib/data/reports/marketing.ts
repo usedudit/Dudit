@@ -40,20 +40,34 @@ const fetchMarketingDataStatic = unstable_cache(
       scopeQueryToStores(ordersQuery, storeId)
       scopeQueryToStores(couponsQuery, storeId)
     }
-    const couponUsagesQuery = supabase.from("coupon_usages").select("coupon_id, order_id, used_at").gte("used_at", `${from}T00:00:00`)
-    const [ordersResult, couponsResult, couponUsagesResult, campaignsResult] = await Promise.all([
+    const [ordersResult, couponsResult, campaignsResult] = await Promise.all([
       ordersQuery
         .gte("created_at", `${from}T00:00:00`)
         .order("created_at", { ascending: false })
         .limit(500),
       couponsQuery.limit(200),
-      couponUsagesQuery.limit(500),
       campaignsQuery.order("created_at", { ascending: false }).limit(50),
     ])
 
     if (ordersResult.error) throw ordersResult.error
     if (couponsResult.error) throw couponsResult.error
     if (campaignsResult.error) throw campaignsResult.error
+
+    const coupons = couponsResult.data || []
+    const partnerCouponIds = coupons.map((c: any) => c.id)
+
+    let couponUsages: any[] = []
+    if (partnerCouponIds.length > 0) {
+      const usagesRes = await supabase
+        .from("coupon_usages")
+        .select("coupon_id, order_id, used_at")
+        .in("coupon_id", partnerCouponIds)
+        .gte("used_at", `${from}T00:00:00`)
+        .limit(500)
+      if (!usagesRes.error && usagesRes.data) {
+        couponUsages = usagesRes.data
+      }
+    }
 
     const orders = ordersResult.data || []
 
@@ -69,12 +83,11 @@ const fetchMarketingDataStatic = unstable_cache(
     const topSource = topSourceEntry ? topSourceEntry[0] : "N/A"
     const topSourcePercent = totalRevenue > 0 && topSourceEntry ? Math.round((topSourceEntry[1] / totalRevenue) * 100) : 0
 
-    const coupons = couponsResult.data || []
     const selectedOrderIds = new Set(orders.map((order: any) => order.id))
-    const couponUsages = (couponUsagesResult.data || []).filter((usage: any) => !storeId || selectedOrderIds.has(usage.order_id))
+    const filteredCouponUsages = storeId ? couponUsages.filter((usage: any) => selectedOrderIds.has(usage.order_id)) : couponUsages
 
     const usageCountMap = new Map<string, number>()
-    for (const u of couponUsages) {
+    for (const u of filteredCouponUsages) {
       usageCountMap.set(u.coupon_id, (usageCountMap.get(u.coupon_id) || 0) + 1)
     }
 

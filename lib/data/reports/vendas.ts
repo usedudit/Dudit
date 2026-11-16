@@ -50,17 +50,27 @@ export interface SalesReportData {
   detailedOrders: { id: string; orderNumber: string; customer: string; source: string; paymentMethod: string; status: string; date: string; total: number }[]
 }
 
-const getCachedSalesData = cache(async (partnerId: string, period: Period = "monthly", storeId = ""): Promise<SalesReportData> => {
+const getCachedSalesData = cache(async (partnerId: string, period: Period = "monthly", storeId = "", compareFrom = "", compareTo = ""): Promise<SalesReportData> => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
+      const prevFrom = compareFrom || previousFrom
+      const prevTo = compareTo || from
 
       const currentOrdersQuery = supabase
           .from("orders")
           .select("id, order_number, customer_name, total_amount, order_source, payment_method, situation, created_at, discount_total, delivery_fee, amount_paid")
           .eq("partner_id", partnerId)
       const prevOrdersQuery = supabase.from("orders").select("id, total_amount, created_at").eq("partner_id", partnerId)
+      const currentSalesQuery = supabase
+          .from("sales")
+          .select("id, sale_number, final_amount, paid_amount, discount_amount, payment_status, status, created_at, sale_items(id, product_id, product_name, unit_price, quantity, subtotal, total_price)")
+          .eq("partner_id", partnerId)
+      const prevSalesQuery = supabase
+          .from("sales")
+          .select("id, final_amount, created_at")
+          .eq("partner_id", partnerId)
       const itemsQuery = supabase.from("order_items").select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId)
       const allItemsQuery = supabase.from("order_items").select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId)
       const serviceItemsQuery = supabase.from("order_items").select("product_name, quantity, net_item_value, line_type, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId)
@@ -71,14 +81,23 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         scopeQueryToStores(allItemsQuery, storeId, "orders.store_id")
         scopeQueryToStores(serviceItemsQuery, storeId, "orders.store_id")
       }
-      const [currentOrdersResult, prevOrdersResult, itemsResult, allItemsResult, serviceItemsResult] = await Promise.all([
+      const [currentOrdersResult, prevOrdersResult, currentSalesResult, prevSalesResult, itemsResult, allItemsResult, serviceItemsResult] = await Promise.all([
         currentOrdersQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
         prevOrdersQuery
-          .gte("created_at", `${previousFrom}T00:00:00`)
-          .lt("created_at", `${from}T00:00:00`)
+          .gte("created_at", `${prevFrom}T00:00:00`)
+          .lte("created_at", `${prevTo}T23:59:59`)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        currentSalesQuery
+          .gte("created_at", `${from}T00:00:00`)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        prevSalesQuery
+          .gte("created_at", `${prevFrom}T00:00:00`)
+          .lte("created_at", `${prevTo}T23:59:59`)
           .order("created_at", { ascending: false })
           .limit(500),
         itemsQuery
@@ -96,8 +115,43 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
 
       if (currentOrdersResult.error) throw currentOrdersResult.error
 
-      const periodOrders = currentOrdersResult.data || []
-      const prevOrders = prevOrdersResult.data || []
+      const rawSales = currentSalesResult.data || []
+      const posOrders = rawSales.map((s: any) => ({
+        id: s.id,
+        order_number: s.sale_number ? String(s.sale_number).trim() : `PDV-${String(s.id).slice(0, 8).toUpperCase()}`,
+        customer_name: "Consumidor final",
+        total_amount: Number(s.final_amount ?? 0),
+        order_source: "Presencial",
+        payment_method: "PDV Balcão",
+        situation: s.status === "paid" || s.payment_status === "paid" ? "paid" : s.status || "paid",
+        created_at: s.created_at,
+        discount_total: Number(s.discount_amount ?? 0),
+        delivery_fee: 0,
+        amount_paid: Number(s.paid_amount ?? s.final_amount ?? 0),
+      }))
+
+      const posItems: any[] = []
+      for (const s of rawSales) {
+        if (Array.isArray(s.sale_items)) {
+          for (const it of s.sale_items) {
+            posItems.push({
+              product_id: it.product_id,
+              product_name: it.product_name,
+              quantity: Number(it.quantity || 0),
+              net_item_value: Number(it.total_price ?? it.subtotal ?? 0),
+              created_at: s.created_at,
+            })
+          }
+        }
+      }
+
+      const periodOrders = [...(currentOrdersResult.data || []), ...posOrders]
+      const prevSalesOrders = (prevSalesResult.data || []).map((s: any) => ({
+        id: s.id,
+        total_amount: Number(s.final_amount ?? 0),
+        created_at: s.created_at,
+      }))
+      const prevOrders = [...(prevOrdersResult.data || []), ...prevSalesOrders]
 
       const revenue = periodOrders.reduce((a: number, o: any) => a + money(o.total_amount), 0)
       const prevRevenue = prevOrders.reduce((a: number, o: any) => a + money(o.total_amount), 0)
@@ -367,11 +421,17 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         })),
       }
     },
-    [`report-sales-${partnerId}-${period}-${storeId || "all"}`],
+    [`report-sales-${partnerId}-${period}-${storeId || "all"}-${compareFrom || "none"}-${compareTo || "none"}`],
     { tags: [REPORT_TAGS.vendas(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getSalesReportData(partnerId: string, period: Period = "monthly", storeId = "") {
-  return getCachedSalesData(partnerId, period, storeId)
+export async function getSalesReportData(
+  partnerId: string,
+  period: Period = "monthly",
+  storeId = "",
+  compareFrom = "",
+  compareTo = ""
+) {
+  return getCachedSalesData(partnerId, period, storeId, compareFrom, compareTo)
 }

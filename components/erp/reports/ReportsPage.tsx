@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Tabs, TabsList, TabsTrigger, TabsContent, Button, ListItem, FormDropdown, Badge } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
@@ -30,7 +30,7 @@ import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardDa
 import type {
     SalesReportData, CustomerReportData, ReturnsReportData,
     DeliveryReportData, MarketingReportData, ProductivityReportData,
-    ServiceOrderReportData, GoalReportData, SubscriptionReportData,
+    ServiceOrderReportData, GoalReportData,
     AppointmentsReportData,
 } from "@/lib/data/reports"
 import type { Period, CompareMode } from "@/lib/period-types"
@@ -85,6 +85,7 @@ interface ReportsPageProps {
     activeResources?: string[]
     period: Period
     compare?: CompareMode
+    tab?: string
     planSlug: string
     productsData: ProductsDashboardData | null
     servicesData: ServicesDashboardData | null
@@ -98,7 +99,6 @@ interface ReportsPageProps {
     serviceOrdersData: ServiceOrderReportData | null
     appointmentsData: AppointmentsReportData | null
     goalData: GoalReportData | null
-    subscriptionData: SubscriptionReportData | null
     stockValue: number
     controls?: React.ReactNode
 }
@@ -127,6 +127,13 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
 
 const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray" | "yellow" | "purple"> = {
     positive: "green", negative: "red", warning: "orange", info: "blue", neutral: "gray",
+}
+
+function parseBrl(val?: string | number | null): number {
+    if (typeof val === "number") return isNaN(val) ? 0 : val
+    if (!val) return 0
+    const clean = String(val).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")
+    return Number(clean) || 0
 }
 
 /**
@@ -214,9 +221,24 @@ function PlanUpgradeCTA({ tabId, currentPlan }: { tabId: TabId; currentPlan: str
 }
 
 export function ReportsPage(props: ReportsPageProps) {
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
     const availableTabs = useAvailableTabs(props)
-    const initialTab = availableTabs.length > 0 ? availableTabs[0].id : ""
-    const [, setActiveTab] = useState<string>(initialTab)
+
+    const tabParam = props.tab || searchParams.get("tab")
+    const activeTab = (tabParam && availableTabs.some(t => t.id === tabParam))
+        ? tabParam
+        : (availableTabs[0]?.id || "vendas")
+
+    const handleTabChange = useCallback((newTab: string) => {
+        const currentSearch = typeof window !== "undefined" && window.location.search
+            ? window.location.search
+            : searchParams.toString()
+        const params = new URLSearchParams(currentSearch)
+        params.set("tab", newTab)
+        router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    }, [router, pathname, searchParams])
 
     if (availableTabs.length === 0) {
         return (
@@ -227,7 +249,7 @@ export function ReportsPage(props: ReportsPageProps) {
     }
 
     return (
-        <Tabs defaultValue={initialTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="mb-4">
                 {availableTabs.map(tab => (
                     <TabsTrigger key={tab.id} value={tab.id} icon={tab.icon}>{tab.label}</TabsTrigger>
@@ -288,10 +310,34 @@ function SalesSection({ salesData, productsData, compare = "none" }: { salesData
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!salesData) return
-        const headers = ["Indicador", "Valor"]
-        const rows = [["Receita", salesData.metrics.revenueFormatted], ["Pedidos", String(salesData.metrics.orderCount)]]
-        if (fmt === "csv") exportCSV("relatorio-vendas", headers, rows)
-        else await exportXLSX("relatorio-vendas", [{ name: "Vendas", headers, rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Receita Total", salesData.metrics.revenueFormatted],
+            ["Volume de Pedidos", String(salesData.metrics.orderCount)],
+            ["Ticket Médio", salesData.metrics.ticketFormatted],
+            ["Itens Vendidos", String(salesData.metrics.itemsSold)],
+            ["Taxa de Cancelamento", salesData.metrics.cancellationRateFormatted],
+        ]
+        const orderHeaders = ["Pedido", "Cliente", "Origem", "Forma Pagamento", "Status", "Data", "Total"]
+        const orderRows = (salesData.detailedOrders || []).map(o => [
+            o.orderNumber,
+            o.customer,
+            o.source,
+            o.paymentMethod,
+            o.status,
+            o.date,
+            brl(o.total),
+        ])
+        if (fmt === "csv") {
+            const allHeaders = orderRows.length > 0 ? orderHeaders : summaryHeaders
+            const allRows = orderRows.length > 0 ? orderRows : summaryRows
+            exportCSV("relatorio-vendas", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-vendas", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Pedidos", headers: orderHeaders, rows: orderRows },
+            ])
+        }
     }, [salesData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -475,9 +521,22 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!productsData) return
-        const rows = kpis.map((m: any) => [m.title, m.value])
-        if (fmt === "csv") exportCSV("relatorio-produtos", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-produtos", [{ name: "Produtos", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = kpis.map((m: any) => [m.title, String(m.value)])
+        const prodHeaders = ["Produto", "Quantidade Vendida"]
+        const prodRows = (productsData.topProducts || []).map((p: any) => [p.title, String(p.value)])
+        const stockHeaders = ["Produto", "Estoque Restante", "Situação"]
+        const stockRows = (productsData.criticalStock || []).map((p: any) => [p.title, String(p.value), p.subtitle || ""])
+
+        if (fmt === "csv") {
+            exportCSV("relatorio-produtos", ["Produto", "Vendas / Estoque"], prodRows.length > 0 ? prodRows : summaryRows)
+        } else {
+            await exportXLSX("relatorio-produtos", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Mais Vendidos", headers: prodHeaders, rows: prodRows },
+                { name: "Estoque Crítico", headers: stockHeaders, rows: stockRows },
+            ])
+        }
     }, [kpis, productsData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -557,7 +616,7 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={AwardIcon} title="Mais Vendidos" />
                         <HorizontalBarRankingList
-                            items={productsData.topProducts.slice(0, 5).map(p => ({ label: p.title, value: Number(String(p.value).replace(/[^\d]/g, "")) || 0 }))}
+                            items={productsData.topProducts.slice(0, 5).map(p => ({ label: p.title, value: parseBrl(p.value) }))}
                             colors={CHART_COLORS_VIVID}
                         />
                     </div>
@@ -801,9 +860,44 @@ function AppointmentsSection({ appointmentsData, compare = "none" }: { appointme
     })), [insights])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        const rows = appointmentsData.metrics.map((m: any) => [m.title, String(m.value)])
-        if (fmt === "csv") exportCSV("relatorio-agendamentos", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-agendamentos", [{ name: "Agendamentos", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = appointmentsData.metrics.map((m: any) => [m.title, String(m.value)])
+
+        const apptHeaders = ["Cliente", "Serviço", "Profissional", "Data", "Hora", "Status", "Valor", "Duração (min)"]
+        const apptRows = (appointmentsData.appointmentDetails || []).map(a => [
+            a.customer || "-",
+            a.service || "-",
+            a.staff || "-",
+            a.date || "-",
+            a.time || "-",
+            a.status || "-",
+            brl(a.price || 0),
+            String(a.duration || 0),
+        ])
+
+        const serviceHeaders = ["Serviço", "Total Agendamentos"]
+        const serviceRows = (appointmentsData.servicePopularity || []).map(s => [s.label, String(s.value)])
+
+        const staffHeaders = ["Profissional", "Atendimentos", "Cancelados", "Faturamento"]
+        const staffRows = (appointmentsData.staffPerformance || []).map(sp => [
+            sp.label,
+            String(sp.appointments),
+            String(sp.cancelled),
+            sp.value,
+        ])
+
+        if (fmt === "csv") {
+            const allHeaders = apptRows.length > 0 ? apptHeaders : summaryHeaders
+            const allRows = apptRows.length > 0 ? apptRows : summaryRows
+            exportCSV("relatorio-agendamentos", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-agendamentos", [
+                ...(apptRows.length > 0 ? [{ name: "Agendamentos", headers: apptHeaders, rows: apptRows }] : []),
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Serviços Populares", headers: serviceHeaders, rows: serviceRows },
+                { name: "Equipe", headers: staffHeaders, rows: staffRows },
+            ])
+        }
     }, [appointmentsData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -947,9 +1041,32 @@ function DeliveriesSection({ deliveryData, compare = "none" }: { deliveryData: D
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!deliveryData) return
-        const rows = [["Total", String(deliveryData.metrics.total)], ["No Prazo", `${deliveryData.metrics.onTimeRate}%`]]
-        if (fmt === "csv") exportCSV("relatorio-entregas", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-entregas", [{ name: "Entregas", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Total de Entregas", String(deliveryData.metrics.total)],
+            ["Pendentes", String(deliveryData.metrics.pending)],
+            ["Atrasadas", String(deliveryData.metrics.late)],
+            ["No Prazo", `${deliveryData.metrics.onTimeRate}%`],
+            ["Tempo Médio", `${deliveryData.metrics.avgTimeMinutes} min`],
+        ]
+        const delHeaders = ["ID Entrega", "Entregador", "Duração", "Status", "Data"]
+        const delRows = (deliveryData.recentDeliveries || []).map(d => [
+            d.id,
+            d.deliveryPerson || "-",
+            d.duration || "-",
+            d.status,
+            d.date,
+        ])
+        if (fmt === "csv") {
+            const allHeaders = delRows.length > 0 ? delHeaders : summaryHeaders
+            const allRows = delRows.length > 0 ? delRows : summaryRows
+            exportCSV("relatorio-entregas", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-entregas", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Últimas Entregas", headers: delHeaders, rows: delRows },
+            ])
+        }
     }, [deliveryData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -1134,6 +1251,27 @@ function ServiceOrdersSection({ serviceOrdersData, compare = "none" }: { service
     const { setExportHandler } = useDashboard()
     const showComparison = compare !== "none"
 
+    const insights = useMemo(() => {
+        if (!serviceOrdersData) return []
+        const list: any[] = []
+        if (serviceOrdersData.metrics.open > 0) {
+            list.push({ message: `${serviceOrdersData.metrics.open} ordem${serviceOrdersData.metrics.open > 1 ? "ns" : ""} de serviço em aberto aguardando início.`, color: "orange" })
+        }
+        if (serviceOrdersData.metrics.inProgress > 0) {
+            list.push({ message: `${serviceOrdersData.metrics.inProgress} OS em andamento ou aguardando peças.`, color: "blue" })
+        }
+        if (serviceOrdersData.metrics.total > 0 && serviceOrdersData.metrics.cancelled > 0) {
+            const pct = Math.round((serviceOrdersData.metrics.cancelled / serviceOrdersData.metrics.total) * 100)
+            if (pct > 10) {
+                list.push({ message: `${pct}% das OS foram canceladas no período.`, color: "red" })
+            }
+        }
+        if (serviceOrdersData.metrics.completed > 0) {
+            list.push({ message: `${serviceOrdersData.metrics.completed} OS concluídas no período com receita de ${serviceOrdersData.metrics.totalRevenueFormatted}.`, color: "green" })
+        }
+        return list
+    }, [serviceOrdersData])
+
     const kpis = useMemo(() => {
         if (!serviceOrdersData) return []
         return [
@@ -1148,9 +1286,33 @@ function ServiceOrdersSection({ serviceOrdersData, compare = "none" }: { service
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!serviceOrdersData) return
-        const rows = [["Total", String(serviceOrdersData.metrics.total)], ["Receita", serviceOrdersData.metrics.totalRevenueFormatted]]
-        if (fmt === "csv") exportCSV("ordens-servico", ["Indicador", "Valor"], rows)
-        else await exportXLSX("ordens-servico", [{ name: "Ordens de Serviço", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Total de OS", String(serviceOrdersData.metrics.total)],
+            ["Abertas", String(serviceOrdersData.metrics.open)],
+            ["Em Andamento", String(serviceOrdersData.metrics.inProgress)],
+            ["Concluídas", String(serviceOrdersData.metrics.completed)],
+            ["Canceladas", String(serviceOrdersData.metrics.cancelled)],
+            ["Receita Total", serviceOrdersData.metrics.totalRevenueFormatted],
+        ]
+        const osHeaders = ["N° OS", "Título", "Total", "Status", "Data"]
+        const osRows = (serviceOrdersData.recentOrders || []).map(o => [
+            o.orderNumber,
+            o.title,
+            o.total,
+            o.status,
+            o.date,
+        ])
+        if (fmt === "csv") {
+            const allHeaders = osRows.length > 0 ? osHeaders : summaryHeaders
+            const allRows = osRows.length > 0 ? osRows : summaryRows
+            exportCSV("ordens-servico", allHeaders, allRows)
+        } else {
+            await exportXLSX("ordens-servico", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Últimas OS", headers: osHeaders, rows: osRows },
+            ])
+        }
     }, [serviceOrdersData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -1166,6 +1328,8 @@ function ServiceOrdersSection({ serviceOrdersData, compare = "none" }: { service
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
+            <InsightsRegister insights={insights} />
+
             {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
@@ -1371,13 +1535,25 @@ function FinancialSection({ financialData, compare = "none" }: { financialData: 
             }))
     }, [financialData.dailyMovements])
 
+    const receivable = useMemo(() => {
+        return (financialData.transactionRows || [])
+            .filter(t => t.type === "income" && t.status !== "paid" && t.status !== "completed")
+            .reduce((acc, t) => acc + Number(t.amount || 0), 0)
+    }, [financialData.transactionRows])
+
+    const payable = useMemo(() => {
+        return (financialData.transactionRows || [])
+            .filter(t => t.type === "expense" && t.status !== "paid" && t.status !== "completed")
+            .reduce((acc, t) => acc + Number(t.amount || 0), 0)
+    }, [financialData.transactionRows])
+
     const insights = useMemo(() => generateFinancialInsights({
-        balance: Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("saldo"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-        receivable: 0,
-        payable: 0,
-        incomeTotal: Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("receita"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-        expenseTotal: totalExpenses || Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("despesa"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
-    }), [financialData, totalExpenses])
+        balance: parseBrl(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("saldo"))?.value),
+        receivable,
+        payable,
+        incomeTotal: parseBrl(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("receita"))?.value),
+        expenseTotal: totalExpenses || parseBrl(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("despesa"))?.value),
+    }), [financialData, totalExpenses, receivable, payable])
 
     const mappedInsights = useMemo(() => insights.map(ins => ({
         message: ins.message,
@@ -1385,15 +1561,36 @@ function FinancialSection({ financialData, compare = "none" }: { financialData: 
     })), [insights])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        const rows = [
-            ["Receitas do mês", financialData.metrics.find((m: any) => m.title.includes("Receitas"))?.value || "R$ 0,00"],
-            ["Despesas do mês", financialData.metrics.find((m: any) => m.title.includes("Despesas"))?.value || "R$ 0,00"],
-            ["Resultado do mês", financialData.metrics.find((m: any) => m.title.includes("Resultado"))?.value || "R$ 0,00"],
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Receitas", financialData.metrics.find((m: any) => m.title.includes("Receita"))?.value || "R$ 0,00"],
+            ["Despesas", financialData.metrics.find((m: any) => m.title.includes("Despesa"))?.value || "R$ 0,00"],
+            ["Resultado", financialData.metrics.find((m: any) => m.title.includes("Resultado"))?.value || "R$ 0,00"],
             ["Saldo atual", financialData.metrics.find((m: any) => m.title.includes("Saldo"))?.value || "R$ 0,00"],
+            ["Total a Receber Previsto", brl(receivable)],
+            ["Total a Pagar Previsto", brl(payable)],
         ]
-        if (fmt === "csv") exportCSV("financeiro", ["Indicador", "Valor"], rows)
-        else await exportXLSX("financeiro", [{ name: "Financeiro", headers: ["Indicador", "Valor"], rows }])
-    }, [financialData])
+        const txHeaders = ["Descrição", "Categoria", "Tipo", "Vencimento", "Pagamento", "Status", "Valor"]
+        const txRows = (financialData.transactionRows || []).map(t => [
+            t.description || "-",
+            t.category || "-",
+            t.type === "income" ? "Receita" : t.type === "expense" ? "Despesa" : t.type,
+            t.dueDate ? t.dueDate.slice(0, 10).split("-").reverse().join("/") : "-",
+            t.paymentDate ? t.paymentDate.slice(0, 10).split("-").reverse().join("/") : "-",
+            t.status || "-",
+            brl(Number(t.amount || 0)),
+        ])
+        if (fmt === "csv") {
+            const allHeaders = txRows.length > 0 ? txHeaders : summaryHeaders
+            const allRows = txRows.length > 0 ? txRows : summaryRows
+            exportCSV("relatorio-financeiro", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-financeiro", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Lançamentos", headers: txHeaders, rows: txRows },
+            ])
+        }
+    }, [financialData, receivable, payable])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
 
@@ -1556,9 +1753,32 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!customerData) return
-        const rows = [["Total", String(customerData.totalCustomers)], ["Ativos", String(customerData.activeCustomers)]]
-        if (fmt === "csv") exportCSV("relatorio-clientes", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-clientes", [{ name: "Clientes", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Total de Clientes", String(customerData.totalCustomers)],
+            ["Clientes Ativos", String(customerData.activeCustomers)],
+            ["Clientes Recorrentes", String(customerData.recurringCustomers)],
+            ["Novos Clientes", String(customerData.newCustomers)],
+            ["Inativos (+90d)", String(customerData.inactiveCustomers)],
+            ["Ticket Médio", customerData.avgTicketFormatted],
+            ["Frequência Média", `${customerData.purchaseFrequency} pedidos/cliente`],
+        ]
+        const custHeaders = ["Cliente", "Total Gasto", "Pedidos"]
+        const custRows = (customerData.topCustomers || []).map(c => [
+            c.label,
+            String(c.value),
+            String(c.orders || "-"),
+        ])
+        if (fmt === "csv") {
+            const allHeaders = custRows.length > 0 ? custHeaders : summaryHeaders
+            const allRows = custRows.length > 0 ? custRows : summaryRows
+            exportCSV("relatorio-clientes", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-clientes", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Top Clientes", headers: custHeaders, rows: custRows },
+            ])
+        }
     }, [customerData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -1709,9 +1929,47 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!marketingData) return
-        const rows = [["Faturamento", marketingData.totalRevenueFormatted], ["Top Canal", marketingData.topSource]]
-        if (fmt === "csv") exportCSV("relatorio-marketing", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-marketing", [{ name: "Marketing", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Faturamento Total", marketingData.totalRevenueFormatted],
+            ["Top Canal", `${marketingData.topSource} (${marketingData.topSourcePercent}%)`],
+            ["Total de Cupons", String(marketingData.couponStats.total)],
+            ["Cupons Utilizados", String(marketingData.couponStats.used)],
+            ["Taxa de Uso de Cupons", `${marketingData.couponStats.usageRate}%`],
+            ["Total Desconto Concedido", marketingData.couponStats.totalDiscountFormatted],
+        ]
+
+        const channelHeaders = ["Canal", "Faturamento"]
+        const channelRows = (marketingData.revenueBySource || []).map(s => [s.label, brl(s.value)])
+
+        const couponHeaders = ["Código do Cupom", "Tipo Desconto", "Valor", "Usos"]
+        const couponRows = (marketingData.topCoupons || []).map(c => [
+            c.code,
+            c.discountType === "percentage" ? "Porcentagem" : "Valor Fixo",
+            c.discountType === "percentage" ? `${c.discountValue}%` : brl(c.discountValue),
+            String(c.usageCount),
+        ])
+
+        const campaignHeaders = ["Campanha", "Status", "Início", "Término"]
+        const campaignRows = (marketingData.campaigns || []).map(c => [
+            c.name,
+            c.isActive ? "Ativa" : "Inativa",
+            c.startsAt ? new Date(c.startsAt).toLocaleDateString("pt-BR") : "-",
+            c.endsAt ? new Date(c.endsAt).toLocaleDateString("pt-BR") : "-",
+        ])
+
+        if (fmt === "csv") {
+            const allHeaders = couponRows.length > 0 ? couponHeaders : summaryHeaders
+            const allRows = couponRows.length > 0 ? couponRows : summaryRows
+            exportCSV("relatorio-marketing", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-marketing", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Canais", headers: channelHeaders, rows: channelRows },
+                { name: "Cupons", headers: couponHeaders, rows: couponRows },
+                { name: "Campanhas", headers: campaignHeaders, rows: campaignRows },
+            ])
+        }
     }, [marketingData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -1874,10 +2132,51 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!productivityData) return
-        const rows = [["Atendimentos", String(productivityData.metrics.totalAppointments)], ["Receita", productivityData.metrics.totalRevenueFormatted]]
-        if (fmt === "csv") exportCSV("relatorio-produtividade", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-produtividade", [{ name: "Produtividade", headers: ["Indicador", "Valor"], rows }])
-    }, [productivityData])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Atendimentos Totais", String(productivityData.metrics.totalAppointments)],
+            ["Receita Total", productivityData.metrics.totalRevenueFormatted],
+            ["Ticket Médio", brl(productivityData.metrics.avgTicketPerStaff)],
+            ["Tempo Médio", `${productivityData.metrics.avgDuration} min`],
+            ["Taxa de Comparecimento", `${productivityData.metrics.attendanceRate}%`],
+        ]
+
+        const staffHeaders = ["Profissional", "Atendimentos", "Cancelados", "Receita (R$)", "Ticket Médio (R$)"]
+        const staffRows = (productivityData.staffRanking || []).map(s => [
+            s.label,
+            String(s.appointments),
+            String(s.cancelled),
+            brl(s.revenue),
+            brl(s.ticketMedio || 0),
+        ])
+
+        const serviceHeaders = ["Serviço", "Atendimentos"]
+        const serviceRows = (productivityData.serviceRanking || []).map(s => [
+            s.label,
+            String(s.count),
+        ])
+
+        const goalHeaders = ["Meta", "Alvo", "Progresso (%)", "Status"]
+        const goalRows = (goalData?.goals || []).map(g => [
+            g.name,
+            g.targetFormatted,
+            `${g.progressPct}%`,
+            g.achieved ? "Atingida" : "Em andamento",
+        ])
+
+        if (fmt === "csv") {
+            const allHeaders = staffRows.length > 0 ? staffHeaders : summaryHeaders
+            const allRows = staffRows.length > 0 ? staffRows : summaryRows
+            exportCSV("relatorio-produtividade", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-produtividade", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                { name: "Equipe", headers: staffHeaders, rows: staffRows },
+                { name: "Serviços", headers: serviceHeaders, rows: serviceRows },
+                ...(goalRows.length > 0 ? [{ name: "Metas", headers: goalHeaders, rows: goalRows }] : []),
+            ])
+        }
+    }, [productivityData, goalData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
 
@@ -2044,9 +2343,49 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         if (!returnsData) return
-        const rows = [["Total", String(returnsData.returnCount)], ["Taxa", `${returnsData.returnRate}%`]]
-        if (fmt === "csv") exportCSV("relatorio-trocas", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-trocas", [{ name: "Trocas", headers: ["Indicador", "Valor"], rows }])
+        const summaryHeaders = ["Indicador", "Valor"]
+        const summaryRows = [
+            ["Total Devoluções", String(returnsData.returnCount)],
+            ["Taxa de Devolução", `${returnsData.returnRate}%`],
+            ["Total Reembolsado", returnsData.totalRefundedFormatted],
+            ["Ticket Médio", brl(returnsData.returnCount > 0 ? returnsData.totalRefunded / returnsData.returnCount : 0)],
+        ]
+
+        const returnHeaders = ["ID", "Data", "Cliente", "Motivo", "Valor", "Status"]
+        const returnRows = (returnsData.recentReturns || []).map(r => [
+            String(r.id).slice(0, 8),
+            r.date || "-",
+            r.customer || "-",
+            r.reason || "-",
+            r.amount || "-",
+            r.status || "-",
+        ])
+
+        const productHeaders = ["Produto", "Devoluções (x)", "Quantidade"]
+        const productRows = (returnsData.topReturnedProducts || []).map(p => [
+            p.productName,
+            String(p.count),
+            formatQuantityWithUnit(p.totalQuantity, (p as any).unit),
+        ])
+
+        const reasonHeaders = ["Motivo", "Quantidade"]
+        const reasonRows = (returnsData.byReason || []).map(r => [
+            r.label,
+            String(r.value),
+        ])
+
+        if (fmt === "csv") {
+            const allHeaders = returnRows.length > 0 ? returnHeaders : summaryHeaders
+            const allRows = returnRows.length > 0 ? returnRows : summaryRows
+            exportCSV("relatorio-trocas", allHeaders, allRows)
+        } else {
+            await exportXLSX("relatorio-trocas", [
+                { name: "Resumo", headers: summaryHeaders, rows: summaryRows },
+                ...(returnRows.length > 0 ? [{ name: "Devoluções", headers: returnHeaders, rows: returnRows }] : []),
+                { name: "Produtos Devolvidos", headers: productHeaders, rows: productRows },
+                { name: "Motivos", headers: reasonHeaders, rows: reasonRows },
+            ])
+        }
     }, [returnsData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
@@ -2200,186 +2539,6 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                             <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">Taxa de devolução: {returnsData.returnRate}%</p>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─────────────────────────────────────────────────────────────
-// 11. ABA DE ASSINATURAS
-// ─────────────────────────────────────────────────────────────
-function SubscriptionSection({ subscriptionData }: { subscriptionData: SubscriptionReportData | null }) {
-    const { setExportHandler } = useDashboard()
-
-    const kpis = useMemo(() => {
-        if (!subscriptionData) return []
-        return [
-            { title: "MRR (Ativo)", value: brl(subscriptionData.mrr), trend: "" },
-            { title: "ARR (Anual)", value: brl(subscriptionData.arr), trend: "" },
-            { title: "LTV Médio", value: brl(subscriptionData.ltv), trend: "" },
-            { title: "Renovação", value: `${subscriptionData.renewalRate.toFixed(1)}%`, trend: "" },
-            { title: "Churn (30d)", value: `${subscriptionData.churnRate.toFixed(1)}%`, trend: "" },
-        ]
-    }, [subscriptionData])
-
-    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        if (!subscriptionData) return
-        const rows = [
-            ["MRR Ativo", brl(subscriptionData.mrr)],
-            ["ARR Anualizado", brl(subscriptionData.arr)],
-            ["LTV Médio", brl(subscriptionData.ltv)],
-            ["Taxa de Renovação", `${subscriptionData.renewalRate.toFixed(1)}%`],
-            ["Churn Rate (30d)", `${subscriptionData.churnRate.toFixed(1)}%`],
-        ]
-        if (fmt === "csv") exportCSV("relatorio-assinaturas", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-assinaturas", [{ name: "Assinaturas", headers: ["Indicador", "Valor"], rows }])
-    }, [subscriptionData])
-
-    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
-    if (!subscriptionData) return <SectionPlaceholder title="Assinaturas Recorrentes" description="Dados e métricas de assinaturas indisponíveis." />
-
-    const statusDonutData = [
-        { label: "Ativas", value: subscriptionData.activeCount, fill: "#79c325" },
-        { label: "Pausadas", value: subscriptionData.pausedCount, fill: "#f59e0b" },
-        { label: "Pendentes", value: subscriptionData.delinquentCount, fill: "#ef4444" },
-        { label: "Canceladas", value: subscriptionData.cancelledCount, fill: "#94a3b8" },
-    ]
-
-    return (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            {/* Header controls */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Analytics de Assinaturas</h2>
-                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Desempenho recorrente e demanda prevista de produtos.</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button onClick={() => onExport("csv")} variant="outline" size="sm" leftIcon={<ExportFileIcon size={18} />}>Exportar CSV</Button>
-                    <Button onClick={() => onExport("xlsx")} variant="outline" size="sm" leftIcon={<ExportFileIcon size={18} />}>Exportar Excel</Button>
-                </div>
-            </div>
-
-            {/* Row 1: KPI Horizontal */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
-            </div>
-
-            {/* Row 2: Previsão Financeira (8) + Status das Assinaturas (4) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TrendingUpIcon} title="Faturamento Previsto (Próximos 30 dias)" />
-                        <div className="my-auto space-y-4 max-w-lg mx-auto w-full py-4">
-                            <div className="flex justify-between items-center pb-3 border-b border-brand-border dark:border-dark-border">
-                                <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">Ciclos Previstos</span>
-                                <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{subscriptionData.projectedOrders30Days} ciclos</span>
-                            </div>
-                            <div className="flex justify-between items-center pb-3 border-b border-brand-border dark:border-dark-border">
-                                <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">Previsão Financeira</span>
-                                <span className="text-2xl font-extrabold text-brand-green">{brl(subscriptionData.projectedRevenue30Days)}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Status das Assinaturas" />
-                        <DashboardDonutChart
-                            data={statusDonutData}
-                            totalValue={String(subscriptionData.activeCount + subscriptionData.pausedCount + subscriptionData.delinquentCount + subscriptionData.cancelledCount)}
-                            totalLabel="Total"
-                            colors={["#79c325", "#f59e0b", "#ef4444", "#94a3b8"]}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* Row 3: Demanda de Produtos (8) + Créditos (4) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={BoxIcon} title="Demanda Prevista de Produtos (Próximos 30 dias)" />
-                        {subscriptionData.projectedProducts.length === 0 ? (
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body py-10 text-center">Nenhuma demanda prevista.</p>
-                        ) : (
-                            <div className="overflow-x-auto my-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead>
-                                        <tr className="border-b border-brand-border dark:border-dark-border text-brand-inactive-text font-semibold">
-                                            <th className="pb-3">Produto</th>
-                                            <th className="pb-3 text-right">Qtd Prevista</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                        {subscriptionData.projectedProducts.slice(0, 5).map((p) => (
-                                            <tr key={p.id}>
-                                                <td className="py-3 font-medium text-brand-dark dark:text-dark-heading">{p.name}</td>
-                                                <td className="py-3 text-right font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(p.quantity, (p as any).unit)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={CreditCardIcon} title="Uso de Créditos" />
-                        <div className="grid grid-cols-2 gap-4 my-auto">
-                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 rounded-2xl p-4 text-center border border-brand-border/60 dark:border-dark-border/60">
-                                <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">Utilizados</span>
-                                <p className="text-2xl font-extrabold text-brand-green mt-1">{subscriptionData.creditsUsedCount}</p>
-                            </div>
-                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 rounded-2xl p-4 text-center border border-brand-border/60 dark:border-dark-border/60">
-                                <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">Expirados</span>
-                                <p className="text-2xl font-extrabold text-brand-red mt-1">{subscriptionData.creditsExpiredCount}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TargetIcon} title="Retenção de Assinantes" />
-                        <DashboardDonutChart
-                            data={[
-                                { label: "Renovados", value: subscriptionData.renewalRate, fill: "#79c325" },
-                                { label: "Churn", value: subscriptionData.churnRate, fill: "#ef4444" },
-                            ]}
-                            totalValue={`${subscriptionData.renewalRate.toFixed(0)}%`}
-                            totalLabel="Retenção"
-                            colors={["#79c325", "#ef4444"]}
-                        />
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={BoxIcon} title="Top Produtos Assinados" />
-                        <HorizontalBarRankingList
-                            items={subscriptionData.projectedProducts.slice(0, 5).map(p => ({ label: p.name, value: p.quantity }))}
-                            colors={CHART_COLORS_VIVID}
-                        />
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <ReportRankingCard
-                        title="Resumo de Status"
-                        items={[
-                            { id: "1", label: "Assinaturas Ativas", value: String(subscriptionData.activeCount), trendDirection: "up", trend: "Ativo" },
-                            { id: "2", label: "Em Pausa", value: String(subscriptionData.pausedCount) },
-                            { id: "3", label: "Aguardando Reposição", value: String(subscriptionData.delinquentCount), trendDirection: "down", trend: "Pendente" },
-                            { id: "4", label: "Canceladas", value: String(subscriptionData.cancelledCount) },
-                        ]}
-                        variant="compact"
-                        icon={AwardIcon}
-                        className="h-full"
-                    />
                 </div>
             </div>
         </div>

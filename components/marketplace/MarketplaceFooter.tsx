@@ -80,6 +80,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                             <ul className="space-y-3">
                                 <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Como a Dudit funciona</Link></li>
                                 <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Por que a Dudit existe</Link></li>
+                                <li><Link href="/blog" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Blog do Dino</Link></li>
                                 <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
                                 <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale com a gente</Link></li>
                             </ul>

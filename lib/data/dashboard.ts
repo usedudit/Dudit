@@ -8,7 +8,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 import { getDateComponents, startOfDay, getTodayYmd } from "@/lib/date"
 import { getPartnerTimezone } from "@/lib/date/server"
-import type { Period } from "@/lib/period-types"
+import { getDateRangeWithPrevious, type Period } from "@/lib/period-types"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { normalizeOrderSource } from "@/lib/orders/order-utils"
 import { cache } from "react"
@@ -486,15 +486,16 @@ async function getCachedGeneral(partnerId: string, storeId = "", tz?: string): P
   )
 }
 
-async function getCachedProducts(partnerId: string, storeId = ""): Promise<ProductsDashboardData> {
+async function getCachedProducts(partnerId: string, storeId = "", period: Period = "monthly"): Promise<ProductsDashboardData> {
+  const { from } = getDateRangeWithPrevious(period)
   return getCachedErpPage(
-    ["dashboard-products", partnerId, storeId],
+    ["dashboard-products", partnerId, storeId, period],
     [DASHBOARD_TAGS.products(partnerId)],
     async () => {
         const supabase = createAdminClient()
         const productsQuery = scopeActiveOnly(supabase.from("products").select("id, name, sku, brand, stock_quantity, unit, category:product_categories!category_id(name), price, is_active, show_in_marketplace").eq("partner_id", partnerId))
-        const ordersQuery = supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29)))
-        const itemsQuery = supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29)))
+        const ordersQuery = supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`)
+        const itemsQuery = supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${from}T00:00:00`)
         if (storeId) {
           scopeQueryToStores(productsQuery, storeId)
           scopeQueryToStores(ordersQuery, storeId)
@@ -567,14 +568,13 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
   )
 }
 
-async function getCachedServices(partnerId: string, storeId = ""): Promise<ServicesDashboardData> {
+async function getCachedServices(partnerId: string, storeId = "", period: Period = "monthly"): Promise<ServicesDashboardData> {
+  const { today, from } = getDateRangeWithPrevious(period)
   return getCachedErpPage(
-    ["dashboard-services", partnerId, storeId],
+    ["dashboard-services", partnerId, storeId, period],
     [DASHBOARD_TAGS.services(partnerId)],
     async () => {
         const supabase = createAdminClient()
-        const today = getTodayYmdInTz()
-        const from = addDays(today, -29)
         const appointmentsQuery = supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from)
         const servicesQuery = scopeActiveOnly(supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, status, service_categories(name)").eq("partner_id", partnerId).eq("status", "ativo"))
         if (storeId) {
@@ -904,14 +904,14 @@ export async function getDashboardGeneralData(partnerId: string, storeId = "") {
   return getCachedGeneral(partnerId, storeId, tz)
 }
 
-export async function getDashboardProductsData(partnerId: string, storeId = "") {
+export async function getDashboardProductsData(partnerId: string, storeId = "", period: Period = "monthly") {
   await requirePermission(partnerId, "products", "view")
-  return getCachedProducts(partnerId, storeId)
+  return getCachedProducts(partnerId, storeId, period)
 }
 
-export async function getDashboardServicesData(partnerId: string, storeId = "") {
+export async function getDashboardServicesData(partnerId: string, storeId = "", period: Period = "monthly") {
   await requirePermission(partnerId, "appointments", "view")
-  return getCachedServices(partnerId, storeId)
+  return getCachedServices(partnerId, storeId, period)
 }
 
 export async function getDashboardFinancialData(partnerId: string, storeId = "") {

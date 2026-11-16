@@ -92,7 +92,6 @@ export async function getAdminServiceOrders(
             created_at,
             updated_at,
             assigned_user_id,
-            assigned_user_name,
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
         `)
 
@@ -123,8 +122,24 @@ export async function getAdminServiceOrders(
     const { data, error } = await query
     if (error) throw error
 
-    const items = ((data || []) as any[]).map((row: any) => ({
+    const list = (data || []) as any[]
+    const assignedIds = Array.from(
+        new Set(list.map((r: any) => r.assigned_user_id).filter(Boolean)),
+    ) as string[]
+    let nameMap = new Map<string, string>()
+    if (assignedIds.length > 0) {
+        const { data: profiles } = await admin
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", assignedIds)
+        nameMap = new Map(
+            (profiles || []).map((p: any) => [String(p.user_id), String(p.full_name || "")]),
+        )
+    }
+
+    const items = list.map((row: any) => ({
         ...row,
+        assigned_user_name: row.assigned_user_id ? (nameMap.get(String(row.assigned_user_id)) || null) : null,
         customer_name: row.customer_snapshot?.name || "Cliente não informado",
         customer_phone: row.customer_snapshot?.phone || null,
         customer_email: row.customer_snapshot?.email || null,
@@ -173,8 +188,19 @@ export async function getAdminServiceOrderDetail(orderId: string): Promise<any |
         actor_name: t.actor_name || (t.metadata?.dudit_action || t.metadata?.is_admin_action ? "Equipe Dudit" : "Sistema"),
     }))
 
+    let assignedUserName = null
+    if (order.assigned_user_id) {
+        const { data: profile } = await admin
+            .from("user_profiles")
+            .select("full_name")
+            .eq("user_id", order.assigned_user_id)
+            .maybeSingle()
+        if (profile) assignedUserName = profile.full_name
+    }
+
     return {
         ...order,
+        assigned_user_name: assignedUserName,
         services: servicesRes.data || [],
         products: productsRes.data || [],
         attachments: attachmentsRes.data || [],

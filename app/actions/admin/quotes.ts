@@ -81,7 +81,6 @@ export async function getAdminQuotes(
             shipping_cost,
             additional_costs,
             issue_date,
-            valid_until,
             expiration_date,
             public_token,
             created_at,

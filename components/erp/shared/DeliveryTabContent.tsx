@@ -863,6 +863,20 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
                 />
             )}
             <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
+            {!isPickup && !carrier && (
+                <DetailRow
+                    label="Código de entrega"
+                    value={
+                        order.delivery_status === "delivered"
+                            ? "Confirmado via código"
+                            : driverInfo?.type === "platform"
+                            ? "Obrigatório (Rede Dudit)"
+                            : Number(order.total_amount || 0) > 500
+                            ? "Obrigatório (Valor > R$ 500)"
+                            : "Não exigido (Até R$ 500)"
+                    }
+                />
+            )}
             {carrier && <DetailRow label="Serviço" value={getCarrierTitle(carrier)} />}
             {carrier?.breakdown &&
                 (carrier.breakdown.deliveryMinDays != null || carrier.breakdown.deliveryMaxDays != null) && (

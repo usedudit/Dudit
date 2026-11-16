@@ -233,6 +233,62 @@ const jsonLd = {
                 "Controle financeiro, fechamento de caixa e relatórios operacionais",
             ],
         },
+        {
+            "@type": "ItemList",
+            "@id": "https://dudit.com.br/#navigation",
+            name: "Navegação Principal Dudit",
+            itemListElement: [
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 1,
+                    name: "Explorar Produtos e Lojas",
+                    description: "Encontre produtos e lojas que entregam na sua cidade ou em todo o Brasil",
+                    url: "https://dudit.com.br/explorar",
+                },
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 2,
+                    name: "Planos com 0% de Comissão",
+                    description: "Planos acessíveis sem cobrança de porcentagem sobre as vendas",
+                    url: "https://dudit.com.br/institucional/planos",
+                },
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 3,
+                    name: "Segmentos Atendidos",
+                    description: "Soluções para roupas, alimentação, oficinas, salões e autônomos",
+                    url: "https://dudit.com.br/institucional/segmentos",
+                },
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 4,
+                    name: "Ferramentas e Calculadoras",
+                    description: "Calculadoras gratuitas de taxas de marketplace, markup e margem",
+                    url: "https://dudit.com.br/ferramentas",
+                },
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 5,
+                    name: "Sobre a Dudit",
+                    description: "Conheça nossa história e modelo de gestão e vendas sem comissão",
+                    url: "https://dudit.com.br/institucional/sobre",
+                },
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 6,
+                    name: "Central de Ajuda",
+                    description: "Tutoriais e suporte passo a passo para lojistas e clientes",
+                    url: "https://dudit.com.br/ajuda",
+                },
+                {
+                    "@type": "SiteNavigationElement",
+                    position: 7,
+                    name: "Blog do Dino",
+                    description: "Dicas práticas de vendas, finanças, segurança e gestão para pequenos negócios",
+                    url: "https://dudit.com.br/blog",
+                },
+            ],
+        },
     ],
 }
 

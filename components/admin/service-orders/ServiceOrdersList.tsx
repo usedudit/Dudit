@@ -690,12 +690,12 @@ export default function ServiceOrdersList({
                   })}
                 </div>
               ) : (
-                <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                <div className="w-full overflow-hidden rounded-xl relative">
+                  <div className="overflow-x-auto no-scrollbar">
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                       <thead>
-                        <tr className="border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/20">
-                          <th className="py-3 pl-4 pr-0 w-12 text-left">
+                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                          <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
                             <Checkbox
                               checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selection.has(o.id))}
                               onChange={() => {
@@ -706,20 +706,41 @@ export default function ServiceOrdersList({
                                   return next
                                 })
                               }}
+                              className="bg-white dark:bg-dark-background"
                             />
                           </th>
-                          {COLUMNS.map((col) => (
-                            <th
-                              key={col.id}
-                              style={{ width: col.width }}
-                              className={`py-3 px-4 text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider text-${col.align}`}
-                            >
-                              {col.label}
-                            </th>
-                          ))}
+                          {COLUMNS.map((col, idx) => {
+                            const isSorted = sortConfig?.key === col.id
+                            return (
+                              <th
+                                key={col.id}
+                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
+                                style={{ width: col.width, minWidth: col.width }}
+                                onClick={() => {
+                                  if (col.id === "actions") return
+                                  setSortConfig((prev) => ({
+                                    key: col.id,
+                                    direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                  }))
+                                }}
+                              >
+                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                  <span>{col.label}</span>
+                                  {col.id !== "actions" && (
+                                    <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                      <ArrowUpDownIcon
+                                        size={14}
+                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </th>
+                            )
+                          })}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                      <tbody>
                         {paginatedOrders.map((order) => {
                           const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
                           const statusColor = statusMeta?.variant || "gray"

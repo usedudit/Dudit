@@ -500,7 +500,7 @@ export default function PromotionsList({
                     })}
                   </div>
                 ) : (
-                  <div className="w-full overflow-hidden rounded-xl relative border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                  <div className="w-full overflow-hidden rounded-xl relative">
                     <div className="overflow-x-auto pb-4 custom-scrollbar">
                       <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
                         <thead>

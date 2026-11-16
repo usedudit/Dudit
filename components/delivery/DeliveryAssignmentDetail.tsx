@@ -32,6 +32,7 @@ import {
     transitionMyDeliveryAssignmentAction,
     markSingleOrderDeliveredAction,
 } from "@/app/actions/delivery-drivers"
+import { DeliveryOtpModal } from "@/components/delivery/DeliveryOtpModal"
 import {
     ChevronLeftIcon,
     TruckIcon,
@@ -235,6 +236,52 @@ export default function DeliveryAssignmentDetail({
         return ordersList.filter((o: any) => orderDeliveredMap[o.order_id]).length
     }, [ordersList, orderDeliveredMap])
 
+    const [otpModalState, setOtpModalState] = useState<{
+        isOpen: boolean
+        orderId?: string
+        orderNumber?: string
+        customerName?: string
+        isSingleOrderRoute?: boolean
+    } | null>(null)
+
+    const handleOtpConfirm = async (code: string) => {
+        if (!otpModalState) return { success: false, error: "Pedido não selecionado." }
+
+        if (otpModalState.isSingleOrderRoute) {
+            setLoading(true)
+            const res = await transitionMyDeliveryAssignmentAction({
+                assignmentId: assignment.assignment_id,
+                status: "delivered",
+                deliveryOtp: code,
+            })
+            setLoading(false)
+            if (!res.success) {
+                return { success: false, error: res.error }
+            }
+            setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+            toast.success("Entrega finalizada com sucesso!")
+            return { success: true }
+        } else {
+            setLoading(true)
+            const res = await markSingleOrderDeliveredAction({
+                assignmentId: assignment.assignment_id,
+                orderId: otpModalState.orderId!,
+                deliveryOtp: code,
+            })
+            setLoading(false)
+            if (!res.success) {
+                return { success: false, error: res.error }
+            }
+            setOrderDeliveredMap(prev => ({ ...prev, [otpModalState.orderId!]: true }))
+            toast.success(`Pedido #${otpModalState.orderNumber || ""} entregue com sucesso!`)
+            const allDone = ordersList.every((o: any) => o.order_id === otpModalState.orderId || orderDeliveredMap[o.order_id])
+            if (allDone) {
+                setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+            }
+            return { success: true }
+        }
+    }
+
     const advance = async () => {
         const next = NEXT_STATUS[assignment.status]
         if (!next) return
@@ -242,6 +289,19 @@ export default function DeliveryAssignmentDetail({
         // Se estiver em rota e houver múltiplos pedidos, todas as paradas devem ser entregues antes de finalizar
         if (assignment.status === "out_for_delivery" && ordersList.length > 1 && !allOrdersDelivered) {
             toast.error(`Ainda restam ${ordersList.length - deliveredOrdersCount} paradas a serem entregues nesta rota.`)
+            return
+        }
+
+        // Se estiver finalizando rota de pedido único, exigir código de confirmação
+        if (next.status === "delivered" && ordersList.length <= 1) {
+            const singleOrder = ordersList[0]
+            setOtpModalState({
+                isOpen: true,
+                orderId: singleOrder?.order_id || assignment.order_id,
+                orderNumber: singleOrder?.order_number || assignment.order_number,
+                customerName: singleOrder?.customer_name || assignment.customer_name,
+                isSingleOrderRoute: true,
+            })
             return
         }
 
@@ -639,23 +699,14 @@ export default function DeliveryAssignmentDetail({
                                                                                     <EyeIcon size={16} /> Ver Detalhes do Pedido
                                                                                 </DropdownItem>
                                                                                 {assignment.status === "out_for_delivery" && !isOrderDelivered && (
-                                                                                    <DropdownItem onClick={async () => {
-                                                                                        setLoading(true)
-                                                                                        const res = await markSingleOrderDeliveredAction({
-                                                                                            assignmentId: assignment.assignment_id,
+                                                                                    <DropdownItem onClick={() => {
+                                                                                        setOtpModalState({
+                                                                                            isOpen: true,
                                                                                             orderId: order.order_id,
+                                                                                            orderNumber: order.order_number,
+                                                                                            customerName: order.customer_name,
+                                                                                            isSingleOrderRoute: false,
                                                                                         })
-                                                                                        setLoading(false)
-                                                                                        if (!res.success) {
-                                                                                            toast.error(res.error || "Não foi possível marcar como entregue.")
-                                                                                            return
-                                                                                        }
-                                                                                        setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
-                                                                                        toast.success(`Pedido #${order.order_number || String(order.order_id).slice(0, 8)} entregue!`)
-                                                                                        const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
-                                                                                        if (allDone) {
-                                                                                            setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
-                                                                                        }
                                                                                     }}>
                                                                                         <CheckCircleIcon size={16} className="text-emerald-600" /> Confirmar Entrega deste Pedido
                                                                                     </DropdownItem>
@@ -1323,6 +1374,14 @@ export default function DeliveryAssignmentDetail({
                         }
                     })
                 }}
+            />
+
+            <DeliveryOtpModal
+                isOpen={Boolean(otpModalState?.isOpen)}
+                onClose={() => setOtpModalState(null)}
+                onConfirm={handleOtpConfirm}
+                orderNumber={otpModalState?.orderNumber}
+                customerName={otpModalState?.customerName}
             />
         </>
     )

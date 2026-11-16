@@ -1,24 +1,20 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftIcon, SparklesIcon } from "@/lib/icons"
-import { Badge, Button } from "@/components/reusable"
-import { BLOG_CATEGORIES, getBlogCategory } from "@/lib/blog/categories"
+import { ChevronLeftIcon } from "@/lib/icons"
+import { Badge, Button, IconPlaceholder } from "@/components/reusable"
+import { BLOG_CATEGORIES } from "@/lib/blog/categories"
 import { getPublishedBlogPostsByCategory } from "@/lib/blog/queries"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import BlogCard from "@/components/blog/BlogCard"
 import { BLOG_ACCENT_CLASSES } from "@/components/blog/category-styles"
 
-export const revalidate = 3600
+export const dynamic = "force-dynamic"
 
 const BASE_URL = "https://dudit.com.br"
 
 type Props = {
     params: Promise<{ category: string }>
-}
-
-export function generateStaticParams() {
-    return BLOG_CATEGORIES.map((category) => ({ category: category.id }))
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -112,35 +108,22 @@ export default async function BlogCategoryPage({ params }: Props) {
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLd) }}
             />
 
-            <section className="relative overflow-hidden border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
-                <div className="pointer-events-none absolute inset-0">
-                    <img
-                        src="https://img.dudit.com.br/static/banners/WavesPattern.png"
-                        alt=""
-                        className="h-full w-full object-cover opacity-[0.12]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/60 to-white dark:via-dark-surface/60 dark:to-dark-surface" />
-                    <div className={`absolute -right-24 -top-24 h-72 w-72 rounded-full ${accent.softBg} blur-3xl`} />
-                </div>
+            <section className="border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
+                <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
+                    <Button variant="filled" asChild className="mb-6 h-10 w-10 shrink-0 p-0">
+                        <Link href="/blog" prefetch={false} aria-label="Voltar para o blog">
+                            <ChevronLeftIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
+                        </Link>
+                    </Button>
 
-                <div className="relative z-10 mx-auto w-full max-w-[1100px] px-4 py-14 lg:py-20">
-                    <Link
-                        href="/blog"
-                        prefetch={false}
-                        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-brand-inactive-text transition-colors hover:text-brand-green dark:text-dark-body"
-                    >
-                        <ArrowLeftIcon size={15} />
-                        Todos os artigos
-                    </Link>
-
-                    <Badge variant={accent.badge} className="mb-5" icon={<SparklesIcon />}>
-                        {category.emoji} {category.label}
+                    <Badge variant={accent.badge} icon={null}>
+                        Blog do Dino
                     </Badge>
 
-                    <h1 className="max-w-4xl text-3xl font-black leading-[1.1] tracking-tight text-brand-dark dark:text-dark-heading md:text-4xl lg:text-5xl">
+                    <h1 className="mt-4 max-w-4xl text-3xl font-bold leading-tight tracking-tight text-brand-dark dark:text-dark-heading md:text-4xl lg:text-5xl">
                         {category.label}
                     </h1>
-                    <p className="mt-5 max-w-2xl text-base leading-relaxed text-brand-inactive-text dark:text-dark-body lg:text-lg">
+                    <p className="mt-4 max-w-2xl text-base leading-relaxed text-brand-inactive-text dark:text-dark-body lg:text-lg">
                         {category.description}
                     </p>
                     <p className="mt-3 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
@@ -149,7 +132,7 @@ export default async function BlogCategoryPage({ params }: Props) {
                 </div>
             </section>
 
-            <div className="mx-auto w-full max-w-[1200px] px-4 py-12 lg:py-16">
+            <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
                 {posts.length > 0 ? (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                         {posts.map((post) => (
@@ -157,26 +140,21 @@ export default async function BlogCategoryPage({ params }: Props) {
                         ))}
                     </div>
                 ) : (
-                    <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-brand-border bg-brand-gray/40 p-10 text-center dark:border-dark-border dark:bg-dark-border/20">
-                        <span className="text-5xl" aria-hidden="true">{category.emoji}</span>
-                        <h2 className="mt-5 text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                            Ainda não há artigos nesta categoria
-                        </h2>
-                        <p className="mt-3 text-brand-inactive-text dark:text-dark-body">
-                            Estamos preparando novos conteúdos. Enquanto isso, explore todas as dicas ou a Central de Ajuda.
-                        </p>
-                        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-                            <Button asChild>
-                                <Link href="/blog" prefetch={false}>Ver todas as dicas</Link>
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <Link href="/ajuda" prefetch={false}>Central de Ajuda</Link>
-                            </Button>
-                        </div>
+                    <div className="mx-auto max-w-2xl py-10">
+                        <IconPlaceholder
+                            title="Ainda não há artigos nesta categoria"
+                            subtitle="Estamos preparando novos conteúdos. Enquanto isso, explore todas as dicas ou a Central de Ajuda."
+                            titleClass="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2"
+                            subtitleClass="text-brand-inactive-text dark:text-dark-body max-w-md mb-2 text-sm"
+                            buttons={[
+                                { text: "Ver todas as dicas", action: "/blog" },
+                                { text: "Central de Ajuda", action: "/ajuda", variant: "outline" },
+                            ]}
+                        />
                     </div>
                 )}
 
-                <section className="mt-16 border-t border-brand-border pt-10 dark:border-dark-border">
+                <section className="mt-14 border-t border-brand-border pt-8 dark:border-dark-border">
                     <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Explore outras categorias</h2>
                     <div className="mt-4 flex flex-wrap gap-2">
                         {BLOG_CATEGORIES.filter((item) => item.id !== category.id).map((item) => (
@@ -184,9 +162,9 @@ export default async function BlogCategoryPage({ params }: Props) {
                                 key={item.id}
                                 href={`/blog/categoria/${item.id}`}
                                 prefetch={false}
-                                className="rounded-full border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-inactive-text transition-all hover:border-brand-green/40 hover:text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-body dark:hover:text-dark-heading"
+                                className="rounded-full border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-inactive-text hover:text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-body dark:hover:text-dark-heading"
                             >
-                                {item.emoji} {item.label}
+                                {item.label}
                             </Link>
                         ))}
                     </div>

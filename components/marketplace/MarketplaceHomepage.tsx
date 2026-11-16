@@ -676,10 +676,11 @@ export default function MarketplaceHome({
             </div>
         )
     } else {
-        const productSection = sections.find(s => s.id !== "services" && s.id !== "topVitrines")
+        const productSection = sections.find(s => s.id !== "services" && s.id !== "topVitrines" && s.id !== "brasilTodo")
         const serviceSection = sections.find(s => s.id === "services")
         const vitrineSection = sections.find(s => s.id === "topVitrines")
-        const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection)
+        const brasilTodoSection = sections.find(s => s.id === "brasilTodo")
+        const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection && s !== brasilTodoSection)
 
         const exploreHref = useMemo(() => {
             if (selectedCityName === "Brasil") return "/explorar/brasil"
@@ -734,6 +735,26 @@ export default function MarketplaceHome({
                             onSeeAll={vitrineSection.seeMoreLink ? () => router.push(vitrineSection.seeMoreLink!) : undefined}
                             renderItem={(item: any) => <VitrineCard vitrine={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                             itemWidthClass="w-[270px] sm:w-[320px]"
+                        />
+                    )}
+
+                    {/* 5. Seção de Destaques em todo o Brasil */}
+                    {brasilTodoSection && brasilTodoSection.items.length > 0 && (
+                        <HorizontalCarousel
+                            key={brasilTodoSection.id}
+                            title={brasilTodoSection.title}
+                            subtitle={brasilTodoSection.subtitle}
+                            items={brasilTodoSection.items}
+                            onSeeAll={brasilTodoSection.seeMoreLink ? () => router.push(brasilTodoSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => (
+                                <ItemCard
+                                    product={item}
+                                    userCoords={userCoords}
+                                    locationContext={{ scope: "country" }}
+                                    className="w-full"
+                                />
+                            )}
+                            itemWidthClass="w-[190px] sm:w-[210px]"
                         />
                     )}
 

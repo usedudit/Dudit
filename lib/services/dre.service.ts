@@ -189,7 +189,7 @@ async function computeDrePeriod(
       id, total_amount, discount_amount, final_amount, paid_amount,
       payment_status, status, origin_type, created_at,
       payment_method_fee_amount, payment_method_fixed_fee_amount,
-      payment_method_interest_amount, payment_method_discount_amount,
+      payment_method_interest_amount,
       sale_items (id, product_id, variant_id, product_name, quantity,
         unit_price, unit_cost, total_price, subtotal,
         original_price, is_gift)
@@ -393,10 +393,9 @@ async function computeDrePeriod(
     }, 0) || 0
 
     const couponDiscount = Number(s.discount_amount || 0) // cupom no PDV
-    const manualDiscount = Math.max(0, Number(s.payment_method_discount_amount || 0)) // PM discount como manual no POS
-    const pmDiscount = Number(s.payment_method_discount_amount || 0)
+    const pmDiscount = Number((s as any).payment_method_discount_amount || 0)
 
-    // No POS, discount_amount = cupom; payment_method_discount_amount = desconto do meio de pagamento
+    // No POS, discount_amount = cupom/desconto da venda; payment_method_discount_amount (se presente)
     posDiscounts += derivedItemDiscount + couponDiscount + pmDiscount
 
     // Taxas de cartão/gateway do PDV

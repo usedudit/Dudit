@@ -1725,6 +1725,62 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     }
 }
 
+// ─── 14. Destaques em todo o Brasil (Produtos nacionais) ──────────────────────
+
+async function fetchBrasilTodo(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
+    const allIds = [...tiers.allIds]
+    if (allIds.length === 0) {
+        dLog(`[Discover] SKIP brasilTodo reason=no_partners`)
+        return null
+    }
+
+    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    if (!pool || pool.length === 0) {
+        dLog(`[Discover] SKIP brasilTodo reason=no_products`)
+        return null
+    }
+
+    // Ordenar pelo ranqueamento Dudit: engajamento (views + favoritos + vendas) ou marketplace_score + novidade
+    const sorted = [...pool].sort((a, b) => {
+        const rA = a as RawProduct
+        const rB = b as RawProduct
+        const engA = (rA.views_last_30_days ?? 0) + (rA.favorites_count ?? 0) * 2 + (rA.sales_last_30_days ?? 0) * 5
+        const scoreA = (engA > 0 ? engA : ((rA as any).marketplace_score ?? 0)) + recencyBoost(rA.created_at)
+        const engB = (rB.views_last_30_days ?? 0) + (rB.favorites_count ?? 0) * 2 + (rB.sales_last_30_days ?? 0) * 5
+        const scoreB = (engB > 0 ? engB : ((rB as any).marketplace_score ?? 0)) + recencyBoost(rB.created_at)
+        return scoreB - scoreA
+    })
+
+    // Limitar para diversidade (máximo 2 produtos por parceiro/loja)
+    const partnerCounts = new Map<string, number>()
+    const diversified: RawProduct[] = []
+    const overflow: RawProduct[] = []
+
+    for (const item of sorted) {
+        const pid = item.partner_id || "unknown"
+        const count = partnerCounts.get(pid) || 0
+        if (count < 2) {
+            partnerCounts.set(pid, count + 1)
+            diversified.push(item)
+        } else {
+            overflow.push(item)
+        }
+    }
+
+    const finalCandidates = [...diversified, ...overflow]
+    const items = finalCandidates.slice(0, 20).map(item => processProduct(item as RawProduct))
+
+    return {
+        id: "brasilTodo",
+        title: "Destaques em todo o Brasil",
+        subtitle: "Descubra produtos e novidades de lojas de todo o país",
+        gatilho: "curiosidade",
+        items,
+        _allItems: finalCandidates.map(item => processProduct(item as RawProduct)),
+        seeMoreLink: "/explorar/brasil",
+    }
+}
+
 // ─── MAIN ENTRY POINT (Dinâmico, Balanceado & Alta Performance) ───────────────
 
 async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]> {
@@ -1739,13 +1795,14 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     }
 
     // 1. Core anchors in parallel
-    const [trendingRes, vitrinesRes, servicesRes] = await Promise.all([
+    const [trendingRes, vitrinesRes, servicesRes, brasilTodoRes] = await Promise.all([
         fetchTrending(tiers, ctx).catch(() => null),
         fetchVitrines(tiers, ctx).catch(() => null),
         fetchServices(tiers, ctx).catch(() => null),
+        fetchBrasilTodo(tiers, ctx).catch(() => null),
     ])
 
-    // 2. Consolidated Launch Section Layout: Produtos, Serviços, Vitrines
+    // 2. Consolidated Launch Section Layout: Produtos, Serviços, Vitrines, Brasil Todo
     const pool: HomeSection[] = []
     const usedIds = new Set<string>()
 
@@ -1775,6 +1832,11 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     // Slot 3: Vitrines / Lojas
     if (vitrinesRes && vitrinesRes.items.length > 0) {
         addSection(vitrinesRes)
+    }
+
+    // Slot 4: Destaques em todo o Brasil
+    if (brasilTodoRes && brasilTodoRes.items.length > 0) {
+        addSection(brasilTodoRes)
     }
 
     // Ultimate fallback if still completely empty
@@ -1974,8 +2036,8 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    // Filtrar itens até 5km para Produtos, Serviços e Lojas/Vitrines
-    // Fallback gracioso para os itens da cidade/região caso não dê para calcular ou não encontre nada em 5km
+    // Filtrar itens até 10km para Produtos, Serviços e Lojas/Vitrines
+    // Fallback gracioso para os itens da cidade/região caso não dê para calcular ou não encontre nada em 10km
     for (const section of sections) {
         const isProductSection = section.id === "trending" || section.id === "allProducts"
         const isServiceSection = section.id === "services"
@@ -1985,23 +2047,23 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             const typeParam = isServiceSection ? "servicos" : isVitrineSection ? "vitrines" : "produtos"
             const sectionName = isServiceSection ? "Serviços" : isVitrineSection ? "Lojas e vitrines" : "Produtos"
 
-            let filteredBy5km: any[] = []
+            let filteredBy10km: any[] = []
             if (ctx.coords) {
                 const candidates = (section._allItems && section._allItems.length > 0)
                     ? section._allItems
                     : section.items
 
-                filteredBy5km = candidates.filter((item: any) => {
+                filteredBy10km = candidates.filter((item: any) => {
                     const d = item.distance_km ?? item.partners?.distance_km
-                    return typeof d === "number" && !isNaN(d) && d <= 5
+                    return typeof d === "number" && !isNaN(d) && d <= 10
                 })
             }
 
-            if (filteredBy5km.length > 0) {
-                section.items = filteredBy5km.slice(0, 20)
+            if (filteredBy10km.length > 0) {
+                section.items = filteredBy10km.slice(0, 20)
                 section.title = `${sectionName} pertinho de você!`
-                section.subtitle = "Até 5km do seu endereço"
-                section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=5`
+                section.subtitle = "Até 10km do seu endereço"
+                section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=10`
             } else {
                 if (ctx.scope === "city" || ctx.scope === "state") {
                     section.title = `${sectionName} pertinho de você!`

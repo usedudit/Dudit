@@ -166,6 +166,7 @@ export async function getMyDeliveryAssignmentAction(assignmentId: string) {
           delivery_type: ord.delivery_type || "delivery",
           notes: ord.notes || "",
           created_at: ord.created_at || null,
+          requires_delivery_otp: true,
           items: rawItems.map((item: any) => ({
             id: item.id,
             name: item.product_name,
@@ -184,6 +185,10 @@ export async function getMyDeliveryAssignmentAction(assignmentId: string) {
       })
       data.order_count = data.orders.length
     }
+  }
+
+  if (data) {
+    data.requires_delivery_otp = true
   }
 
   return { success: true as const, data }
@@ -475,8 +480,65 @@ export async function transitionMyDeliveryAssignmentAction(params: {
   assignmentId: string
   status: "accepted" | "picked_up" | "out_for_delivery" | "delivered" | "failed"
   failureReason?: string
+  deliveryOtp?: string
 }) {
   const { user } = await requireDeliveryDriver()
+
+  // Se estiver concluindo a entrega, validar código de confirmação se exigido
+  if (params.status === "delivered") {
+    const { getAdminClient } = await import("@/lib/supabase/admin")
+    const admin = getAdminClient()
+
+    const { data: da } = await admin
+      .from("delivery_assignments")
+      .select("id, order_id, delivery_id")
+      .eq("id", params.assignmentId)
+      .eq("driver_id", user.id)
+      .maybeSingle()
+
+    if (!da) return { success: false as const, error: "Entrega não encontrada ou sem permissão." }
+
+    let targetOrderId = da.order_id
+    if (!targetOrderId && da.delivery_id) {
+      const { data: doRows } = await admin
+        .from("delivery_orders")
+        .select("order_id")
+        .eq("delivery_id", da.delivery_id)
+        .limit(2)
+
+      if (doRows && doRows.length === 1) {
+        targetOrderId = doRows[0].order_id
+      }
+    }
+
+    if (targetOrderId) {
+      const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+      const requirement = await doesOrderRequireDeliveryOtp(targetOrderId, { adminClient: admin })
+      if (requirement.requiresOtp) {
+        if (!params.deliveryOtp) {
+          return {
+            success: false as const,
+            error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+          }
+        }
+
+        const verifyRes = await verifyAndConsumeDeliveryOtp({
+          orderId: targetOrderId,
+          code: params.deliveryOtp,
+          confirmedByUserId: user.id,
+          adminClient: admin,
+        })
+
+        if (!verifyRes.success) {
+          return {
+            success: false as const,
+            error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+          }
+        }
+      }
+    }
+  }
+
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("transition_delivery_assignment", {
     p_assignment_id: params.assignmentId,
@@ -987,12 +1049,14 @@ export async function acceptDeliveryDriverInvitationAction(params: { token: stri
 export async function markSingleOrderDeliveredAction(params: {
   assignmentId: string
   orderId: string
+  deliveryOtp?: string
 }) {
   const { user } = await requireDeliveryDriver()
   const { getAdminClient } = await import("@/lib/supabase/admin")
+  const admin = getAdminClient()
 
   // Verify the assignment belongs to this driver
-  const { data: assignment } = await getAdminClient()
+  const { data: assignment } = await admin
     .from("delivery_assignments")
     .select("id, delivery_id, driver_id, partner_id, status")
     .eq("id", params.assignmentId)
@@ -1002,6 +1066,32 @@ export async function markSingleOrderDeliveredAction(params: {
   if (!assignment) return { success: false as const, error: "Entrega não encontrada ou sem permissão." }
   if (!["picked_up", "out_for_delivery"].includes(assignment.status)) {
     return { success: false as const, error: "A entrega precisa estar em retirada ou em rota para marcar pedidos individualmente." }
+  }
+
+  // Validar código OTP se exigido
+  const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+  const requirement = await doesOrderRequireDeliveryOtp(params.orderId, { adminClient: admin })
+  if (requirement.requiresOtp) {
+    if (!params.deliveryOtp) {
+      return {
+        success: false as const,
+        error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+      }
+    }
+
+    const verifyRes = await verifyAndConsumeDeliveryOtp({
+      orderId: params.orderId,
+      code: params.deliveryOtp,
+      confirmedByUserId: user.id,
+      adminClient: admin,
+    })
+
+    if (!verifyRes.success) {
+      return {
+        success: false as const,
+        error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+      }
+    }
   }
 
   const nowIso = new Date().toISOString()

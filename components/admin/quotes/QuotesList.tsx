@@ -820,69 +820,55 @@ export default function QuotesList({
                                                         })}
                                                     </div>
                                                 ) : (
-                                                    <div
-                                                        ref={tableContainerRef}
-                                                        onScroll={checkScroll}
-                                                        className="w-full overflow-x-auto relative rounded-2xl border border-brand-border dark:border-dark-border"
-                                                    >
-                                                        <div className="inline-block min-w-full align-middle">
-                                                            <table className="min-w-full border-collapse text-left">
-                                                                <thead className="border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface sticky top-0 z-10">
-                                                                    <tr>
-                                                                        <th className="w-10 px-4 py-3 text-left">
-                                                                            <Checkbox
-                                                                                checked={selection.ids.size === filteredQuotes.length && filteredQuotes.length > 0}
-                                                                                onChange={() => {
-                                                                                    if (selection.ids.size === filteredQuotes.length) {
-                                                                                        setSelection({ ids: new Set() })
-                                                                                    } else {
-                                                                                        setSelection({ ids: new Set(filteredQuotes.map(q => q.originalId)) })
-                                                                                    }
-                                                                                }}
-                                                                            />
-                                                                        </th>
-                                                                        {COLUMNS.map((col) => {
-                                                                            const isSortable = col.id !== "actions"
-                                                                            const isSorted = sortConfig?.key === col.id
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                            <div className="flex items-center">
+                                                                                <Checkbox
+                                                                                    checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                                    onChange={(checked) => {
+                                                                                        setSelection({ ids: checked ? new Set(paginated.map((x: Quote) => x.originalId)) : new Set() })
+                                                                                    }}
+                                                                                    className="bg-white dark:bg-dark-background"
+                                                                                />
+                                                                            </div>
+                                                                        </th>
+                                                                        {COLUMNS.map((col, idx) => {
+                                                                            const isSortable = col.id !== "actions";
+                                                                            const isSorted = sortConfig?.key === col.id;
                                                                             return (
                                                                                 <th
                                                                                     key={col.id}
+                                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
                                                                                     style={{ width: col.width }}
-                                                                                    className={`py-3 px-4 text-xs font-bold text-brand-dark dark:text-dark-heading ${
-                                                                                        col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"
-                                                                                    } ${isSortable ? "cursor-pointer select-none group" : ""}`}
                                                                                     onClick={() => {
-                                                                                        if (!isSortable) return
-                                                                                        setSortConfig((prev) => {
-                                                                                            if (prev?.key === col.id) {
-                                                                                                return prev.direction === "asc"
-                                                                                                    ? { key: col.id as SortKey, direction: "desc" }
-                                                                                                    : null
-                                                                                            }
-                                                                                            return { key: col.id as SortKey, direction: "asc" }
-                                                                                        })
+                                                                                        if (!isSortable) return;
+                                                                                        setSortConfig(prev => ({
+                                                                                            key: col.id as SortKey,
+                                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        }));
                                                                                     }}
                                                                                 >
-                                                                                    <div className={`flex items-center relative ${
-                                                                                        col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"
-                                                                                    }`}>
+                                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
                                                                                         <span>{col.label}</span>
                                                                                         {isSortable && (
                                                                                             <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
                                                                                                 <ArrowUpDownIcon
                                                                                                     size={14}
-                                                                                                    className={`transition-all duration-200 ${
-                                                                                                        isSorted
-                                                                                                            ? "text-brand-dark dark:text-dark-heading opacity-100 block"
-                                                                                                            : "text-brand-inactive-text hidden group-hover:block opacity-40"
-                                                                                                    } ${isSorted && sortConfig.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                                        } ${isSorted && sortConfig?.direction === 'desc' ? 'rotate-180' : ''}`}
                                                                                                 />
                                                                                             </div>
                                                                                         )}
                                                                                     </div>
                                                                                 </th>
-                                                                            )
+                                                                            );
                                                                         })}
                                                                     </tr>
                                                                 </thead>

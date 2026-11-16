@@ -37,6 +37,7 @@ import {
     isCarrierDeliveryOrder,
     type DeliveryDriverInfo,
 } from "@/components/erp/shared/DeliveryTabContent"
+import { DeliveryOtpCard } from "@/components/marketplace/DeliveryOtpCard"
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -2157,6 +2158,18 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             )}
                                         </div>
                                     </FormSection>
+
+                                    {/* Section Delivery Confirmation OTP */}
+                                    {order.delivery_otp?.requiresOtp && (
+                                        <div className="my-2">
+                                            <DeliveryOtpCard
+                                                code={order.delivery_otp.code}
+                                                status={order.delivery_status === "delivered" ? "confirmed" : order.delivery_otp.status}
+                                                confirmedAt={order.delivery_otp.confirmedAt || order.delivery_completed_at}
+                                                expiresAt={order.delivery_otp.expiresAt}
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Section 4: Entregador */}
                                     {isDelivery && order.delivery_driver && (

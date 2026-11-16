@@ -73,7 +73,6 @@ export async function getAdminCampaigns(
             ends_at,
             is_active,
             created_at,
-            updated_at,
             promotions(*),
             campaign_customers(customer_id),
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
@@ -187,9 +186,7 @@ export async function updateAdminCampaign(
         return { success: false, error: "Campanha não encontrada." }
     }
 
-    const payloadToUpdate: Record<string, any> = {
-        updated_at: new Date().toISOString(),
-    }
+    const payloadToUpdate: Record<string, any> = {}
 
     if (updates.name !== undefined) payloadToUpdate.name = sanitizeInput(updates.name)
     if (updates.description !== undefined) payloadToUpdate.description = sanitizeNotes(updates.description || "")
@@ -222,7 +219,6 @@ export async function updateAdminCampaign(
     if (updates.rule) {
         const rule = updates.rule
         const rulePayload: Record<string, any> = {
-            updated_at: new Date().toISOString(),
             promotion_type: rule.promotion_type,
             discount_type: rule.discount_type || null,
             discount_value: rule.discount_value !== undefined ? Number(rule.discount_value) : null,
@@ -374,7 +370,7 @@ export async function toggleAdminCampaignsStatus(
     const admin = getAdminClient()
     const { error } = await admin
         .from("campaigns")
-        .update({ is_active: isActive, updated_at: new Date().toISOString() })
+        .update({ is_active: isActive })
         .in("id", ids)
 
     if (error) return { success: false, error: error.message }

@@ -227,6 +227,9 @@ export default async function HomePage() {
 
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[80px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading">
+            <h1 className="sr-only">
+                Dudit | Compre perto de você e receba de qualquer lugar do Brasil com 0% de comissão
+            </h1>
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(homeJsonLd) }}

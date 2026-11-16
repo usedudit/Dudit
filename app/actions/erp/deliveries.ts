@@ -2618,6 +2618,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     deliveryId: string
     status: DeliveryStatusValue
     changeReason?: string
+    deliveryOtp?: string
   }) {
     const user = await requireUser()
     const actor = await getDeliveryActorScope(params.partnerId)
@@ -2648,6 +2649,51 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     const allowed = new Set<DeliveryStatusValue>(["pending", "not_sent", "preparing", "pickup_available", "sent", "delivered", "cancelled", "delivery_failed"])
     if (!allowed.has(nextStatus)) {
       return { success: false as const, error: "Status de entrega inválido." }
+    }
+
+    // Se estiver marcando como entregue, verificar se exige código de confirmação
+    if (nextStatus === "delivered") {
+      const { data: dOrders } = await supabase
+        .from("delivery_orders")
+        .select("order_id")
+        .eq("delivery_id", params.deliveryId)
+
+      const orderIds = (dOrders || []).map((o: any) => o.order_id).filter(Boolean)
+      if (orderIds.length > 0) {
+        const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+        const otpRequiredOrderIds: string[] = []
+        for (const oId of orderIds) {
+          const req = await doesOrderRequireDeliveryOtp(oId)
+          if (req.requiresOtp) {
+            otpRequiredOrderIds.push(oId)
+          }
+        }
+
+        if (otpRequiredOrderIds.length === 1) {
+          if (!params.deliveryOtp) {
+            return {
+              success: false as const,
+              error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+            }
+          }
+          const verifyRes = await verifyAndConsumeDeliveryOtp({
+            orderId: otpRequiredOrderIds[0],
+            code: params.deliveryOtp,
+            confirmedByUserId: user.id,
+          })
+          if (!verifyRes.success) {
+            return {
+              success: false as const,
+              error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+            }
+          }
+        } else if (otpRequiredOrderIds.length > 1) {
+          return {
+            success: false as const,
+            error: "Esta rota contém múltiplos pedidos que exigem código de confirmação. Confirme cada parada individualmente informando o respectivo código.",
+          }
+        }
+      }
     }
 
     const nowIso = new Date().toISOString()
@@ -3142,6 +3188,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   orderId: string
   status: DeliveryStatusValue
   changeReason?: string
+  deliveryOtp?: string
 }) {
 
   const user = await requireUser()
@@ -3172,6 +3219,33 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   const allowed = new Set<DeliveryStatusValue>(["pending", "not_sent", "preparing", "pickup_available", "sent", "delivered", "cancelled", "delivery_failed"])
   if (!allowed.has(nextStatus)) {
     return { success: false as const, error: "Status de entrega inválido." }
+  }
+
+  // Se estiver marcando pedido como entregue, verificar se exige código de confirmação
+  if (nextStatus === "delivered") {
+    const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+    const requirement = await doesOrderRequireDeliveryOtp(params.orderId)
+    if (requirement.requiresOtp) {
+      if (!params.deliveryOtp) {
+        return {
+          success: false as const,
+          error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+        }
+      }
+
+      const verifyRes = await verifyAndConsumeDeliveryOtp({
+        orderId: params.orderId,
+        code: params.deliveryOtp,
+        confirmedByUserId: user.id,
+      })
+
+      if (!verifyRes.success) {
+        return {
+          success: false as const,
+          error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+        }
+      }
+    }
   }
 
   const nowIso = new Date().toISOString()

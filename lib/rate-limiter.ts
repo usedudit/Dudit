@@ -58,6 +58,8 @@ export enum RateLimitCategory {
   COMMUNITY_VIDEO_UPLOAD = "COMMUNITY_VIDEO_UPLOAD",
   FEEDBACK_CREATE = "FEEDBACK_CREATE",
   SUPPORT_CREATE = "SUPPORT_CREATE",
+  DELIVERY_OTP_VERIFY = "DELIVERY_OTP_VERIFY",
+  DELIVERY_OTP_REQUEST = "DELIVERY_OTP_REQUEST",
   DEFAULT = "DEFAULT",
 }
 
@@ -352,6 +354,18 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 5,
     window: "10 m",
     identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: false,
+  },
+  [RateLimitCategory.DELIVERY_OTP_VERIFY]: {
+    maxRequests: 10,
+    window: "1 m",
+    identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: true,
+  },
+  [RateLimitCategory.DELIVERY_OTP_REQUEST]: {
+    maxRequests: 30,
+    window: "1 m",
+    identifierType: IdentifierType.USER,
     failClosed: false,
   },
   [RateLimitCategory.DEFAULT]: {

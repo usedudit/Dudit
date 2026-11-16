@@ -103,6 +103,19 @@ const sitemapSections: SiteMapSection[] = [
             { label: "Política de Privacidade", href: "/institucional/privacidade", description: "Diretrizes de proteção e tratamento de dados (LGPD)" },
         ],
     },
+    {
+        title: "Blog do Dino & Dicas",
+        description: "Artigos práticos sobre segurança, finanças, fotos de produtos e vendas para empreendedores.",
+        icon: FileText,
+        links: [
+            { label: "Página Principal do Blog", href: "/blog", description: "Todos os artigos, guias e novidades para pequenos negócios" },
+            { label: "Vendas e Marketing", href: "/blog/categoria/vendas-e-marketing", description: "Estratégias práticas para vender mais no balcão, no WhatsApp e online" },
+            { label: "Gestão Financeira", href: "/blog/categoria/gestao-financeira", description: "Fluxo de caixa, precificação, margem e lucratividade" },
+            { label: "Proteção e Segurança", href: "/blog/categoria/protecao-e-seguranca", description: "Como reconhecer golpes e proteger as vendas da sua conta" },
+            { label: "Fotos e Anúncios", href: "/blog/categoria/fotos-e-anuncios", description: "Dicas de fotografia e catálogo para atrair mais clientes" },
+            { label: "Gestão do Negócio", href: "/blog/categoria/gestao-do-negocio", description: "Organização, rotinas e controle de estoque sem complicação" },
+        ],
+    },
 ];
 
 export default function MapaDoSitePage() {

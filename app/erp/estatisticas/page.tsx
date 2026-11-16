@@ -20,7 +20,6 @@ import {
     getProductivityReportData,
     getServiceOrderReportData,
     getGoalReportData,
-    getSubscriptionReportData,
     getAppointmentsReportData,
 } from "@/lib/data/reports"
 import { getErpRequestContext } from "@/lib/auth/erp-context"
@@ -36,7 +35,7 @@ import type { Period, CompareMode } from "@/lib/period-types"
 export const dynamic = "force-dynamic"
 
 export default async function ERPEstatisticasPage(props: {
-    searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }>
+    searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string; tab?: string }>
 }) {
     const context = await getErpRequestContext()
     if (!context) return <AccessDenied />
@@ -57,6 +56,10 @@ export default async function ERPEstatisticasPage(props: {
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
     const compare = (searchParams?.compare as CompareMode) || "none"
+    const compareFrom = searchParams?.compareFrom || ""
+    const compareTo = searchParams?.compareTo || ""
+    const tab = searchParams?.tab || ""
+
     return (
         <>
             <ERPPageHeader title="Estatísticas" />
@@ -88,6 +91,9 @@ export default async function ERPEstatisticasPage(props: {
                                 activeResources={activeResources}
                                 period={period}
                                 compare={compare}
+                                compareFrom={compareFrom}
+                                compareTo={compareTo}
+                                tab={tab}
                                 planSlug={plan.slug}
                                 permissionContext={context as RbacUserLike}
                                 controls={
@@ -111,6 +117,9 @@ async function ReportsContent({
     activeResources,
     period,
     compare,
+    compareFrom,
+    compareTo,
+    tab,
     planSlug,
     permissionContext,
     controls,
@@ -119,6 +128,9 @@ async function ReportsContent({
     activeResources: string[]
     period: Period
     compare: CompareMode
+    compareFrom: string
+    compareTo: string
+    tab: string
     planSlug: string
     permissionContext: RbacUserLike
     controls?: ReactNode
@@ -134,15 +146,14 @@ async function ReportsContent({
     const hasProductivity = activeResources.includes("productivity") || activeResources.includes("team")
     const hasServiceOrders = activeResources.includes("serviceOrders")
     const hasGoals = activeResources.includes("goals")
-    const hasSubscriptions = activeResources.includes("recurringSubscriptions") || activeResources.includes("recurring_subscriptions") || activeResources.includes("recorrentes")
     const hasAppointments = activeResources.includes("appointments")
     const hasPermission = (permission: string) => can(permissionContext, permission)
 
-    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, subscriptionData, stockValue, appointmentsData] = await Promise.all([
-        hasProducts && hasPermission("products.view") ? getDashboardProductsData(partnerId).catch(() => null) : Promise.resolve(null),
-        hasServices && hasPermission("appointments.view") ? getDashboardServicesData(partnerId).catch(() => null) : Promise.resolve(null),
+    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, stockValue, appointmentsData] = await Promise.all([
+        hasProducts && hasPermission("products.view") ? getDashboardProductsData(partnerId, "", period).catch(() => null) : Promise.resolve(null),
+        hasServices && hasPermission("appointments.view") ? getDashboardServicesData(partnerId, "", period).catch(() => null) : Promise.resolve(null),
         hasFinancial && hasPermission("financial.view") ? getDashboardFinancialData(partnerId).catch(() => null) : Promise.resolve(null),
-        hasOrders && hasPermission("products.view") ? getSalesReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasOrders && hasPermission("products.view") ? getSalesReportData(partnerId, period, "", compareFrom, compareTo).catch(() => null) : Promise.resolve(null),
         hasCustomers && hasPermission("customers.view") ? getCustomerReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
         hasReturns && hasPermission("orders.view") ? getReturnsReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
         hasDeliveries && hasPermission("delivery.view") ? getDeliveryReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
@@ -150,7 +161,6 @@ async function ReportsContent({
         hasProductivity && hasPermission("appointments.view") ? getProductivityReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
         hasServiceOrders && hasPermission("service_orders.view") ? getServiceOrderReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
         hasGoals && hasPermission("appointments.view") ? getGoalReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-        hasSubscriptions && hasPermission("recurring_subscriptions.view") ? getSubscriptionReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
         hasProducts && hasPermission("products.view") ? (async () => {
             try {
                 const supabase = (await import("@/lib/supabase/server")).createAdminClient()
@@ -167,6 +177,7 @@ async function ReportsContent({
             activeResources={activeResources}
             period={period}
             compare={compare}
+            tab={tab}
             planSlug={planSlug}
             productsData={productsData}
             servicesData={servicesData}
@@ -179,7 +190,6 @@ async function ReportsContent({
             productivityData={productivityData}
             serviceOrdersData={serviceOrdersData}
             goalData={goalData}
-            subscriptionData={subscriptionData}
             stockValue={stockValue}
             appointmentsData={appointmentsData}
             controls={controls}

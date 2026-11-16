@@ -3,7 +3,7 @@ import { getPublishedBlogPosts } from "@/lib/blog/queries"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import BlogIndex from "@/components/blog/BlogIndex"
 
-export const revalidate = 3600
+export const dynamic = "force-dynamic"
 
 const CANONICAL = "https://dudit.com.br/blog"
 

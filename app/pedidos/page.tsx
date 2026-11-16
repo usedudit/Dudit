@@ -325,6 +325,24 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     } catch (e) {
       console.error("[MY_ORDERS_PAGE] Error hydrating delivery drivers:", e)
     }
+
+    // Hydrate delivery confirmation OTPs for buyer's orders requiring OTP
+    try {
+      const { getCustomerDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+      const eligibleOrders = orders.filter((o: any) => o.situation !== "cancelled" && o.delivery_type !== "pickup")
+      await Promise.all(
+        eligibleOrders.map(async (ord: any) => {
+          try {
+            const otpRes = await getCustomerDeliveryOtp({ orderId: ord.id, userId: user.id, adminClient })
+            if (otpRes.success && otpRes.data?.requiresOtp) {
+              ord.delivery_otp = otpRes.data
+            }
+          } catch {}
+        })
+      )
+    } catch (e) {
+      console.error("[MY_ORDERS_PAGE] Error hydrating delivery OTPs:", e)
+    }
   }
 
   const reviewedItemsArray = reviewsResult.data || []

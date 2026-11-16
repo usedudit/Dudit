@@ -42,6 +42,7 @@ const CONTEXT_INFO = {
   whatsapp: "whatsapp-token-encryption",
   superfrete: "superfrete-token-encryption",
   nfe_xml: "nfe-xml-encryption",
+  delivery_otp: "delivery-otp-encryption",
 } as const
 
 type CryptoContext = keyof typeof CONTEXT_INFO
