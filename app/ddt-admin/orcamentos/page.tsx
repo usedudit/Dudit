@@ -13,8 +13,12 @@ export default async function AdminQuotesPage() {
     return (
         <>
             <AdminHeader pageTitle="Orçamentos" />
-            <QuotesList initialData={initialData.data} initialStats={initialStats} />
+            <QuotesList
+                quotes={initialData.data}
+                initialNextCursor={initialData.nextCursor}
+                initialHasMore={initialData.hasMore}
+                initialStats={initialStats}
+            />
         </>
     )
 }
-

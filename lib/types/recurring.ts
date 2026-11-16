@@ -85,6 +85,9 @@ export type RecurringPlan = {
   createdAt: string
   updatedAt: string
   price?: number
+  partner_name?: string | null
+  store_name?: string | null
+  stores?: { id: string; name: string } | null
   items?: RecurringPlanItemRow[]
   images?: string[] | null
   billingMode?: "manual" | "auto_mercado_pago"

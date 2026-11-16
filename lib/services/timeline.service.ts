@@ -19,12 +19,13 @@ export interface TimelineEntry {
   id: string
   partner_id: string
   actor_user_id: string | null
+  actor_name?: string | null
   entity_type: string
   entity_id: string | null
   action_type: ActionType | string
   change_lines: string[]
   metadata: Record<string, unknown> | null
-  source: "user" | "system" | "webhook" | "manual" | "marketplace"
+  source: "user" | "system" | "webhook" | "manual" | "marketplace" | "erp" | "admin" | string
   created_at: string
 }
 
@@ -55,7 +56,7 @@ interface LogAuditEventInput {
   actionType: ActionType | string
   changeLines: string[]
   metadata?: Record<string, unknown> | null
-  source?: "system" | "webhook" | "manual" | "marketplace" | "erp" | "user"
+  source?: "system" | "webhook" | "manual" | "marketplace" | "erp" | "user" | "admin"
   storeId?: string | null
   storeName?: string | null
   actorName?: string | null
@@ -277,7 +278,7 @@ async function fetchRawTimeline(
 
   const { data, error } = await supabase
     .from("audit_logs")
-    .select("id, partner_id, actor_user_id, entity_type, entity_id, action_type, change_lines, metadata, source, created_at")
+    .select("id, partner_id, actor_user_id, actor_name, entity_type, entity_id, action_type, change_lines, metadata, source, created_at")
     .eq("partner_id", partnerId)
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
@@ -295,7 +296,7 @@ async function fetchRawTimeline(
   const actorIds = Array.from(
     new Set(
       data
-        .map((entry: TimelineEntry) => entry.actor_user_id)
+        .map((entry: any) => entry.actor_user_id)
         .filter((value: string | null): value is string => Boolean(value)),
     ),
   )
@@ -320,12 +321,18 @@ async function fetchRawTimeline(
     }
   }
 
-  return data.map((entry: TimelineEntry) => ({
-    ...entry,
-    actor_name: entry.actor_user_id
-      ? (namesByUserId.get(entry.actor_user_id) || "Usuário")
-      : "Sistema",
-  }))
+  return data.map((entry: any) => {
+    let resolvedActor = "Sistema"
+    if (entry.actor_user_id) {
+      resolvedActor = namesByUserId.get(entry.actor_user_id) || entry.actor_name || "Usuário"
+    } else if (entry.actor_name) {
+      resolvedActor = entry.actor_name
+    }
+    return {
+      ...entry,
+      actor_name: resolvedActor,
+    }
+  })
 }
 
 export const getAdminTimeline = cache(

@@ -1011,7 +1011,6 @@ export async function getFinancialTransactionsAction(
 }
 
 export type CreateManualTransactionInput = {
-    id?: string | null
     partnerId: string
     transactionType: "income" | "expense" | "transfer" | "adjustment" | "refund"
     amount: number
@@ -1033,8 +1032,6 @@ export type CreateManualTransactionInput = {
     origin?: "manual" | "system" | "gateway"
     refundKind?: "expense_refund" | "revenue_refund" | null
     referenceNote?: string | null
-    installmentGroupId?: string | null
-    installmentNumber?: number | null
     storeId?: string | null
 }
 
@@ -1074,7 +1071,8 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         if (input.status !== undefined && !["pending", "paid"].includes(input.status)) {
             throw new Error("Status de transação inválido.")
         }
-        if (input.id || input.installmentGroupId || input.installmentNumber !== undefined) {
+        const rawInput = input as Record<string, unknown>
+        if (rawInput.id || rawInput.installmentGroupId || (rawInput.installmentNumber !== undefined && rawInput.installmentNumber !== null)) {
             throw new Error("IDs de transação/parcelamento não podem ser definidos nesta ação.")
         }
 

@@ -68,9 +68,11 @@ function mapReturnEventToHistoryEntry(
         orderCustomerName: event.actor_name || null,
     })
 
-    const isDuditAction = Boolean(
+    const isErpAction = event.source === "erp" || metadata?.source === "erp"
+    const isDuditAction = !isErpAction && Boolean(
         metadata.dudit_action ||
         event.source === "admin" ||
+        metadata?.is_admin_action ||
         (event.actor_name && String(event.actor_name).toLowerCase().includes("dudit")) ||
         (actorName && String(actorName).toLowerCase().includes("dudit"))
     )

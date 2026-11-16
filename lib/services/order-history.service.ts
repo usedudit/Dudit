@@ -14,6 +14,8 @@ export interface OrderHistoryEntry {
   order_id: string
   partner_id: string
   actor_user_id: string | null
+  actor_name?: string | null
+  source?: string | null
   entry_type: string
   change_lines: string[]
   metadata?: Record<string, any> | null
@@ -33,7 +35,7 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
   const [timelineRes, returnRequestsRes] = await Promise.all([
     supabase
       .from("audit_logs")
-      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
+      .select("id, partner_id, actor_user_id, actor_name, source, action_type, change_lines, created_at, entity_id, metadata")
       .eq("partner_id", partnerId)
       .eq("entity_type", "order")
       .eq("entity_id", orderId)
@@ -64,7 +66,7 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
   if (returnRequestIdsList.length > 0) {
     const { data: rtData, error: rtError } = await supabase
       .from("audit_logs")
-      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
+      .select("id, partner_id, actor_user_id, actor_name, source, action_type, change_lines, created_at, entity_id, metadata")
       .eq("partner_id", partnerId)
       .eq("entity_type", "return_request")
       .in("entity_id", returnRequestIdsList)
@@ -81,6 +83,8 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     order_id: entry.entity_id,
     partner_id: entry.partner_id,
     actor_user_id: entry.actor_user_id,
+    actor_name: entry.actor_name,
+    source: entry.source,
     entry_type: entry.action_type,
     change_lines: entry.change_lines || [],
     metadata: entry.metadata,
@@ -92,6 +96,8 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     order_id: entry.entity_id,
     partner_id: entry.partner_id,
     actor_user_id: entry.actor_user_id,
+    actor_name: entry.actor_name,
+    source: entry.source,
     entry_type: `return_${entry.action_type}`,
     change_lines: entry.change_lines || [],
     metadata: entry.metadata,
@@ -133,14 +139,14 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
   }
 
   return merged.map((entry) => {
-    let actorName = entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema"
     let changeLines = (entry.change_lines || []).map((line) => humanizeTimelineChangeLine(line))
 
-    const isDuditAction = Boolean(
-      entry.metadata?.dudit_action ||
+    const isErpAction = entry.source === "erp" || (entry.metadata as any)?.source === "erp"
+    const isDuditAction = !isErpAction && Boolean(
+      entry.source === "admin" ||
       (entry.metadata as any)?.is_admin_action ||
-      (entry as any).actor_name === "Equipe Dudit" ||
-      (entry.metadata as any)?.admin_actor_name
+      (entry.metadata?.dudit_action && (entry.source === "admin" || !entry.actor_user_id)) ||
+      (entry.actor_name === "Equipe Dudit" && entry.source === "admin")
     )
 
     const isDriverAction = Boolean(
@@ -153,11 +159,25 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
       entry.entry_type === "delivery_payment_received"
     )
 
+    let actorName: string
     if (isDuditAction) {
       actorName = "Equipe Dudit"
     } else if (isDriverAction) {
       const resolvedName = (entry.metadata as any)?.driver_name || (entry.actor_user_id ? namesByUserId.get(entry.actor_user_id) : null) || "Entregador"
       actorName = resolvedName.toLowerCase().includes("entregador") ? resolvedName : `${resolvedName} (Entregador)`
+    } else if (entry.actor_user_id) {
+      const resolved = namesByUserId.get(entry.actor_user_id)
+      if (resolved && resolved !== "Usuário") {
+        actorName = resolved
+      } else if (entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit") && entry.actor_name !== "Sistema") {
+        actorName = entry.actor_name
+      } else {
+        actorName = resolved || "Usuário"
+      }
+    } else if (entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit")) {
+      actorName = entry.actor_name
+    } else {
+      actorName = "Sistema"
     }
 
     // Default line for return created if empty

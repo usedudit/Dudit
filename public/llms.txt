@@ -32,6 +32,15 @@ A Dudit resolve a dor de taxas abusivas cobradas por grandes marketplaces e a fa
 - **Central de Ajuda**: `https://dudit.com.br/ajuda`
 - Guias detalhados com passo a passo sobre emissão de ordens de serviço, agendamentos, precificação, marketing local e gestão de estoque.
 
+### Blog do Dino — Conteúdo Editorial
+- **Blog**: `https://dudit.com.br/blog` (dicas práticas para pequenos negócios)
+- **Feed RSS**: `https://dudit.com.br/blog/feed.xml`
+- **Categorias**: `https://dudit.com.br/blog/categoria/{categoria}` — proteção-e-seguranca, gestao-financeira, vendas-e-marketing, fotos-e-anuncios, gestao-do-negocio, dicas-da-plataforma, noticias, geral.
+- Artigos de referência:
+  - `https://dudit.com.br/blog/como-evitar-golpes-ao-vender-pelo-whatsapp`
+  - `https://dudit.com.br/blog/fluxo-de-caixa-o-que-e-e-como-controlar`
+  - `https://dudit.com.br/blog/como-tirar-fotos-melhores-dos-produtos-com-o-celular`
+
 ### Pesquisas e Estatísticas do Mercado
 - **Estatísticas do Comércio Local e Taxas de Marketplace**: `https://dudit.com.br/institucional/estatisticas`
 

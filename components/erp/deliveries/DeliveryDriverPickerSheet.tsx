@@ -272,6 +272,17 @@ export default function DeliveryDriverPickerSheet({
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                 Ao solicitar, a entrega é enviada para todos os entregadores parceiros Dudit online da sua cidade. O primeiro a aceitar fará a coleta na sua loja e a entrega ao cliente.
                             </p>
+                            <div className="pt-2 border-t border-brand-border/60 dark:border-dark-border/60 flex flex-wrap items-center justify-between gap-1 text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                <span>Limites: até 15 kg e 60L (~45x40x35cm)</span>
+                                <a
+                                    href="/ajuda/entregas/regras-e-limites-entregas-dudit"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-bold text-brand-green hover:underline inline-flex items-center gap-1"
+                                >
+                                    Ver regras e limites
+                                </a>
+                            </div>
                         </div>
 
                         {/* SUMMARY CARD */}

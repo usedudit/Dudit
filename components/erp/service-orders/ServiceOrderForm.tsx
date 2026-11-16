@@ -61,6 +61,7 @@ interface ServiceOrderFormProps {
     onBack: () => void
     onSaved: (data?: any) => void
     editData?: any
+    onSaveOverride?: (payload: any, originalData: any) => Promise<{ success: boolean; error?: string }>
 }
 
 const REQUIRED_FIELDS = [
@@ -86,7 +87,7 @@ const getLocalTimeString = (d: Date) => {
 
 
 
-export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, editData }: ServiceOrderFormProps) {
+export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, editData, onSaveOverride }: ServiceOrderFormProps) {
     const { toast } = useToast()
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -670,23 +671,41 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         const specsPayload = pendingSpecsRef.current || editData?.specifications || undefined
 
         if (editData) {
-            // Update OS details + services + products in a single atomic action
-            const res = await updateServiceOrderAction(partnerId, editData.id, {
-                ...payload,
-                services: canEditItemsField ? servicesPayload : undefined,
-                products: canEditItemsField ? productsPayload : undefined,
-                specifications: canEditSpecsField ? specsPayload : undefined,
-            })
+            if (onSaveOverride) {
+                const savePayload = {
+                    ...payload,
+                    services: canEditItemsField ? servicesPayload : undefined,
+                    products: canEditItemsField ? productsPayload : undefined,
+                    specifications: canEditSpecsField ? specsPayload : undefined,
+                }
+                const overrideRes = await onSaveOverride(savePayload, editData)
+                if (!overrideRes.success) {
+                    toast({ description: overrideRes.error || "Erro ao atualizar OS" })
+                    setSaving(false)
+                    return
+                }
+                success = true
+                savedData = { id: editData.id, ...savePayload }
+                pendingSpecsRef.current = null
+            } else {
+                // Update OS details + services + products in a single atomic action
+                const res = await updateServiceOrderAction(partnerId, editData.id, {
+                    ...payload,
+                    services: canEditItemsField ? servicesPayload : undefined,
+                    products: canEditItemsField ? productsPayload : undefined,
+                    specifications: canEditSpecsField ? specsPayload : undefined,
+                })
 
-            if (!res.success) {
-                toast({ description: res.error || "Erro ao atualizar OS" })
-                setSaving(false)
-                return
+                if (!res.success) {
+                    toast({ description: res.error || "Erro ao atualizar OS" })
+                    setSaving(false)
+                    return
+                }
+
+                success = true
+                savedData = res.data
+                pendingSpecsRef.current = null
             }
-
-            success = true
-            savedData = res.data
-            pendingSpecsRef.current = null
         } else {
             // Create OS + services + products + specifications in a single atomic action
             const res = await createServiceOrderAction(partnerId, {

@@ -7191,6 +7191,7 @@ O sistema_resolve isso em etapas simples:
 - **Configurando entregas da loja** - Passo a passo para ativar e configurar entregas
 - **Portal de entregadores** - Como funciona o acesso dos entregadores
 - **Acompanhando sua entrega** - Guia para clientes rastrearem pedidos
+- **Regras, limites e cuidados nas entregas** - Limites de peso, tamanho, valor e itens proibidos
 `
             },
             {
@@ -7376,6 +7377,7 @@ O entregador **não pode**:
 ## Dicas para o entregador
 
 - **Atualize o status** a cada entrega - isso avisa o cliente e o vendedor
+- **Conheça seus limites e direitos** - Pacotes acima de 15 kg ou 60L não devem ser transportados em motos. Veja as [Regras, limites e cuidados nas entregas](/ajuda/entregas/regras-e-limites-entregas-dudit)
 - Se tiver problema, use o campo de **observações** para explicar
 - Mantenha o **telefone** atualizado para contato
 - Em caso de falha, tente novamente no mesmo dia se possível
@@ -7483,6 +7485,103 @@ Verifique se o endereço está completo com CEP, rua, número, bairro, cidade. S
 
 **Meu pedido chegou com problema.**
 Tire fotos e entre em contato com a loja. Eles vão orientar sobre troca ou devolução.
+`
+            },
+            {
+                id: "regras-e-limites-entregas-dudit",
+                title: "Regras, limites e cuidados nas entregas Dudit",
+                description: "Limites de peso, dimensões, valor máximo, raio de atendimento e itens permitidos/proibidos para entregadores locais.",
+                slug: "regras-e-limites-entregas-dudit",
+                category: "entregas",
+                content: `
+O serviço de entregadores locais da Dudit foi desenhado para proporcionar entregas rápidas, ágeis e seguras dentro da cidade e região metropolitana, utilizando principalmente motocicletas com baú ou mochila térmica (*bag* de entrega).
+
+Para garantir a segurança física dos condutores, a integridade das mercadorias e a clareza nas responsabilidades entre loja, entregador e cliente, estabelecemos limites operacionais e diretrizes obrigatórias de envio.
+
+---
+
+## 1. Limites físicos: Peso, volume e dimensões
+
+Para que um pedido possa ser despachado por um entregador parceiro em motocicleta, ele deve respeitar estritamente os seguintes parâmetros:
+
+* **Peso máximo:** Até **15 kg** por entrega.
+* **Volume máximo:** Até **60 litros** (equivalente à capacidade de uma mochila térmica de entrega de grande porte ou baú padrão para motocicletas).
+* **Dimensões recomendadas:**
+  * **Comprimento:** Até 45 cm
+  * **Largura:** Até 40 cm
+  * **Altura:** Até 35 cm
+* **Tolerância máxima:** Nenhum dos lados pode exceder **50 cm** e a soma das três dimensões (Comprimento + Largura + Altura) não deve ultrapassar **130 cm**.
+
+> [!WARNING]
+> Cargas que ultrapassem 15 kg ou 60 litros não podem ser transportadas com segurança em motos. O entregador tem o direito e a orientação de **recusar o pacote** caso constate que as medidas ou peso reais excedem esses limites.
+
+---
+
+## 2. Raio de distância e área de cobertura
+
+* **Raio operacional:** Até **20 km** de distância entre o endereço do estabelecimento (coleta) e o endereço do cliente (entrega).
+* **Abrangência:** A modalidade destina-se a entregas locais na mesma cidade ou região metropolitana atendida pelos entregadores parceiros ativos na plataforma.
+
+---
+
+## 3. Prazos e horários de funcionamento
+
+* **Disponibilidade sob demanda:** As entregas locais da Dudit não possuem janelas rígidas obrigatórias de horário pré-fixadas pela plataforma.
+* **Horário da operação:** As solicitações dependem do horário de funcionamento e preparação cadastrados pelo estabelecimento, bem como da presença de entregadores parceiros conectados e disponíveis na região no momento do chamado.
+* **Tempo de deslocamento:** Assim que um entregador parceiro aceita a corrida e retira a mercadoria no balcão, o trajeto é direto até o cliente.
+
+---
+
+## 4. Teto de valor e limites de responsabilidade
+
+### Teto de segurança do produto
+* O valor de venda dos itens transportados em uma única corrida deve ser de até **R$ 3.000,00**.
+* Este teto foi definido para mitigar riscos de segurança pública e operacional no trânsito urbano. Itens com valores superiores a R$ 3.000,00 não devem ser despachados nesta modalidade sem contratação prévia de transporte ou escolta especializada por conta e ordem das partes.
+
+### Papel da plataforma Dudit e isenção de seguro automático
+* **Intermediação tecnológica:** A Dudit disponibiliza ferramentas de software para conectar estabelecimentos, entregadores participantes e compradores, facilitando o cálculo de frete, o despacho do pedido e a comunicação.
+* **Ausência de seguro ou ressarcimento automático:** A Dudit **não atua como empresa transportadora, não é seguradora e não assume responsabilidade financeira ou dever de reembolso/indenização automática** por eventuais danos, quebras, furtos, perdas ou extravios ocorridos durante a execução do frete (conforme estipulado nos [Termos de Uso da Dudit](/institucional/termos)).
+* **Responsabilidade pela embalagem:** O estabelecimento lojista é o único responsável por embalar, lacrar e proteger adequadamente o produto. Produtos frágeis devem conter proteção contra impactos (plástico-bolha, divisórias ou caixas reforçadas). Danos decorrentes de embalagem inadequada são de responsabilidade do vendedor perante o consumidor.
+* **Zelo no transporte:** O entregador responde civilmente pela guarda dos pertences que aceitou transportar desde a retirada até a entrega.
+* **Suporte e mediação:** Em caso de intercorrências ou desacordos, a Dudit oferece canais de atendimento para suporte e mediação administrativa entre as partes, podendo aplicar advertências, retenções ou suspensões de contas que violem as boas práticas.
+
+---
+
+## 5. Itens proibidos e restritos
+
+É terminantemente vedado o despacho dos seguintes itens pela rede de entregadores parceiros:
+
+1. **Pessoas e animais:** Transporte de seres vivos de qualquer espécie.
+2. **Substâncias e itens ilícitos:** Drogas, entorpecentes, produtos falsificados ou sem comprovação de procedência legal.
+3. **Armas e explosivos:** Armas de fogo, munições, réplicas, simulacros, fogos de artifício e artefatos bélicos.
+4. **Materiais inflamáveis e perigosos:** Combustíveis líquidos (gasolina, álcool puro, querosene), solventes, botijões de gás, baterias com ácido exposto, materiais tóxicos ou corrosivos.
+5. **Valores monetários e joias:** Dinheiro em espécie (cédulas ou moedas), cheques ao portador, barras de ouro/prata e pedras preciosas.
+6. **Medicamentos controlados:** Remédios sob prescrição de receita médica retida (salvo drogarias autorizadas com emissão da documentação fiscal exigida pela vigilância sanitária).
+7. **Perecíveis sem conservação térmica:** Carnes frescas, laticínios ou alimentos sensíveis à temperatura sem caixa isotérmica apropriada.
+8. **Objetos cortantes desprotegidos:** Vidros, lâminas ou pontas metálicas sem embalagem rígida externa protetora.
+9. **Cargas incompatíveis com o trânsito:** Pacotes amarrados de forma precária por fora do compartimento ou que violem as normas do CONTRAN (Resolução nº 943/2022) para condução de motocicletas.
+
+---
+
+## 6. Boas práticas para o lojista
+
+1. **Só chame quando estiver pronto:** Solicite o entregador somente após o pedido estar totalmente separado, embalado e pronto para viagem, evitando espera desnecessária do motoboy no balcão.
+2. **Embalagem discreta e resistente:** Use caixas pardas ou sacos opacos invioláveis com fita adesiva de segurança.
+3. **Identificação clara:** Escreva o número do pedido e o nome do destinatário do lado de fora do pacote.
+4. **Instruções específicas:** Ao solicitar no sistema, inclua observações úteis no campo de notas (ex.: "tocar campainha da casa dos fundos", "deixar na portaria com Seu Carlos").
+
+---
+
+## Perguntas frequentes
+
+**O que acontece se o cliente não estiver no endereço para receber?**  
+O entregador tentará contato telefônico com o cliente ou com a loja. Se não houver sucesso após alguns minutos, o entregador retornará o pacote ao estabelecimento de origem, sendo devida a taxa de deslocamento correspondente.
+
+**O entregador pode recusar um pacote?**  
+Sim. Se o pacote exceder 15 kg, ultrapassar as dimensões da bag/baú (60L), apresentar vazamento de líquidos ou contiver itens proibidos, o entregador tem autonomia para recusar o transporte.
+
+**A Dudit cobre prejuízos de acidentes no trânsito?**  
+Não. Conforme os Termos de Uso, a plataforma Dudit atua como facilitadora tecnológica e não oferece apólice de seguro de carga automático. Loja e entregador operam como agentes independentes, devendo resolver sinistros diretamente ou acionar seguros individuais contratados.
 `
             }
         ]

@@ -87,7 +87,7 @@ async function fetchQuoteHistoryEntries(quoteId: string, partnerId: string, limi
 
   return merged.map((entry) => ({
     ...entry,
-    actor_name: entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema",
+    actor_name: entry.metadata?.actor_name || (entry.metadata?.dudit_action || (entry.metadata as any)?.is_admin_action ? "Equipe Dudit" : (entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema")),
   }))
 }
 

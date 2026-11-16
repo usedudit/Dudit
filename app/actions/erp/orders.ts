@@ -3175,7 +3175,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
           entityId: order.id,
           actionType: "created",
           changeLines: ["criou venda"],
-          source: "manual",
+          source: "erp",
         }),
         ...skippedGifts.map((promo: any) =>
           logAuditEvent({
@@ -3187,7 +3187,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             changeLines: [
               `Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`,
             ],
-            source: "manual",
+            source: "erp",
           }),
         ),
       ];
@@ -3891,11 +3891,12 @@ export async function getOrderHistoryAction(
 
   const entries = rawEntries
     .map((e) => {
-      const isDuditAction = Boolean(
-        e.metadata?.dudit_action ||
+      const isErpAction = e.source === "erp" || (e.metadata as any)?.source === "erp";
+      const isDuditAction = !isErpAction && Boolean(
+        e.source === "admin" ||
         (e.metadata as any)?.is_admin_action ||
-        e.actor_name === "Equipe Dudit" ||
-        (e.metadata as any)?.admin_actor_name
+        (e.metadata?.dudit_action && (e.source === "admin" || !e.actor_user_id)) ||
+        (e.actor_name === "Equipe Dudit" && e.source === "admin")
       );
 
       const actorName = resolveTimelineActorName({
@@ -5188,7 +5189,7 @@ export async function updateERPOrderAction(
           }
           : {}),
     },
-    source: "manual",
+    source: adminBypass ? "admin" : "erp",
   });
 
   const skippedGifts = filteredPromotions.filter(
@@ -5206,7 +5207,7 @@ export async function updateERPOrderAction(
       changeLines: [
         `Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`,
       ],
-      source: "manual",
+      source: adminBypass ? "admin" : "erp",
     });
   }
 
@@ -5277,6 +5278,7 @@ export async function updateERPOrderAction(
         changeLines: changeLinesForAudit,
         metadata: {
           dudit_action: true,
+          is_admin_action: true,
           admin_actor_name: adminActorEmail || adminActorId,
           admin_actor_id: adminActorId,
           from_status: currentOrder.situation,
@@ -5285,7 +5287,7 @@ export async function updateERPOrderAction(
           reason: actionCtx?.reason?.trim() || null,
           ...(typeof actionCtx?.riskScore === "number" ? { risk_score: actionCtx.riskScore } : {}),
         },
-        source: "manual",
+        source: "admin",
         storeId: effectiveStoreId,
       });
     } catch (e) {
@@ -5459,21 +5461,29 @@ export async function updateOrderNotesAction(input: {
     return { success: false as const, error: updateError.message };
   }
 
+  const { data: userProfile } = await supabase
+    .from("user_profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const effectiveUserName =
+    userProfile?.full_name?.trim() ||
+    (user as any).user_metadata?.name ||
+    (user as any).user_metadata?.full_name ||
+    user.email ||
+    "Usuário";
+
   try {
     await logAuditEvent({
       partnerId: input.partnerId,
       actorUserId: user.id,
-      actorName: isAdmin ? "Equipe Dudit" : undefined,
+      actorName: effectiveUserName,
       entityType: "order",
       entityId: input.orderId,
       actionType: "updated",
       changeLines: ["alterou as observações do pedido."],
-      metadata: isAdmin ? {
-        dudit_action: true,
-        admin_actor_name: adminEmail || user.id,
-        admin_actor_id: user.id,
-      } : undefined,
-      source: "manual",
+      source: "erp",
     });
   } catch (historyError) {
     console.error("[orders_notes] audit_log_failed", historyError);
@@ -5645,6 +5655,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
   const supabase = createAdminClient();
   const capabilities = await getPartnerCapabilities(payload.partnerId);
 
+  const { data: userProfile } = await supabase
+    .from("user_profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const effectiveUserName =
+    userProfile?.full_name?.trim() ||
+    (user as any).user_metadata?.name ||
+    (user as any).user_metadata?.full_name ||
+    user.email ||
+    "Usuário";
+
   const { data: currentOrders } = await supabase
     .from("orders")
     .select(
@@ -5801,22 +5824,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
       ),
     );
 
-    const [profileRes, partnerUsersRes] = await Promise.all([
-      supabase
-        .from("user_profiles")
-        .select("full_name")
-        .eq("user_id", user.id)
-        .single(),
+    const partnerUsersRes =
       capabilities.hasProductivity && creatorUserIds.length > 0
-        ? supabase
+        ? await supabase
           .from("partner_users")
           .select("id, user_id")
           .eq("partner_id", payload.partnerId)
           .in("user_id", creatorUserIds)
-        : Promise.resolve({ data: null }),
-    ]);
-
-    const effectiveUserName = profileRes.data?.full_name || "Usuário";
+        : { data: null };
     const sellerPartnerUserIdMap = new Map<string, string>();
     for (const row of partnerUsersRes.data || []) {
       if (row.user_id && row.id) {
@@ -6156,17 +6171,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
               oldStatus: getPaymentStatusLabel(order.situation),
               newStatus: "Cancelado",
               statusScope: "payment",
-              ...(isAdmin ? {
-                dudit_action: true,
-                admin_actor_name: adminEmail || user.id,
-                admin_actor_id: user.id,
-              } : {}),
             };
 
             return logAuditEvent({
               partnerId: payload.partnerId,
               actorUserId: user.id,
-              actorName: isAdmin ? "Equipe Dudit" : undefined,
+              actorName: effectiveUserName,
               entityType: "order",
               entityId: order.id,
               actionType: "cancelled",
@@ -6825,23 +6835,18 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         const auditMetadata = {
           ...metadata,
-          ...(isAdmin ? {
-            dudit_action: true,
-            admin_actor_name: adminEmail || user.id,
-            admin_actor_id: user.id,
-          } : {}),
         };
 
         return logAuditEvent({
           partnerId: payload.partnerId,
           actorUserId: user.id,
-          actorName: isAdmin ? "Equipe Dudit" : undefined,
+          actorName: effectiveUserName,
           entityType: "order",
           entityId: order.id,
           actionType: payload.actionType,
           changeLines: lines,
           metadata: auditMetadata,
-          source: "manual",
+          source: "erp",
         });
       }),
     );
@@ -7675,6 +7680,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         newSituation: nextSituation,
         paidAmount: nextPaidAmount,
       },
+      source: "erp",
     });
 
     if (nextSituation === "paid") {
@@ -8006,7 +8012,7 @@ export async function saveOrderAttachmentAction(
       entityType: "order",
       entityId: orderId,
       actionType: "attachment_created",
-      source: "manual",
+      source: "erp",
       changeLines: [`Anexo adicionado: ${fileName}`],
     });
 
@@ -8147,7 +8153,7 @@ export async function deleteOrderAttachmentAction(
       entityType: "order",
       entityId: orderId,
       actionType: "attachment_deleted",
-      source: "manual",
+      source: "erp",
       changeLines: [`Anexo removido: ${attachment.file_name || "Documento"}`],
     });
 

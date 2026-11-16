@@ -6,5 +6,5 @@ export default async function AdminPromotionDetailPage({
     params: Promise<{ id: string }>
 }) {
     const { id } = await params
-    redirect(`/ddt-admin/promocoes?search=${id}`)
+    redirect(`/ddt-admin/promocoes?view=${id}`)
 }

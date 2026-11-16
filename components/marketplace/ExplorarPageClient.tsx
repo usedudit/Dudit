@@ -292,7 +292,27 @@ export function ExplorarPageClient({
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
     const stateDropdownRef = useRef<HTMLDivElement>(null)
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
+    const [hasMountedFilters, setHasMountedFilters] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
+    const [hasMountedSort, setHasMountedSort] = useState(false)
+
+    const handleOpenFilters = useCallback(() => {
+        setHasMountedFilters(true)
+        setIsFiltersBottomSheetOpen(true)
+    }, [])
+
+    const handleOpenSort = useCallback(() => {
+        setHasMountedSort(true)
+        setIsSortBottomSheetOpen(true)
+    }, [])
+
+    useEffect(() => {
+        if (isFiltersBottomSheetOpen && !hasMountedFilters) setHasMountedFilters(true)
+    }, [isFiltersBottomSheetOpen, hasMountedFilters])
+
+    useEffect(() => {
+        if (isSortBottomSheetOpen && !hasMountedSort) setHasMountedSort(true)
+    }, [isSortBottomSheetOpen, hasMountedSort])
 
     // Demand modal states
     const [isDemandModalOpen, setIsDemandModalOpen] = useState(false)
@@ -1752,8 +1772,8 @@ export function ExplorarPageClient({
                 {rawItems.length > 0 && (
                     <ExplorarMobileControls
                         activeFiltersCount={activeFiltersCount}
-                        onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
-                        onOpenSort={() => setIsSortBottomSheetOpen(true)}
+                        onOpenFilters={handleOpenFilters}
+                        onOpenSort={handleOpenSort}
                     />
                 )}
 
@@ -1862,8 +1882,8 @@ export function ExplorarPageClient({
                         {/* Filtros / Ordenar - fixos logo abaixo do título - Hide when completely empty */}
                         {!isLandingPage && !isEmptyListing && (
                             <ExplorarViewControls
-                                onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
-                                onOpenSort={() => setIsSortBottomSheetOpen(true)}
+                                onOpenFilters={handleOpenFilters}
+                                onOpenSort={handleOpenSort}
                                 hasActiveFilters={activeFiltersCount > 0}
                                 activeFilterChips={activeFilterChips}
                             />
@@ -2075,7 +2095,7 @@ export function ExplorarPageClient({
             </div>
 
             {/* FILTERS SHEET */}
-            {isFiltersBottomSheetOpen && (
+            {hasMountedFilters && (
                 <ExplorarFiltersBottomSheet
                     userProfile={userProfile}
                     isOpen={isFiltersBottomSheetOpen}
@@ -2104,7 +2124,7 @@ export function ExplorarPageClient({
                 />
             )}
 
-            {isSortBottomSheetOpen && (
+            {hasMountedSort && (
                 <ExplorarSortBottomSheet
                     isOpen={isSortBottomSheetOpen}
                     onClose={() => setIsSortBottomSheetOpen(false)}

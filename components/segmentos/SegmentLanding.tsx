@@ -166,15 +166,9 @@ export default function SegmentLanding({
                                         {feature.mockup}
                                     </div>
                                     <div className="pt-5">
-                                        <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block mb-1">
-                                            {feature.label}
-                                        </span>
-                                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
-                                            {feature.title}
-                                        </h4>
-                                        <p className="text-brand-inactive-text text-sm leading-relaxed">
-                                            {feature.description}
-                                        </p>
+                                        <span className="text-xs font-bold text-brand-green block mb-1">{feature.label}</span>
+                                        <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">{feature.title}</h4>
+                                        <p className="text-brand-inactive-text text-sm leading-relaxed">{feature.description}</p>
                                     </div>
                                 </motion.div>
                             ))}

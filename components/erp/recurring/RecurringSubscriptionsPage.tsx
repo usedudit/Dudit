@@ -1020,7 +1020,7 @@ export default function RecurringSubscriptionsPage({
                     <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
                       {SECTION_META[currentTab].title}
                     </h1>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium pt-2">
                       {SECTION_META[currentTab].subtitle}
                     </p>
                   </div>

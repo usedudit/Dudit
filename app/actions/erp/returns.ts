@@ -558,14 +558,26 @@ export async function getReturnRequestDetailsAction(
             .eq("entity_id", requestId)
             .order("created_at", { ascending: true })
 
+        const actorUserIds = Array.from(new Set((auditLogsData || []).map((e: any) => e.actor_user_id).filter(Boolean)))
+        let namesByUserId = new Map<string, string>()
+        if (actorUserIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", actorUserIds)
+            if (profiles) {
+                namesByUserId = new Map(profiles.map((p: any) => [p.user_id, p.full_name?.trim() || "Usuário"]))
+            }
+        }
+
         const returnEvents = (auditLogsData || []).map((e: any) => {
             const meta = e.metadata || e.new_values || {}
-            const isDuditAction = Boolean(
-                meta.dudit_action ||
-                (meta as any)?.is_admin_action ||
-                e.actor_name === "Equipe Dudit" ||
+            const isErpAction = e.source === "erp" || (meta as any)?.source === "erp"
+            const isDuditAction = !isErpAction && Boolean(
                 e.source === "admin" ||
-                String(e.actor_name || "").toLowerCase().includes("dudit")
+                (meta as any)?.is_admin_action ||
+                (meta.dudit_action && (e.source === "admin" || !e.actor_user_id)) ||
+                (e.actor_name === "Equipe Dudit" && e.source === "admin")
             )
             let actorName = e.actor_name || "Sistema"
             let sanitizedMeta = { ...meta }
@@ -583,6 +595,12 @@ export async function getReturnRequestDetailsAction(
                     delete sanitizedMeta.admin_actor_id
                     actorName = "Equipe Dudit"
                 }
+            } else if (e.actor_user_id) {
+                actorName = namesByUserId.get(e.actor_user_id) || (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit") ? e.actor_name : "Usuário")
+            } else if (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit")) {
+                actorName = e.actor_name
+            } else {
+                actorName = "Sistema"
             }
 
             return {
@@ -671,14 +689,27 @@ export async function getReturnAuditLogsAction(
             .eq("entity_id", requestId)
             .order("created_at", { ascending: true })
         if (error) throw error
+
+        const actorUserIds = Array.from(new Set((data || []).map((e: any) => e.actor_user_id).filter(Boolean)))
+        let namesByUserId = new Map<string, string>()
+        if (actorUserIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", actorUserIds)
+            if (profiles) {
+                namesByUserId = new Map(profiles.map((p: any) => [p.user_id, p.full_name?.trim() || "Usuário"]))
+            }
+        }
+
         const events = (data || []).map((e: any) => {
             const meta = e.metadata || e.new_values || {}
-            const isDuditAction = Boolean(
-                meta.dudit_action ||
-                (meta as any)?.is_admin_action ||
-                e.actor_name === "Equipe Dudit" ||
+            const isErpAction = e.source === "erp" || (meta as any)?.source === "erp"
+            const isDuditAction = !isErpAction && Boolean(
                 e.source === "admin" ||
-                String(e.actor_name || "").toLowerCase().includes("dudit")
+                (meta as any)?.is_admin_action ||
+                (meta.dudit_action && (e.source === "admin" || !e.actor_user_id)) ||
+                (e.actor_name === "Equipe Dudit" && e.source === "admin")
             )
             let actorName = e.actor_name || "Sistema"
             let sanitizedMeta = { ...meta }
@@ -696,6 +727,12 @@ export async function getReturnAuditLogsAction(
                     delete sanitizedMeta.admin_actor_id
                     actorName = "Equipe Dudit"
                 }
+            } else if (e.actor_user_id) {
+                actorName = namesByUserId.get(e.actor_user_id) || (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit") ? e.actor_name : "Usuário")
+            } else if (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit")) {
+                actorName = e.actor_name
+            } else {
+                actorName = "Sistema"
             }
 
             return {
@@ -1519,7 +1556,7 @@ export async function processReturnRequestAction(
                     entityId: request.order_id,
                     actionType: "cancelled",
                     changeLines: ["Pedido cancelado - solicitação de cancelamento aprovada."],
-                    source: "manual",
+                    source: "erp",
                 })
             }
         }
@@ -1722,6 +1759,7 @@ export async function processReturnRequestAction(
                     changeLines,
                     metadata: {
                         dudit_action: true,
+                        is_admin_action: true,
                         admin_actor_name: adminActorEmail || adminActorId,
                         admin_actor_id: adminActorId,
                         from_status: request.status,
@@ -1730,7 +1768,7 @@ export async function processReturnRequestAction(
                         reason: actionCtx?.reason?.trim() || null,
                         ...(typeof actionCtx?.riskScore === "number" ? { risk_score: actionCtx.riskScore } : {}),
                     },
-                    source: "manual",
+                    source: "admin",
                     storeId: effectiveStoreId,
                 })
 
@@ -1748,6 +1786,7 @@ export async function processReturnRequestAction(
                         ],
                         metadata: {
                             dudit_action: true,
+                            is_admin_action: true,
                             admin_actor_name: adminActorEmail || adminActorId,
                             admin_actor_id: adminActorId,
                             return_request_id: data.requestId,
@@ -1757,7 +1796,7 @@ export async function processReturnRequestAction(
                             reason: actionCtx?.reason?.trim() || null,
                             ...(typeof actionCtx?.riskScore === "number" ? { risk_score: actionCtx.riskScore } : {}),
                         },
-                        source: "manual",
+                        source: "admin",
                         storeId: effectiveStoreId,
                     })
                 }
@@ -1970,7 +2009,7 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
                 userAgent,
                 appliedBalanceDelta,
             },
-            source: "manual",
+            source: "erp",
         })
 
         // 12. Registra também na timeline do pedido
@@ -1989,7 +2028,7 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
                 mpRefundId: mpResult.mpRefundId || null,
                 paymentId: mpPaymentId,
             },
-            source: "manual",
+            source: "erp",
         })
 
         await Promise.all([

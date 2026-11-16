@@ -71,12 +71,15 @@ export enum AdminActionType {
 
     // Service Orders (admin editing seller service orders)
     SERVICE_ORDER_UPDATE = "service_order.update",
+    SERVICE_ORDER_DELETE = "service_order.delete",
 
     // Quotes (admin editing seller quotes)
     QUOTE_UPDATE = "quote.update",
+    QUOTE_DELETE = "quote.delete",
 
     // Promotions & Community Videos
     PROMOTION_UPDATE = "promotion.update",
+    PROMOTION_DELETE = "promotion.delete",
     COMMUNITY_VIDEO_UPDATE = "community_video.update",
 
     // Catalog admin editing (admin acting on seller catalog)
@@ -93,6 +96,12 @@ export enum AdminActionType {
 
     // Financial
     SUBSCRIPTION_CANCEL = "subscription.cancel",
+
+    // Blog / editorial
+    BLOG_POST_CREATE = "blog.post_create",
+    BLOG_POST_UPDATE = "blog.post_update",
+    BLOG_POST_DELETE = "blog.post_delete",
+    BLOG_POST_STATUS_CHANGE = "blog.post_status_change",
 
     // Advertising
     AD_CREATE = "advertising.create",
@@ -137,6 +146,7 @@ export type AuditTargetType =
     | "service_order"
     | "quote"
     | "promotion"
+    | "blog_post"
 
 export interface AdminAuditLogEntry {
     adminUserId: string

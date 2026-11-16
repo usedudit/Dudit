@@ -259,7 +259,7 @@ export async function listAdminCatalogPlans(input?: {
         let query = admin
             .from("recurring_plans")
             .select(
-                "id, name, status, frequency_type, frequency_interval, start_date, show_in_marketplace, images, partner_id, store_id, updated_at, created_at",
+                "id, name, description, status, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, start_date, end_date, billing_mode, show_in_marketplace, images, partner_id, store_id, updated_at, created_at, recurring_plan_items(id, unit_price, quantity)",
             )
             .order("updated_at", { ascending: false })
             .order("id", { ascending: false })
@@ -279,7 +279,18 @@ export async function listAdminCatalogPlans(input?: {
         const rows = data || []
         const partnerMap = await fetchPartnerNames(admin, rows.map((r: any) => r.partner_id))
         return successResponse({
-            items: rows.map((r: any) => ({ ...r, partner_name: partnerMap[r.partner_id] || null })),
+            items: rows.map((r: any) => {
+                const mapped = mapPlanRow(r)
+                return {
+                    ...mapped,
+                    partner_name: partnerMap[r.partner_id] || null,
+                    items: (r.recurring_plan_items || []).map((it: any) => ({
+                        id: String(it.id),
+                        unitPrice: Number(it.unit_price || 0),
+                        quantity: Number(it.quantity || 1),
+                    })),
+                }
+            }),
             hasMore: rows.length === limit,
         })
     } catch (e: any) {

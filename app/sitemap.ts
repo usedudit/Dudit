@@ -2,6 +2,8 @@ import { MetadataRoute } from 'next'
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { helpCategories } from "@/lib/help-data"
+import { BLOG_CATEGORIES } from "@/lib/blog/categories"
+import { getPublishedBlogSlugs } from "@/lib/blog/queries"
 
 export const revalidate = 86400
 
@@ -33,6 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { url: "https://dudit.com.br/explorar", lastModified: now, changeFrequency: "daily", priority: 0.9 },
         { url: "https://dudit.com.br/ferramentas", lastModified: now, changeFrequency: "daily", priority: 0.9 },
         { url: "https://dudit.com.br/ajuda", lastModified: now, changeFrequency: "daily", priority: 0.9 },
+        { url: "https://dudit.com.br/blog", lastModified: now, changeFrequency: "daily", priority: 0.9 },
         { url: "https://dudit.com.br/institucional/inicio", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/sobre", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/planos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
@@ -61,6 +64,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { url: "https://dudit.com.br/segmentos/lojas-de-roupas-e-calcados", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
         { url: "https://dudit.com.br/segmentos/autonomos-e-prestadores-de-servicos", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
     ]
+
+    // --- Blog do Dino: index, categories and published posts ---
+    const blogCategoryUrls: MetadataRoute.Sitemap = BLOG_CATEGORIES.map((category) => ({
+        url: `https://dudit.com.br/blog/categoria/${category.id}`,
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.7,
+    }))
+
+    const blogSlugs = await getPublishedBlogSlugs()
+    const blogPostUrls: MetadataRoute.Sitemap = blogSlugs.map((post) => ({
+        url: `https://dudit.com.br/blog/${post.slug}`,
+        lastModified: new Date(post.updated_at),
+        changeFrequency: "weekly",
+        priority: 0.8,
+    }))
 
     // --- Help Center Categories & Articles (AEO / GEO) ---
     const helpUrls: MetadataRoute.Sitemap = []
@@ -102,6 +121,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ...staticUrls,
         ...toolUrls,
         ...segmentUrls,
+        ...blogCategoryUrls,
+        ...blogPostUrls,
         ...helpUrls,
         ...stateUrls,
         ...categoryUrls

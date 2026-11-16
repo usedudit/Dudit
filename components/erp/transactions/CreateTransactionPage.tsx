@@ -1152,7 +1152,7 @@ export default function CreateTransactionPage({
                     firstInstallmentPaymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
                 })
                 if (!installmentRes.success) return error(installmentRes.error || "Erro ao criar parcelamento")
-                const installmentGroupId = (installmentRes.data as { id?: string } | undefined)?.id
+                const installmentGroupId = (installmentRes.data as { id?: string; groupId?: string } | undefined)?.groupId || (installmentRes.data as { id?: string } | undefined)?.id
                 if (installmentGroupId) await uploadStagedAttachments(installmentGroupId)
                 success("Parcelamento criado com sucesso!")
                 onSuccess?.()
@@ -1161,7 +1161,6 @@ export default function CreateTransactionPage({
                 return
             }
             const res = await createManualTransactionAction({
-                id: transactionId,
                 partnerId,
                 storeId,
                 transactionType: txKind,
@@ -1184,8 +1183,8 @@ export default function CreateTransactionPage({
                 origin: "manual",
             })
             if (!res.success) return error(res.error || "Erro ao salvar transação")
-            const createdTxId = (res.data as { id?: string } | undefined)?.id || transactionId
-            await uploadStagedAttachments(createdTxId)
+            const createdTxId = (res.data as { id?: string } | undefined)?.id
+            if (createdTxId) await uploadStagedAttachments(createdTxId)
             success("Transação criada com sucesso!")
             onSuccess?.()
             debouncedRefresh()

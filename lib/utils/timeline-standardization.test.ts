@@ -239,4 +239,45 @@ describe("resolveTimelineActorName", () => {
       storeName: "Dudit Store",
     })).toBe("Sistema")
   })
+
+  it("never resolves ERP actions as Equipe Dudit, even with legacy dudit flags", () => {
+    // Action done in ERP by the owner or staff, but polluted with legacy dudit_action or generic actor_name
+    const dummyErpActionPolluted = {
+      actor_user_id: "user-seller-1",
+      actor_name: "Equipe Dudit",
+      metadata: { dudit_action: true, source: "erp" },
+      source: "erp",
+    }
+
+    expect(resolveTimelineActorName({
+      entry: dummyErpActionPolluted,
+      viewer: "seller",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Vendedor")
+
+    expect(resolveTimelineActorName({
+      entry: dummyErpActionPolluted,
+      viewer: "customer",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Dudit Store")
+
+    const dummyErpActionWithStaffName = {
+      actor_user_id: "user-seller-2",
+      actor_name: "Roberta Funcionária",
+      metadata: { dudit_action: true },
+      source: "erp",
+    }
+
+    expect(resolveTimelineActorName({
+      entry: dummyErpActionWithStaffName,
+      viewer: "seller",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Roberta Funcionária")
+  })
 })

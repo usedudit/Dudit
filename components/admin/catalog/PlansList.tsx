@@ -1,676 +1,700 @@
 "use client"
 
-import React, { useState, useTransition, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { useToast } from "@/hooks/use-toast"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import { useNotification } from "@/hooks/use-notification"
+
+// Reusable Components
 import {
     Button,
-    Badge,
-    Input,
-    Pagination,
     IconPlaceholder,
-    ActionsDropdown,
-    DefaultModal,
-    FormTextarea,
+    ThreeDotsLoader,
+    Pagination,
+    Checkbox,
+    SelectionBanner,
+    AlertModal,
 } from "@/components/reusable"
-import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { toast } from "@/hooks/use-notification"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+
+// Specific Page components from ERP
+import NewRecurringPlanPage from "@/components/erp/recurring/NewRecurringPlanPage"
+import PlanDetailPage from "@/components/erp/recurring/PlanDetailPage"
+import PlanPageControls from "@/components/erp/recurring/PlanPageControls"
+import PlanGridCard from "@/components/erp/recurring/PlanGridCard"
+import PlanListRow from "@/components/erp/recurring/PlanListRow"
+
+// Icons & Utils
 import {
+    PlusIcon,
+    ArrowUpDownIcon,
+    TrashIcon,
     RepeatIcon,
-    EditIcon,
-    EyeIcon,
-    StoreIcon,
-    SearchIcon,
-    ListIcon,
-    GridIcon,
-    FilterIcon,
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { useAdminActionModal } from "@/components/admin/AdminActionModal"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
+import type { RecurringPlan } from "@/lib/types/recurring"
+import { getRecurringFrequencyLabel, getRecurringBillingModeLabel } from "@/lib/types/recurring"
+import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import FilterChip from "@/components/reusable/FilterChip"
 import {
+    listAdminCatalogPlans,
     getAdminCatalogPlanDetail,
     updateAdminRecurringPlan,
+    deleteAdminRecurringPlan,
 } from "@/app/actions/admin/catalog"
+import { useAdminActionModal } from "@/components/admin/AdminActionModal"
+import { diffChangedFields } from "@/lib/admin/changed-fields"
+import { PermissionProvider } from "@/lib/permission-context"
+import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions"
+import { StoreProvider } from "@/lib/store-context"
+
+type PlanFilters = { frequency: string[]; billing: string[]; price: { min: string; max: string } }
+
+const EMPTY_PLAN_FILTERS: PlanFilters = { frequency: [], billing: [], price: { min: "", max: "" } }
+
+const PLAN_FREQUENCY_LABELS: Record<string, string> = {
+  daily: "Diária",
+  weekly: "Semanal",
+  monthly: "Mensal",
+  yearly: "Anual",
+  custom: "Personalizada",
+}
+
+const PLAN_BILLING_LABELS: Record<string, string> = {
+  auto_mercado_pago: "Mercado Pago",
+  manual: "Manual",
+}
+
+const PLAN_FILTER_SECTIONS: FilterSectionConfig[] = [
+  {
+    id: "frequency",
+    title: "Frequência",
+    type: "checkbox-list",
+    options: ["daily", "weekly", "monthly", "yearly", "custom"],
+    optionLabels: PLAN_FREQUENCY_LABELS,
+  },
+  {
+    id: "billing",
+    title: "Cobrança",
+    type: "checkbox-list",
+    options: ["auto_mercado_pago", "manual"],
+    optionLabels: PLAN_BILLING_LABELS,
+  },
+  {
+    id: "price",
+    title: "Preço",
+    type: "range",
+    rangeConfig: {
+      minKey: "min",
+      maxKey: "max",
+      minPlaceholder: "Preço mínimo",
+      maxPlaceholder: "Preço máximo",
+    },
+  },
+]
+
+const PlanFilterChips = ({
+  filters,
+  onClear,
+}: {
+  filters: PlanFilters
+  onClear: (key: keyof PlanFilters) => void
+}) => {
+  const priceValue =
+    filters.price.min || filters.price.max
+      ? [
+          filters.price.min ? `a partir de R$ ${filters.price.min}` : null,
+          filters.price.max ? `até R$ ${filters.price.max}` : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : ""
+
+  return (
+    <AnimatePresence>
+      {filters.frequency.length > 0 && (
+        <FilterChip
+          key="frequency"
+          label="Frequência"
+          value={filters.frequency.map((v) => PLAN_FREQUENCY_LABELS[v] || v).join(", ")}
+          onRemove={() => onClear("frequency")}
+        />
+      )}
+      {filters.billing.length > 0 && (
+        <FilterChip
+          key="billing"
+          label="Cobrança"
+          value={filters.billing.map((v) => PLAN_BILLING_LABELS[v] || v).join(", ")}
+          onRemove={() => onClear("billing")}
+        />
+      )}
+      {priceValue && (
+        <FilterChip
+          key="price"
+          label="Preço"
+          value={priceValue}
+          onRemove={() => onClear("price")}
+        />
+      )}
+    </AnimatePresence>
+  )
+}
+
+type SortKey = "name" | "seller" | "frequency" | "billing" | "startDate" | "endDate" | "status"
+type SortDirection = "asc" | "desc"
+
+type PlanColumn = {
+    id: string
+    label: string
+    align?: "left" | "center" | "right"
+    width?: string
+    sortable: boolean
+    key?: SortKey
+}
+
+const COLUMNS: PlanColumn[] = [
+    { id: "name", label: "Plano", align: "left" as const, width: "280px", sortable: true, key: "name" },
+    { id: "seller", label: "Vendedor", align: "left" as const, width: "180px", sortable: true, key: "seller" },
+    { id: "frequency", label: "Frequência", align: "left" as const, width: "140px", sortable: true, key: "frequency" },
+    { id: "billing", label: "Cobrança", align: "left" as const, width: "160px", sortable: true, key: "billing" },
+    { id: "startDate", label: "Início", align: "left" as const, width: "120px", sortable: true, key: "startDate" },
+    { id: "endDate", label: "Fim", align: "left" as const, width: "120px", sortable: true, key: "endDate" },
+    { id: "status", label: "Status", align: "center" as const, width: "120px", sortable: true, key: "status" },
+    { id: "actions", label: "Ações", align: "center" as const, width: "100px", sortable: false },
+]
 
 interface PlansListProps {
     initialItems: any[]
 }
 
-const FREQUENCY_LABELS: Record<string, string> = {
-    weekly: "Semanal",
-    biweekly: "Quinzenal",
-    monthly: "Mensal",
-    bimonthly: "Bimestral",
-    quarterly: "Trimestral",
-    semiannual: "Semestral",
-    yearly: "Anual",
-}
+export default function PlansList({ initialItems = [] }: PlansListProps) {
+    const { toast } = useToast()
+    const { success: notifySuccess, error: notifyError } = useNotification()
+    const { modal: actionModal, runAction } = useAdminActionModal()
+    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
 
-export default function PlansList({ initialItems }: PlansListProps) {
-    const [plans, setPlans] = useState(initialItems)
-    const [activeTab, setActiveTab] = useState("all")
-    const [viewMode, setViewMode] = useState<"list" | "grid">("list")
-    const [search, setSearch] = useState("")
-    const [page, setPage] = useState(1)
-    const itemsPerPage = 10
-
-    // Filter Sheet state
-    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
-    const [frequencyFilters, setFrequencyFilters] = useState<string[]>([])
-
-    // Detail & Edit State
-    const [selectedPlanDetail, setSelectedPlanDetail] = useState<any | null>(null)
-    const [isLoadingDetail, setIsLoadingDetail] = useState(false)
-
-    const [editingPlan, setEditingPlan] = useState<any | null>(null)
-    const [editForm, setEditForm] = useState<{
-        status: string
-        name: string
-        price: number
-        description: string
-    }>({
-        status: "active",
-        name: "",
-        price: 0,
-        description: "",
+    // useEntityPage Hook for managing URL state and query caching
+    const entityPage = useEntityPage<any, any, string>({
+        entityType: "recurring_plans",
+        partnerId: "admin",
+        queryKey: ["admin", "recurring_plans"],
+        initialItems,
+        initialNextCursor: null,
+        initialHasMore: false,
+        fetchPageFn: async () => {
+            const res = await listAdminCatalogPlans({ limit: 100 })
+            if (!res.success || !res.data) throw new Error((res as any).error || "Erro ao carregar planos.")
+            return { items: res.data.items, nextCursor: null, hasMore: res.data.hasMore }
+        },
+        dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            const res = await getAdminCatalogPlanDetail(id)
+            if (res.success && res.data) {
+                return {
+                    ...res.data.plan,
+                    store: res.data.store,
+                    partner: res.data.partner,
+                    audit_events: res.data.auditEvents || [],
+                }
+            }
+            return null
+        },
+        listToDetail: (item: any) => item,
     })
 
-    const [isPending, startTransition] = useTransition()
-    const { modal: actionModal, runAction } = useAdminActionModal()
+    const {
+        items: rawPlans,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isListLoading,
+        entityState,
+        openEntity,
+        closeEntity,
+        currentEntity,
+        afterMutation,
+        queryClient,
+    } = entityPage
 
-    const activeCount = plans.filter((p) => p.status === "active" || p.status === "ativo").length
-    const inactiveCount = plans.length - activeCount
+    const handleMutation = useCallback(() => {
+        afterMutation()
+        queryClient.invalidateQueries({ queryKey: ["admin", "recurring_plans"] })
+    }, [afterMutation, queryClient])
 
-    const tabs = useMemo(() => [
-        { id: "all", label: "Todos os Planos", count: plans.length },
-        { id: "active", label: "Ativos", count: activeCount },
-        { id: "inactive", label: "Inativos", count: inactiveCount },
-    ], [plans.length, activeCount, inactiveCount])
+    // Local states
+    const [viewMode, setViewMode] = useState<"list" | "grid">(isTablet ? "grid" : "list")
+    const [searchQuery, setSearchQuery] = useState("")
+    const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
+    const [isFilterOpen, setIsFilterOpen] = useState(false)
+    const [filters, setFilters] = useState<PlanFilters>(EMPTY_PLAN_FILTERS)
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
+        key: "name",
+        direction: "asc",
+    })
+    const [page, setPage] = useState(1)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-    const filtered = useMemo(() => {
-        return plans.filter((p) => {
-            const isAct = p.status === "active" || p.status === "ativo"
-            let matchesTab = true
-            if (activeTab === "active") matchesTab = isAct
-            else if (activeTab === "inactive") matchesTab = !isAct
+    // Modals
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+    const [itemToDelete, setItemToDelete] = useState<any | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
-            const freq = (p.billing_frequency || p.frequency || p.interval || "").toLowerCase()
-            const matchesFrequency =
-                frequencyFilters.length === 0 || frequencyFilters.includes(freq)
-
-            const term = search.trim().toLowerCase()
-            const matchesSearch =
-                !term ||
-                p.name?.toLowerCase().includes(term) ||
-                p.partner_name?.toLowerCase().includes(term) ||
-                p.stores?.name?.toLowerCase().includes(term)
-
-            return matchesTab && matchesFrequency && matchesSearch
-        })
-    }, [plans, activeTab, frequencyFilters, search])
-
-    const paginated = useMemo(() => {
-        return filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage)
-    }, [filtered, page])
-
-    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1
-
-    const handleOpenDetail = async (plan: any) => {
-        setSelectedPlanDetail(plan)
-        setIsLoadingDetail(true)
-        try {
-            const res = await getAdminCatalogPlanDetail(plan.id)
-            if (res.success && res.data?.plan) {
-                setSelectedPlanDetail(res.data.plan)
-            }
-        } catch (err) {
-            console.error("Failed to fetch plan detail:", err)
-        } finally {
-            setIsLoadingDetail(false)
+    // Sync viewMode on breakpoint change
+    useEffect(() => {
+        if (isTablet && viewMode !== "grid") {
+            setViewMode("grid")
         }
-    }
+    }, [isTablet, viewMode])
 
-    const handleOpenEdit = (plan: any) => {
-        setEditingPlan(plan)
-        setEditForm({
-            status: plan.status || "active",
-            name: plan.name || "",
-            price: Number(plan.price || 0),
-            description: plan.description || "",
+    // Reset pagination when search/filter/tab changes
+    useEffect(() => {
+        setPage(1)
+    }, [searchQuery, activeTab, filters])
+
+    // Selected plan for detail/edit
+    const selectedPlan = useMemo(() => {
+        if (!entityState.isOpen || !entityState.entityId) return null
+        if (currentEntity && currentEntity.id === entityState.entityId) return currentEntity
+        return rawPlans.find((p: any) => p.id === entityState.entityId) || null
+    }, [entityState.isOpen, entityState.entityId, currentEntity, rawPlans])
+
+    // Filter logic
+    const filteredPlans = useMemo(() => {
+        return rawPlans.filter((plan: any) => {
+            if (activeTab === "Ativo" && plan.status !== "active") return false
+            if (activeTab === "Inativo" && plan.status !== "inactive") return false
+            if (activeTab === "Arquivado" && plan.status !== "archived") return false
+
+            if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase().trim()
+                const nameMatch = plan.name?.toLowerCase().includes(query)
+                const descMatch = plan.description?.toLowerCase().includes(query)
+                const sellerMatch = (plan.partner_name || plan.store_name || "").toLowerCase().includes(query)
+                if (!nameMatch && !descMatch && !sellerMatch) return false
+            }
+
+            if (filters.frequency.length > 0 && !filters.frequency.includes(plan.frequencyType)) {
+                return false
+            }
+
+            if (filters.billing.length > 0 && !filters.billing.includes(plan.billingMode)) {
+                return false
+            }
+
+            if (filters.price.min || filters.price.max) {
+                const totalPrice = (plan.items || []).reduce(
+                    (acc: number, item: any) => acc + (Number(item.unitPrice || 0) * Number(item.quantity || 1)),
+                    0
+                )
+                if (filters.price.min && totalPrice < Number(filters.price.min)) return false
+                if (filters.price.max && totalPrice > Number(filters.price.max)) return false
+            }
+
+            return true
         })
+    }, [rawPlans, activeTab, searchQuery, filters])
+
+    // Sort logic
+    const sortedPlans = useMemo(() => {
+        if (!sortConfig) return filteredPlans
+
+        return [...filteredPlans].sort((a: any, b: any) => {
+            let aVal: any = a[sortConfig.key]
+            let bVal: any = b[sortConfig.key]
+
+            if (sortConfig.key === "name") {
+                aVal = a.name?.toLowerCase() || ""
+                bVal = b.name?.toLowerCase() || ""
+            } else if (sortConfig.key === "seller") {
+                aVal = (a.partner_name || a.store_name || "").toLowerCase()
+                bVal = (b.partner_name || b.store_name || "").toLowerCase()
+            } else if (sortConfig.key === "startDate") {
+                aVal = new Date(a.startDate).getTime() || 0
+                bVal = new Date(b.startDate).getTime() || 0
+            } else if (sortConfig.key === "endDate") {
+                aVal = a.endDate ? new Date(a.endDate).getTime() : Infinity
+                bVal = b.endDate ? new Date(b.endDate).getTime() : Infinity
+            }
+
+            if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1
+            if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1
+            return 0
+        })
+    }, [filteredPlans, sortConfig])
+
+    // Pagination
+    const itemsPerPage = 8
+    const totalPages = Math.ceil(sortedPlans.length / itemsPerPage)
+    const paginated = useMemo(() => {
+        const start = (page - 1) * itemsPerPage
+        return sortedPlans.slice(start, start + itemsPerPage)
+    }, [sortedPlans, page, itemsPerPage])
+
+    // Tab counts
+    const tabCounts = useMemo(() => {
+        const Todos = rawPlans.length
+        const Ativo = rawPlans.filter((p: any) => p.status === "active").length
+        const Inativo = rawPlans.filter((p: any) => p.status === "inactive").length
+        const Arquivado = rawPlans.filter((p: any) => p.status === "archived").length
+        return { Todos, Ativo, Inativo, Arquivado }
+    }, [rawPlans])
+
+    const handleSelectRow = useCallback((id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+        })
+    }, [])
+
+    const handleAddPlan = () => openEntity("create")
+    const handleEditPlan = (plan: any) => openEntity("edit", plan.id)
+    const handleDetailsPlan = (plan: any) => openEntity("view", plan.id)
+
+    const handleDeleteTrigger = (plan: any) => {
+        setItemToDelete(plan)
+        setIsDeleteModalOpen(true)
     }
 
-    const handleSaveEdit = async () => {
-        if (!editingPlan) return
-
-        const changedFields: string[] = []
-        if (editForm.status !== editingPlan.status) changedFields.push("status")
-        if (editForm.name !== (editingPlan.name || "")) changedFields.push("nome")
-        if (editForm.price !== Number(editingPlan.price || 0)) changedFields.push("preço")
-        if (editForm.description !== (editingPlan.description || "")) changedFields.push("descrição")
-
-        await runAction({
-            title: "Salvar Alterações no Plano Recorrente",
-            description: `Plano "${editingPlan.name}" (${editingPlan.partner_name || editingPlan.stores?.name || "Loja"})`,
-            changedFields,
-            force: true,
-            confirmLabel: "Salvar e Notificar",
-            notifyLabel: "Enviar notificação pelo Dudit ao vendedor",
+    const handleDeleteConfirm = async () => {
+        if (!itemToDelete) return
+        const result = await runAction({
+            title: "Excluir plano recorrente",
+            description: `Plano "${itemToDelete.name}" (${itemToDelete.partner_name || "Loja"}). O time do vendedor será notificado.`,
+            requireReason: true,
+            confirmLabel: "Excluir",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
             runner: async (payload) => {
-                const partnerId = editingPlan.partner_id || editingPlan.partnerId || editingPlan.stores?.partner_id || ""
-                const res = await updateAdminRecurringPlan(
-                    {
-                        partnerId,
-                        planId: editingPlan.id,
-                        status: editForm.status as any,
-                        name: editForm.name,
-                        description: editForm.description,
-                    },
-                    payload
-                )
-
-                if (!res.success) {
-                    toast({ title: "Erro ao salvar", description: res.error, variant: "destructive" })
-                    return { success: false, error: res.error }
-                }
-
-                toast({ title: "Sucesso", description: "Plano atualizado com sucesso." })
-                setPlans((prev) =>
-                    prev.map((p) =>
-                        p.id === editingPlan.id
-                            ? {
-                                  ...p,
-                                  status: editForm.status,
-                                  name: editForm.name,
-                                  price: editForm.price,
-                                  description: editForm.description,
-                              }
-                            : p
-                    )
-                )
-                setEditingPlan(null)
-                if (selectedPlanDetail?.id === editingPlan.id) {
-                    setSelectedPlanDetail((prev: any) => ({
-                        ...prev,
-                        status: editForm.status,
-                        name: editForm.name,
-                        price: editForm.price,
-                        description: editForm.description,
-                    }))
-                }
-                return { success: true }
+                const res = await deleteAdminRecurringPlan(itemToDelete.id, {
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                return res.success ? { success: true } : { success: false, error: res.error }
             },
         })
+        if (result.success) {
+            notifySuccess("Plano recorrente excluído pela administração!")
+            setSelectedIds(prev => {
+                const next = new Set(prev)
+                next.delete(itemToDelete.id)
+                return next
+            })
+            handleMutation()
+        }
+        setIsDeleteModalOpen(false)
+        setItemToDelete(null)
     }
 
-    const filterSections: FilterSectionConfig[] = [
-        {
-            id: "frequency",
-            title: "Frequência de Cobrança",
-            type: "checkbox-list",
-            options: ["weekly", "biweekly", "monthly", "quarterly", "semiannual", "yearly"],
-            optionLabels: FREQUENCY_LABELS,
-        },
-    ]
+    // Admin save override handler for plans
+    const handleAdminSavePlan = async (payload: any): Promise<{ success?: boolean; error?: string; cancelled?: boolean } | void> => {
+        if (!selectedPlan) return
+        const changedFields = diffChangedFields(selectedPlan, payload)
+        const result = await runAction({
+            title: "Salvar alterações no Plano Recorrente",
+            description: `Plano "${selectedPlan.name}" (${selectedPlan.partner_name || "Loja"})`,
+            changedFields,
+            force: true,
+            confirmLabel: "Salvar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (actionPayload) => {
+                const res: any = await updateAdminRecurringPlan(
+                    { ...payload, planId: selectedPlan.id, partnerId: selectedPlan.partnerId || selectedPlan.partner_id },
+                    {
+                        reason: actionPayload.reason || null,
+                        riskScore: actionPayload.riskScore,
+                        notifySeller: actionPayload.notifySeller,
+                        changedFields,
+                    }
+                )
+                if (res?.success) return { success: true }
+                return { success: false, error: res?.error || "Erro ao salvar o plano." }
+            },
+        })
+
+        if (result.cancelled) return { cancelled: true }
+        if (result.success) {
+            notifySuccess("Plano atualizado com sucesso pela administração!")
+            closeEntity()
+            handleMutation()
+            return { success: true }
+        }
+        notifyError(result.error || "Erro ao salvar plano")
+        return { success: false, error: result.error }
+    }
+
+    const handleSort = (key: SortKey) => {
+        setSortConfig(prev => {
+            if (prev?.key === key) {
+                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+            }
+            return { key, direction: "asc" }
+        })
+    }
+
+    const isViewing = entityState.isOpen && entityState.action === "view"
+    const isEditing = entityState.isOpen && entityState.action === "edit"
+    const isCreating = entityState.isOpen && entityState.action === "create"
+
+    const activePartnerId = selectedPlan?.partnerId || selectedPlan?.partner_id || "admin"
+    const activeStore = selectedPlan?.store || selectedPlan?.stores || null
 
     return (
-        <FadeIn className="w-full space-y-6 pt-4 px-4 md:px-8 max-w-[1700px] mx-auto pb-12">
-            {/* Top Controls matching ERP */}
-            <div className="flex flex-col gap-4">
-                {/* Tabs */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.id
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => {
-                                    setActiveTab(tab.id)
-                                    setPage(1)
-                                }}
-                                className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                                    isActive
-                                        ? "bg-brand-dark dark:bg-white text-white dark:text-brand-dark shadow-sm"
-                                        : "bg-white dark:bg-dark-surface text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white border border-brand-border dark:border-dark-border"
-                                }`}
-                            >
-                                <span>{tab.label}</span>
-                                <span
-                                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                        isActive
-                                            ? "bg-white/20 text-white dark:bg-brand-dark/20 dark:text-brand-dark"
-                                            : "bg-brand-gray dark:bg-dark-border text-brand-inactive-text"
-                                    }`}
-                                >
-                                    {tab.count}
-                                </span>
-                            </button>
-                        )
-                    })}
-                </div>
-
-                {/* Search & Actions Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="relative w-full sm:w-80 md:w-96">
-                        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
-                        <Input
-                            placeholder="Buscar plano ou loja..."
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value)
-                                setPage(1)
-                            }}
-                            className="pl-10 h-10 text-xs rounded-xl border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsFilterSheetOpen(true)}
-                            className="flex items-center gap-2 text-xs font-semibold h-10 px-3 border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                        >
-                            <FilterIcon className="w-3.5 h-3.5" />
-                            <span>Filtros</span>
-                            {frequencyFilters.length > 0 && (
-                                <span className="w-2 h-2 rounded-full bg-brand-green" />
-                            )}
-                        </Button>
-
-                        <div className="flex items-center border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-0.5">
-                            <button
-                                onClick={() => setViewMode("list")}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    viewMode === "list"
-                                        ? "bg-brand-green-light dark:bg-dark-border text-brand-dark dark:text-white"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
-                                title="Visualização em Lista"
-                            >
-                                <ListIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode("grid")}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    viewMode === "grid"
-                                        ? "bg-brand-green-light dark:bg-dark-border text-brand-dark dark:text-white"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
-                                title="Visualização em Grade"
-                            >
-                                <GridIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Content Area */}
-            {filtered.length === 0 ? (
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex flex-col justify-center min-h-[360px]">
-                    <IconPlaceholder
-                        title="Nenhum plano recorrente encontrado"
-                        subtitle="Não há planos correspondentes aos filtros aplicados."
-                        className="py-12"
-                    />
-                </div>
-            ) : viewMode === "list" ? (
-                /* ERP List / Table Layout */
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-brand-gray/50 dark:bg-dark-border/30 border-b border-brand-border dark:border-dark-border">
-                                <tr>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Nome do Plano
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Loja / Vendedor
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Frequência
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Preço / Mensalidade
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Cobrança
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body text-center">
-                                        Status
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body text-center">
-                                        Ações
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                {paginated.map((plan) => {
-                                    const isAct = plan.status === "active" || plan.status === "ativo"
-                                    const storeName = plan.partner_name || plan.stores?.name || "Loja Parceira"
-                                    const freq = (plan.billing_frequency || plan.frequency || plan.interval || "monthly").toLowerCase()
-
-                                    return (
-                                        <tr
-                                            key={plan.id}
-                                            onClick={() => handleOpenDetail(plan)}
-                                            className="h-[72px] cursor-pointer hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20 transition-colors"
-                                        >
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                                                        <RepeatIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading block">
-                                                            {plan.name}
-                                                        </span>
-                                                        <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                            {plan.items_count ? `${plan.items_count} item(ns) inclusos` : "Plano Recorrente"}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <div className="flex items-center gap-1.5 font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                    <StoreIcon size={14} className="text-brand-green shrink-0" />
-                                                    <span className="truncate max-w-[180px]">{storeName}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle text-xs font-semibold text-brand-dark dark:text-dark-heading capitalize">
-                                                {FREQUENCY_LABELS[freq] || freq}
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <span className="text-[14px] font-bold text-brand-green">
-                                                    {formatCurrency(plan.price || 0)}
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {plan.billing_mode === "manual" ? "Manual" : "Mercado Pago Automático"}
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle text-center">
-                                                <Badge variant={isAct ? "green" : "gray"}>
-                                                    {isAct ? "Ativo" : "Inativo"}
-                                                </Badge>
-                                            </td>
-                                            <td
-                                                className="py-3.5 px-5 align-middle text-center"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleOpenEdit(plan)}
-                                                    className="inline-flex items-center gap-1 text-xs h-8 px-2.5"
-                                                >
-                                                    <EditIcon className="w-3.5 h-3.5" />
-                                                    <span>Editar</span>
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {totalPages > 1 && (
-                        <div className="p-4 border-t border-brand-border dark:border-dark-border flex justify-end">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={setPage}
-                            />
-                        </div>
-                    )}
-                </div>
-            ) : (
-                /* ERP Grid Mode matching PlanGridCard */
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {paginated.map((plan) => {
-                            const isAct = plan.status === "active" || plan.status === "ativo"
-                            const storeName = plan.partner_name || plan.stores?.name || "Loja Parceira"
-                            const freq = (plan.billing_frequency || plan.frequency || plan.interval || "monthly").toLowerCase()
-
-                            return (
-                                <div
-                                    key={plan.id}
-                                    onClick={() => handleOpenDetail(plan)}
-                                    className="p-5 rounded-[24px] bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
-                                >
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-9 h-9 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                                                    <RepeatIcon size={16} />
-                                                </div>
-                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors line-clamp-1">
-                                                    {plan.name}
-                                                </span>
-                                            </div>
-                                            <Badge variant={isAct ? "green" : "gray"}>
-                                                {isAct ? "Ativo" : "Inativo"}
-                                            </Badge>
-                                        </div>
-
-                                        <div className="space-y-1 mb-4">
-                                            <p className="text-base font-bold text-brand-green">
-                                                {formatCurrency(plan.price || 0)}
-                                                <span className="text-xs font-normal text-brand-inactive-text">
-                                                    {" "}/ {FREQUENCY_LABELS[freq] || freq}
-                                                </span>
-                                            </p>
-                                            <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pt-1">
-                                                <StoreIcon size={12} className="text-brand-green shrink-0" />
-                                                <span className="truncate">{storeName}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between">
-                                        <span className="text-xs text-brand-inactive-text font-medium">
-                                            {plan.billing_mode === "manual" ? "Manual" : "Mercado Pago"}
-                                        </span>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleOpenEdit(plan)
-                                            }}
-                                            className="text-xs h-8 px-2.5"
-                                        >
-                                            Editar
-                                        </Button>
-                                    </div>
+        <>
+            <AnimatePresence mode="wait">
+                {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
+                    <FadeIn key="form" className="w-full h-full">
+                        {!isCreating && !selectedPlan ? (
+                            isListLoading ? (
+                                <ERPDetailLoading />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-4 h-full min-h-[200px] bg-white dark:bg-dark-background">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                        imageAlt="Plano não encontrado"
+                                        title="Plano não encontrado"
+                                        subtitle="Este plano não está disponível na sua lista atual."
+                                    />
+                                    <Button variant="outline" onClick={() => closeEntity()}>
+                                        Voltar para a lista
+                                    </Button>
                                 </div>
                             )
-                        })}
-                    </div>
-
-                    {totalPages > 1 && (
-                        <div className="p-4 bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border flex justify-end">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={setPage}
-                            />
+                        ) : isViewing && selectedPlan ? (
+                            <PermissionProvider
+                                role="OWNER"
+                                routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+                                partnerId={activePartnerId}
+                                businessInfo={{}}
+                                planSlug="escalar"
+                            >
+                                <StoreProvider
+                                    partnerId={activePartnerId}
+                                    initialStores={activeStore ? [activeStore] : []}
+                                    activeStoreId={selectedPlan?.store_id || activeStore?.id || null}
+                                >
+                                    <PlanDetailPage
+                                        key={`plan-detail-${selectedPlan.id}`}
+                                        partnerId={activePartnerId}
+                                        plan={selectedPlan}
+                                        onBack={() => closeEntity()}
+                                        canManage={true}
+                                        onEdit={(plan) => openEntity("edit", plan.id)}
+                                        onDelete={handleDeleteTrigger}
+                                    />
+                                </StoreProvider>
+                            </PermissionProvider>
+                        ) : isEditing && selectedPlan ? (
+                            <PermissionProvider
+                                role="OWNER"
+                                routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+                                partnerId={activePartnerId}
+                                businessInfo={{}}
+                                planSlug="escalar"
+                            >
+                                <StoreProvider
+                                    partnerId={activePartnerId}
+                                    initialStores={activeStore ? [activeStore] : []}
+                                    activeStoreId={selectedPlan?.store_id || activeStore?.id || null}
+                                >
+                                    <NewRecurringPlanPage
+                                        partnerId={activePartnerId}
+                                        plan={selectedPlan}
+                                        onBack={() => closeEntity()}
+                                        onSuccess={() => {
+                                            closeEntity()
+                                            handleMutation()
+                                        }}
+                                        onSave={handleAdminSavePlan}
+                                    />
+                                </StoreProvider>
+                            </PermissionProvider>
+                        ) : null}
+                    </FadeIn>
+                ) : (
+                    <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                        {/* Desktop Header */}
+                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8 pt-4">
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                        Planos Recorrentes
+                                    </h1>
+                                </div>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    Gerencie todos os planos recorrentes cadastrados pelos vendedores na plataforma.
+                                </p>
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
+
+                        {/* Page Controls */}
+                        <PlanPageControls
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            tabCounts={tabCounts}
+                            viewMode={viewMode}
+                            onViewModeChange={setViewMode}
+                            search={searchQuery}
+                            onSearchChange={setSearchQuery}
+                            onAddPlan={handleAddPlan}
+                            canManage={false}
+                            onOpenFilter={() => setIsFilterOpen(true)}
+                            hasActiveFilters={Boolean(
+                                filters.frequency.length > 0 ||
+                                filters.billing.length > 0 ||
+                                filters.price.min ||
+                                filters.price.max
+                            )}
+                            chips={
+                                <PlanFilterChips
+                                    filters={filters}
+                                    onClear={(key) =>
+                                        setFilters((prev) => ({
+                                            ...prev,
+                                            [key]: key === "price" ? { min: "", max: "" } : [],
+                                        }))
+                                    }
+                                />
+                            }
+                        />
+
+                        {/* Content Area */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-8">
+                            {paginated.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center p-12 text-center min-h-[350px]">
+                                    <IconPlaceholder
+                                        icon={RepeatIcon}
+                                        containerSize="w-16 h-16 mb-2"
+                                        iconSize="w-6 h-6"
+                                        title="Nenhum plano recorrente encontrado"
+                                        subtitle="Não encontramos planos recorrentes para os filtros selecionados."
+                                    />
+                                </div>
+                            ) : viewMode === "grid" ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {paginated.map((plan: any) => (
+                                        <PlanGridCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            selected={selectedIds.has(plan.id)}
+                                            onSelect={() => handleSelectRow(plan.id)}
+                                            canManage={true}
+                                            onEdit={handleEditPlan}
+                                            onDelete={handleDeleteTrigger}
+                                            onDetails={handleDetailsPlan}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface shadow-sm">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                                            <thead>
+                                                <tr className="border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/20">
+                                                    <th className="py-3 pl-4 pr-0 w-12 text-left">
+                                                        <Checkbox
+                                                            checked={paginated.length > 0 && paginated.every((p: any) => selectedIds.has(p.id))}
+                                                            onChange={() => {
+                                                                const allSelected = paginated.every((p: any) => selectedIds.has(p.id))
+                                                                setSelectedIds(prev => {
+                                                                    const next = new Set(prev)
+                                                                    paginated.forEach((p: any) => allSelected ? next.delete(p.id) : next.add(p.id))
+                                                                    return next
+                                                                })
+                                                            }}
+                                                        />
+                                                    </th>
+                                                    {COLUMNS.map((col) => (
+                                                        <th
+                                                            key={col.id}
+                                                            style={{ width: col.width }}
+                                                            className={`py-3 px-4 text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider text-${col.align} ${
+                                                                col.sortable ? "cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border/40 select-none" : ""
+                                                            }`}
+                                                            onClick={() => col.sortable && col.key && handleSort(col.key)}
+                                                        >
+                                                            <div className={`flex items-center gap-1.5 ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                                                <span>{col.label}</span>
+                                                                {col.sortable && col.key && (
+                                                                    <ArrowUpDownIcon
+                                                                        size={14}
+                                                                        className={`transition-transform ${
+                                                                            sortConfig?.key === col.key
+                                                                                ? "text-brand-dark dark:text-dark-heading opacity-100"
+                                                                                : "opacity-40"
+                                                                        } ${sortConfig?.key === col.key && sortConfig.direction === "desc" ? "rotate-180" : ""}`}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                                {paginated.map((plan: any) => (
+                                                    <PlanListRow
+                                                        key={plan.id}
+                                                        plan={plan}
+                                                        columns={COLUMNS}
+                                                        canManage={true}
+                                                        selected={selectedIds.has(plan.id)}
+                                                        onSelect={handleSelectRow}
+                                                        onEdit={handleEditPlan}
+                                                        onDelete={handleDeleteTrigger}
+                                                        onDetails={handleDetailsPlan}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex justify-center pt-6">
+                                    <Pagination
+                                        currentPage={page}
+                                        totalPages={totalPages}
+                                        onPageChange={setPage}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </FadeIn>
+                )}
+            </AnimatePresence>
 
             {/* Filter Sheet */}
             <FilterSheet
-                isOpen={isFilterSheetOpen}
-                onClose={() => setIsFilterSheetOpen(false)}
-                sections={filterSections}
-                filters={{ frequency: frequencyFilters }}
-                setFilters={(newFilters: any) => setFrequencyFilters(newFilters.frequency || [])}
-                onClear={() => setFrequencyFilters([])}
+                isOpen={isFilterOpen}
+                onClose={() => setIsFilterOpen(false)}
+                sections={PLAN_FILTER_SECTIONS}
+                filters={filters}
+                setFilters={setFilters as any}
+                onClear={() => setFilters(EMPTY_PLAN_FILTERS)}
             />
 
-            {/* Detail Modal matching PlanDetailPage */}
-            {selectedPlanDetail && (
-                <DefaultModal
-                    isOpen={Boolean(selectedPlanDetail)}
-                    onClose={() => setSelectedPlanDetail(null)}
-                    title={selectedPlanDetail.name}
-                    description={`Loja: ${selectedPlanDetail.partner_name || selectedPlanDetail.stores?.name || "Loja Parceira"}`}
-                    footer={
-                        <div className="flex justify-between items-center w-full">
-                            <div className="text-xs text-brand-inactive-text">
-                                Criado em {formatDate(selectedPlanDetail.created_at)}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        const p = selectedPlanDetail
-                                        setSelectedPlanDetail(null)
-                                        handleOpenEdit(p)
-                                    }}
-                                >
-                                    Editar Plano
-                                </Button>
-                                <Button variant="default" onClick={() => setSelectedPlanDetail(null)}>
-                                    Fechar
-                                </Button>
-                            </div>
-                        </div>
-                    }
-                >
-                    <div className="space-y-6 pt-2">
-                        {/* Status & Pricing */}
-                        <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-gray/50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border">
-                            <div>
-                                <span className="text-xs text-brand-inactive-text font-medium block">
-                                    Frequência de Cobrança
-                                </span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">
-                                    {FREQUENCY_LABELS[selectedPlanDetail.interval || selectedPlanDetail.billing_frequency] || "Mensal"}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-xs text-brand-inactive-text font-medium block">
-                                    Preço Recorrente
-                                </span>
-                                <span className="text-lg font-bold text-brand-green">
-                                    {formatCurrency(selectedPlanDetail.price || 0)}
-                                </span>
-                            </div>
-                        </div>
+            {/* Delete Confirmation Modal */}
+            <AlertModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Excluir Plano Recorrente"
+                description={`Tem certeza que deseja excluir o plano "${itemToDelete?.name}"? Esta ação não pode ser desfeita.`}
+                confirmText="Excluir"
+                cancelText="Cancelar"
+                isLoading={isDeleting}
+            />
 
-                        {/* Description */}
-                        {selectedPlanDetail.description && (
-                            <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-1">
-                                    Descrição do Plano
-                                </h4>
-                                <p className="text-xs text-brand-dark dark:text-dark-heading leading-relaxed">
-                                    {selectedPlanDetail.description}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Items included */}
-                        {selectedPlanDetail.items && selectedPlanDetail.items.length > 0 && (
-                            <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border space-y-2">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
-                                    Itens Inclusos na Mensalidade ({selectedPlanDetail.items.length})
-                                </h4>
-                                <div className="divide-y divide-brand-border dark:divide-dark-border">
-                                    {selectedPlanDetail.items.map((it: any, i: number) => (
-                                        <div key={i} className="py-2 flex items-center justify-between text-xs">
-                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                {it.name || "Item do Plano"}
-                                            </span>
-                                            <span className="text-brand-inactive-text">
-                                                {it.quantity} {it.unit || "un"}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </DefaultModal>
-            )}
-
-            {/* Edit Modal with AdminActionModal */}
-            {editingPlan && (
-                <DefaultModal
-                    isOpen={Boolean(editingPlan)}
-                    onClose={() => setEditingPlan(null)}
-                    title={`Editar Plano Recorrente`}
-                    description={`Loja: ${editingPlan.partner_name || editingPlan.stores?.name || "Loja Parceira"}`}
-                    footer={
-                        <div className="flex justify-end gap-2 w-full">
-                            <Button variant="ghost" onClick={() => setEditingPlan(null)}>
-                                Cancelar
-                            </Button>
-                            <Button variant="default" onClick={handleSaveEdit}>
-                                Prosseguir e Salvar
-                            </Button>
-                        </div>
-                    }
-                >
-                    <div className="space-y-4 pt-2">
-                        <div>
-                            <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                                Status do Plano
-                            </label>
-                            <select
-                                className="w-full px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-white text-sm"
-                                value={editForm.status}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))}
-                            >
-                                <option value="active">Ativo (Disponível na vitrine)</option>
-                                <option value="inactive">Inativo (Pausado)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                                Nome do Plano
-                            </label>
-                            <Input
-                                value={editForm.name}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                                Preço da Mensalidade
-                            </label>
-                            <Input
-                                type="number"
-                                value={editForm.price}
-                                onChange={(e) =>
-                                    setEditForm((prev) => ({
-                                        ...prev,
-                                        price: parseFloat(e.target.value) || 0,
-                                    }))
-                                }
-                            />
-                        </div>
-
-                        <div>
-                            <FormTextarea
-                                label="Descrição do Plano"
-                                value={editForm.description}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                                rows={3}
-                            />
-                        </div>
-                    </div>
-                </DefaultModal>
-            )}
-
-            {/* Action Context Modal (Notification + Audit) */}
+            {/* Admin Action Modal */}
             {actionModal}
-        </FadeIn>
+        </>
     )
 }

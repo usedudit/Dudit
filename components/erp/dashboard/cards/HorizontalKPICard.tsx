@@ -79,8 +79,8 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                                     item.badgeVariant === "red" || item.badgeVariant === "orange"
                                         ? "bg-[#fce6e5] text-[#cc4745] dark:bg-red-950/40 dark:text-red-400"
                                         : item.badgeVariant === "blue"
-                                        ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
-                                        : "bg-brand-green-secondary text-brand-green dark:bg-green-950/40 dark:text-green-400"
+                                            ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                                            : "bg-brand-green-secondary text-brand-green dark:bg-green-950/40 dark:text-green-400"
                                 )}>
                                     {item.badgeText}
                                 </span>

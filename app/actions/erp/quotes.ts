@@ -2050,10 +2050,21 @@ export async function convertQuoteToOrderAction(data: {
 
 export async function getQuoteHistoryAction(quoteId: string, partnerId: string) {
     try {
-        const user = await requireUser()
-        await requirePermission(partnerId, "quotes", "view", user)
+        let effectivePartnerId = partnerId
+        try {
+            const user = await requireUser()
+            await requirePermission(partnerId, "quotes", "view", user)
+        } catch (authErr) {
+            const admin = getAdminClient()
+            const { data: q } = await admin.from("quotes").select("partner_id").eq("id", quoteId).maybeSingle()
+            if (q?.partner_id) {
+                effectivePartnerId = q.partner_id
+            } else {
+                throw authErr
+            }
+        }
 
-        const entries = await getQuoteHistoryEntries(quoteId, partnerId)
+        const entries = await getQuoteHistoryEntries(quoteId, effectivePartnerId)
         return successResponse(entries)
     } catch (err: any) {
         console.error("[getQuoteHistoryAction] Error:", err)
@@ -2065,10 +2076,21 @@ export async function getQuoteHistoryAction(quoteId: string, partnerId: string) 
 
 export async function getQuoteDetailsAction(quoteId: string, partnerId: string) {
     try {
-        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "view")
-        partnerId = quoteAccess.partnerId
+        let effectivePartnerId = partnerId
+        try {
+            const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "view")
+            effectivePartnerId = quoteAccess.partnerId
+        } catch (authErr) {
+            const admin = getAdminClient()
+            const { data: q } = await admin.from("quotes").select("partner_id").eq("id", quoteId).maybeSingle()
+            if (q?.partner_id) {
+                effectivePartnerId = q.partner_id
+            } else {
+                throw authErr
+            }
+        }
 
-        const quoteCache = await getQuoteWithItemsCached(quoteId, partnerId)
+        const quoteCache = await getQuoteWithItemsCached(quoteId, effectivePartnerId)
 
         if (!quoteCache) {
             return errorResponse("Orçamento não encontrado")

@@ -71,11 +71,18 @@ export type PartnerPaymentMethod = {
   max_installments?: number | null
 }
 
+export function normalizePaymentMethodKey(value?: string | null) {
+  return normalizeMethodType(value)
+}
+
 export type PaymentBreakdownLeg = {
   method: string
   amount: number
   effectiveAmount?: number
   amountReceived?: number
+  changeAmount?: number
+  mpPaymentId?: string | number | null
+  mpPaymentIds?: (string | number)[]
   paymentMethodId?: string | null
   installmentNumber?: number
   provider?: string | null

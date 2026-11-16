@@ -40,7 +40,7 @@ export function HomeSellerBanner() {
                         <h3 className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#09211b] dark:text-white leading-snug">
                             Pronto para vender na sua cidade e em todo o Brasil?
                         </h3>
-                        <p className="text-xs sm:text-sm text-[#1c4d12]/90 dark:text-gray-300 font-medium leading-relaxed mt-1 max-w-2xl line-clamp-2 sm:line-clamp-none">
+                        <p className="text-xs sm:text-sm dark:text-gray-300 font-medium leading-relaxed mt-1 max-w-2xl line-clamp-2 sm:line-clamp-none">
                             Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda sem comissão.
                         </p>
                     </div>

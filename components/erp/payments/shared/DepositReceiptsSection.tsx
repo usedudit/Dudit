@@ -44,8 +44,40 @@ export function DepositReceiptsSection({
   onSelectLeg,
   hasRemainingBalance = false,
 }: DepositReceiptsSectionProps) {
-  const receivedLegs = legs.filter((entry) => Number(entry.amountReceived || 0) > 0.009)
-  if (receivedLegs.length === 0) return null
+  const consolidatedLegs = React.useMemo(() => {
+    const result: PaymentBreakdownLeg[] = []
+    for (const entry of legs) {
+      const received = Number(entry.amountReceived || 0)
+      if (received <= 0.009) continue
+
+      const existing = result.find((item) => {
+        if (item.mpPaymentId || entry.mpPaymentId) {
+          return Boolean(
+            item.mpPaymentId &&
+            entry.mpPaymentId &&
+            String(item.mpPaymentId) === String(entry.mpPaymentId)
+          )
+        }
+        if (item.paymentMethodId && entry.paymentMethodId) {
+          return String(item.paymentMethodId) === String(entry.paymentMethodId)
+        }
+        const itemKey = normalizePaymentMethodKey(String(item.method || ""))
+        const entryKey = normalizePaymentMethodKey(String(entry.method || ""))
+        return Boolean(itemKey && entryKey && itemKey === entryKey)
+      })
+
+      if (existing) {
+        existing.amount = Number((Number(existing.amount || 0) + Number(entry.amount || received)).toFixed(2))
+        existing.amountReceived = Number((Number(existing.amountReceived || 0) + received).toFixed(2))
+        existing.effectiveAmount = Number((Number(existing.effectiveAmount || 0) + Number(entry.effectiveAmount || received)).toFixed(2))
+      } else {
+        result.push({ ...entry })
+      }
+    }
+    return result
+  }, [legs])
+
+  if (consolidatedLegs.length === 0) return null
 
   return (
     <div className="space-y-3">
@@ -53,7 +85,7 @@ export function DepositReceiptsSection({
         Recebimentos confirmados{orderNumber ? ` - ${orderNumber}` : ""}
       </h4>
       <div className="space-y-2">
-        {receivedLegs.map((entry, index) => {
+        {consolidatedLegs.map((entry, index) => {
           const received = Number(entry.amountReceived || 0)
           const methodLabel = formatPaymentMethodLabel(entry.method, null)
           const mp = isMpLeg(entry)

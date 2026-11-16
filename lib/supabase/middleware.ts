@@ -21,6 +21,7 @@ const PUBLIC_PATHS = [
   "/quote",
   "/os",
   "/manutencao",
+  "/blog",
 ]
 
 type SecureRuntimeStatus = {
@@ -120,7 +121,7 @@ export async function middleware(request: NextRequest) {
   const isSystemPath =
     pathname === "/" ||
     PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
-    ["/institucional", "/ajuda", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/print", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/entregadores", "/invite", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp", "/manutencao", "/ferramentas"].some(p => pathname.startsWith(p));
+    ["/institucional", "/ajuda", "/blog", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/print", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/entregadores", "/invite", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp", "/manutencao", "/ferramentas"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
@@ -476,7 +477,7 @@ export async function middleware(request: NextRequest) {
   requestHeaders.delete("x-user-email")
   requestHeaders.delete("x-skip-auth-fallback")
   // Mark public pages so the root layout can skip the getCurrentUser() call.
-  const isPublicPage = ["/institucional", "/ajuda", "/auth", "/manutencao"].some(p => pathname === p || pathname.startsWith(p + "/"))
+  const isPublicPage = ["/institucional", "/ajuda", "/blog", "/auth", "/manutencao"].some(p => pathname === p || pathname.startsWith(p + "/"))
   if (isPublicPage) requestHeaders.set("x-dudit-public-page", "1")
   requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
 
@@ -505,7 +506,7 @@ export async function middleware(request: NextRequest) {
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
   const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/entregadores", "/assinaturas", "/colecoes", "/favoritos"]
-  const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto"]
+  const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto", "/blog"]
 
   const isPrivatePage = PRIVATE_PREFIXES.some(prefix => pathname.startsWith(prefix))
   const isPublicCacheable = !isPrivatePage && PUBLIC_CACHEABLE_PATTERNS.some(pattern => pathname.startsWith(pattern))
@@ -780,6 +781,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|/ajuda|/institucional|~offline|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|/ajuda|/institucional|/blog|~offline|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
   ],
 }

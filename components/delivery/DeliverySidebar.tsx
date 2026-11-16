@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { TruckIcon, Package, XIcon, ChevronRightIcon } from "@/lib/icons"
+import { TruckIcon, Package, XIcon, ChevronRightIcon, HelpCircleIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebar } from "@/lib/sidebar-context"
 import { Drawer } from "vaul"
@@ -13,6 +13,7 @@ interface NavItem {
     icon: any
     label: string
     href: string
+    target?: string
 }
 
 const navItems: NavItem[] = [
@@ -25,6 +26,12 @@ const navItems: NavItem[] = [
         icon: Package,
         label: "Entregas Disponíveis",
         href: "/entregadores/entregas-disponiveis",
+    },
+    {
+        icon: HelpCircleIcon,
+        label: "Regras e Limites",
+        href: "/ajuda/entregas/regras-e-limites-entregas-dudit",
+        target: "_blank",
     },
 ]
 
@@ -177,6 +184,8 @@ export function DeliverySidebar({
                                         <Link
                                             href={item.href}
                                             prefetch={false}
+                                            target={item.target}
+                                            rel={item.target === "_blank" ? "noopener noreferrer" : undefined}
                                             onClick={() => {
                                                 setIsMobileOpen(false)
                                                 setHoveredItem(null)
@@ -267,6 +276,8 @@ export function DeliverySidebar({
                                             <Link
                                                 href={item.href}
                                                 prefetch={false}
+                                                target={item.target}
+                                                rel={item.target === "_blank" ? "noopener noreferrer" : undefined}
                                                 className={cn(
                                                     "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
                                                     isActive ? activeClasses : inactiveClasses

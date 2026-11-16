@@ -91,6 +91,12 @@ export const PlanListRow: React.FC<PlanListRowProps> = ({
             </div>
           </div>
         )
+      case "seller":
+        return (
+          <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate max-w-[180px] block" title={plan.partner_name || (plan as any).store_name || (plan as any).stores?.name || "—"}>
+            {plan.partner_name || (plan as any).store_name || (plan as any).stores?.name || "—"}
+          </span>
+        )
       case "frequency":
         return (
           <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">

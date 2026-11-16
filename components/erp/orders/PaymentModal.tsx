@@ -17,6 +17,7 @@ import {
     CheckCircleIcon,
     ChevronRightIcon,
     InfoIcon,
+    MoneyBagIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem, IconPlaceholder } from '@/components/reusable';
@@ -91,8 +92,6 @@ const getCustomerCredit = (cust: any, fetchedCredit?: number | null) => {
     if (!cust) return 0;
     return Math.max(0, Number(cust.store_credit ?? cust.storeCredit ?? cust.credit ?? cust.customer_credit ?? cust.store_credit_amount ?? cust.balance ?? 0));
 };
-
-
 
 import { CompactPaymentStatusAlert } from '@/components/erp/payments/shared/CompactPaymentStatusAlert';
 import { PaymentAmountLabel } from '@/components/erp/payments/shared/PaymentAmountLabel';
@@ -1857,6 +1856,8 @@ const PaymentModal = ({
         }
     };
 
+    const isSplitMode = view === 'split' || view === 'split_method_select' || editingPaymentIndex !== null;
+
     const activeSplitLegs = useMemo(
         () => payments.filter((p) => p.method && p.amount > 0.009),
         [payments],
@@ -1864,8 +1865,8 @@ const PaymentModal = ({
 
     useEffect(() => {
         let active = true;
-        if (view !== 'split' || !partnerId) {
-            if (view !== 'split') setSplitPreview(null);
+        if (!isSplitMode || !partnerId) {
+            if (!isSplitMode) setSplitPreview(null);
             setIsSplitPreviewLoading(false);
             return;
         }
@@ -1905,7 +1906,7 @@ const PaymentModal = ({
             active = false;
             clearTimeout(t);
         };
-    }, [view, partnerId, chargeTarget, activeSplitLegs, payments]);
+    }, [isSplitMode, partnerId, chargeTarget, activeSplitLegs, payments]);
 
     // Auto-fill amount logic
     useEffect(() => {
@@ -2167,15 +2168,40 @@ const PaymentModal = ({
     }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalTotalWithMethodPricing, isAllocationUnderpaid, splitPreview]);
 
     const currentPricingTotals = useMemo(() => {
-        if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
+        if (isSplitMode && splitPreview && 'success' in splitPreview && splitPreview.success) {
             const rows = splitPreview.rows || [];
-            const hasMerchantBearer = rows.some((row: any) => row?.feeBearer === "merchant");
+            let discount = 0;
+            let interest = 0;
+            let installmentCost = 0;
+            let fee = 0;
+            let fixedFee = 0;
+            let hasCustomerFee = false;
+            let hasCustomerInstallment = false;
+
+            for (const row of rows) {
+                discount += Number(row?.paymentMethodDiscountAmount || 0);
+                const rowInstCost = Number(row?.installmentCostAmount || 0);
+                const rowInt = Number(row?.interestAmount || 0);
+                interest += rowInt;
+                installmentCost += rowInstCost;
+                fee += Number(row?.feeAmount || 0);
+                fixedFee += Number(row?.fixedFeeAmount || 0);
+                if (row?.feeBearer === "customer") hasCustomerFee = true;
+                if (row?.installmentFeeBearer === "customer") hasCustomerInstallment = true;
+            }
+
             return {
-                paymentMethodDiscountAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.paymentMethodDiscountAmount || 0), 0),
-                interestAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.interestAmount || 0), 0),
-                feeAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.feeAmount || 0), 0),
-                fixedFeeAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.fixedFeeAmount || 0), 0),
-                feeBearer: hasMerchantBearer ? "merchant" as const : "customer" as const,
+                paymentMethodDiscountAmount: discount,
+                interestAmount: interest,
+                fixedInterestAmount: Math.max(0, interest - installmentCost),
+                installmentCostAmount: installmentCost,
+                feeAmount: fee,
+                fixedFeeAmount: fixedFee,
+                feeBearer: hasCustomerFee ? ("customer" as const) : ("merchant" as const),
+                installmentFeeBearer: hasCustomerInstallment ? ("customer" as const) : ("merchant" as const),
+                appliedDiscountPercent: 0,
+                appliedFeePercent: 0,
+                appliedInterestPercent: 0,
             };
         }
         if (paymentCalculation?.success) {
@@ -2209,19 +2235,19 @@ const PaymentModal = ({
             appliedFeePercent: 0,
             appliedInterestPercent: 0,
         };
-    }, [view, splitPreview, paymentCalculation]);
+    }, [isSplitMode, splitPreview, paymentCalculation]);
 
     const displayTransactionTotal = (paymentStatus === "success" || paymentStatus === "processing") && successSnapshot
         ? successSnapshot.displayOrderTotal
-        : view === 'split'
+        : isSplitMode
             ? (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : (useStoreCredit && effectiveCreditApplied > 0 ? netChargeTarget : chargeTarget))
             : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
                 ? finalTotalWithMethodPricing
                 : (useStoreCredit && effectiveCreditApplied > 0 ? netChargeTarget : total);
 
     const receiptPricingDetails = useMemo(() => {
-        const source = paymentStatus === "success" && successSnapshot
-            ? {
+        if (paymentStatus === "success" && successSnapshot) {
+            const source = {
                 paymentMethodDiscountAmount: successSnapshot.paymentMethodDiscountAmount,
                 interestAmount: successSnapshot.interestAmount,
                 installmentCostAmount: successSnapshot.installmentCostAmount,
@@ -2232,9 +2258,104 @@ const PaymentModal = ({
                 appliedDiscountPercent: successSnapshot.appliedDiscountPercent,
                 appliedFeePercent: successSnapshot.appliedFeePercent,
                 appliedInterestPercent: successSnapshot.appliedInterestPercent,
-            }
-            : currentPricingTotals;
+            };
+            const installmentCostAmount = Number(source.installmentCostAmount || 0);
+            const interestAmount = Number(source.interestAmount || 0);
+            const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount);
+            const isMerchantFee = source.feeBearer === "merchant";
+            const isMerchantInstallment = (source.installmentFeeBearer || "merchant") === "merchant";
 
+            const absorbedInterest = isMerchantFee ? fixedInterestAmount : 0;
+            const customerInterest = !isMerchantFee ? fixedInterestAmount : 0;
+            const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0;
+            const customerInstallmentCost = !isMerchantInstallment ? installmentCostAmount : 0;
+            const absorbedFee = isMerchantFee ? (Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) : 0;
+
+            const totalAbsorbed = absorbedInterest + absorbedFee + absorbedInstallmentCost;
+
+            const tooltipRows = [
+                (isMerchantFee && (fixedInterestAmount + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) > 0.009)
+                    ? { label: "Juros/taxas absorvidos", value: formatCurrency(fixedInterestAmount + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) } : null,
+                (isMerchantInstallment && installmentCostAmount > 0.009)
+                    ? { label: "Custo de parcelamento", value: formatCurrency(installmentCostAmount) } : null,
+            ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+            return [
+                source.paymentMethodDiscountAmount > 0 ? { label: `Desc. meio pagamento${source.appliedDiscountPercent ? ` (${source.appliedDiscountPercent}%)` : ''}`, amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
+                customerInterest > 0.009 ? { label: "Juros", amount: customerInterest, prefix: '+', tone: 'neutral' } : null,
+                customerInstallmentCost > 0.009 ? { label: "Juros (parcelamento)", amount: customerInstallmentCost, prefix: '+', tone: 'neutral' } : null,
+                (!isMerchantFee && Number(source.feeAmount || 0) > 0.009) ? { label: `Taxas${source.appliedFeePercent ? ` (${source.appliedFeePercent}%)` : ''}`, amount: Number(source.feeAmount || 0), tone: 'neutral' } : null,
+                (!isMerchantFee && Number(source.fixedFeeAmount || 0) > 0.009) ? { label: "Custo do método", amount: Number(source.fixedFeeAmount || 0), prefix: '+', tone: 'neutral' } : null,
+                totalAbsorbed > 0.009 ? {
+                    label: "Taxas/juros absorvidos",
+                    amount: totalAbsorbed,
+                    isAbsorbed: true,
+                    tooltipTitle: "Custos absorvidos pela empresa",
+                    tooltipRows,
+                } : null,
+            ].filter(Boolean);
+        }
+
+        if (isSplitMode && splitPreview && 'success' in splitPreview && splitPreview.success) {
+            const rows = splitPreview.rows || [];
+            let totalDiscount = 0;
+            let totalCustomerInterest = 0;
+            let totalCustomerInstallmentCost = 0;
+            let totalCustomerFee = 0;
+            let totalCustomerFixedFee = 0;
+            let totalAbsorbedInterest = 0;
+            let totalAbsorbedInstallmentCost = 0;
+            let totalAbsorbedFee = 0;
+
+            for (const row of rows) {
+                totalDiscount += Number(row?.paymentMethodDiscountAmount || 0);
+                const rowInstCost = Number(row?.installmentCostAmount || 0);
+                const rowTotalInt = Number(row?.interestAmount || 0);
+                const rowFixedInt = Math.max(0, rowTotalInt - rowInstCost);
+                const isMerchantFee = row?.feeBearer === "merchant";
+                const isMerchantInst = (row?.installmentFeeBearer || "merchant") === "merchant";
+
+                if (isMerchantFee) {
+                    totalAbsorbedInterest += rowFixedInt;
+                    totalAbsorbedFee += Number(row?.feeAmount || 0) + Number(row?.fixedFeeAmount || 0);
+                } else {
+                    totalCustomerInterest += rowFixedInt;
+                    totalCustomerFee += Number(row?.feeAmount || 0);
+                    totalCustomerFixedFee += Number(row?.fixedFeeAmount || 0);
+                }
+
+                if (isMerchantInst) {
+                    totalAbsorbedInstallmentCost += rowInstCost;
+                } else {
+                    totalCustomerInstallmentCost += rowInstCost;
+                }
+            }
+
+            const totalAbsorbed = totalAbsorbedInterest + totalAbsorbedFee + totalAbsorbedInstallmentCost;
+            const tooltipRows = [
+                (totalAbsorbedInterest + totalAbsorbedFee > 0.009)
+                    ? { label: "Juros/taxas absorvidos", value: formatCurrency(totalAbsorbedInterest + totalAbsorbedFee) } : null,
+                (totalAbsorbedInstallmentCost > 0.009)
+                    ? { label: "Custo de parcelamento", value: formatCurrency(totalAbsorbedInstallmentCost) } : null,
+            ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+            return [
+                totalDiscount > 0 ? { label: "Desc. meio pagamento", amount: totalDiscount, prefix: '-', tone: 'positive' } : null,
+                totalCustomerInterest > 0.009 ? { label: "Juros", amount: totalCustomerInterest, prefix: '+', tone: 'neutral' } : null,
+                totalCustomerInstallmentCost > 0.009 ? { label: "Juros (parcelamento)", amount: totalCustomerInstallmentCost, prefix: '+', tone: 'neutral' } : null,
+                totalCustomerFee > 0.009 ? { label: "Taxas", amount: totalCustomerFee, tone: 'neutral' } : null,
+                totalCustomerFixedFee > 0.009 ? { label: "Custo do método", amount: totalCustomerFixedFee, prefix: '+', tone: 'neutral' } : null,
+                totalAbsorbed > 0.009 ? {
+                    label: "Taxas/juros absorvidos",
+                    amount: totalAbsorbed,
+                    isAbsorbed: true,
+                    tooltipTitle: "Custos absorvidos pela empresa",
+                    tooltipRows,
+                } : null,
+            ].filter(Boolean);
+        }
+
+        const source = currentPricingTotals;
         const installmentCostAmount = Number(source.installmentCostAmount || 0);
         const interestAmount = Number(source.interestAmount || 0);
         const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount);
@@ -2270,7 +2391,7 @@ const PaymentModal = ({
                 tooltipRows,
             } : null,
         ].filter(Boolean);
-    }, [paymentStatus, successSnapshot, currentPricingTotals]);
+    }, [paymentStatus, successSnapshot, isSplitMode, splitPreview, currentPricingTotals]);
 
     const receiptView = successSnapshot
         ? {
@@ -2536,6 +2657,28 @@ const PaymentModal = ({
             const normalizedType = normalizeMethodType(method.type);
             setView(getTargetViewForMethodType(normalizedType));
         }
+    };
+
+    const handleSelectSplitType = (type: string) => {
+        const methodsOfType = activeMethods.filter(
+            (method: any) => normalizeMethodType(method.type) === type
+        );
+        if (isFreePlan || methodsOfType.length === 1) {
+            const only = methodsOfType[0];
+            if (only) {
+                handleMethodSelectionInSplit(only);
+                return;
+            }
+            if (type === "cash") {
+                handleMethodSelectionInSplit({ id: "", name: "Dinheiro", type: "cash" } as any);
+                return;
+            }
+        }
+        if (methodsOfType.length === 0 && type === "cash") {
+            handleMethodSelectionInSplit({ id: "", name: "Dinheiro", type: "cash" } as any);
+            return;
+        }
+        setSplitSelectedType(type);
     };
 
     const openMethodTypeSelection = (methodType: string) => {
@@ -3180,7 +3323,7 @@ const PaymentModal = ({
         if (label.includes('dinheiro')) return MoneyIcon;
         if (label.includes('credito') || label.includes('cartão') || label.includes('cartao') || label.includes('débito') || label.includes('debito')) return CreditCardIcon;
         if (label.includes('transferência') || label.includes('transferencia') || label.includes('ted') || label.includes('doc')) return FileIcon;
-        return TagIcon;
+        return MoneyBagIcon;
     }
 
     return (
@@ -3942,17 +4085,17 @@ const PaymentModal = ({
                                                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{p.method || `Selecionar método ${idx + 1}`}</span>
                                                                     </div>
                                                                     {payments.length > 2 && !isLockedMarketplace && existingPaidAmount <= 0.009 && (
-                                                                        <button
-                                                                            type="button"
+                                                                        <Button
+                                                                            variant="ghostred"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 setPayments((prev) => prev.filter((_, i) => i !== idx));
                                                                             }}
-                                                                            className="p-1 rounded-full text-brand-inactive-text hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                                            className="w-5 h-5"
                                                                             title="Remover este método"
                                                                         >
                                                                             <XIcon size={14} />
-                                                                        </button>
+                                                                        </Button>
                                                                     )}
                                                                 </div>
                                                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -4018,21 +4161,21 @@ const PaymentModal = ({
                                                             {splitPreview.finalTotal >= chargeTarget - 0.005 ? (
                                                                 splitPreview.finalTotal > chargeTarget + 0.005 ? (
                                                                     <>
-                                                                        <span className="text-sm font-bold text-green-600">Troco:</span>
-                                                                        <span className="text-lg font-bold text-green-600">
+                                                                        <span className="text-sm font-bold text-brand-green">Troco:</span>
+                                                                        <span className="text-lg font-bold text-brand-green">
                                                                             {formatCurrency(splitPreview.finalTotal - chargeTarget)}
                                                                         </span>
                                                                     </>
                                                                 ) : (
                                                                     <>
                                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Valor total atingido:</span>
-                                                                        <span className="text-lg font-bold text-green-600">OK</span>
+                                                                        <span className="text-lg font-bold text-brand-green">OK</span>
                                                                     </>
                                                                 )
                                                             ) : (
                                                                 <>
                                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Saldo restante:</span>
-                                                                    <span className="text-lg font-bold text-amber-600">
+                                                                    <span className="text-lg font-bold text-brand-orange">
                                                                         {formatCurrency(Math.max(0, chargeTarget - splitPreview.finalTotal))}
                                                                     </span>
                                                                 </>
@@ -4048,14 +4191,13 @@ const PaymentModal = ({
                                         <motion.div key="split_method_select" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full">
                                             {!splitSelectedType ? (
                                                 <>
-                                                    <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione o tipo</h3>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {availableMethodTypes.has("cash") && (
                                                             <PaymentMethodCard
                                                                 icon={MoneyIcon}
                                                                 label="Dinheiro"
                                                                 disabled={isLockedMarketplace}
-                                                                onClick={() => setSplitSelectedType("cash")}
+                                                                onClick={() => handleSelectSplitType("cash")}
                                                             />
                                                         )}
                                                         {availableMethodTypes.has("pix") && (
@@ -4063,7 +4205,7 @@ const PaymentModal = ({
                                                                 icon={QRCodeIcon}
                                                                 label="Pix"
                                                                 disabled={isLockedMarketplace}
-                                                                onClick={() => setSplitSelectedType("pix")}
+                                                                onClick={() => handleSelectSplitType("pix")}
                                                             />
                                                         )}
                                                         {availableMethodTypes.has("credit_card") && (
@@ -4071,7 +4213,7 @@ const PaymentModal = ({
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Crédito"
                                                                 disabled={isLockedMarketplace}
-                                                                onClick={() => setSplitSelectedType("credit_card")}
+                                                                onClick={() => handleSelectSplitType("credit_card")}
                                                             />
                                                         )}
                                                         {availableMethodTypes.has("debit_card") && (
@@ -4079,7 +4221,7 @@ const PaymentModal = ({
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Débito"
                                                                 disabled={isLockedMarketplace}
-                                                                onClick={() => setSplitSelectedType("debit_card")}
+                                                                onClick={() => handleSelectSplitType("debit_card")}
                                                             />
                                                         )}
                                                         {availableMethodTypes.has("bank_transfer") && (
@@ -4087,7 +4229,7 @@ const PaymentModal = ({
                                                                 icon={FileIcon}
                                                                 label="Transferência"
                                                                 disabled={isLockedMarketplace}
-                                                                onClick={() => setSplitSelectedType("bank_transfer")}
+                                                                onClick={() => handleSelectSplitType("bank_transfer")}
                                                             />
                                                         )}
                                                         {availableMethodTypes.has("store_credit") && (
@@ -4124,22 +4266,13 @@ const PaymentModal = ({
                                                                 icon={TagIcon}
                                                                 label="Outros"
                                                                 disabled={isLockedMarketplace}
-                                                                onClick={() => setSplitSelectedType("other")}
+                                                                onClick={() => handleSelectSplitType("other")}
                                                             />
                                                         )}
                                                     </div>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <div className="flex items-center gap-2 mb-4">
-                                                        <button
-                                                            onClick={() => setSplitSelectedType(null)}
-                                                            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
-                                                        >
-                                                            <ChevronLeftIcon size={16} />
-                                                        </button>
-                                                        <h3 className="text-sm font-bold text-brand-inactive-text tracking-wide uppercase">Selecione o método</h3>
-                                                    </div>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {activeMethods
                                                             .filter((method: any) => normalizeMethodType(method.type) === splitSelectedType)

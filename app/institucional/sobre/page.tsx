@@ -189,7 +189,7 @@ const BentoPillars = () => {
                                 )}
                             </div>
                             <div className="pt-6">
-                                <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block mb-1">{card.subtitle}</span>
+                                <span className="text-xs font-bold text-brand-green block mb-1">{card.subtitle}</span>
                                 <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">{card.title}</h4>
                                 <p className="text-brand-inactive-text text-sm leading-relaxed">{card.description}</p>
                             </div>

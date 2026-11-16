@@ -47,6 +47,7 @@ interface CreateQuoteProps {
     onBack: () => void;
     existingQuote?: any;
     mode: 'create' | 'edit' | 'duplicate' | 'view';
+    onSaveOverride?: (payload: any, originalQuote: any) => Promise<{ success: boolean; error?: string } | void>;
 }
 
 const REQUIRED_FIELDS = [
@@ -55,7 +56,7 @@ const REQUIRED_FIELDS = [
     { field: "manualItemPrices", tab: "Dados Gerais" },
 ]
 
-const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
+const CreateQuote = ({ partnerId, onBack, existingQuote, mode, onSaveOverride }: CreateQuoteProps) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const router = useRouter();
     const debouncedRefresh = useDebouncedRefresh();
@@ -783,6 +784,47 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         setIsSaving(true);
         try {
             if (mode === "edit" && existingQuote?.id) {
+                if (onSaveOverride) {
+                    const payload = {
+                        customerId: selectedCustomer?.id ?? null,
+                        issueDate: quoteDate,
+                        expirationDate: expiryDate,
+                        notes: internalNote,
+                        internalNotes: staffInternalNotes,
+                        discountType: discountType === "%" ? "percentage" : "fixed",
+                        discountValue: Number(discount) || 0,
+                        shippingCost: Number(shippingFee) || 0,
+                        additionalCosts: Number(otherCosts) || 0,
+                        status,
+                        items: quoteItems.map((item, idx) => ({
+                            productId: (item.isBlank || item.isService) ? null : item.id,
+                            customName: item.name ? item.name.trim() : undefined,
+                            description: undefined,
+                            quantity: item.qty,
+                            unitPrice: item.price,
+                            sortOrder: idx,
+                        })),
+                        preview: {
+                            primaryColor,
+                            secondaryColor,
+                            quoteTitle,
+                            quoteSubtitle,
+                            showDecoration,
+                        },
+                    };
+                    const res = await onSaveOverride(payload, existingQuote);
+                    if (res?.success) {
+                        notifySuccess("Alterações salvas!", "O orçamento foi salvo com sucesso.");
+                        debouncedRefresh();
+                        onBack();
+                        return;
+                    } else if (res?.error) {
+                        notifyError("Erro ao salvar", res.error);
+                        return;
+                    }
+                    return;
+                }
+
                 if (!originalQuoteData) {
                     notifyError("Aguarde", "Os dados do orçamento ainda estão carregando.");
                     return;

@@ -19,6 +19,7 @@ import {
     SidebarCard,
     NumberInputWithCheckbox,
 } from "@/components/reusable"
+import { motion, AnimatePresence } from "framer-motion"
 import { updateStoreAction } from "@/app/actions/erp/stores"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { ChevronLeftIcon, SaveIcon, Store, WhatsappIcon, TrashIcon, ClockIcon, MonitorIcon, ImageIcon } from "@/lib/icons"
@@ -383,6 +384,28 @@ export const ShowcaseSubPage = ({
         setGeneralInfo((p: any) => ({ ...p, bannerUrl: randomBanner }))
     }
 
+    // Map preview utilities (matching BusinessDataSubPage)
+    const formattedAddress = React.useMemo(() => {
+        const streetLine = address.street
+            ? `${address.street}${address.number ? `, ${address.number}` : ""} - ${address.neighborhood || "Bairro não informado"}`
+            : null;
+
+        const cityLine = (address.city || address.state)
+            ? `${address.city || ""}${address.state ? ` - ${address.state}` : ""}`
+            : null;
+
+        const zipLine = address.zipCode;
+
+        return [streetLine, cityLine, zipLine]
+            .filter(Boolean)
+            .join("\n");
+    }, [address]);
+
+    const mapsUrl = React.useMemo(() => {
+        const fullAddress = `${address.street || ""}, ${address.number || ""}, ${address.neighborhood || ""}, ${address.city || ""} - ${address.state || ""}, ${address.zipCode || ""}`;
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+    }, [address]);
+
     return (
         <FadeIn className="h-full">
             <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
@@ -537,74 +560,109 @@ export const ShowcaseSubPage = ({
                                     </TabsContent>
 
                                     <TabsContent value="address" className="mt-0 focus-visible:outline-none">
-                                        <div className="max-w-[700px] space-y-6">
-                                            <FormSection title="Endereço de Localização">
-                                                <div className="space-y-4">
-                                                    <CepInput
-                                                        value={address.zipCode}
-                                                        onChange={(val) => setAddress((p) => ({ ...p, zipCode: val }))}
-                                                        onAddressFetched={(addr) => {
-                                                            setAddress((prev) => ({
-                                                                ...prev,
-                                                                city: addr.city || prev.city,
-                                                                state: addr.state || prev.state,
-                                                                neighborhood: addr.neighborhood || prev.neighborhood,
-                                                                street: addr.street || prev.street,
-                                                                ibge: addr.ibge || prev.ibge,
-                                                                latitude: typeof addr.latitude === "number" ? addr.latitude : prev.latitude,
-                                                                longitude: typeof addr.longitude === "number" ? addr.longitude : prev.longitude,
-                                                            }))
-                                                        }}
-                                                    />
-                                                    <Input
-                                                        name="street"
-                                                        label="Rua / Logradouro"
-                                                        placeholder="Ex: Rua das Flores"
-                                                        value={address.street}
-                                                        onChange={(e) => setAddress((p) => ({ ...p, street: e.target.value }))}
-                                                    />
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <NumberInputWithCheckbox
-                                                            label="Número"
-                                                            placeholder="Ex: 123"
-                                                            number={address.noNumber ? "" : address.number}
-                                                            noNumber={address.noNumber}
-                                                            onNumberChange={(val: string) => setAddress((p) => ({ ...p, number: val }))}
-                                                            onNoNumberChange={(checked: boolean) => setAddress((p) => ({ ...p, noNumber: checked, number: checked ? "" : p.number }))}
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                                <FormSection title="Endereço">
+                                                    <div className="space-y-4">
+                                                        <CepInput
+                                                            value={address.zipCode}
+                                                            onChange={(val) => setAddress((p) => ({ ...p, zipCode: val }))}
+                                                            name="cep"
+                                                            onAddressFetched={(data) => {
+                                                                setAddress(prev => ({
+                                                                    ...prev,
+                                                                    street: data.street || prev.street,
+                                                                    number: data.number || prev.number,
+                                                                    neighborhood: data.neighborhood || prev.neighborhood,
+                                                                    city: data.city || prev.city,
+                                                                    state: data.state || prev.state,
+                                                                    noNumber: data.number === "S/N",
+                                                                    ibge: data.ibge || prev.ibge,
+                                                                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                                                                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
+                                                                }))
+                                                            }}
                                                         />
                                                         <Input
-                                                            name="complement"
-                                                            label="Complemento"
-                                                            placeholder="Ex: Apto 101, Sala 2"
-                                                            value={address.complement}
-                                                            onChange={(e) => setAddress((p) => ({ ...p, complement: e.target.value }))}
+                                                            label="Rua/Avenida"
+                                                            placeholder="Rua, Avenida, etc."
+                                                            value={address.street}
+                                                            onChange={e => setAddress({ ...address, street: e.target.value })}
                                                         />
-                                                    </div>
-                                                    <Input
-                                                        name="neighborhood"
-                                                        label="Bairro"
-                                                        placeholder="Ex: Centro"
-                                                        value={address.neighborhood}
-                                                        onChange={(e) => setAddress((p) => ({ ...p, neighborhood: e.target.value }))}
-                                                    />
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                                                        <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
+                                                            <div>
+                                                                <NumberInputWithCheckbox
+                                                                    label="Número"
+                                                                    number={address.number}
+                                                                    noNumber={address.noNumber}
+                                                                    onNumberChange={val => setAddress({ ...address, number: val })}
+                                                                    onNoNumberChange={checked => setAddress({ ...address, noNumber: checked, number: checked ? "S/N" : "" })}
+                                                                    placeholder="123"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <Input
+                                                                    label="Complemento"
+                                                                    placeholder="Apto, Bloco, etc."
+                                                                    value={address.complement}
+                                                                    onChange={e => setAddress({ ...address, complement: e.target.value })}
+                                                                />
+                                                            </div>
+                                                        </div>
                                                         <Input
-                                                            name="city"
-                                                            label="Cidade"
-                                                            placeholder="Ex: São Paulo"
-                                                            value={address.city}
-                                                            onChange={(e) => setAddress((p) => ({ ...p, city: e.target.value }))}
-                                                            required
+                                                            label="Bairro"
+                                                            placeholder="Nome do bairro"
+                                                            value={address.neighborhood}
+                                                            onChange={e => setAddress({ ...address, neighborhood: e.target.value })}
                                                         />
-                                                        <StateComboBox
-                                                            value={address.state}
-                                                            onChange={(val) => setAddress((p) => ({ ...p, state: val }))}
-                                                            className="w-full"
-                                                        />
+
+                                                        <div className="grid grid-cols-2 gap-3 items-start">
+                                                            <div>
+                                                                <Input
+                                                                    label="Cidade"
+                                                                    placeholder="Nome da cidade"
+                                                                    value={address.city}
+                                                                    onChange={e => setAddress({ ...address, city: e.target.value })}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <StateComboBox
+                                                                    value={address.state}
+                                                                    onChange={v => setAddress({ ...address, state: v })}
+                                                                    className="w-full"
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </FormSection>
-                                        </div>
+                                                </FormSection>
+                                            </div>
+
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                                <SidebarCard hasTopStrip hasSeparator title="Localização">
+                                                    <div className="flex flex-col">
+                                                        <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
+                                                            <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
+                                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mb-0">
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{store?.name || "Nome do Negócio"}</h4>
+                                                                <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
+                                                            </div>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
+                                                                {formattedAddress}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
+                                        </motion.div>
                                     </TabsContent>
                                 </>
                             ) : (
@@ -784,6 +842,112 @@ export const ShowcaseSubPage = ({
                                                 </SidebarCard>
                                             </div>
                                         </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="address" className="mt-0 focus-visible:outline-none">
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                                <FormSection title="Endereço">
+                                                    <div className="space-y-4">
+                                                        <CepInput
+                                                            value={address.zipCode}
+                                                            onChange={(val) => setAddress((p) => ({ ...p, zipCode: val }))}
+                                                            name="cep"
+                                                            onAddressFetched={(data) => {
+                                                                setAddress(prev => ({
+                                                                    ...prev,
+                                                                    street: data.street || prev.street,
+                                                                    number: data.number || prev.number,
+                                                                    neighborhood: data.neighborhood || prev.neighborhood,
+                                                                    city: data.city || prev.city,
+                                                                    state: data.state || prev.state,
+                                                                    noNumber: data.number === "S/N",
+                                                                    ibge: data.ibge || prev.ibge,
+                                                                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                                                                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
+                                                                }))
+                                                            }}
+                                                        />
+                                                        <Input
+                                                            label="Rua/Avenida"
+                                                            placeholder="Rua, Avenida, etc."
+                                                            value={address.street}
+                                                            onChange={e => setAddress({ ...address, street: e.target.value })}
+                                                        />
+
+                                                        <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
+                                                            <div>
+                                                                <NumberInputWithCheckbox
+                                                                    label="Número"
+                                                                    number={address.number}
+                                                                    noNumber={address.noNumber}
+                                                                    onNumberChange={val => setAddress({ ...address, number: val })}
+                                                                    onNoNumberChange={checked => setAddress({ ...address, noNumber: checked, number: checked ? "S/N" : "" })}
+                                                                    placeholder="123"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <Input
+                                                                    label="Complemento"
+                                                                    placeholder="Apto, Bloco, etc."
+                                                                    value={address.complement}
+                                                                    onChange={e => setAddress({ ...address, complement: e.target.value })}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <Input
+                                                            label="Bairro"
+                                                            placeholder="Nome do bairro"
+                                                            value={address.neighborhood}
+                                                            onChange={e => setAddress({ ...address, neighborhood: e.target.value })}
+                                                        />
+
+                                                        <div className="grid grid-cols-2 gap-3 items-start">
+                                                            <div>
+                                                                <Input
+                                                                    label="Cidade"
+                                                                    placeholder="Nome da cidade"
+                                                                    value={address.city}
+                                                                    onChange={e => setAddress({ ...address, city: e.target.value })}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <StateComboBox
+                                                                    value={address.state}
+                                                                    onChange={v => setAddress({ ...address, state: v })}
+                                                                    className="w-full"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </FormSection>
+                                            </div>
+
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                                <SidebarCard hasTopStrip hasSeparator title="Localização">
+                                                    <div className="flex flex-col">
+                                                        <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
+                                                            <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
+                                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mb-0">
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{store?.name || "Nome do Negócio"}</h4>
+                                                                <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
+                                                            </div>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
+                                                                {formattedAddress}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </SidebarCard>
+                                            </div>
+                                        </motion.div>
                                     </TabsContent>
 
                                     <TabsContent value="gallery" className="mt-0 focus-visible:outline-none">

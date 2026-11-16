@@ -520,15 +520,15 @@ export function resolveTimelineActorName({
 }: ResolveTimelineActorParams): string {
   const metadata = entry.metadata || {}
   const rawActor = String(entry.actor_name || "").toLowerCase()
-  const isDuditAction = Boolean(
-    metadata.dudit_action ||
+  const isErpAction = entry.source === "erp" || metadata.source === "erp"
+  const isDuditAction = !isErpAction && Boolean(
+    entry.source === "admin" ||
     metadata.is_admin_action ||
-    metadata.admin_actor_name ||
-    rawActor.includes("dudit") ||
-    entry.source === "admin"
+    (metadata.dudit_action && (entry.source === "admin" || !entry.actor_user_id)) ||
+    (rawActor.includes("dudit") && entry.source === "admin")
   )
   const isSystem = Boolean(
-    (!entry.actor_user_id && !isDuditAction && !metadata.admin_actor_name) ||
+    (!entry.actor_user_id && !isDuditAction && !metadata.admin_actor_name && (!entry.actor_name || entry.actor_name.toLowerCase() === "sistema")) ||
     entry.actor_name?.toLowerCase() === "sistema" ||
     entry.source === "system" ||
     entry.source === "webhook"
@@ -588,7 +588,7 @@ export function resolveTimelineActorName({
     if (viewer === "customer") {
       return "Você"
     }
-    const customerDisplayName = orderCustomerName || entry.actor_name || "Cliente"
+    const customerDisplayName = orderCustomerName || (entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit") ? entry.actor_name : "Cliente")
     return `${customerDisplayName} (Cliente)`
   }
 
@@ -604,16 +604,21 @@ export function resolveTimelineActorName({
   }
 
   // 5. Ação do Vendedor / Lojista
+  const resolvedSellerActorName =
+    entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit")
+      ? entry.actor_name
+      : "Vendedor"
+
   if (viewer === "customer") {
     // Cliente nunca vê nome pessoal do colaborador da loja; vê o nome da loja ou "Vendedor"
     return storeName || "Vendedor"
   }
   if (viewer === "admin") {
-    const staffName = entry.actor_name || "Vendedor"
+    const staffName = resolvedSellerActorName
     return `${staffName} (Vendedor)`
   }
   // Vendedor no ERP vê o nome do usuário que fez a ação
-  return entry.actor_name || "Vendedor"
+  return resolvedSellerActorName
 }
 
 /**
@@ -625,6 +630,26 @@ export function humanizeTimelineChangeLine(line: string): string {
   const trimmed = line.trim()
   if (!trimmed) return ""
   const lower = trimmed.toLowerCase()
+
+  // Higieniza mensagens com prefixo 'Equipe Dudit' em eventos legados do pedido/solicitação
+  if (lower.startsWith("equipe dudit alterou:")) {
+    return trimmed.replace(/^equipe dudit alterou:\s*/i, "Alterou: ")
+  }
+  if (lower === "equipe dudit atualizou o pedido.") {
+    return "Pedido atualizado."
+  }
+  if (lower.startsWith("equipe dudit alterou o status")) {
+    return trimmed.replace(/^equipe dudit alterou o status/i, "Status alterado")
+  }
+  if (lower.startsWith("equipe dudit atualizou:")) {
+    return trimmed.replace(/^equipe dudit atualizou:\s*/i, "Atualizou: ")
+  }
+  if (lower === "equipe dudit atualizou a solicitação.") {
+    return "Solicitação atualizada."
+  }
+  if (lower.startsWith("equipe dudit atualizou a solicitação de devolução")) {
+    return trimmed.replace(/^equipe dudit atualizou a solicitação de devolução/i, "Solicitação de devolução atualizada")
+  }
 
   // 1. Linhas de status de entrega
   if (lower.includes("status de entrega") || lower.includes("status da entrega")) {

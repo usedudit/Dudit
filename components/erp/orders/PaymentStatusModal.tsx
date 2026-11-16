@@ -47,7 +47,7 @@ import {
 import { DepositReceiptsSection } from "@/components/erp/payments/shared/DepositReceiptsSection";
 import { BalancePaymentCollector } from "@/components/erp/payments/BalancePaymentCollector";
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
-import { formatPaymentMethodToFullLabel } from "@/components/erp/payments/shared/payment-utils";
+import { formatPaymentMethodToFullLabel, normalizePaymentMethodKey } from "@/components/erp/payments/shared/payment-utils";
 import { useModalLayer } from "@/lib/modal-stack";
 import type { PaymentBreakdownLeg } from "@/components/erp/payments/shared/payment-utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
@@ -128,6 +128,7 @@ const TransactionReceiptContent = ({
   totalRemaining,
   depositSummary,
   orderNumber,
+  pendingChange = 0,
 }: any) => (
   <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
     <div className="mb-6 flex justify-between items-center">
@@ -190,6 +191,16 @@ const TransactionReceiptContent = ({
             {formatCurrency(totalPaid)}
           </span>
         </div>
+        {pendingChange > 0.005 && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+              Troco
+            </span>
+            <span className="font-bold text-green-600 dark:text-green-400">
+              {formatCurrency(pendingChange)}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center">
@@ -243,6 +254,7 @@ export default function PaymentStatusModal({
     isUnderpaid: boolean;
     remainingPartial: number;
     paymentBreakdown: any[];
+    change?: number;
   } | null>(null);
   const [mpLoading, setMpLoading] = useState(false);
   const [mpPaymentData, setMpPaymentData] = useState<{
@@ -510,6 +522,21 @@ export default function PaymentStatusModal({
     [pendingLegs],
   );
 
+  const pendingChange = useMemo(() => {
+    let change = 0;
+    for (const leg of pendingLegs) {
+      if (leg.changeAmount && Number(leg.changeAmount) > 0.005) {
+        change += Number(leg.changeAmount);
+      } else if (Number(leg.amountReceived || 0) > Number(leg.amount || 0) + 0.005) {
+        change += Number(leg.amountReceived || 0) - Number(leg.amount || 0);
+      }
+    }
+    if (change <= 0.005 && pendingNewAmount > totalRemaining + 0.005) {
+      change = pendingNewAmount - totalRemaining;
+    }
+    return change;
+  }, [pendingLegs, pendingNewAmount, totalRemaining]);
+
   const receiptCart = useMemo(() => {
     const items =
       targetOrder?.order_items ||
@@ -767,15 +794,46 @@ export default function PaymentStatusModal({
         }
 
         if (legRemaining > 0.009) {
-          updatedBreakdown.push({
-            ...pendingLeg,
-            amount: legRemaining,
-            effectiveAmount: legRemaining,
-            amountReceived: Number(legRemaining.toFixed(2)),
-            adjustmentType: "none",
-            adjustmentPercent: 0,
-            adjustmentAmount: 0,
-          } as any);
+          const existingSameMethodIndex = updatedBreakdown.findIndex((leg: any) => {
+            if (leg.mpPaymentId || pendingLeg.mpPaymentId) {
+              return Boolean(
+                leg.mpPaymentId &&
+                pendingLeg.mpPaymentId &&
+                String(leg.mpPaymentId) === String(pendingLeg.mpPaymentId)
+              );
+            }
+            if (leg.paymentMethodId && pendingLeg.paymentMethodId) {
+              return String(leg.paymentMethodId) === String(pendingLeg.paymentMethodId);
+            }
+            const legKey = normalizePaymentMethodKey(String(leg.method || ""));
+            const pendingKey = normalizePaymentMethodKey(String(pendingLeg.method || ""));
+            return Boolean(legKey && pendingKey && legKey === pendingKey);
+          });
+
+          const appliedToOrder = Math.min(legRemaining, totalRemaining);
+          const toAdd = Number(appliedToOrder.toFixed(2));
+
+          if (existingSameMethodIndex >= 0) {
+            const existingLeg = updatedBreakdown[existingSameMethodIndex];
+            existingLeg.amount = Number((Number(existingLeg.amount || 0) + toAdd).toFixed(2));
+            existingLeg.amountReceived = Number((Number(existingLeg.amountReceived || 0) + toAdd).toFixed(2));
+            existingLeg.effectiveAmount = Number((Number(existingLeg.effectiveAmount || existingLeg.amount || 0) + toAdd).toFixed(2));
+            if (pendingLeg.changeAmount) {
+              existingLeg.changeAmount = Number((Number(existingLeg.changeAmount || 0) + Number(pendingLeg.changeAmount)).toFixed(2));
+            }
+            legRemaining = 0;
+          } else {
+            updatedBreakdown.push({
+              ...pendingLeg,
+              amount: toAdd,
+              effectiveAmount: toAdd,
+              amountReceived: toAdd,
+              adjustmentType: "none",
+              adjustmentPercent: 0,
+              adjustmentAmount: 0,
+            } as any);
+            legRemaining = 0;
+          }
         }
       }
 
@@ -804,7 +862,7 @@ export default function PaymentStatusModal({
         pendingNewAmount >= totalOrder - 0.005;
       const nextPaidAmount = isFullPaymentOfBalance
         ? totalOrder
-        : totalPaid + pendingNewAmount;
+        : Math.min(totalOrder, totalPaid + pendingNewAmount);
       const nextSituation = resolveSituationFromPaid(
         nextPaidAmount,
         totalOrder,
@@ -844,6 +902,7 @@ export default function PaymentStatusModal({
           isUnderpaid: nextSituation !== "paid",
           remainingPartial: Math.max(0, totalOrder - nextPaidAmount),
           paymentBreakdown: updatedBreakdown,
+          change: pendingChange,
         });
         setPaymentStatus("success");
         onSuccess?.();
@@ -914,6 +973,7 @@ export default function PaymentStatusModal({
               orderNumber={targetOrder?.order_number}
               itemCount={receiptCart.length}
               customerName={targetOrder.customer_name}
+              pendingChange={pendingChange}
             />
           </div>
         </div>
@@ -1514,6 +1574,16 @@ export default function PaymentStatusModal({
                         )}
                       </div>
                     </div>
+                    {Boolean(successSnapshot?.change && successSnapshot.change > 0) && (
+                      <div>
+                        <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">
+                          Troco
+                        </span>
+                        <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                          {formatCurrency(successSnapshot?.change || 0)}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {successSnapshot?.paymentBreakdown &&

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
-    Menu,
     XIcon,
     ChevronRightIcon,
     ChevronDownIcon,
@@ -30,7 +29,7 @@ import {
 } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { createPortal } from "react-dom"
 import { Drawer } from "vaul"
 
@@ -104,6 +103,11 @@ const navSections: NavSection[] = [
                 icon: VideoIcon,
                 label: "Vídeos da Comunidade",
                 href: "/ddt-admin/videos",
+            },
+            {
+                icon: FileTextIcon,
+                label: "Blog do Dino",
+                href: "/ddt-admin/blog",
             },
             {
                 icon: MegaphoneIcon,
@@ -227,7 +231,6 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     const sidebarRef = useRef<HTMLDivElement>(null)
-    const triggerRef = useRef<HTMLButtonElement>(null)
 
     const isActivePath = useCallback((href: string) => {
         if (href === "/ddt-admin") {
@@ -244,7 +247,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
         let isCancelled = false
         getAdminSidebarBadgesAction().then((res) => {
             if (!isCancelled && res) setBadges(res)
-        }).catch(() => {})
+        }).catch(() => { })
         return () => { isCancelled = true }
     }, [pathname])
 
@@ -313,10 +316,10 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
             <div
                 ref={sidebarRef}
                 className={cn(
-                    "hidden xl:flex flex-col h-screen max-h-screen border-r shrink-0 sticky top-0 z-40 select-none",
+                    "hidden md:flex flex-col h-screen max-h-screen border-r shrink-0 sticky top-0 z-40 select-none",
                     "bg-brand-dark dark:bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
-                    isCollapsed ? "xl:w-[68px]" : "xl:w-64",
+                    isCollapsed ? "md:w-[68px]" : "md:w-64",
                 )}
             >
                 <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
@@ -350,7 +353,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                 <button
                     onClick={toggleSidebar}
                     className={cn(
-                        "hidden xl:flex items-center justify-center absolute -right-3 top-8 z-50 w-6 h-6",
+                        "hidden md:flex items-center justify-center absolute -right-3 top-8 z-50 w-6 h-6",
                         "bg-dark-surface border border-dark-border rounded-full shadow-sm hover:bg-dark-border",
                         "transition-transform duration-300",
                     )}
@@ -512,15 +515,6 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                 </nav>
             </div>
 
-            {/* MOBILE TRIGGER BUTTON */}
-            <button
-                ref={triggerRef}
-                onClick={() => setIsMobileOpen(true)}
-                className="xl:hidden fixed top-4 left-4 z-30 p-2 bg-dark-background rounded-xl border border-dark-border shadow-sm"
-            >
-                <Menu className="w-6 h-6 text-white" />
-            </button>
-
             {/* MOBILE BOTTOM SHEET (VAUL) */}
             <Drawer.Root open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                 <Drawer.Portal>
@@ -650,20 +644,16 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
             </Drawer.Root>
             {isMounted && isCollapsed && hoveredItem && typeof document !== "undefined" && (() => {
                 const hoveredNav = allNavItems.find((i) => i.label === hoveredItem)
-                if (!hoveredNav || !hoveredNav.submenu) return null
-                const badge = hoveredNav.label === "Moderação"
-                    ? badges.moderation
-                    : hoveredNav.label === "Denúncias"
-                    ? badges.reports
-                    : hoveredNav.label === "Trocas e Devoluções"
-                    ? badges.returns
-                    : undefined
+                if (!hoveredNav) return null
+                const hasSubmenu = Boolean(hoveredNav.submenu && hoveredNav.submenu.length > 0)
+                const badge = getItemBadge(hoveredNav.href)
+                const cardHeight = hasSubmenu ? 220 : 90
 
                 return createPortal(
                     <div
                         style={{
                             position: "fixed",
-                            top: Math.max(12, Math.min(typeof window !== "undefined" ? window.innerHeight - 220 : 500, hoverTop)),
+                            top: Math.max(12, Math.min(typeof window !== "undefined" ? window.innerHeight - cardHeight : 500, hoverTop)),
                             left: 76,
                             zIndex: 9999,
                         }}
@@ -692,22 +682,37 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                             </div>
 
                             <div className="py-1 bg-dark-background">
-                                {hoveredNav.submenu.map((subItem) => {
-                                    const isActive = isActivePath(subItem.href)
-                                    return (
-                                        <Link
-                                            key={subItem.href}
-                                            href={subItem.href}
-                                            prefetch={false}
-                                            className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
-                                            onClick={() => setHoveredItem(null)}
-                                        >
-                                            <span className={isActive ? "text-brand-green font-medium" : ""}>
-                                                {subItem.label}
-                                            </span>
-                                        </Link>
-                                    )
-                                })}
+                                {hasSubmenu ? (
+                                    hoveredNav.submenu!.map((subItem) => {
+                                        const isActive = isActivePath(subItem.href)
+                                        return (
+                                            <Link
+                                                key={subItem.href}
+                                                href={subItem.href}
+                                                prefetch={false}
+                                                className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
+                                                onClick={() => setHoveredItem(null)}
+                                            >
+                                                <span className={isActive ? "text-brand-green font-medium" : ""}>
+                                                    {subItem.label}
+                                                </span>
+                                            </Link>
+                                        )
+                                    })
+                                ) : hoveredNav.href ? (
+                                    <Link
+                                        href={hoveredNav.href}
+                                        prefetch={false}
+                                        className="block p-2 hover:bg-white/5 transition-colors"
+                                        onClick={() => setHoveredItem(null)}
+                                    >
+                                        <div className="text-xs text-brand-inactive-text px-2 pb-1">Navegar para {hoveredNav.label}</div>
+                                    </Link>
+                                ) : (
+                                    <div className="p-2">
+                                        <div className="text-xs text-brand-inactive-text px-2 pb-1">Navegar para {hoveredNav.label}</div>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     </div>,

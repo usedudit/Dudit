@@ -97,6 +97,13 @@ const QuoteListItem = React.memo(
                         </div>
                     )
 
+                case "seller":
+                    return (
+                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate max-w-[180px] block" title={quote.store_name || quote.stores?.name || quote.partner_name || "—"}>
+                            {quote.store_name || quote.stores?.name || quote.partner_name || "—"}
+                        </span>
+                    )
+
                 case "issue_date":
                     return (
                         <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">

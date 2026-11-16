@@ -107,13 +107,17 @@ export function HistoryTimeline({
                 {entries.map((entry, index) => {
                     const Icon = getEntryIcon(entry)
                     const isSystem = entry.actor_name?.toLowerCase() === "sistema"
-                    const isDudit = !disableDuditHighlight && Boolean(
+                    const isErp = (entry as any).source === "erp" || entry.metadata?.source === "erp"
+                    const isDudit = !disableDuditHighlight && !isErp && Boolean(
                         entry.highlight ||
                         entry.actor_name?.toLowerCase().includes("dudit") ||
                         entry.metadata?.dudit_action ||
                         (entry.metadata as any)?.is_admin_action ||
                         entry.metadata?.admin_actor_name
                     )
+                    const actorDisplayName = (isErp && entry.actor_name && entry.actor_name.toLowerCase().includes("dudit"))
+                        ? "Vendedor"
+                        : entry.actor_name
                     const isDriver = Boolean(
                         entry.actor_name?.toLowerCase().includes("entregador") ||
                         entry.metadata?.is_driver ||
@@ -164,7 +168,7 @@ export function HistoryTimeline({
                                         "font-bold text-[15px]",
                                         isDudit ? "text-brand-green" : isDriver ? "text-brand-orange" : "text-brand-dark dark:text-dark-heading"
                                     )}>
-                                        {entry.actor_name}
+                                        {actorDisplayName}
                                     </span>
                                     <span className="text-[14px] text-brand-inactive-text dark:text-dark-body">
                                         • {formatDateTime(entry.created_at)}

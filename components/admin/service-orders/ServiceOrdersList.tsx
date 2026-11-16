@@ -1,789 +1,879 @@
 "use client"
 
-import React, { useState, useTransition, useMemo } from "react"
-import {
-    Button,
-    Badge,
-    Input,
-    Pagination,
-    IconPlaceholder,
-    ActionsDropdown,
-    DefaultModal,
-    FormTextarea,
-} from "@/components/reusable"
-import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { toast } from "@/hooks/use-notification"
-import {
-    WrenchIcon,
-    EditIcon,
-    EyeIcon,
-    StoreIcon,
-    ClockIcon,
-    SearchIcon,
-    ListIcon,
-    GridIcon,
-    FilterIcon,
-} from "@/lib/icons"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { AnimatePresence } from "framer-motion"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { useToast } from "@/hooks/use-toast"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { Button, Checkbox, DefaultModal, FormDropdown, IconPlaceholder, Input, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
+import FilterChip from "@/components/reusable/FilterChip"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import Pagination from "@/components/reusable/Pagination"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { useAdminActionModal } from "@/components/admin/AdminActionModal"
+import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
+import ServiceOrderListRow from "@/components/erp/service-orders/ServiceOrderListRow"
+import ServiceOrderGridCard from "@/components/erp/service-orders/ServiceOrderGridCard"
+import ServiceOrderForm from "@/components/erp/service-orders/ServiceOrderForm"
+import ServiceOrderDetail from "@/components/erp/service-orders/ServiceOrderDetail"
+import ServiceOrderPageControls from "@/components/erp/service-orders/ServiceOrderPageControls"
 import {
-    updateAdminServiceOrder,
-    getAdminServiceOrderDetail,
-    type AdminServiceOrderStats,
+  PlusIcon, WrenchIcon, SearchIcon, FilterIcon, TrashIcon,
+  ListIcon, GridIcon, ArrowUpDownIcon, ClockIcon, CheckCircleIcon, BlockedIcon, ExportFileIcon,
+} from "@/lib/icons"
+import { useErpExport } from "@/hooks/use-erp-export"
+import { usePermissions, PermissionProvider } from "@/lib/permission-context"
+import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions"
+import { StoreProvider } from "@/lib/store-context"
+import {
+  isDatePeriodFilterActive,
+  resolveDatePeriodBounds,
+  ymdInBounds,
+  summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
+import {
+  getAdminServiceOrders,
+  getAdminServiceOrderDetail,
+  updateAdminServiceOrder,
+  deleteAdminServiceOrder,
+  updateAdminServiceOrderStatus,
+  type AdminServiceOrderStats,
 } from "@/app/actions/admin/service-orders"
+import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, type ServiceOrderStatus } from "@/lib/types/service-order"
+import OSSPrintModal from "@/components/erp/service-orders/OSSPrintModal"
+import { useAdminActionModal } from "@/components/admin/AdminActionModal"
+import { diffChangedFields } from "@/lib/admin/changed-fields"
+
+const SERVICE_STATUS_ORDER: string[] = [
+  "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
+  "aguardando_peca", "concluida", "entregue"
+]
+
+function doesServiceTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
+  if (currentStatus === "cancelada" || nextStatus === "cancelada") return false
+  const currentIdx = SERVICE_STATUS_ORDER.indexOf(currentStatus)
+  const nextIdx = SERVICE_STATUS_ORDER.indexOf(nextStatus)
+  if (currentIdx === -1 || nextIdx === -1) return false
+  return nextIdx < currentIdx
+}
+
+const CHANGE_STATUS_REASONS = [
+  { value: "operational_error", label: "Erro operacional / Clique acidental" },
+  { value: "client_request", label: "Solicitação do cliente" },
+  { value: "rework", label: "Retrabalho necessário" },
+  { value: "logistics_issue", label: "Problema logístico" },
+  { value: "other", label: "Outro" }
+]
+
+const TAB_STATUSES: Record<string, string[]> = {
+  all: [],
+  aberta: ["aberta", "aguardando_aprovacao", "aprovada"],
+  em_andamento: ["em_andamento", "aguardando_peca"],
+  concluida: ["concluida", "entregue"],
+  cancelada: ["cancelada"],
+}
+
+const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+  { id: "order_number", label: "Nº OS", align: "left", width: "150px" },
+  { id: "title", label: "Título", align: "left", width: "230px" },
+  { id: "seller", label: "Vendedor", align: "left", width: "180px" },
+  { id: "customer", label: "Cliente", align: "left", width: "180px" },
+  { id: "assigned", label: "Responsável", align: "left", width: "160px" },
+  { id: "date", label: "Data Prev.", align: "left", width: "120px" },
+  { id: "total", label: "Total", align: "left", width: "120px" },
+  { id: "status", label: "Status", align: "center", width: "140px" },
+  { id: "actions", label: "Ações", align: "center", width: "80px" },
+]
 
 interface ServiceOrdersListProps {
-    initialData: any[]
-    initialStats?: AdminServiceOrderStats
+  initialData: any[]
+  initialStats?: AdminServiceOrderStats
+  initialNextCursor?: any
+  initialHasMore?: boolean
 }
 
-const STATUS_MAP: Record<string, { label: string; variant: "green" | "orange" | "red" | "blue" | "gray" }> = {
-    aberta: { label: "Aberta", variant: "blue" },
-    aguardando_aprovacao: { label: "Aguardando Aprovação", variant: "orange" },
-    aprovada: { label: "Aprovada", variant: "blue" },
-    em_andamento: { label: "Em Andamento", variant: "orange" },
-    aguardando_peca: { label: "Aguardando Peça", variant: "orange" },
-    concluida: { label: "Concluída", variant: "green" },
-    entregue: { label: "Entregue", variant: "green" },
-    cancelada: { label: "Cancelada", variant: "red" },
-}
+export default function ServiceOrdersList({
+  initialData: rawOrders,
+  initialStats,
+  initialNextCursor,
+  initialHasMore = false,
+}: ServiceOrdersListProps) {
+  const { toast } = useToast()
+  const { modal: actionModal, runAction } = useAdminActionModal()
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
+  const [filters, setFilters] = useState<any>({
+    status: [],
+    total: { min: "", max: "" },
+    expected_completion_date: { presets: [], from: "", to: "" },
+  })
+  const [activeTab, setActiveTab] = useState<"all" | "aberta" | "em_andamento" | "concluida" | "cancelada">("all")
+  const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
+  const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [selection, setSelection] = useState<Set<string>>(new Set())
+  const [showFilters, setShowFilters] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [showShareModal, setShowShareModal] = useState<{ id: string; token: string; loading?: boolean } | null>(null)
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
+  const [statusModal, setStatusModal] = useState<{ orderId: string; currentStatus: string; nextStatus: string } | null>(null)
+  const [statusWarningModal, setStatusWarningModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string; nextStatus: string; reasonValue: string; customReason: string } | null>(null)
+  const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null)
+  const itemsPerPage = 50
 
-export default function ServiceOrdersList({ initialData, initialStats }: ServiceOrdersListProps) {
-    const [orders, setOrders] = useState(initialData)
-    const [stats, setStats] = useState(initialStats)
-    const [activeTab, setActiveTab] = useState("all")
-    const [viewMode, setViewMode] = useState<"list" | "grid">("list")
-    const [search, setSearch] = useState("")
-    const [page, setPage] = useState(1)
-    const itemsPerPage = 10
+  const isDefaultView = activeTab === "all" && !debouncedSearch
 
-    // Filter Sheet state
-    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
-    const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const entityPage = useEntityPage<any, any, any>({
+    entityType: "service_orders",
+    partnerId: "admin",
+    queryKey: ["admin-service-orders", activeTab, debouncedSearch],
+    initialItems: rawOrders,
+    initialNextCursor,
+    initialHasMore,
+    skipInitialData: !isDefaultView,
+    fetchPageFn: async ({ cursor }) => {
+      const res = await getAdminServiceOrders(cursor, 100, {
+        statuses: TAB_STATUSES[activeTab] || [],
+        search: debouncedSearch || undefined,
+      })
+      return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
+    },
+    dedupeKey: useCallback((o: any) => String(o?.id || ""), []),
+    getDetailFn: async (id: string) => {
+      const data = await getAdminServiceOrderDetail(id)
+      return data || null
+    },
+    listToDetail: (item) => ({ ...item, __partial: true }),
+    staleTime: 30_000,
+  })
 
-    // Detail & Edit State
-    const [selectedOrderDetail, setSelectedOrderDetail] = useState<any | null>(null)
-    const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const {
+    items: effectiveOrders,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+    entityState, openEntity, closeEntity,
+    currentEntity, isLoadingDetail,
+    afterMutation, queryClient,
+    getPrefetchProps,
+  } = entityPage
 
-    const [editingOrder, setEditingOrder] = useState<any | null>(null)
-    const [editForm, setEditForm] = useState<{
-        status: string
-        title: string
-        description: string
-        diagnosis: string
-        internal_notes: string
-        expected_completion_date: string
-    }>({
-        status: "",
-        title: "",
-        description: "",
-        diagnosis: "",
-        internal_notes: "",
-        expected_completion_date: "",
+  const activeOrder = useMemo(() => {
+    if (!entityState.isOpen || !entityState.entityId) return null
+    if (currentEntity) return currentEntity
+    return (effectiveOrders || []).find((o: any) => o.id === entityState.entityId) || null
+  }, [entityState.isOpen, entityState.entityId, currentEntity, effectiveOrders])
+
+  const handleMutation = useCallback(() => {
+    afterMutation()
+    queryClient.invalidateQueries({ queryKey: ["admin-service-orders"] })
+  }, [afterMutation, queryClient])
+
+  const handleSearchChange = useCallback((val: string) => {
+    setSearch(val)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const sortedOrders = useMemo(() => {
+    let result = [...(effectiveOrders || [])]
+
+    // Status tab filter
+    const allowedStatuses = TAB_STATUSES[activeTab]
+    if (allowedStatuses && allowedStatuses.length > 0) {
+      result = result.filter(o => allowedStatuses.includes(o.status))
+    }
+
+    // Filter Sheet: status
+    if (filters.status && filters.status.length > 0) {
+      result = result.filter(o => {
+        const meta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
+        const label = meta?.label || o.status
+        return filters.status.includes(label)
+      })
+    }
+
+    // Filter Sheet: total range
+    if (filters.total?.min) {
+      const minVal = parseFloat(filters.total.min)
+      if (!isNaN(minVal)) {
+        result = result.filter(o => Number(o.total_amount || 0) >= minVal)
+      }
+    }
+    if (filters.total?.max) {
+      const maxVal = parseFloat(filters.total.max)
+      if (!isNaN(maxVal)) {
+        result = result.filter(o => Number(o.total_amount || 0) <= maxVal)
+      }
+    }
+
+    // Filter Sheet: expected completion date
+    if (isDatePeriodFilterActive(filters.expected_completion_date)) {
+      const { startYmd, endYmd } = resolveDatePeriodBounds(filters.expected_completion_date)
+      if (startYmd !== null || endYmd !== null) {
+        result = result.filter(o => {
+          if (!o.expected_completion_date) return false
+          const d = o.expected_completion_date.slice(0, 10)
+          return ymdInBounds(d, startYmd, endYmd)
+        })
+      }
+    }
+
+    if (sortConfig) {
+      result.sort((a, b) => {
+        let valA: any
+        let valB: any
+
+        switch (sortConfig.key) {
+          case "order_number":
+            valA = a.order_number || 0
+            valB = b.order_number || 0
+            break
+          case "title":
+            valA = (a.title || "").toLowerCase()
+            valB = (b.title || "").toLowerCase()
+            break
+          case "seller":
+            valA = (a.store_name || a.stores?.name || "").toLowerCase()
+            valB = (b.store_name || b.stores?.name || "").toLowerCase()
+            break
+          case "customer":
+            valA = (a.customer_snapshot?.name || "").toLowerCase()
+            valB = (b.customer_snapshot?.name || "").toLowerCase()
+            break
+          case "assigned":
+            valA = (a.assigned_user_name || "").toLowerCase()
+            valB = (b.assigned_user_name || "").toLowerCase()
+            break
+          case "date":
+            valA = a.expected_completion_date || ""
+            valB = b.expected_completion_date || ""
+            break
+          case "total":
+            valA = Number(a.total_amount || 0)
+            valB = Number(b.total_amount || 0)
+            break
+          case "status":
+            valA = a.status || ""
+            valB = b.status || ""
+            break
+          default:
+            return 0
+        }
+
+        if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1
+        if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1
+        return 0
+      })
+    }
+
+    return result
+  }, [effectiveOrders, activeTab, filters, sortConfig])
+
+  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage)
+  const paginatedOrders = useMemo(() => {
+    const start = (page - 1) * itemsPerPage
+    return sortedOrders.slice(start, start + itemsPerPage)
+  }, [sortedOrders, page, itemsPerPage])
+
+  const tabCounts = useMemo(() => {
+    let Todas = (effectiveOrders || []).length
+    let Abertas = 0
+    let EmAndamento = 0
+    let Concluidas = 0
+    let Canceladas = 0
+    for (const o of (effectiveOrders || [])) {
+      if (TAB_STATUSES.aberta.includes(o.status)) Abertas++
+      else if (TAB_STATUSES.em_andamento.includes(o.status)) EmAndamento++
+      else if (TAB_STATUSES.concluida.includes(o.status)) Concluidas++
+      else if (TAB_STATUSES.cancelada.includes(o.status)) Canceladas++
+    }
+    return { Todas, Abertas, "Em Andamento": EmAndamento, Concluidas, Canceladas }
+  }, [effectiveOrders])
+
+  const handleStatusChange = async (id: string, newStatus: string, reason?: string) => {
+    setIsUpdatingStatus(true)
+    try {
+      const res = await updateAdminServiceOrderStatus(id, newStatus, reason)
+      if (res.success) {
+        toast({ description: "Status alterado pela administração" })
+        handleMutation()
+      } else {
+        toast({ description: res.error || "Erro ao alterar status" })
+      }
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleStatusTransition = (orderId: string, currentStatus: string, nextStatus: string) => {
+    setStatusModal(null)
+    if (currentStatus === nextStatus) return
+
+    if (doesServiceTransitionRequireReason(currentStatus, nextStatus)) {
+      setStatusWarningModal({
+        isOpen: true,
+        orderId,
+        currentStatus,
+        nextStatus,
+        reasonValue: "",
+        customReason: "",
+      })
+    } else {
+      setSimpleConfirmModal({
+        isOpen: true,
+        orderId,
+        nextStatus,
+      })
+    }
+  }
+
+  const confirmStatusWarning = async () => {
+    if (!statusWarningModal) return
+    const { orderId, nextStatus, reasonValue, customReason } = statusWarningModal
+    let finalReason = reasonValue
+    if (reasonValue === "other" && customReason.trim()) {
+      finalReason = `Outro: ${customReason.trim()}`
+    } else {
+      const foundLabel = CHANGE_STATUS_REASONS.find(r => r.value === reasonValue)?.label
+      if (foundLabel) finalReason = foundLabel
+    }
+    setStatusWarningModal(null)
+    await handleStatusChange(orderId, nextStatus, finalReason)
+  }
+
+  const handleOpenStatusModal = (orderId: string) => {
+    const order = effectiveOrders?.find((o: any) => o.id === orderId)
+    if (!order) return
+    const currentStatus = order.status || "aberta"
+    setStatusModal({ orderId, currentStatus, nextStatus: currentStatus })
+  }
+
+  const handleDelete = async (id: string) => {
+    const order = effectiveOrders?.find((o: any) => o.id === id)
+    const result = await runAction({
+      title: "Excluir ordem de serviço",
+      description: `OS #${order?.order_number || id.slice(0, 8)}. O time do vendedor será notificado.`,
+      requireReason: true,
+      confirmLabel: "Excluir",
+      notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+      runner: async (payload) => {
+        const res = await deleteAdminServiceOrder(id, {
+          reason: payload.reason,
+          riskScore: payload.riskScore,
+          notifySeller: payload.notifySeller,
+        })
+        return res.success ? { success: true } : { success: false, error: res.error }
+      },
+    })
+    if (result.success) {
+      toast({ description: "OS excluída pela administração" })
+      handleMutation()
+    }
+    setConfirmDelete(null)
+  }
+
+  // Admin save override handler with diff, modal and logging
+  const handleAdminSaveOS = async (payload: any, originalData: any): Promise<{ success: boolean; error?: string }> => {
+    const changedFields = diffChangedFields(originalData, payload)
+    const result = await runAction({
+      title: "Salvar alterações na OS",
+      description: `OS #${originalData.order_number || String(originalData.id).slice(0, 8)} (${originalData.store_name || originalData.stores?.name || "Loja"})`,
+      changedFields,
+      force: true,
+      confirmLabel: "Salvar",
+      notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+      runner: async (actionPayload) => {
+        const res = await updateAdminServiceOrder(originalData.id, payload, {
+          reason: actionPayload.reason || null,
+          riskScore: actionPayload.riskScore,
+          notifySeller: actionPayload.notifySeller,
+          changedFields,
+        })
+        if (res.success) return { success: true }
+        return { success: false, error: res.error || "Erro ao salvar alterações da OS" }
+      },
     })
 
-    const [isPending, startTransition] = useTransition()
-    const { modal: actionModal, runAction } = useAdminActionModal()
+    if (result.cancelled) return { success: false }
+    if (result.success) {
+      toast({ description: "Alterações salvas com sucesso pela administração!" })
+      handleMutation()
+      return { success: true }
+    }
+    return { success: false, error: result.error }
+  }
 
-    const tabs = useMemo(() => [
-        { id: "all", label: "Todas", count: stats?.total ?? orders.length },
-        { id: "aberta", label: "Abertas", count: (stats?.aberta ?? 0) + (stats?.aguardando_aprovacao ?? 0) },
-        { id: "em_andamento", label: "Em Andamento", count: stats?.em_andamento ?? 0 },
-        { id: "concluida", label: "Concluídas", count: stats?.concluida ?? 0 },
-        { id: "cancelada", label: "Canceladas", count: stats?.cancelada ?? 0 },
-    ], [stats, orders.length])
+  const observerRef = useRef<HTMLDivElement>(null)
+  useInfiniteScrollObserver(observerRef, {
+    fetchNextPage: () => fetchNextPage(),
+    enabled: true,
+    hasNextPage: !!hasNextPage,
+    isFetchingNextPage,
+  })
 
-    const filtered = useMemo(() => {
-        return orders.filter((o) => {
-            const statusLower = (o.status || "").toLowerCase()
-            let matchesTab = true
-            if (activeTab === "aberta") {
-                matchesTab = ["aberta", "aguardando_aprovacao", "aprovada"].includes(statusLower)
-            } else if (activeTab === "em_andamento") {
-                matchesTab = ["em_andamento", "aguardando_peca"].includes(statusLower)
-            } else if (activeTab === "concluida") {
-                matchesTab = ["concluida", "entregue"].includes(statusLower)
-            } else if (activeTab === "cancelada") {
-                matchesTab = ["cancelada"].includes(statusLower)
-            }
+  const filterSections: FilterSectionConfig[] = useMemo(() => {
+    const statusLabels = [...new Set((effectiveOrders || []).map((o: any) => {
+      const meta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
+      return meta?.label || o.status
+    }))]
 
-            const matchesStatusFilter =
-                statusFilters.length === 0 || statusFilters.includes(statusLower)
+    const hasMultipleTotals = (effectiveOrders || []).some((o: any, i, arr) =>
+      i > 0 && Number(o.total_amount || 0) !== Number(arr[0].total_amount || 0)
+    )
 
-            const term = search.trim().toLowerCase()
-            const matchesSearch =
-                !term ||
-                o.order_number?.toLowerCase().includes(term) ||
-                o.title?.toLowerCase().includes(term) ||
-                o.customer_name?.toLowerCase().includes(term) ||
-                o.store_name?.toLowerCase().includes(term) ||
-                o.stores?.name?.toLowerCase().includes(term)
+    const hasDates = (effectiveOrders || []).some((o: any) => o.expected_completion_date)
 
-            return matchesTab && matchesStatusFilter && matchesSearch
-        })
-    }, [orders, activeTab, statusFilters, search])
+    const sections: FilterSectionConfig[] = []
 
-    const paginated = useMemo(() => {
-        return filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage)
-    }, [filtered, page])
-
-    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1
-
-    const handleOpenDetail = async (order: any) => {
-        setSelectedOrderDetail(order)
-        setIsLoadingDetail(true)
-        try {
-            const fullDetail = await getAdminServiceOrderDetail(order.id)
-            if (fullDetail) setSelectedOrderDetail(fullDetail)
-        } catch (err) {
-            console.error("Failed to fetch service order details:", err)
-        } finally {
-            setIsLoadingDetail(false)
-        }
+    if (statusLabels.length > 1) {
+      sections.push({
+        id: "status",
+        title: "Status",
+        type: "checkbox-list",
+        options: statusLabels,
+      })
     }
 
-    const handleOpenEdit = (order: any) => {
-        setEditingOrder(order)
-        setEditForm({
-            status: order.status || "aberta",
-            title: order.title || "",
-            description: order.description || "",
-            diagnosis: order.diagnosis || "",
-            internal_notes: order.internal_notes || "",
-            expected_completion_date: order.expected_completion_date
-                ? order.expected_completion_date.slice(0, 10)
-                : "",
-        })
-    }
-
-    const handleSaveEdit = async () => {
-        if (!editingOrder) return
-
-        const changedFields: string[] = []
-        if (editForm.status !== editingOrder.status) changedFields.push("status")
-        if (editForm.title !== (editingOrder.title || "")) changedFields.push("título")
-        if (editForm.diagnosis !== (editingOrder.diagnosis || "")) changedFields.push("diagnóstico")
-        if (editForm.internal_notes !== (editingOrder.internal_notes || "")) changedFields.push("observações internas")
-        if (editForm.expected_completion_date !== (editingOrder.expected_completion_date?.slice(0, 10) || "")) {
-            changedFields.push("data prevista")
-        }
-
-        await runAction({
-            title: "Salvar Alterações na Ordem de Serviço",
-            description: `OS #${editingOrder.order_number} (${editingOrder.store_name || editingOrder.stores?.name || "Loja"})`,
-            changedFields,
-            force: true,
-            confirmLabel: "Salvar e Notificar",
-            notifyLabel: "Enviar notificação pelo Dudit ao responsável da loja",
-            runner: async (payload) => {
-                const res = await updateAdminServiceOrder(
-                    editingOrder.id,
-                    {
-                        status: editForm.status,
-                        title: editForm.title,
-                        description: editForm.description,
-                        diagnosis: editForm.diagnosis,
-                        internal_notes: editForm.internal_notes,
-                        expected_completion_date: editForm.expected_completion_date || null,
-                    },
-                    payload
-                )
-
-                if (!res.success) {
-                    toast({ title: "Erro ao salvar", description: res.error, variant: "destructive" })
-                    return { success: false, error: res.error }
-                }
-
-                toast({ title: "Sucesso", description: "Ordem de Serviço atualizada com sucesso." })
-                setOrders((prev) =>
-                    prev.map((o) =>
-                        o.id === editingOrder.id
-                            ? {
-                                  ...o,
-                                  status: editForm.status,
-                                  title: editForm.title,
-                                  description: editForm.description,
-                                  diagnosis: editForm.diagnosis,
-                                  internal_notes: editForm.internal_notes,
-                                  expected_completion_date: editForm.expected_completion_date,
-                              }
-                            : o
-                    )
-                )
-                setEditingOrder(null)
-                if (selectedOrderDetail?.id === editingOrder.id) {
-                    setSelectedOrderDetail((prev: any) => ({
-                        ...prev,
-                        status: editForm.status,
-                        title: editForm.title,
-                        description: editForm.description,
-                        diagnosis: editForm.diagnosis,
-                        internal_notes: editForm.internal_notes,
-                        expected_completion_date: editForm.expected_completion_date,
-                    }))
-                }
-                return { success: true }
-            },
-        })
-    }
-
-    const filterSections: FilterSectionConfig[] = [
-        {
-            id: "status",
-            title: "Status da Ordem de Serviço",
-            type: "checkbox-list",
-            options: [
-                "aberta",
-                "aguardando_aprovacao",
-                "aprovada",
-                "em_andamento",
-                "aguardando_peca",
-                "concluida",
-                "entregue",
-                "cancelada",
-            ],
-            optionLabels: {
-                aberta: "Aberta",
-                aguardando_aprovacao: "Aguardando Aprovação",
-                aprovada: "Aprovada",
-                em_andamento: "Em Andamento",
-                aguardando_peca: "Aguardando Peça",
-                concluida: "Concluída",
-                entregue: "Entregue",
-                cancelada: "Cancelada",
-            },
+    if (hasMultipleTotals) {
+      sections.push({
+        id: "total",
+        title: "Valor Total",
+        type: "range",
+        rangeConfig: {
+          minKey: "min",
+          maxKey: "max",
+          minPlaceholder: "Mín (R$)",
+          maxPlaceholder: "Máx (R$)",
         },
-    ]
+      })
+    }
 
+    if (hasDates) {
+      sections.push({
+        id: "expected_completion_date",
+        title: "Data Prevista",
+        type: "date-period",
+      })
+    }
+
+    return sections
+  }, [effectiveOrders])
+
+  const hasActiveFilters = useMemo(() => {
     return (
-        <FadeIn className="w-full space-y-6 pt-4 px-4 md:px-8 max-w-[1700px] mx-auto pb-12">
-            {/* Top Controls matching ERP */}
-            <div className="flex flex-col gap-4">
-                {/* Tabs */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.id
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => {
-                                    setActiveTab(tab.id)
-                                    setPage(1)
-                                }}
-                                className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                                    isActive
-                                        ? "bg-brand-dark dark:bg-white text-white dark:text-brand-dark shadow-sm"
-                                        : "bg-white dark:bg-dark-surface text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white border border-brand-border dark:border-dark-border"
-                                }`}
-                            >
-                                <span>{tab.label}</span>
-                                <span
-                                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                        isActive
-                                            ? "bg-white/20 text-white dark:bg-brand-dark/20 dark:text-brand-dark"
-                                            : "bg-brand-gray dark:bg-dark-border text-brand-inactive-text"
-                                    }`}
-                                >
-                                    {tab.count}
-                                </span>
-                            </button>
-                        )
-                    })}
+      (filters.status && filters.status.length > 0) ||
+      Boolean(filters.total?.min || filters.total?.max) ||
+      isDatePeriodFilterActive(filters.expected_completion_date)
+    )
+  }, [filters])
+
+  const renderGroupedBadge = (label: string, items: string[], key: string) => {
+    if (!items || items.length === 0) return null
+    const displayValue = items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`
+    const fullValue = items.join(", ")
+    return (
+      <FilterChip
+        key={key}
+        label={label}
+        value={displayValue}
+        onRemove={() => setFilters((p: any) => ({ ...p, [key]: [] }))}
+      />
+    )
+  }
+
+  const renderRangeBadge = (label: string, range: { min: string; max: string }, key: string) => {
+    if (!range?.min && !range?.max) return null
+    const val = range.min && range.max
+      ? `${range.min} - ${range.max}`
+      : range.min
+      ? `>= ${range.min}`
+      : `<= ${range.max}`
+    return (
+      <FilterChip
+        key={key}
+        label={label}
+        value={val}
+        onRemove={() => setFilters((p: any) => ({ ...p, [key]: { min: "", max: "" } }))}
+      />
+    )
+  }
+
+  const renderDatePeriodBadge = (label: string, period: any, key: string) => {
+    if (!isDatePeriodFilterActive(period)) return null
+    const summary = summarizeDatePeriodFilter(period)
+    if (!summary) return null
+    return (
+      <FilterChip
+        key={key}
+        label={label}
+        value={summary}
+        onRemove={() => setFilters((p: any) => ({ ...p, [key]: { presets: [], from: "", to: "" } }))}
+      />
+    )
+  }
+
+  const BadgeList = () => (
+    <>
+      {renderGroupedBadge("Status", filters.status, "status")}
+      {renderRangeBadge("Valor", filters.total, "total")}
+      {renderDatePeriodBadge("Data Prevista", filters.expected_completion_date, "expected_completion_date")}
+    </>
+  )
+
+  const activePartnerId = activeOrder?.partner_id || activeOrder?.stores?.partner_id || "admin"
+  const activeStore = activeOrder?.stores || null
+
+  return (
+    <>
+      <AnimatePresence mode="wait">
+        {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
+          <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
+            {entityState.action === "edit" && isLoadingDetail && !activeOrder ? (
+              <div className="flex items-center justify-center h-full min-h-[200px] w-full">
+                <ThreeDotsLoader />
+              </div>
+            ) : entityState.action === "edit" && !isLoadingDetail && !activeOrder ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] w-full gap-4">
+                <p className="text-brand-inactive-text">Ordem de serviço não encontrada.</p>
+                <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
+              </div>
+            ) : (
+              <PermissionProvider
+                role="OWNER"
+                routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+                partnerId={activePartnerId}
+                businessInfo={{}}
+                planSlug="escalar"
+              >
+                <StoreProvider
+                  partnerId={activePartnerId}
+                  initialStores={activeStore ? [activeStore] : []}
+                  activeStoreId={activeOrder?.store_id || activeStore?.id || null}
+                >
+                  <ServiceOrderForm
+                    partnerId={activePartnerId}
+                    storeId={activeOrder?.store_id || null}
+                    onBack={() => closeEntity()}
+                    onSaved={() => {
+                      closeEntity()
+                      handleMutation()
+                    }}
+                    editData={entityState.action === "edit" ? activeOrder : undefined}
+                    onSaveOverride={handleAdminSaveOS}
+                  />
+                </StoreProvider>
+              </PermissionProvider>
+            )}
+          </FadeIn>
+        ) : entityState.isOpen && entityState.action === "view" ? (
+          <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
+            {isLoadingDetail && !activeOrder ? (
+              <div className="flex items-center justify-center h-full min-h-[200px] w-full">
+                <ThreeDotsLoader />
+              </div>
+            ) : !isLoadingDetail && !activeOrder ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] w-full gap-4">
+                <p className="text-brand-inactive-text">Ordem de serviço não encontrada.</p>
+                <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
+              </div>
+            ) : (
+              <PermissionProvider
+                role="OWNER"
+                routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+                partnerId={activePartnerId}
+                businessInfo={{}}
+                planSlug="escalar"
+              >
+                <StoreProvider
+                  partnerId={activePartnerId}
+                  initialStores={activeStore ? [activeStore] : []}
+                  activeStoreId={activeOrder?.store_id || activeStore?.id || null}
+                >
+                  <ServiceOrderDetail
+                    data={activeOrder}
+                    partnerId={activePartnerId}
+                    onBack={() => closeEntity()}
+                    onMutation={() => handleMutation()}
+                    onEdit={(id) => openEntity("edit", id)}
+                  />
+                </StoreProvider>
+              </PermissionProvider>
+            )}
+          </FadeIn>
+        ) : (
+          <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            {/* Desktop Header */}
+            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8 pt-4">
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                    Ordens de Serviço
+                  </h1>
                 </div>
-
-                {/* Search & Actions Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="relative w-full sm:w-80 md:w-96">
-                        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
-                        <Input
-                            placeholder="Buscar por número, título, cliente ou loja..."
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value)
-                                setPage(1)
-                            }}
-                            className="pl-10 h-10 text-xs rounded-xl border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsFilterSheetOpen(true)}
-                            className="flex items-center gap-2 text-xs font-semibold h-10 px-3 border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                        >
-                            <FilterIcon className="w-3.5 h-3.5" />
-                            <span>Filtros</span>
-                            {statusFilters.length > 0 && (
-                                <span className="w-2 h-2 rounded-full bg-brand-green" />
-                            )}
-                        </Button>
-
-                        <div className="flex items-center border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-0.5">
-                            <button
-                                onClick={() => setViewMode("list")}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    viewMode === "list"
-                                        ? "bg-brand-green-light dark:bg-dark-border text-brand-dark dark:text-white"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
-                                title="Visualização em Lista"
-                            >
-                                <ListIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode("grid")}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    viewMode === "grid"
-                                        ? "bg-brand-green-light dark:bg-dark-border text-brand-dark dark:text-white"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
-                                title="Visualização em Grade"
-                            >
-                                <GridIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                  Gerencie todas as ordens de serviço da plataforma, acompanhando clientes, vendedores e status de execução.
+                </p>
+              </div>
             </div>
 
-            {/* Content Area */}
-            {filtered.length === 0 ? (
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex flex-col justify-center min-h-[360px]">
-                    <IconPlaceholder
-                        title="Nenhuma ordem de serviço encontrada"
-                        subtitle="Não há OS correspondentes aos filtros aplicados."
-                        className="py-12"
-                    />
-                </div>
-            ) : viewMode === "list" ? (
-                /* ERP List / Table Layout */
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-brand-gray/50 dark:bg-dark-border/30 border-b border-brand-border dark:border-dark-border">
-                                <tr>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Nº OS
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Título do Serviço
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Cliente
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Loja / Oficina
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Data Prevista
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
-                                        Total
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body text-center">
-                                        Status
-                                    </th>
-                                    <th className="py-3.5 px-5 text-xs font-bold text-brand-inactive-text dark:text-dark-body text-center">
-                                        Ações
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                {paginated.map((order) => {
-                                    const meta = STATUS_MAP[order.status?.toLowerCase()] || {
-                                        label: order.status,
-                                        variant: "gray" as const,
-                                    }
-                                    const storeName = order.store_name || order.stores?.name || "Loja Parceira"
-
-                                    return (
-                                        <tr
-                                            key={order.id}
-                                            onClick={() => handleOpenDetail(order)}
-                                            className="h-[72px] cursor-pointer hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20 transition-colors"
-                                        >
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                                                        <WrenchIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading block">
-                                                            #{order.order_number}
-                                                        </span>
-                                                        <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                            Criada em {formatDate(order.created_at)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading line-clamp-1 max-w-[220px]">
-                                                    {order.title || "Ordem de Serviço Geral"}
-                                                </div>
-                                                <div className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body line-clamp-1 max-w-[220px]">
-                                                    {order.diagnosis || order.description || "Sem descrição"}
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                    {order.customer_name || "Cliente não informado"}
-                                                </div>
-                                                <div className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                    {order.customer_phone || order.customer_email || "Sem contato"}
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <div className="flex items-center gap-1.5 font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                    <StoreIcon size={14} className="text-brand-green shrink-0" />
-                                                    <span className="truncate max-w-[180px]">{storeName}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                                {order.expected_completion_date
-                                                    ? formatDate(order.expected_completion_date)
-                                                    : "Não definida"}
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle">
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(order.total_amount || 0)}
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5 px-5 align-middle text-center">
-                                                <Badge variant={meta.variant}>{meta.label}</Badge>
-                                            </td>
-                                            <td
-                                                className="py-3.5 px-5 align-middle text-center"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <ActionsDropdown
-                                                    onView={() => handleOpenDetail(order)}
-                                                    onEdit={() => handleOpenEdit(order)}
-                                                />
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {totalPages > 1 && (
-                        <div className="p-4 border-t border-brand-border dark:border-dark-border flex justify-end">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={setPage}
-                            />
-                        </div>
-                    )}
-                </div>
-            ) : (
-                /* ERP Grid Mode matching ServiceOrderGridCard */
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {paginated.map((order) => {
-                            const meta = STATUS_MAP[order.status?.toLowerCase()] || {
-                                label: order.status,
-                                variant: "gray" as const,
-                            }
-                            const storeName = order.store_name || order.stores?.name || "Loja Parceira"
-
-                            return (
-                                <div
-                                    key={order.id}
-                                    onClick={() => handleOpenDetail(order)}
-                                    className="p-5 rounded-[24px] bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
-                                >
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-9 h-9 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                                                    <WrenchIcon size={16} />
-                                                </div>
-                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
-                                                    #{order.order_number}
-                                                </span>
-                                            </div>
-                                            <Badge variant={meta.variant}>{meta.label}</Badge>
-                                        </div>
-
-                                        <div className="space-y-1 mb-4">
-                                            <p className="font-bold text-[13px] text-brand-dark dark:text-dark-heading line-clamp-1">
-                                                {order.title || "Ordem de Serviço"}
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-1">
-                                                {order.customer_name || "Cliente não informado"}
-                                            </p>
-                                            <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pt-1">
-                                                <StoreIcon size={12} className="text-brand-green shrink-0" />
-                                                <span className="truncate">{storeName}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between">
-                                        <div>
-                                            <span className="text-[11px] font-medium text-brand-inactive-text block">
-                                                Total da OS
-                                            </span>
-                                            <span className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(order.total_amount || 0)}
-                                            </span>
-                                        </div>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleOpenEdit(order)
-                                            }}
-                                            className="text-xs h-8 px-2.5"
-                                        >
-                                            Editar
-                                        </Button>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-
-                    {totalPages > 1 && (
-                        <div className="p-4 bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border flex justify-end">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={setPage}
-                            />
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Filter Sheet */}
-            <FilterSheet
-                isOpen={isFilterSheetOpen}
-                onClose={() => setIsFilterSheetOpen(false)}
-                sections={filterSections}
-                filters={{ status: statusFilters }}
-                setFilters={(newFilters: any) => setStatusFilters(newFilters.status || [])}
-                onClear={() => setStatusFilters([])}
+            {/* Controls Header */}
+            <ServiceOrderPageControls
+              activeTab={activeTab as any}
+              setActiveTab={(tab: any) => {
+                setActiveTab(tab)
+                setPage(1)
+              }}
+              search={search}
+              onSearchChange={handleSearchChange}
+              onOpenFilter={() => setShowFilters(true)}
+              onExport={() => {}}
+              onAddOrder={() => openEntity("create")}
+              filters={filters as any}
+              setFilters={setFilters as any}
+              viewMode={effectiveViewMode}
+              onViewModeChange={(m) => setViewMode(m)}
+              hasActiveFilters={hasActiveFilters}
+              tabCounts={tabCounts}
             />
 
-            {/* Detail Modal matching ServiceOrderDetail */}
-            {selectedOrderDetail && (
-                <DefaultModal
-                    isOpen={Boolean(selectedOrderDetail)}
-                    onClose={() => setSelectedOrderDetail(null)}
-                    title={`Ordem de Serviço #${selectedOrderDetail.order_number}`}
-                    description={`Loja: ${selectedOrderDetail.store_name || selectedOrderDetail.stores?.name || "Loja Parceira"}`}
-                    footer={
-                        <div className="flex justify-between items-center w-full">
-                            <div className="text-xs text-brand-inactive-text">
-                                Criada em {formatDate(selectedOrderDetail.created_at)}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        const o = selectedOrderDetail
-                                        setSelectedOrderDetail(null)
-                                        handleOpenEdit(o)
-                                    }}
-                                >
-                                    Editar OS
-                                </Button>
-                                <Button variant="default" onClick={() => setSelectedOrderDetail(null)}>
-                                    Fechar
-                                </Button>
-                            </div>
-                        </div>
-                    }
-                >
-                    <div className="space-y-6 pt-2">
-                        {/* Status Bar */}
-                        <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-gray/50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border">
-                            <div>
-                                <span className="text-xs text-brand-inactive-text font-medium block">
-                                    Situação Atual
-                                </span>
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">
-                                    {selectedOrderDetail.status?.replace(/_/g, " ")}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-xs text-brand-inactive-text font-medium block">
-                                    Total
-                                </span>
-                                <span className="text-lg font-bold text-brand-green">
-                                    {formatCurrency(selectedOrderDetail.total_amount || 0)}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Customer Info */}
-                        <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border space-y-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
-                                Dados do Cliente
-                            </h4>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div>
-                                    <span className="text-xs text-brand-inactive-text block">Nome:</span>
-                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                        {selectedOrderDetail.customer_name || "Não informado"}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-brand-inactive-text block">Contato:</span>
-                                    <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                        {selectedOrderDetail.customer_phone || selectedOrderDetail.customer_email || "Sem contato"}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Diagnosis / Notes */}
-                        <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border space-y-3">
-                            <div>
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-1">
-                                    Título / Reclamação
-                                </h4>
-                                <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                    {selectedOrderDetail.title || "Não especificado"}
-                                </p>
-                            </div>
-                            {selectedOrderDetail.diagnosis && (
-                                <div>
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-1">
-                                        Diagnóstico Técnico
-                                    </h4>
-                                    <p className="text-xs text-brand-dark dark:text-dark-heading">
-                                        {selectedOrderDetail.diagnosis}
-                                    </p>
-                                </div>
-                            )}
-                            {selectedOrderDetail.internal_notes && (
-                                <div>
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-1">
-                                        Notas Internas
-                                    </h4>
-                                    <p className="text-xs text-brand-dark dark:text-dark-heading">
-                                        {selectedOrderDetail.internal_notes}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Services / Products if loaded */}
-                        {selectedOrderDetail.services && selectedOrderDetail.services.length > 0 && (
-                            <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border space-y-2">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">
-                                    Serviços Aplicados ({selectedOrderDetail.services.length})
-                                </h4>
-                                <div className="divide-y divide-brand-border dark:divide-dark-border">
-                                    {selectedOrderDetail.services.map((s: any, i: number) => (
-                                        <div key={i} className="py-2 flex items-center justify-between text-xs">
-                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                {s.services?.name || s.name || "Serviço"}
-                                            </span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(s.price || 0)}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </DefaultModal>
-            )}
-
-            {/* Edit Modal with AdminActionModal */}
-            {editingOrder && (
-                <DefaultModal
-                    isOpen={Boolean(editingOrder)}
-                    onClose={() => setEditingOrder(null)}
-                    title={`Editar Ordem de Serviço #${editingOrder.order_number}`}
-                    description={`Loja: ${editingOrder.store_name || editingOrder.stores?.name || "Loja"} • Cliente: ${editingOrder.customer_name || "Sem nome"}`}
-                    footer={
-                        <div className="flex justify-end gap-2 w-full">
-                            <Button variant="ghost" onClick={() => setEditingOrder(null)}>
-                                Cancelar
-                            </Button>
-                            <Button variant="default" onClick={handleSaveEdit}>
-                                Prosseguir e Salvar
-                            </Button>
-                        </div>
-                    }
-                >
-                    <div className="space-y-4 pt-2">
-                        <div>
-                            <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                                Status da OS
-                            </label>
-                            <select
-                                className="w-full px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-white text-sm"
-                                value={editForm.status}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))}
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-8">
+              {paginatedOrders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center min-h-[350px]">
+                  <IconPlaceholder
+                    icon={WrenchIcon}
+                    containerSize="w-16 h-16 mb-2"
+                    iconSize="w-6 h-6"
+                    title="Nenhuma ordem de serviço encontrada"
+                    subtitle="Não encontramos ordens de serviço para os filtros selecionados."
+                  />
+                </div>
+              ) : effectiveViewMode === "grid" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {paginatedOrders.map((order) => {
+                    const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
+                    const statusColor = statusMeta?.variant || "gray"
+                    const statusLabel = statusMeta?.label || order.status
+                    return (
+                      <ServiceOrderGridCard
+                        key={order.id}
+                        order={order}
+                        selected={selection.has(order.id)}
+                        onSelect={() => {
+                          setSelection(p => {
+                            const next = new Set(p)
+                            next.has(order.id) ? next.delete(order.id) : next.add(order.id)
+                            return next
+                          })
+                        }}
+                        onDetails={() => openEntity("view", order.id)}
+                        onEdit={() => openEntity("edit", order.id)}
+                        onStatus={() => handleOpenStatusModal(order.id)}
+                        onPrint={() => setPrintOrderId(order.id)}
+                        onDelete={() => handleDelete(order.id)}
+                        statusColor={statusColor}
+                        statusLabel={statusLabel}
+                        {...getPrefetchProps(order.id)}
+                      />
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                      <thead>
+                        <tr className="border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/20">
+                          <th className="py-3 pl-4 pr-0 w-12 text-left">
+                            <Checkbox
+                              checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selection.has(o.id))}
+                              onChange={() => {
+                                const allSelected = paginatedOrders.every(o => selection.has(o.id))
+                                setSelection(p => {
+                                  const next = new Set(p)
+                                  paginatedOrders.forEach(o => allSelected ? next.delete(o.id) : next.add(o.id))
+                                  return next
+                                })
+                              }}
+                            />
+                          </th>
+                          {COLUMNS.map((col) => (
+                            <th
+                              key={col.id}
+                              style={{ width: col.width }}
+                              className={`py-3 px-4 text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider text-${col.align}`}
                             >
-                                <option value="aberta">Aberta</option>
-                                <option value="aguardando_aprovacao">Aguardando Aprovação</option>
-                                <option value="aprovada">Aprovada</option>
-                                <option value="em_andamento">Em Andamento</option>
-                                <option value="aguardando_peca">Aguardando Peça</option>
-                                <option value="concluida">Concluída</option>
-                                <option value="entregue">Entregue</option>
-                                <option value="cancelada">Cancelada</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                                Título do Serviço
-                            </label>
-                            <Input
-                                value={editForm.title}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                              {col.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                        {paginatedOrders.map((order) => {
+                          const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
+                          const statusColor = statusMeta?.variant || "gray"
+                          const statusLabel = statusMeta?.label || order.status
+                          return (
+                            <ServiceOrderListRow
+                              key={order.id}
+                              order={order}
+                              columns={COLUMNS}
+                              selected={selection.has(order.id)}
+                              onSelect={() => {
+                                setSelection(p => {
+                                  const next = new Set(p)
+                                  next.has(order.id) ? next.delete(order.id) : next.add(order.id)
+                                  return next
+                                })
+                              }}
+                              onDetails={() => openEntity("view", order.id)}
+                              onEdit={() => openEntity("edit", order.id)}
+                              onStatus={() => handleOpenStatusModal(order.id)}
+                              onPrint={() => setPrintOrderId(order.id)}
+                              onDelete={() => handleDelete(order.id)}
+                              statusColor={statusColor}
+                              statusLabel={statusLabel}
+                              {...getPrefetchProps(order.id)}
                             />
-                        </div>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
-                        <div>
-                            <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                                Data Prevista de Conclusão
-                            </label>
-                            <Input
-                                type="date"
-                                value={editForm.expected_completion_date}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, expected_completion_date: e.target.value }))}
-                            />
-                        </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center pt-6">
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setPage(p)}
+                  />
+                </div>
+              )}
+            </div>
+          </FadeIn>
+        )}
+      </AnimatePresence>
 
-                        <div>
-                            <FormTextarea
-                                label="Diagnóstico Técnico"
-                                value={editForm.diagnosis}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, diagnosis: e.target.value }))}
-                                rows={2}
-                            />
-                        </div>
+      {/* Filter Sheet */}
+      <FilterSheet
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        sections={filterSections}
+        filters={filters}
+        setFilters={setFilters as any}
+        onClear={() => {
+          setFilters({ status: [], total: { min: "", max: "" }, expected_completion_date: { presets: [], from: "", to: "" } })
+          setPage(1)
+        }}
+      />
 
-                        <div>
-                            <FormTextarea
-                                label="Observações Internas"
-                                value={editForm.internal_notes}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, internal_notes: e.target.value }))}
-                                rows={2}
-                            />
-                        </div>
-                    </div>
-                </DefaultModal>
+      {/* Status Change Modal */}
+      {statusModal && (
+        <DefaultModal
+          isOpen={true}
+          onClose={() => setStatusModal(null)}
+          title="Alterar Status da OS"
+          maxWidth="md"
+        >
+          <div className="space-y-4 pt-2">
+            <FormDropdown
+              label="Novo Status"
+              value={statusModal.nextStatus}
+              options={Object.entries(SERVICE_ORDER_STATUS_META).map(([key, meta]) => ({
+                value: key,
+                label: meta.label,
+              }))}
+              setValue={(val) => setStatusModal(p => p ? { ...p, nextStatus: val } : null)}
+            />
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setStatusModal(null)}>Cancelar</Button>
+              <Button onClick={() => handleStatusTransition(statusModal.orderId, statusModal.currentStatus, statusModal.nextStatus)}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DefaultModal>
+      )}
+
+      {/* Status Warning Modal (reason required) */}
+      {statusWarningModal && (
+        <DefaultModal
+          isOpen={statusWarningModal.isOpen}
+          onClose={() => setStatusWarningModal(null)}
+          title="Regressão de Status"
+          maxWidth="md"
+        >
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-brand-inactive-text">
+              Você está regredindo o status da OS. Informe o motivo desta alteração:
+            </p>
+            <FormDropdown
+              label="Motivo"
+              value={statusWarningModal.reasonValue}
+              options={CHANGE_STATUS_REASONS}
+              setValue={(val) => setStatusWarningModal(p => p ? { ...p, reasonValue: val } : null)}
+            />
+            {statusWarningModal.reasonValue === "other" && (
+              <Input
+                label="Descreva o motivo"
+                value={statusWarningModal.customReason}
+                onChange={(e) => setStatusWarningModal(p => p ? { ...p, customReason: e.target.value } : null)}
+              />
             )}
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setStatusWarningModal(null)}>Cancelar</Button>
+              <Button onClick={confirmStatusWarning} disabled={!statusWarningModal.reasonValue}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DefaultModal>
+      )}
 
-            {/* Action Context Modal (Notification + Audit) */}
-            {actionModal}
-        </FadeIn>
-    )
+      {/* Simple Confirm Modal */}
+      {simpleConfirmModal && (
+        <AlertModal
+          isOpen={simpleConfirmModal.isOpen}
+          onClose={() => setSimpleConfirmModal(null)}
+          onConfirm={() => {
+            const { orderId, nextStatus } = simpleConfirmModal
+            setSimpleConfirmModal(null)
+            void handleStatusChange(orderId, nextStatus)
+          }}
+          title="Alterar Status"
+          description={`Deseja realmente alterar o status para "${SERVICE_ORDER_STATUS_META[simpleConfirmModal.nextStatus as ServiceOrderStatus]?.label || simpleConfirmModal.nextStatus}"?`}
+          confirmText="Confirmar"
+          cancelText="Cancelar"
+        />
+      )}
+
+      {/* Print OS Modal */}
+      {printOrderId && (
+        <OSSPrintModal
+          isOpen={true}
+          onClose={() => setPrintOrderId(null)}
+          orderId={printOrderId}
+          partnerId={activePartnerId}
+        />
+      )}
+
+      {/* Admin Action Modal (Salvar alterações na OS, Excluir) */}
+      {actionModal}
+    </>
+  )
 }

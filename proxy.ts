@@ -4,7 +4,11 @@ import { middleware as supabaseMiddleware } from "@/lib/supabase/middleware"
 /** Request proxy for security checks and session handling. */
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
-  const isStaticLegalOrHelpPage = path.startsWith("/institucional/") || path.startsWith("/ajuda/")
+  const isStaticLegalOrHelpPage =
+    path.startsWith("/institucional/") ||
+    path.startsWith("/ajuda/") ||
+    path === "/blog" ||
+    path.startsWith("/blog/")
 
   if (isStaticLegalOrHelpPage) {
     return NextResponse.next()

@@ -197,7 +197,7 @@ export function StoreSwitcher({
                 fullWidth={isSidebar}
             >
                 {stores.map((store) => {
-                    const storeImage = getR2ImageUrl(store.logo_url) || "/local-grocery-store.png"
+                    const storeImage = getR2ImageUrl(store.logo_url) || "https://img.dudit.com.br/static/Placeholder.png"
 
                     return (
                         <DropdownItem

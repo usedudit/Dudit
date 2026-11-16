@@ -131,6 +131,15 @@ const PromotionGridCard = React.memo(({
                 </div>
             </div>
 
+            {(campaign.store_name || campaign.stores?.name || campaign.partner_name) && (
+                <div className="mb-1 flex flex-col">
+                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">Vendedor</span>
+                    <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate" title={campaign.store_name || campaign.stores?.name || campaign.partner_name}>
+                        {campaign.store_name || campaign.stores?.name || campaign.partner_name}
+                    </span>
+                </div>
+            )}
+
             <div className="my-3 flex flex-col">
                 <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{ruleDetails.above}</span>
                 <span className="text-xs font-bold text-brand-dark dark:text-dark-heading mt-0.5">{ruleDetails.below}</span>

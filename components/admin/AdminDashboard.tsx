@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -260,7 +259,7 @@ export default function AdminDashboard({ stats: serverStats }: AdminDashboardPro
     const formattedActivities = recentLogs.map(formatLogToActivity)
 
     return (
-        <div className="w-full space-y-6 pt-4 px-4 md:px-8 max-w-[1700px] mx-auto pb-12">
+        <div className="w-full space-y-6 p-4 md:p-8 max-w-[1700px] mx-auto pb-12">
             {/* Header */}
             <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex flex-col gap-2 pt-1">

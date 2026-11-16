@@ -85,6 +85,13 @@ const ServiceOrderListRow = React.memo(
             </span>
           )
 
+        case "seller":
+          return (
+            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate max-w-[180px] block" title={order.store_name || order.stores?.name || order.partner_name || "—"}>
+              {order.store_name || order.stores?.name || order.partner_name || "—"}
+            </span>
+          )
+
         case "customer":
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[180px] block">

@@ -89,6 +89,17 @@ export const PlanGridCard: React.FC<PlanGridCardProps> = ({
       </div>
 
       <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+        {(plan.partner_name || (plan as any).store_name || (plan as any).stores?.name) && (
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Vendedor</span>
+              <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate" title={plan.partner_name || (plan as any).store_name || (plan as any).stores?.name}>
+                {plan.partner_name || (plan as any).store_name || (plan as any).stores?.name}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Início</span>

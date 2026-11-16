@@ -78,6 +78,7 @@ interface PromotionFormPageProps {
     promotions: any[]
     storeId?: string | null
     onBack: () => void
+    onSaveOverride?: (payload: any, originalData: any) => Promise<{ success: boolean; error?: string }>
 }
 
 export default function PromotionFormPage({
@@ -88,6 +89,7 @@ export default function PromotionFormPage({
     promotions,
     storeId,
     onBack,
+    onSaveOverride,
 }: PromotionFormPageProps) {
     const { toast } = useToast()
     const { setHeaderOverride } = useSidebar()
@@ -355,6 +357,22 @@ export default function PromotionFormPage({
             const targetCampaignId = (currentMode === "edit" && campaign?.id) ? campaign.id : createdCampaignId
 
             if (currentMode === "edit" || createdCampaignId) {
+                if (onSaveOverride) {
+                    const overrideRes = await onSaveOverride(
+                        { ...payload, id: targetCampaignId, rule: editingRule },
+                        campaign
+                    )
+                    if (!overrideRes.success) {
+                        toast({ title: "Erro ao salvar campanha.", description: overrideRes.error, variant: "destructive" })
+                        setIsSaving(false)
+                        return
+                    }
+                    toast({ title: "Campanha atualizada com sucesso." })
+                    setIsSaving(false)
+                    setCurrentMode("details")
+                    return
+                }
+
                 // 1. Update Campaign details
                 const res = await updateCampaignAction(targetCampaignId!, payload)
                 if (!res.success) {

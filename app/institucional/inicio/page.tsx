@@ -250,7 +250,7 @@ const BentoFeaturesComoAjuda = () => {
                                 )}
                             </div>
                             <div className="pt-5">
-                                <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block mb-1">{card.subtitle}</span>
+                                <span className="text-xs font-bold text-brand-green block mb-1">{card.subtitle}</span>
                                 <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">{card.title}</h4>
                                 <p className="text-brand-inactive-text text-sm leading-relaxed">{card.description}</p>
                             </div>
@@ -460,18 +460,18 @@ const GlobalScale = () => {
                         <div className="relative z-10 text-white">
                             <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SEU LUCRO.</span>
                             <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />Sem comissão sobre a venda.</h2>
-                            <p className="text-brand-inactive-text text-lg mb-12 max-w-md leading-relaxed">
+                            <p className="text-gray-300 text-lg mb-12 max-w-md leading-relaxed">
                                 A Dudit é mais uma vitrine para o seu negócio ser encontrado. Sem taxas escondidas e sem porcentagem sobre as suas vendas.
                             </p>
 
                             <div className="flex gap-12 pt-8">
                                 <div>
                                     <div className="text-3xl font-bold text-brand-green mb-1">0%</div>
-                                    <div className="text-brand-inactive-text text-xs">de comissão por venda</div>
+                                    <div className="text-gray-300 text-xs">de comissão por venda</div>
                                 </div>
                                 <div>
                                     <div className="text-3xl font-bold text-brand-green mb-1">100%</div>
-                                    <div className="text-brand-inactive-text text-xs">do valor da venda fica com você</div>
+                                    <div className="text-gray-300 text-xs">do valor da venda fica com você</div>
                                 </div>
                             </div>
                         </div>

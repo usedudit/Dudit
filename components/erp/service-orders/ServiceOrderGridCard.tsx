@@ -104,6 +104,18 @@ const ServiceOrderGridCard = React.memo(
 
         {/* Info Rows */}
         <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
+          {/* Row Vendedor (se disponível) */}
+          {(order.store_name || order.stores?.name || order.partner_name) && (
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Vendedor</span>
+                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={order.store_name || order.stores?.name || order.partner_name}>
+                  {order.store_name || order.stores?.name || order.partner_name}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Row 1: Cliente & Emissão */}
           <div className="flex justify-between items-start gap-2">
             <div className="flex flex-col gap-0.5 min-w-0">

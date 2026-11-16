@@ -238,8 +238,14 @@ export function BalancePaymentCollector({
   const emitLegs = useCallback(
     (legs: PaymentBreakdownLeg[]) => {
       onLegsReady(legs)
-      const total = legs.reduce((sum, leg) => sum + Number(leg.amountReceived || leg.amount || 0), 0)
-      onValidityChange?.(total > 0.009 && total <= remainingBalance + 0.005)
+      const coveredBalance = legs.reduce(
+        (sum, leg) => sum + Number(leg.amount || Math.min(Number(leg.amountReceived || 0), remainingBalance)),
+        0,
+      )
+      const hasNonCashOverpayment = legs.some(
+        (leg) => normalizeMethodType(String(leg.method || "")) !== "cash" && Number(leg.amount || 0) > remainingBalance + 0.005,
+      )
+      onValidityChange?.(coveredBalance > 0.009 && coveredBalance <= remainingBalance + 0.005 && !hasNonCashOverpayment)
     },
     [onLegsReady, onValidityChange, remainingBalance],
   )
