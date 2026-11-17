@@ -38,8 +38,9 @@ const standardTransition = { type: "spring" as const, stiffness: 380, damping: 3
 interface DriverPaymentModalProps {
   isOpen: boolean
   onClose: () => void
-  assignmentId: string
+  assignmentId?: string
   order: any
+  partnerId?: string
   onSuccess?: () => void
 }
 
@@ -172,6 +173,7 @@ export default function DriverPaymentModal({
   const [copiedPix, setCopiedPix] = useState(false)
   const [printOrderId, setPrintOrderId] = useState<string | null>(null)
   const [fallbackMethod, setFallbackMethod] = useState<string>("Dinheiro")
+  const [selectedPaymentCategory, setSelectedPaymentCategory] = useState<"auto" | "pix" | "dinheiro" | "cartao">("auto")
 
   useEffect(() => {
     if (isOpen) {
@@ -182,6 +184,7 @@ export default function DriverPaymentModal({
       setLocalPixQrData(null)
       setCopiedPix(false)
       setPrintOrderId(null)
+      setSelectedPaymentCategory("auto")
       const id = setTimeout(() => setIsAnimating(true), 50)
       return () => clearTimeout(id)
     } else {
@@ -191,11 +194,12 @@ export default function DriverPaymentModal({
 
   // Hydrate order and store payment info
   useEffect(() => {
-    if (!isOpen || !assignmentId) return
+    if (!isOpen) return
     let active = true
     const targetOrderId = initialOrder?.id || initialOrder?.order_id || null
+    const targetAssignmentId = assignmentId || initialOrder?.delivery_id || ""
 
-    getDriverPaymentMethodsAction(assignmentId, targetOrderId)
+    getDriverPaymentMethodsAction(targetAssignmentId, targetOrderId)
       .then((res) => {
         if (!active) return
         if (res.success) {
@@ -220,7 +224,7 @@ export default function DriverPaymentModal({
     return () => {
       active = false
     }
-  }, [isOpen, assignmentId])
+  }, [isOpen, assignmentId, initialOrder?.id, initialOrder?.order_id, initialOrder?.delivery_id])
 
   // Target values
   const targetOrder = currentOrder || initialOrder
@@ -303,14 +307,82 @@ export default function DriverPaymentModal({
       })
   }, [isOpen, targetOrder?.id, targetOrder?.order_id, isFullyPaid, isMpOrder])
 
+  // Sync MP
+  const handleSyncMp = async () => {
+    const orderId = targetOrder?.id || targetOrder?.order_id
+    if (!orderId) return
+    setSyncingMp(true)
+    try {
+      const res = await fetch("/api/orders/sync-payment-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.newStatus === "paid" || data.paymentStatus === "approved") {
+          toast({ title: "Pagamento Aprovado!", description: "Mercado Pago confirmou o pagamento." })
+          setStep("success")
+          onSuccess?.()
+        } else {
+          toast({ title: "Aguardando pagamento", description: "O pagamento ainda não foi identificado pelo Mercado Pago." })
+        }
+      } else {
+        toast({ title: "Aviso", description: "Não foi possível sincronizar no momento.", variant: "warning" })
+      }
+    } catch (err) {
+      console.error("Error syncing MP:", err)
+      toast({ title: "Erro", description: "Falha ao verificar com Mercado Pago.", variant: "destructive" })
+    } finally {
+      setSyncingMp(false)
+    }
+  }
+
+  // Regenerate MP Pix if expired or requested
+  const handleRegenerateMpPix = async () => {
+    const orderId = targetOrder?.id || targetOrder?.order_id
+    if (!orderId) return
+    setMpLoading(true)
+    try {
+      const res = await fetch("/api/orders/retry-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data && (data.pixData || data.boletoData)) {
+          setMpPaymentData(data)
+          toast({ title: "QR Code Pix Atualizado", description: "Novo código de pagamento gerado com sucesso." })
+        }
+      } else {
+        toast({ title: "Aviso", description: "Não foi possível gerar novo QR Code no momento.", variant: "warning" })
+      }
+    } catch (err) {
+      console.error("Error regenerating MP Pix:", err)
+      toast({ title: "Erro", description: "Falha ao gerar QR Code.", variant: "destructive" })
+    } finally {
+      setMpLoading(false)
+    }
+  }
+
   // Generate local Pix if order is Pix and not Mercado Pago
   const resolvedMethodName = String(
     targetOrder?.payment_method || breakdown[0]?.method || ""
   ).trim()
 
+  const activeCategory = useMemo(() => {
+    if (selectedPaymentCategory !== "auto") return selectedPaymentCategory
+    if (isMpOrder) return "pix"
+    if (resolvedMethodName.toLowerCase().includes("pix") || fallbackMethod.toLowerCase().includes("pix")) return "pix"
+    if (resolvedMethodName.toLowerCase().includes("dinheiro") || resolvedMethodName.toLowerCase().includes("cash")) return "dinheiro"
+    if (resolvedMethodName.toLowerCase().includes("cartão") || resolvedMethodName.toLowerCase().includes("cartao") || resolvedMethodName.toLowerCase().includes("crédito") || resolvedMethodName.toLowerCase().includes("débito")) return "cartao"
+    return "fallback"
+  }, [selectedPaymentCategory, isMpOrder, resolvedMethodName, fallbackMethod])
+
   const isPixMethod =
     !isMpOrder &&
-    (resolvedMethodName.toLowerCase().includes("pix") || fallbackMethod.toLowerCase().includes("pix"))
+    (activeCategory === "pix" || resolvedMethodName.toLowerCase().includes("pix") || fallbackMethod.toLowerCase().includes("pix"))
 
   useEffect(() => {
     if (!isOpen || isFullyPaid || !isPixMethod) return
@@ -352,37 +424,6 @@ export default function DriverPaymentModal({
     generatingLocalPix,
   ])
 
-  // Sync MP
-  const handleSyncMp = async () => {
-    const orderId = targetOrder?.id || targetOrder?.order_id
-    if (!orderId) return
-    setSyncingMp(true)
-    try {
-      const res = await fetch("/api/orders/sync-payment-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.newStatus === "paid" || data.paymentStatus === "approved") {
-          toast({ title: "Pagamento Aprovado!", description: "Mercado Pago confirmou o pagamento." })
-          setStep("success")
-          onSuccess?.()
-        } else {
-          toast({ title: "Aguardando pagamento", description: "O pagamento ainda não foi identificado pelo Mercado Pago." })
-        }
-      } else {
-        toast({ title: "Aviso", description: "Não foi possível sincronizar no momento.", variant: "warning" })
-      }
-    } catch (err) {
-      console.error("Error syncing MP:", err)
-      toast({ title: "Erro", description: "Falha ao verificar com Mercado Pago.", variant: "destructive" })
-    } finally {
-      setSyncingMp(false)
-    }
-  }
-
   // Confirm payment execution
   const handleConfirmReceipt = async (methodOverride?: string) => {
     if (isFullyPaid) {
@@ -392,9 +433,15 @@ export default function DriverPaymentModal({
 
     const finalMethod =
       methodOverride ||
-      (resolvedMethodName && !resolvedMethodName.toLowerCase().includes("não definido")
-        ? resolvedMethodName
-        : fallbackMethod)
+      (activeCategory === "pix"
+        ? (isMpOrder ? "Pix Mercado Pago" : "Pix")
+        : activeCategory === "dinheiro"
+        ? "Dinheiro"
+        : activeCategory === "cartao"
+        ? (resolvedMethodName.toLowerCase().includes("débito") ? "Cartão de Débito" : "Cartão de Crédito")
+        : (resolvedMethodName && !resolvedMethodName.toLowerCase().includes("não definido")
+          ? resolvedMethodName
+          : fallbackMethod))
 
     setStep("processing")
     try {
@@ -403,9 +450,10 @@ export default function DriverPaymentModal({
         (finalMethod.toLowerCase().includes("crédito") ? 1 : 1)
 
       const targetOrderId = targetOrder?.id || targetOrder?.order_id || null
+      const targetAssignmentId = assignmentId || initialOrder?.delivery_id || targetOrderId || ""
 
       const res = await driverConfirmPaymentAction({
-        assignmentId,
+        assignmentId: targetAssignmentId,
         orderId: targetOrderId,
         paymentMethod: finalMethod,
         amountReceived: totalRemaining,
@@ -541,158 +589,238 @@ export default function DriverPaymentModal({
                           Não há valores pendentes para receber nesta entrega.
                         </p>
                       </div>
-                    ) : isMpOrder ? (
-                      /* MERCADO PAGO CASE */
-                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
-                              <img
-                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                alt="Mercado Pago"
-                                className="w-6 h-6 object-contain"
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                                {mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago"}
-                                <Badge variant="orange" className="text-[10px] scale-90">Pendente</Badge>
-                              </h4>
-                              <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                {mpPaymentData?.boletoData
-                                  ? "Linha digitável gerada no pedido"
-                                  : "Escaneie o QR Code ou copie a chave Pix"}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSyncMp}
-                            disabled={syncingMp}
-                            className="h-8 text-xs font-semibold"
+                    ) : (
+                      <>
+                        {/* Seletor rápido de forma de recebimento */}
+                        <div className="flex items-center gap-1.5 mb-4 bg-brand-gray dark:bg-dark-border/40 p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentCategory("auto")}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
+                              selectedPaymentCategory === "auto"
+                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-dark dark:text-dark-heading"
+                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                            }`}
                           >
-                            {syncingMp ? <Spinner size={12} className="mr-1.5" /> : null}
-                            Verificar
-                          </Button>
+                            Padrão ({resolvedMethodName || "Pedido"})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentCategory("pix")}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
+                              activeCategory === "pix"
+                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-primary"
+                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                            }`}
+                          >
+                            Pix
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentCategory("dinheiro")}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
+                              activeCategory === "dinheiro"
+                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-primary"
+                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                            }`}
+                          >
+                            Dinheiro
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentCategory("cartao")}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
+                              activeCategory === "cartao"
+                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-primary"
+                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                            }`}
+                          >
+                            Cartão
+                          </button>
                         </div>
 
-                        {mpLoading && (
-                          <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
-                            <Spinner size={24} className="text-brand-primary mb-2" />
-                            <span className="text-xs">Buscando QR Code no Mercado Pago...</span>
-                          </div>
-                        )}
-
-                        {/* Pix MP QR Code */}
-                        {mpPaymentData?.pixData && (
-                          <div className="flex flex-col items-center gap-3 pt-2">
-                            {mpPaymentData.pixData.qrCodeBase64 && (
-                              <div className="w-44 h-44 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center shadow-sm">
-                                <img
-                                  src={`data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`}
-                                  alt="PIX QR Code"
-                                  className="w-full h-full object-contain"
-                                />
+                        {isMpOrder && (activeCategory === "pix" || activeCategory === "fallback") ? (
+                          /* MERCADO PAGO CASE */
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
+                                  <img
+                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                    alt="Mercado Pago"
+                                    className="w-6 h-6 object-contain"
+                                  />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                    {mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago"}
+                                    <Badge variant="orange" className="text-[10px] scale-90">Pendente</Badge>
+                                  </h4>
+                                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    {mpPaymentData?.boletoData
+                                      ? "Linha digitável gerada no pedido"
+                                      : "Escaneie o QR Code ou copie a chave Pix"}
+                                  </p>
+                                </div>
                               </div>
-                            )}
-                            <div className="text-center">
-                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Pix</span>
-                              <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
-                              </span>
-                            </div>
-                            {mpPaymentData.pixData.qrCode && (
-                              <div className="w-full flex gap-2">
-                                <Input
-                                  variant="full-rounded"
-                                  readOnly
-                                  value={mpPaymentData.pixData.qrCode}
-                                  className="flex-1 h-10 truncate text-xs"
-                                />
+                              <div className="flex items-center gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    if (mpPaymentData?.pixData?.qrCode) {
-                                      navigator.clipboard.writeText(mpPaymentData.pixData.qrCode)
-                                      setCopiedPix(true)
-                                      toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." })
-                                      setTimeout(() => setCopiedPix(false), 2000)
-                                    }
-                                  }}
-                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
-                                  title="Copiar código Pix"
+                                  onClick={handleRegenerateMpPix}
+                                  disabled={mpLoading || syncingMp}
+                                  className="h-8 text-xs font-semibold"
+                                  title="Atualizar ou regerar QR Code Pix"
                                 >
-                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                  {mpLoading ? <Spinner size={12} className="mr-1.5" /> : null}
+                                  Atualizar QR Code
                                 </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Boleto MP */}
-                        {mpPaymentData?.boletoData && (
-                          <div className="flex flex-col items-center gap-3 pt-2">
-                            {mpPaymentData.boletoData.barcode && (
-                              <div className="w-full overflow-hidden bg-white p-2 rounded-xl border flex justify-center">
-                                <Barcode
-                                  value={mpPaymentData.boletoData.barcode}
-                                  format="CODE128"
-                                  width={1.5}
-                                  height={45}
-                                  displayValue={false}
-                                  margin={4}
-                                  className="w-full max-w-xs"
-                                />
-                              </div>
-                            )}
-                            <div className="text-center">
-                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Boleto</span>
-                              <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
-                              </span>
-                            </div>
-                            {mpPaymentData.boletoData.barcode && (
-                              <div className="w-full flex gap-2">
-                                <Input
-                                  variant="full-rounded"
-                                  readOnly
-                                  value={mpPaymentData.boletoData.barcode}
-                                  className="flex-1 h-10 truncate text-xs"
-                                />
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    if (mpPaymentData?.boletoData?.barcode) {
-                                      navigator.clipboard.writeText(mpPaymentData.boletoData.barcode)
-                                      setCopiedPix(true)
-                                      toast({ title: "Copiado!", description: "Linha digitável copiada." })
-                                      setTimeout(() => setCopiedPix(false), 2000)
-                                    }
-                                  }}
-                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
-                                  title="Copiar código de barras"
+                                  onClick={handleSyncMp}
+                                  disabled={syncingMp}
+                                  className="h-8 text-xs font-semibold"
                                 >
-                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                  {syncingMp ? <Spinner size={12} className="mr-1.5" /> : null}
+                                  Verificar
+                                </Button>
+                              </div>
+                            </div>
+
+                            {mpLoading && (
+                              <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
+                                <Spinner size={24} className="text-brand-primary mb-2" />
+                                <span className="text-xs">Buscando QR Code no Mercado Pago...</span>
+                              </div>
+                            )}
+
+                            {!mpLoading && !mpPaymentData?.pixData && !mpPaymentData?.boletoData && (
+                              <div className="flex flex-col items-center justify-center py-6 text-center bg-gray-50 dark:bg-dark-border/20 rounded-xl p-4 border border-dashed border-brand-border dark:border-dark-border">
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
+                                  QR Code Pix ainda não gerado ou expirado no Mercado Pago.
+                                </p>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={handleRegenerateMpPix}
+                                  disabled={mpLoading}
+                                  className="h-9 font-semibold"
+                                >
+                                  Gerar QR Code Pix
                                 </Button>
                               </div>
                             )}
-                          </div>
-                        )}
 
-                        <div className="pt-2">
-                          <Button
-                            className="w-full h-11"
-                            onClick={() => handleConfirmReceipt("Pix Mercado Pago")}
-                          >
-                            Confirmar Recebimento do Cliente
-                          </Button>
-                        </div>
-                      </div>
-                    ) : isPixMethod ? (
-                      /* PIX DA LOJA CASE */
+                            {/* Pix MP QR Code */}
+                            {mpPaymentData?.pixData && (
+                              <div className="flex flex-col items-center gap-3 pt-2">
+                                {mpPaymentData.pixData.qrCodeBase64 && (
+                                  <div className="w-44 h-44 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center shadow-sm">
+                                    <img
+                                      src={`data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`}
+                                      alt="PIX QR Code"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                )}
+                                <div className="text-center">
+                                  <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Pix</span>
+                                  <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
+                                  </span>
+                                </div>
+                                {mpPaymentData.pixData.qrCode && (
+                                  <div className="w-full flex gap-2">
+                                    <Input
+                                      variant="full-rounded"
+                                      readOnly
+                                      value={mpPaymentData.pixData.qrCode}
+                                      className="flex-1 h-10 truncate text-xs"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (mpPaymentData?.pixData?.qrCode) {
+                                          navigator.clipboard.writeText(mpPaymentData.pixData.qrCode)
+                                          setCopiedPix(true)
+                                          toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." })
+                                          setTimeout(() => setCopiedPix(false), 2000)
+                                        }
+                                      }}
+                                      className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                      title="Copiar código Pix"
+                                    >
+                                      {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Boleto MP */}
+                            {mpPaymentData?.boletoData && (
+                              <div className="flex flex-col items-center gap-3 pt-2">
+                                {mpPaymentData.boletoData.barcode && (
+                                  <div className="w-full overflow-hidden bg-white p-2 rounded-xl border flex justify-center">
+                                    <Barcode
+                                      value={mpPaymentData.boletoData.barcode}
+                                      format="CODE128"
+                                      width={1.5}
+                                      height={45}
+                                      displayValue={false}
+                                      margin={4}
+                                      className="w-full max-w-xs"
+                                    />
+                                  </div>
+                                )}
+                                <div className="text-center">
+                                  <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Boleto</span>
+                                  <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
+                                  </span>
+                                </div>
+                                {mpPaymentData.boletoData.barcode && (
+                                  <div className="w-full flex gap-2">
+                                    <Input
+                                      variant="full-rounded"
+                                      readOnly
+                                      value={mpPaymentData.boletoData.barcode}
+                                      className="flex-1 h-10 truncate text-xs"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (mpPaymentData?.boletoData?.barcode) {
+                                          navigator.clipboard.writeText(mpPaymentData.boletoData.barcode)
+                                          setCopiedPix(true)
+                                          toast({ title: "Copiado!", description: "Linha digitável copiada." })
+                                          setTimeout(() => setCopiedPix(false), 2000)
+                                        }
+                                      }}
+                                      className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                      title="Copiar código de barras"
+                                    >
+                                      {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="pt-2">
+                              <Button
+                                className="w-full h-11"
+                                onClick={() => handleConfirmReceipt("Pix Mercado Pago")}
+                              >
+                                Confirmar Recebimento do Cliente
+                              </Button>
+                            </div>
+                          </div>
+                        ) : activeCategory === "pix" || isPixMethod ? (
+                          /* PIX DA LOJA CASE */
                       <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center shrink-0 border border-teal-100 dark:border-teal-900/30">
@@ -801,7 +929,7 @@ export default function DriverPaymentModal({
                           Confirmar Recebimento do Pix
                         </Button>
                       </div>
-                    ) : resolvedMethodName.toLowerCase().includes("cartão") || resolvedMethodName.toLowerCase().includes("cartao") || resolvedMethodName.toLowerCase().includes("crédito") || resolvedMethodName.toLowerCase().includes("débito") ? (
+                    ) : activeCategory === "cartao" || (!isMpOrder && !isPixMethod && (resolvedMethodName.toLowerCase().includes("cartão") || resolvedMethodName.toLowerCase().includes("cartao") || resolvedMethodName.toLowerCase().includes("crédito") || resolvedMethodName.toLowerCase().includes("débito"))) ? (
                       /* CARTÃO CRÉDITO OU DÉBITO */
                       <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
                         <div className="flex items-center gap-3">
@@ -844,7 +972,7 @@ export default function DriverPaymentModal({
                           Confirmar Recebimento no Cartão
                         </Button>
                       </div>
-                    ) : resolvedMethodName.toLowerCase().includes("dinheiro") || resolvedMethodName.toLowerCase().includes("cash") ? (
+                    ) : activeCategory === "dinheiro" || (!isMpOrder && !isPixMethod && (resolvedMethodName.toLowerCase().includes("dinheiro") || resolvedMethodName.toLowerCase().includes("cash"))) ? (
                       /* DINHEIRO (CASH) */
                       <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
                         <div className="flex items-center gap-3">
@@ -943,6 +1071,8 @@ export default function DriverPaymentModal({
                         </Button>
                       </div>
                     )}
+                  </>
+                )}
                   </motion.div>
                 )}
 

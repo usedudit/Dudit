@@ -1011,7 +1011,11 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         // Notify partner team
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(order.partner_id)
+            const { getNotificationRecipientRoles } = await import("@/lib/notifications/audience")
+            const teamUserIds = await getPartnerTeamUserIds(
+                order.partner_id,
+                getNotificationRecipientRoles("order_refunded"),
+            )
             if (teamUserIds.length > 0) {
                 const orderNum = order.order_number || order.id.slice(0, 8).toUpperCase()
                 await createNotificationsForUsers(teamUserIds, (userId) => ({
@@ -1115,7 +1119,11 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
         // Notify partner team
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(order.partner_id)
+            const { getNotificationRecipientRoles } = await import("@/lib/notifications/audience")
+            const teamUserIds = await getPartnerTeamUserIds(
+                order.partner_id,
+                getNotificationRecipientRoles("order_cancelled"),
+            )
             if (teamUserIds.length > 0) {
                 const orderNum = order.order_number || order.id.slice(0, 8).toUpperCase()
                 await createNotificationsForUsers(teamUserIds, (userId) => ({

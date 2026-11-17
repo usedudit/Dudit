@@ -156,15 +156,13 @@ export function getDeliveryTimelineSteps(
         return { date: formatDayMonth(when || new Date()), time: formatTime(when || new Date()) }
     }
 
-    const paymentMeta = fmtActive(isPaid)
-    const preparingMeta = fmtActive(isPaid && ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus))
-    const sentMeta = fmtActive(isPaid && ["sent", "delivered", "delivery_failed", "pickup_available"].includes(deliveryStatus))
-    const deliveredMeta = fmtActive(isPaid && ["delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus))
+    const preparingMeta = fmtActive(["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus))
+    const sentMeta = fmtActive(["sent", "delivered", "delivery_failed", "pickup_available"].includes(deliveryStatus))
+    const deliveredMeta = fmtActive(["delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus))
 
     if (isCancelled) {
         return [
-            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
-            { label: isPaid ? "Pago" : "Aguardando pagamento", date: baseDate, time: baseTime, active: true },
+            { label: isPickup ? "Aguardando preparação" : "Não enviado", date: baseDate, time: baseTime, active: true },
             { label: "Cancelado", date: cancelledDate, time: cancelledTime, active: true },
         ]
     }
@@ -182,13 +180,7 @@ export function getDeliveryTimelineSteps(
         if (shipmentStatus === "cancelled" || shipmentStatus === "failed") {
             const failedMeta = fmtWhen(shipment?.updated_at || shipment?.created_at)
             return [
-                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
-                {
-                    label: isPaid ? "Pago" : "Aguardando pagamento",
-                    date: isPaid ? paymentMeta.date : baseDate,
-                    time: isPaid ? paymentMeta.time : baseTime,
-                    active: true,
-                },
+                { label: "Em preparação", date: baseDate, time: baseTime, active: true },
                 {
                     label: shipmentStatus === "failed" ? "Falha no envio" : "Envio cancelado",
                     date: failedMeta.date,
@@ -203,11 +195,10 @@ export function getDeliveryTimelineSteps(
         const deliveredShipmentMeta = fmtWhen(shipment?.delivered_at)
 
         return [
-            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
             {
-                label: isPaid ? "Pago" : "Aguardando pagamento",
-                date: isPaid ? paymentMeta.date : baseDate,
-                time: isPaid ? paymentMeta.time : baseTime,
+                label: "Em preparação",
+                date: baseDate,
+                time: baseTime,
                 active: true,
             },
             {
@@ -236,30 +227,29 @@ export function getDeliveryTimelineSteps(
         if (deliveryStatus === "delivery_failed") finalLabel = "Retirada não realizada"
 
         return [
-            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
             {
-                label: isPaid ? "Pago" : "Aguardando pagamento",
-                date: isPaid ? paymentMeta.date : baseDate,
-                time: isPaid ? paymentMeta.time : baseTime,
+                label: "Aguardando preparação",
+                date: baseDate,
+                time: baseTime,
                 active: true,
             },
             {
                 label: "Em preparação",
                 date: preparingMeta.date,
                 time: preparingMeta.time,
-                active: isPaid && ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
+                active: ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
             },
             {
                 label: "Pronto para retirada",
                 date: sentMeta.date,
                 time: sentMeta.time,
-                active: isPaid && ["sent", "delivered", "delivery_failed", "pickup_available"].includes(deliveryStatus),
+                active: ["sent", "delivered", "delivery_failed", "pickup_available"].includes(deliveryStatus),
             },
             {
                 label: finalLabel,
                 date: deliveredMeta.date,
                 time: deliveredMeta.time,
-                active: isPaid && ["delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
+                active: ["delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
             },
         ]
     }
@@ -268,30 +258,29 @@ export function getDeliveryTimelineSteps(
     if (deliveryStatus === "delivery_failed") finalLabel = "Falha na entrega"
 
     return [
-        { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
         {
-            label: isPaid ? "Pago" : "Aguardando pagamento",
-            date: isPaid ? paymentMeta.date : baseDate,
-            time: isPaid ? paymentMeta.time : baseTime,
+            label: "Não enviado",
+            date: baseDate,
+            time: baseTime,
             active: true,
         },
         {
             label: "Em preparação",
             date: preparingMeta.date,
             time: preparingMeta.time,
-            active: isPaid && ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
+            active: ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
         },
         {
             label: "Saiu para entrega",
             date: sentMeta.date,
             time: sentMeta.time,
-            active: isPaid && ["sent", "delivered", "delivery_failed", "pickup_available"].includes(deliveryStatus),
+            active: ["sent", "delivered", "delivery_failed", "pickup_available"].includes(deliveryStatus),
         },
         {
             label: finalLabel,
             date: deliveredMeta.date,
             time: deliveredMeta.time,
-            active: isPaid && ["delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
+            active: ["delivered", "pickup_available", "delivery_failed"].includes(deliveryStatus),
         },
     ]
 }
@@ -339,9 +328,9 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                         <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                             <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                 <div className="flex justify-between items-center flex-wrap gap-2">
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5">
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                            {isPickup ? "Retirada" : "Entrega"}
+                                            {isPickup ? "Retirada:" : "Entrega:"}
                                         </span>
                                         <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
                                             {currentStep.label}
@@ -786,31 +775,26 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
     // Store driver
     return (
         <FormSection title="Entregador">
-            <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-inactive-text dark:text-dark-body">
-                    <MotorbikeIcon size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
-                        Entregador da loja - {driverInfo.name}
-                    </span>
-                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Entregador próprio do estabelecimento
-                    </span>
-                </div>
-                {driverInfo.phone &&
-                    ["sent", "out_for_delivery"].includes(deliveryStatus) ? (
-                    <a
-                        href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 p-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                        title="Conversar no WhatsApp"
-                    >
-                        <WhatsappIcon size={16} className="text-[#25D366]" />
-                    </a>
-                ) : null}
-            </div>
+            <ListItem
+                icon={<MotorbikeIcon />}
+                title={driverInfo.name}
+                description="Entregador próprio do estabelecimento"
+                className="px-4 py-3"
+                right={
+                    driverInfo.phone &&
+                        ["sent", "out_for_delivery"].includes(deliveryStatus) ? (
+                        <a
+                            href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 p-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
+                            title="Conversar no WhatsApp"
+                        >
+                            <WhatsappIcon size={16} className="text-[#25D366]" />
+                        </a>
+                    ) : null
+                }
+            />
         </FormSection>
     )
 }
@@ -846,6 +830,30 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
     const distanceKm = order.delivery_driver?.distanceKm ?? order.delivery_breakdown?.distanceKm
     const estimatedHours = order.delivery_driver?.estimatedHours
 
+    const [otpData, setOtpData] = useState<{
+        code?: string
+        requiresOtp?: boolean
+        status?: string
+    } | null>(order.delivery_otp || null)
+
+    React.useEffect(() => {
+        if (order.delivery_otp) {
+            setOtpData(order.delivery_otp)
+            return
+        }
+        if (!isPickup && !carrier && order?.id && order.situation !== "cancelled") {
+            let active = true
+            import("@/app/actions/delivery-otp").then(({ getCustomerOrderDeliveryOtpAction }) => {
+                getCustomerOrderDeliveryOtpAction({ orderId: order.id }).then((res) => {
+                    if (active && res.success && res.data) {
+                        setOtpData(res.data)
+                    }
+                }).catch(() => { })
+            }).catch(() => { })
+            return () => { active = false }
+        }
+    }, [order.id, order.delivery_otp, isPickup, carrier, order.situation])
+
     const getFulfillmentType = () => {
         if (isPickup) return "Retirada"
         if (carrier) return "Transportadora"
@@ -863,17 +871,17 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
                 />
             )}
             <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
-            {!isPickup && !carrier && (
+            {!isPickup && !carrier && otpData?.requiresOtp && (
                 <DetailRow
                     label="Código de entrega"
                     value={
-                        order.delivery_status === "delivered"
-                            ? "Confirmado via código"
-                            : driverInfo?.type === "platform"
-                            ? "Obrigatório (Rede Dudit)"
-                            : Number(order.total_amount || 0) > 500
-                            ? "Obrigatório (Valor > R$ 500)"
-                            : "Não exigido (Até R$ 500)"
+                        order.delivery_status === "delivered" || otpData.status === "confirmed" ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">Confirmado</span>
+                        ) : otpData.code ? (
+                            <span className="font-mono tracking-widest text-base font-black text-brand-primary">
+                                {otpData.code}
+                            </span>
+                        ) : null
                     }
                 />
             )}

@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client";
 import { createAdminClient } from "@/lib/supabase/server";
-import { revalidateOrders } from "@/lib/utils/revalidation";
+import { revalidateOrders, revalidateOrderHistory } from "@/lib/utils/revalidation";
 import { formatDateTime, resolveTimelineActorName, humanizeTimelineChangeLine } from "@/lib/utils/formatters";
 import { formatCurrency } from "@/lib/utils";
 import { requireUser } from "@/lib/auth/authorization";
@@ -7003,7 +7003,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
               origin: "manual",
             });
           }
-          const teamUserIds = await getPartnerTeamUserIds(payload.partnerId);
+          const { getNotificationRecipientRoles } = await import("@/lib/notifications/audience");
+          const teamUserIds = await getPartnerTeamUserIds(
+            payload.partnerId,
+            getNotificationRecipientRoles("order_paid"),
+          );
           for (const userId of teamUserIds) {
             await createNotification({
               userId,
@@ -7089,7 +7093,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
               origin: "manual",
             });
           }
-          const teamUserIds = await getPartnerTeamUserIds(payload.partnerId);
+          const { getNotificationRecipientRoles } = await import("@/lib/notifications/audience");
+          const teamUserIds = await getPartnerTeamUserIds(
+            payload.partnerId,
+            getNotificationRecipientRoles(notifType),
+          );
           for (const userId of teamUserIds) {
             await createNotification({
               userId,
@@ -8358,4 +8366,174 @@ export async function getOrdersInsightsAction(
   } catch (error: any) {
     return { error: error.message };
   }
+}
+
+export interface ChangeOrderPaymentMethodInput {
+  orderId: string;
+  partnerId: string;
+  newPaymentMethod: string;
+  newPaymentMethodId?: string | null;
+  reason: string;
+}
+
+export async function changeOrderPaymentMethodAction(input: ChangeOrderPaymentMethodInput) {
+  const user = await requireUser();
+  if (!user) return { error: "Não autenticado" };
+
+  const { orderId, partnerId, newPaymentMethod, newPaymentMethodId, reason } = input;
+  if (!orderId || !partnerId) {
+    return { error: "Parâmetros obrigatórios ausentes." };
+  }
+
+  // 1. Validar permissão e papel: apenas OWNER, ADMIN e MANAGER podem alterar
+  const access = await requirePermission(partnerId, "orders", "edit");
+  const normalizedRole = String(access.roleId || "").toLowerCase();
+  const allowedRoles = ["owner", "admin", "manager"];
+  if (!allowedRoles.includes(normalizedRole)) {
+    return {
+      error: "Apenas proprietários, administradores e gerentes podem alterar o método de pagamento.",
+    };
+  }
+
+  // 2. Validar motivo obrigatório
+  const trimmedReason = String(reason || "").trim();
+  if (!trimmedReason || trimmedReason.length < 5) {
+    return {
+      error: "O motivo da alteração é obrigatório (mínimo de 5 caracteres).",
+    };
+  }
+
+  // 3. Validar novo método
+  const trimmedNewMethod = String(newPaymentMethod || "").trim();
+  if (!trimmedNewMethod) {
+    return { error: "Informe o novo método de pagamento." };
+  }
+
+  const supabase = createAdminClient();
+
+  // 4. Buscar pedido
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, partner_id, store_id, order_number, payment_method, payment_breakdown, paid_amount, total_amount, situation, order_source, customer_name, buyer_id")
+    .eq("id", orderId)
+    .eq("partner_id", partnerId)
+    .maybeSingle();
+
+  if (orderError || !order) {
+    return { error: "Pedido não encontrado." };
+  }
+
+  if (order.situation === "paid") {
+    return { error: "Este pedido já foi totalmente pago e não pode ter o método alterado." };
+  }
+
+  const oldMethod = order.payment_method || "Não informado";
+  const formattedNewMethod = formatPaymentMethodLabel(trimmedNewMethod, null);
+
+  if (oldMethod.trim().toLowerCase() === formattedNewMethod.trim().toLowerCase()) {
+    return { error: "O novo método de pagamento deve ser diferente do método atual." };
+  }
+
+  // 5. Atualizar payment_breakdown
+  let updatedBreakdown = Array.isArray(order.payment_breakdown) ? [...order.payment_breakdown] : [];
+  if (updatedBreakdown.length > 0) {
+    updatedBreakdown = updatedBreakdown.map((leg: any) => {
+      if (Number(leg.amountReceived || 0) <= 0.009) {
+        return {
+          ...leg,
+          method: formattedNewMethod,
+          paymentMethodId: newPaymentMethodId || leg.paymentMethodId || null,
+        };
+      }
+      return leg;
+    });
+  } else {
+    const total = Number(order.total_amount || 0);
+    const paid = Number(order.paid_amount || 0);
+    const remaining = Math.max(0, total - paid);
+    updatedBreakdown = [
+      {
+        method: formattedNewMethod,
+        paymentMethodId: newPaymentMethodId || null,
+        amount: remaining || total,
+        effectiveAmount: remaining || total,
+        amountReceived: 0,
+        installmentNumber: 1,
+      },
+    ];
+  }
+
+  // 6. Atualizar tabela orders
+  const nowIso = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      payment_method: formattedNewMethod,
+      payment_method_id: newPaymentMethodId || null,
+      payment_breakdown: updatedBreakdown,
+      updated_at: nowIso,
+    })
+    .eq("id", orderId)
+    .eq("partner_id", partnerId);
+
+  if (updateError) {
+    return { error: `Erro ao atualizar pedido: ${updateError.message}` };
+  }
+
+  // 7. Buscar perfil do usuário para registro do ator
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const rawActorName = profile?.full_name?.trim() || user.email?.split("@")[0] || "Usuário";
+  const roleLabel =
+    normalizedRole === "owner" ? "Proprietário" : normalizedRole === "admin" ? "Administrador" : "Gerente";
+  const actorDisplayName = `${rawActorName} (${roleLabel})`;
+
+  // 8. Gravar em audit_logs
+  const changeLines = [
+    `Método de pagamento alterado de "${oldMethod}" para "${formattedNewMethod}".`,
+    `Motivo: ${trimmedReason}`,
+  ];
+
+  await supabase.from("audit_logs").insert({
+    table_name: "orders",
+    action: "PAYMENT_METHOD_CHANGED",
+    user_id: user.id,
+    actor_user_id: user.id,
+    actor_name: actorDisplayName,
+    partner_id: partnerId,
+    entity_type: "order",
+    entity_id: orderId,
+    action_type: "payment_method_changed",
+    change_lines: changeLines,
+    metadata: {
+      old_payment_method: oldMethod,
+      new_payment_method: formattedNewMethod,
+      reason: trimmedReason,
+      changed_by_role: normalizedRole,
+      changed_by_name: rawActorName,
+      source: "erp",
+    },
+    source: "erp",
+  });
+
+  // 9. Revalidar tags e cache
+  try {
+    await revalidateOrderHistory(orderId);
+    await revalidateOrders(partnerId);
+  } catch (revalErr) {
+    console.error("[changeOrderPaymentMethodAction] Revalidation error:", revalErr);
+  }
+
+  return {
+    success: true,
+    oldMethod,
+    newMethod: formattedNewMethod,
+    paymentBreakdown: updatedBreakdown,
+    actorName: actorDisplayName,
+    updatedAt: nowIso,
+  };
 }

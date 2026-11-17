@@ -2,6 +2,8 @@ import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getNotificationHref } from "@/lib/notifications/navigation"
+import { normalizePartnerRole } from "@/lib/notifications/audience"
+import type { PartnerRole } from "@/lib/permissions/types"
 import type {
   CreateNotificationInput,
   NotificationAudience,
@@ -48,10 +50,14 @@ export async function createNotification(
   const audience = (input.data?.audience as NotificationAudience | undefined) || "customer"
   const origin = input.origin || "system"
 
-  if (origin === "manual" && audience !== "customer") {
-    return { notification: null, created: false }
-  }
-
+  // `origin` diz apenas de onde veio o evento (automação, sistema ou ação
+  // manual no ERP). Ele não decide se o time da loja deve ser avisado: essa
+  // decisão é do call site. Quem precisa ignorar ações manuais já faz isso
+  // explicitamente em notification-automation.service (`if (manual) return`).
+  //
+  // Antes existia aqui um `return` silencioso para `manual` + vendedor, que
+  // engolia notificações legítimas (ex.: confirmação de pagamento/envio em
+  // lote no ERP avisando o restante do time).
   const originMeta = await resolveNotificationOrigin(input.data)
 
   const scope: "platform" | "partner" =
@@ -164,92 +170,156 @@ export async function createNotificationsForUsers(
   )
 }
 
-export async function getPartnerTeamUserIds(partnerId: string): Promise<string[]> {
+/**
+ * Usuários do time do partner, opcionalmente filtrados por papel.
+ *
+ * - `roles` ausente/null => retorna o time inteiro (compatibilidade).
+ * - `roles` informado => retorna apenas quem tem um dos papéis.
+ * - O dono legado (`partners.user_id`) conta como OWNER.
+ * - Nunca devolve vazio quando existe dono: se o filtro não casar com
+ *   ninguém, pelo menos o dono recebe (lojas pequenas não ficam no escuro).
+ */
+export async function getPartnerTeamUserIds(
+  partnerId: string,
+  roles?: PartnerRole[] | null,
+): Promise<string[]> {
   const admin = getAdminClient()
-  const userIds = new Set<string>()
 
   const [{ data: partner }, { data: members }] = await Promise.all([
     admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
-    admin.from("partner_users").select("user_id").eq("partner_id", partnerId),
+    admin.from("partner_users").select("user_id, role, role_id").eq("partner_id", partnerId),
   ])
 
-  if (partner?.user_id) userIds.add(partner.user_id)
-  for (const member of members || []) {
-    if (member.user_id) userIds.add(member.user_id)
+  const ownerUserId = partner?.user_id || null
+  const memberRows = (members || []) as Array<{
+    user_id: string | null
+    role: string | null
+    role_id: string | null
+  }>
+  const rolesFilter = roles == null ? null : new Set(roles)
+  const userIds = new Set<string>()
+
+  for (const member of memberRows) {
+    if (!member.user_id) continue
+    const role = normalizePartnerRole(member.role_id || member.role)
+    if (rolesFilter && !(role && rolesFilter.has(role))) continue
+    userIds.add(member.user_id)
+  }
+
+  if (ownerUserId && (!rolesFilter || rolesFilter.has("OWNER"))) {
+    userIds.add(ownerUserId)
+  }
+
+  // Rede de segurança: filtro de papel nunca deve silenciar a loja inteira.
+  const filterHasRecipients = !rolesFilter || rolesFilter.size > 0
+  if (userIds.size === 0 && filterHasRecipients) {
+    if (ownerUserId) {
+      userIds.add(ownerUserId)
+    } else {
+      for (const member of memberRows) {
+        if (member.user_id) userIds.add(member.user_id)
+      }
+    }
   }
 
   return [...userIds]
 }
 
+/**
+ * Usuários do time que atuam em uma loja, opcionalmente filtrados por papel.
+ *
+ * - OWNER (inclusive o dono legado) sempre atravessa o escopo de loja.
+ * - Demais papéis precisam estar vinculados à loja via `store_members`
+ *   quando um `storeId` é informado; sem `storeId`, vale o time inteiro.
+ * - `staffPartnerUserId` (profissional atribuído a um agendamento) é sempre
+ *   incluído, independentemente de papel.
+ */
 export async function getStoreTeamUserIds(params: {
   partnerId: string
   storeId?: string | null
   staffPartnerUserId?: string | null
+  roles?: PartnerRole[] | null
 }): Promise<string[]> {
   const admin = getAdminClient()
+
+  const [{ data: partner }, { data: rawPartnerUsers }] = await Promise.all([
+    admin
+      .from("partners")
+      .select("user_id")
+      .eq("id", params.partnerId)
+      .maybeSingle(),
+    admin
+      .from("partner_users")
+      .select("id, user_id, role, role_id")
+      .eq("partner_id", params.partnerId),
+  ])
+
+  const partnerUsers = (rawPartnerUsers || []) as Array<{
+    id: string
+    user_id: string | null
+    role: string | null
+    role_id: string | null
+  }>
+
+  const ownerUserId = partner?.user_id || null
+  const rolesFilter = params.roles == null ? null : new Set(params.roles)
   const userIds = new Set<string>()
 
-  // 1. Owner do partner
-  const { data: partner } = await admin
-    .from("partners")
-    .select("user_id")
-    .eq("id", params.partnerId)
-    .maybeSingle()
+  // 1. Vínculo com a loja (e possível override de papel por loja).
+  let storeMemberPuIds: Set<string> | null = null
+  const storeRoleByPuId = new Map<string, PartnerRole | null>()
 
-  if (partner?.user_id) userIds.add(partner.user_id)
+  if (params.storeId && partnerUsers.length > 0) {
+    const { data: rawStoreMembers } = await admin
+      .from("store_members")
+      .select("partner_user_id, role")
+      .eq("store_id", params.storeId)
+      .in("partner_user_id", partnerUsers.map((pu) => pu.id))
 
-  // 2. Todos os partner_users do partner
-  const { data: rawPartnerUsers } = await admin
-    .from("partner_users")
-    .select("id, user_id, role")
-    .eq("partner_id", params.partnerId)
-
-  const partnerUsers = (rawPartnerUsers || []) as Array<{ id: string; user_id: string | null; role: string | null }>
-
-  if (partnerUsers.length === 0) {
-    return [...userIds]
-  }
-
-  // 2a. Usuários com role OWNER sempre recebem acesso
-  for (const pu of partnerUsers) {
-    if (pu.role === "OWNER" && pu.user_id) {
-      userIds.add(pu.user_id)
+    storeMemberPuIds = new Set()
+    for (const sm of (rawStoreMembers || []) as Array<{ partner_user_id: string; role: string | null }>) {
+      storeMemberPuIds.add(sm.partner_user_id)
+      storeRoleByPuId.set(sm.partner_user_id, normalizePartnerRole(sm.role))
     }
   }
 
-  // 3. Se um funcionário/profissional específico foi atribuído (ex: agendamento)
+  // 2. Membros do time que passam no filtro de papel e no escopo da loja.
+  for (const pu of partnerUsers) {
+    if (!pu.user_id) continue
+
+    const baseRole = normalizePartnerRole(pu.role_id || pu.role)
+    const effectiveRole = storeRoleByPuId.get(pu.id) ?? baseRole
+
+    if (rolesFilter && !(effectiveRole && rolesFilter.has(effectiveRole))) continue
+
+    const isOwner = effectiveRole === "OWNER"
+    if (storeMemberPuIds && !isOwner && !storeMemberPuIds.has(pu.id)) continue
+
+    userIds.add(pu.user_id)
+  }
+
+  // 3. Dono legado sempre que o filtro permitir OWNER.
+  if (ownerUserId && (!rolesFilter || rolesFilter.has("OWNER"))) {
+    userIds.add(ownerUserId)
+  }
+
+  // 4. Profissional atribuído (ex.: agendamento) sempre recebe.
   if (params.staffPartnerUserId) {
-    const staffPu = partnerUsers.find((pu: { id: string; user_id: string | null }) => pu.id === params.staffPartnerUserId)
+    const staffPu = partnerUsers.find((pu) => pu.id === params.staffPartnerUserId)
     if (staffPu?.user_id) {
       userIds.add(staffPu.user_id)
     }
   }
 
-  // 4. Se storeId foi fornecido, filtrar membros vinculados à loja
-  if (params.storeId) {
-    const puIds = partnerUsers.map((pu: { id: string }) => pu.id).filter(Boolean)
-    if (puIds.length > 0) {
-      const { data: rawStoreMembers } = await admin
-        .from("store_members")
-        .select("partner_user_id")
-        .eq("store_id", params.storeId)
-        .in("partner_user_id", puIds)
-
-      const storeMembers = (rawStoreMembers || []) as Array<{ partner_user_id: string }>
-
-      if (storeMembers.length > 0) {
-        const memberPuIds = new Set(storeMembers.map((sm: { partner_user_id: string }) => sm.partner_user_id))
-        for (const pu of partnerUsers) {
-          if (memberPuIds.has(pu.id) && pu.user_id) {
-            userIds.add(pu.user_id)
-          }
-        }
+  // 5. Rede de segurança contra time silenciado por filtro/escopo.
+  const filterHasRecipients = !rolesFilter || rolesFilter.size > 0
+  if (userIds.size === 0 && filterHasRecipients) {
+    if (ownerUserId) {
+      userIds.add(ownerUserId)
+    } else {
+      for (const pu of partnerUsers) {
+        if (pu.user_id) userIds.add(pu.user_id)
       }
-    }
-  } else {
-    // Fallback caso não haja storeId: incluir todos os partner_users
-    for (const pu of partnerUsers) {
-      if (pu.user_id) userIds.add(pu.user_id)
     }
   }
 

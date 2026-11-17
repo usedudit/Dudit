@@ -1,5 +1,6 @@
 import { sendPushToUser } from "@/lib/services/fcm.service"
 import { createNotification, getPartnerTeamUserIds } from "@/lib/services/notification.service"
+import { OWNERSHIP_ROLES } from "@/lib/notifications/audience"
 import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { getAdminClient } from "@/lib/supabase/admin"
 
@@ -241,7 +242,7 @@ export async function notifyPartnerTeam(
     metadata: Record<string, any>,
 ): Promise<void> {
     try {
-        const userIds = await getPartnerTeamUserIds(partnerId)
+        const userIds = await getPartnerTeamUserIds(partnerId, OWNERSHIP_ROLES)
         if (!userIds || userIds.length === 0) return
 
         const title = notificationLabels[type] || "Notificação de Reembolso"

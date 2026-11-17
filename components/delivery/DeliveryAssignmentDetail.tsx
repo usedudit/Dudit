@@ -178,6 +178,18 @@ export default function DeliveryAssignmentDetail({
         })
     }, [ordersList, assignment])
 
+    const isSingleDelivered = React.useMemo(() => {
+        if (assignment.status === "delivered") return true
+        const firstOrder = ordersList[0]
+        if (!firstOrder) return false
+        const fId = firstOrder.order_id || firstOrder.id
+        return Boolean(
+            orderDeliveredMap[fId] ||
+            firstOrder.delivery_status === "delivered" ||
+            firstOrder.status === "delivered"
+        )
+    }, [assignment.status, ordersList, orderDeliveredMap])
+
     const buildOrderForModal = React.useCallback((orderData: any, fallbackAssignment: any) => {
         return {
             id: orderData?.order_id || orderData?.id || fallbackAssignment.order_id,
@@ -823,22 +835,28 @@ export default function DeliveryAssignmentDetail({
                                                         </div>
                                                         {ordersList.length === 1 && hasUnpaidPayment && (
                                                             <div className="pt-3 border-t border-brand-border dark:border-dark-border mt-4">
-                                                                {assignment.payment_confirmed_at ? (
-                                                                    <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                                        Recebimento confirmado
-                                                                    </div>
+                                                                {isSingleDelivered ? (
+                                                                    assignment.payment_confirmed_at ? (
+                                                                        <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                                            Recebimento confirmado
+                                                                        </div>
+                                                                    ) : (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            onClick={() => {
+                                                                                setSelectedPaymentOrder(buildOrderForModal(ordersList[0], assignment))
+                                                                                setShowPaymentModal(true)
+                                                                            }}
+                                                                            disabled={loading}
+                                                                            className="w-full"
+                                                                        >
+                                                                            Processar Pagamento
+                                                                        </Button>
+                                                                    )
                                                                 ) : (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        onClick={() => {
-                                                                            setSelectedPaymentOrder(buildOrderForModal(ordersList[0], assignment))
-                                                                            setShowPaymentModal(true)
-                                                                        }}
-                                                                        disabled={loading}
-                                                                        className="w-full"
-                                                                    >
-                                                                        Processar Pagamento
-                                                                    </Button>
+                                                                    <div className="rounded-xl bg-brand-surface dark:bg-dark-hover p-3 text-center text-xs text-brand-muted dark:text-dark-muted">
+                                                                        O recebimento do pagamento poderá ser processado após a confirmação da entrega.
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         )}
@@ -1214,22 +1232,28 @@ export default function DeliveryAssignmentDetail({
 
                                             {orderNeedsPayment && (
                                                 <div className="pt-2">
-                                                    {assignment.payment_confirmed_at ? (
-                                                        <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                            Recebimento confirmado
-                                                        </div>
+                                                    {isOrderDelivered ? (
+                                                        assignment.payment_confirmed_at ? (
+                                                            <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                                Recebimento confirmado
+                                                            </div>
+                                                        ) : (
+                                                            <Button
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setSelectedPaymentOrder(buildOrderForModal(order, assignment))
+                                                                    setShowPaymentModal(true)
+                                                                }}
+                                                                disabled={loading}
+                                                                className="w-full"
+                                                            >
+                                                                Processar Pagamento
+                                                            </Button>
+                                                        )
                                                     ) : (
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setSelectedPaymentOrder(buildOrderForModal(order, assignment))
-                                                                setShowPaymentModal(true)
-                                                            }}
-                                                            disabled={loading}
-                                                            className="w-full"
-                                                        >
-                                                            Processar Pagamento
-                                                        </Button>
+                                                        <div className="rounded-xl bg-brand-surface dark:bg-dark-hover p-3 text-center text-xs text-brand-muted dark:text-dark-muted">
+                                                            O recebimento do pagamento poderá ser processado após a confirmação da entrega.
+                                                        </div>
                                                     )}
                                                 </div>
                                             )}

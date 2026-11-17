@@ -2,6 +2,7 @@ import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { buildNotificationContent } from "@/lib/notifications/templates"
+import { getNotificationRecipientRoles } from "@/lib/notifications/audience"
 import type { NotificationType } from "@/lib/notifications/types"
 import { parseInTz, getDefaultTimezone } from "@/lib/date"
 import {
@@ -32,10 +33,12 @@ async function notifyPartnerTeam(params: {
 }) {
   if (params.origin === "manual") return
 
+  const roles = getNotificationRecipientRoles(params.type)
   const userIds = await getStoreTeamUserIds({
     partnerId: params.partnerId,
     storeId: params.storeId,
     staffPartnerUserId: params.staffPartnerUserId,
+    roles,
   })
   const content = buildNotificationContent(params.type, "seller", params.ctx)
 

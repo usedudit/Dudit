@@ -409,6 +409,96 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
 
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 
+/**
+ * Ensures that an accepted delivery assignment has a corresponding record in `deliveries` and `delivery_orders`.
+ * If the merchant requested a Dudit driver without saving the delivery in ERP first, this creates the
+ * missing delivery and link records so it displays in ERP logistics and status sync works correctly.
+ */
+async function ensureDeliveryRecordForAssignment(admin: any, assignmentId: string, driverUserId: string) {
+  try {
+    const { data: da } = await admin
+      .from("delivery_assignments")
+      .select("id, partner_id, order_id, delivery_id, delivery_fee, notes")
+      .eq("id", assignmentId)
+      .maybeSingle()
+
+    if (!da || !da.order_id || !da.partner_id) return null
+    if (da.delivery_id) return da.delivery_id
+
+    // Check if order is already linked to an existing delivery
+    const { data: existingDo } = await admin
+      .from("delivery_orders")
+      .select("delivery_id")
+      .eq("order_id", da.order_id)
+      .maybeSingle()
+
+    let finalDeliveryId = existingDo?.delivery_id || null
+
+    if (!finalDeliveryId) {
+      // Allocate next delivery number for the partner
+      const { data: maxDel } = await admin
+        .from("deliveries")
+        .select("delivery_number")
+        .eq("partner_id", da.partner_id)
+        .not("delivery_number", "is", null)
+        .order("delivery_number", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const nextDeliveryNumber = (Number(maxDel?.delivery_number || 0) || 0) + 1
+
+      // Lookup partner_user for the driver if exists (FK to partner_users.id)
+      const { data: pu } = await admin
+        .from("partner_users")
+        .select("id")
+        .eq("user_id", driverUserId)
+        .eq("partner_id", da.partner_id)
+        .maybeSingle()
+
+      const deliveryPersonId = pu?.id || null
+
+      const { data: createdDel, error: insErr } = await admin
+        .from("deliveries")
+        .insert({
+          partner_id: da.partner_id,
+          delivery_person_id: deliveryPersonId,
+          status: "pending",
+          delivery_number: nextDeliveryNumber,
+          created_at: new Date().toISOString(),
+          notes: da.notes || null,
+        })
+        .select("id")
+        .single()
+
+      if (insErr || !createdDel) {
+        console.error("[ensureDeliveryRecordForAssignment] Erro ao criar delivery:", insErr)
+        return null
+      }
+
+      finalDeliveryId = createdDel.id
+
+      await admin.from("delivery_orders").insert({
+        delivery_id: finalDeliveryId,
+        order_id: da.order_id,
+        position: 1,
+        status: "pending",
+      })
+    }
+
+    if (finalDeliveryId) {
+      await admin
+        .from("delivery_assignments")
+        .update({ delivery_id: finalDeliveryId })
+        .eq("id", assignmentId)
+    }
+
+    return finalDeliveryId
+  } catch (err) {
+    console.error("[ensureDeliveryRecordForAssignment] Falha inesperada:", err)
+    return null
+  }
+}
+
 export async function acceptDeliveryOfferAction(assignmentId: string) {
   const { user } = await requireDeliveryDriver()
   if (!assignmentId) return { success: false as const, error: "Oferta inválida." }
@@ -426,6 +516,9 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
     try {
       const { getAdminClient } = await import("@/lib/supabase/admin")
       const admin = getAdminClient()
+
+      await ensureDeliveryRecordForAssignment(admin, assignmentId, user.id)
+
       const { data: driverProfile } = await admin
         .from("user_profiles")
         .select("full_name")
@@ -539,6 +632,10 @@ export async function transitionMyDeliveryAssignmentAction(params: {
     }
   }
 
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const admin = getAdminClient()
+  await ensureDeliveryRecordForAssignment(admin, params.assignmentId, user.id)
+
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("transition_delivery_assignment", {
     p_assignment_id: params.assignmentId,
@@ -621,6 +718,18 @@ export async function setMyDeliveryAvailabilityAction(status: "available" | "off
 export async function confirmDeliveryPaymentReceivedAction(assignmentId: string, note?: string) {
   const { user } = await requireDeliveryDriver()
   const supabase = await getSupabaseServerClient()
+
+  // O recebimento do pagamento só pode ser processado após a entrega ser confirmada
+  const { data: daCheck } = await supabase
+    .from("delivery_assignments")
+    .select("status")
+    .eq("id", assignmentId)
+    .maybeSingle()
+
+  if (daCheck && daCheck.status !== "delivered") {
+    return { success: false as const, error: "O recebimento do pagamento só pode ser processado após a entrega ser concluída." }
+  }
+
   const { data, error } = await supabase.rpc("confirm_delivery_payment_received", {
     p_assignment_id: assignmentId,
     p_note: note?.trim() || null,
@@ -693,23 +802,121 @@ export async function confirmDeliveryPaymentReceivedAction(assignmentId: string,
   return { success: true as const, data }
 }
 
-export async function getDriverPaymentMethodsAction(assignmentId: string, orderId?: string | null) {
-  const { user } = await requireDeliveryDriver()
-  if (!assignmentId) return { success: false as const, error: "ID inválido." }
-
+async function resolveDeliveryAssignmentOrStoreDelivery(assignmentIdOrDeliveryId: string, orderId?: string | null) {
+  const { requireUser } = await import("@/lib/auth/authorization")
+  const user = await requireUser()
   const { getAdminClient } = await import("@/lib/supabase/admin")
   const admin = getAdminClient()
 
-  const { data: assignment, error: assignmentError } = await admin
-    .from("delivery_assignments")
-    .select("id, partner_id, order_id, delivery_id, payment_confirmed_at")
-    .eq("id", assignmentId)
-    .eq("driver_id", user.id)
-    .maybeSingle()
+  // 1. Try delivery_assignments (platform driver or store staff checking assignment)
+  if (assignmentIdOrDeliveryId) {
+    const { data: da } = await admin
+      .from("delivery_assignments")
+      .select("id, partner_id, order_id, delivery_id, driver_id, payment_confirmed_at")
+      .eq("id", assignmentIdOrDeliveryId)
+      .maybeSingle()
 
-  if (assignmentError || !assignment) {
-    return { success: false as const, error: "Entrega não encontrada ou não pertence a você." }
+    if (da) {
+      if (da.driver_id === user.id) {
+        return { user, assignment: da, partnerId: da.partner_id, isPlatformDriver: true, isStoreUser: false }
+      }
+      const { data: pu } = await admin
+        .from("partner_users")
+        .select("id, role")
+        .eq("partner_id", da.partner_id)
+        .eq("user_id", user.id)
+        .maybeSingle()
+      if (pu) {
+        return { user, assignment: da, partnerId: da.partner_id, isPlatformDriver: false, isStoreUser: true }
+      }
+    }
   }
+
+  // 2. Try deliveries table (store delivery)
+  if (assignmentIdOrDeliveryId) {
+    const { data: del } = await admin
+      .from("deliveries")
+      .select("id, partner_id, delivery_person_id, status")
+      .eq("id", assignmentIdOrDeliveryId)
+      .maybeSingle()
+
+    if (del) {
+      const { data: pu } = await admin
+        .from("partner_users")
+        .select("id, role")
+        .eq("partner_id", del.partner_id)
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      if (pu) {
+        const syntheticAssignment = {
+          id: del.id,
+          partner_id: del.partner_id,
+          order_id: orderId || null,
+          delivery_id: del.id,
+          driver_id: user.id,
+          payment_confirmed_at: null,
+          isStoreDelivery: true,
+        }
+        return { user, assignment: syntheticAssignment, partnerId: del.partner_id, isPlatformDriver: false, isStoreUser: true }
+      }
+    }
+  }
+
+  // 3. Try by orderId
+  if (orderId) {
+    const { data: ord } = await admin
+      .from("orders")
+      .select("id, partner_id")
+      .eq("id", orderId)
+      .maybeSingle()
+
+    if (ord?.partner_id) {
+      const { data: da } = await admin
+        .from("delivery_assignments")
+        .select("id, partner_id, order_id, delivery_id, driver_id, payment_confirmed_at")
+        .eq("order_id", orderId)
+        .eq("driver_id", user.id)
+        .maybeSingle()
+      if (da) {
+        return { user, assignment: da, partnerId: da.partner_id, isPlatformDriver: true, isStoreUser: false }
+      }
+
+      const { data: pu } = await admin
+        .from("partner_users")
+        .select("id, role")
+        .eq("partner_id", ord.partner_id)
+        .eq("user_id", user.id)
+        .maybeSingle()
+      if (pu) {
+        const syntheticAssignment = {
+          id: orderId,
+          partner_id: ord.partner_id,
+          order_id: orderId,
+          delivery_id: null,
+          driver_id: user.id,
+          payment_confirmed_at: null,
+          isStoreDelivery: true,
+        }
+        return { user, assignment: syntheticAssignment, partnerId: ord.partner_id, isPlatformDriver: false, isStoreUser: true }
+      }
+    }
+  }
+
+  return null
+}
+
+export async function getDriverPaymentMethodsAction(assignmentId: string, orderId?: string | null) {
+  if (!assignmentId && !orderId) return { success: false as const, error: "ID inválido." }
+
+  const authRes = await resolveDeliveryAssignmentOrStoreDelivery(assignmentId, orderId)
+  if (!authRes) {
+    return { success: false as const, error: "Entrega não encontrada ou sem permissão." }
+  }
+
+  const { assignment } = authRes
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const admin = getAdminClient()
 
   const targetOrderId = orderId || assignment.order_id
 
@@ -807,29 +1014,25 @@ export async function driverConfirmPaymentAction(params: {
   paymentMethodId?: string | null
   note?: string
 }) {
-  const { user } = await requireDeliveryDriver()
-  if (!params.assignmentId) {
+  if (!params.assignmentId && !params.orderId) {
     return { success: false as const, error: "ID inválido." }
   }
 
-  const supabase = await getSupabaseServerClient()
-
-  const { data: assignment, error: lookupError } = await supabase
-    .from("delivery_assignments")
-    .select("id, partner_id, order_id, delivery_id, driver_id")
-    .eq("id", params.assignmentId)
-    .eq("driver_id", user.id)
-    .maybeSingle()
-
-  if (lookupError || !assignment || assignment.driver_id !== user.id) {
-    return { success: false as const, error: "Entrega não encontrada ou não pertence a você." }
+  const authRes = await resolveDeliveryAssignmentOrStoreDelivery(params.assignmentId, params.orderId)
+  if (!authRes) {
+    return { success: false as const, error: "Entrega não encontrada ou sem permissão." }
   }
+
+  const { user, assignment } = authRes
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const admin = getAdminClient()
+  const supabase = await getSupabaseServerClient()
 
   const targetOrderId = params.orderId || assignment.order_id
 
-  const { data: order } = await supabase
+  const { data: order } = await admin
     .from("orders")
-    .select("id, order_number, total_amount, paid_amount, situation, store_id, buyer_id, customer_name, customer_id, finance_account_id, order_source, payment_breakdown, payment_method")
+    .select("id, order_number, total_amount, paid_amount, paid_at, situation, store_id, buyer_id, customer_name, customer_id, finance_account_id, order_source, payment_breakdown, payment_method")
     .eq("id", targetOrderId)
     .maybeSingle()
 
@@ -853,37 +1056,83 @@ export async function driverConfirmPaymentAction(params: {
     }
   }
 
-  try {
-    const { data, error: rpcError } = await supabase.rpc("confirm_driver_payment", {
-      p_assignment_id: assignment.id,
-      p_payment_method: params.paymentMethod,
-      p_amount_received: amountReceived,
-      p_installments: params.installments || 1,
-      p_payment_method_id: params.paymentMethodId || null,
-      p_note: params.note || null,
-      p_order_id: targetOrderId,
-    })
+  let confirmedData: any = null
 
-    if (rpcError) {
-      return {
-        success: false as const,
-        error: normalizeError(rpcError, "Não foi possível registrar o recebimento."),
+  try {
+    if ((assignment as any).isStoreDelivery) {
+      const isFull = amountReceived >= totalAmount - 0.01
+      const newSituation = isFull ? "paid" : "partially_paid"
+      const nowIso = new Date().toISOString()
+
+      let breakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
+        ? order.payment_breakdown
+        : [
+            {
+              method: params.paymentMethod,
+              amount: totalAmount,
+              effectiveAmount: amountReceived,
+              amountReceived: amountReceived,
+              paymentMethodId: params.paymentMethodId || null,
+              installmentNumber: params.installments || 1,
+              adjustmentType: "none",
+              adjustmentPercent: 0,
+              adjustmentAmount: 0,
+            }
+          ]
+
+      const { error: updateOrderError } = await admin
+        .from("orders")
+        .update({
+          payment_method: params.paymentMethod,
+          paid_amount: amountReceived,
+          amount_paid: amountReceived,
+          paid_at: isFull ? (order.paid_at || nowIso) : order.paid_at,
+          situation: newSituation,
+          payment_breakdown: breakdown,
+          updated_at: nowIso,
+        })
+        .eq("id", targetOrderId)
+
+      if (updateOrderError) {
+        return { success: false as const, error: "Não foi possível registrar o recebimento no pedido." }
       }
+
+      confirmedData = {
+        confirmed_at: nowIso,
+        order_id: targetOrderId,
+        amount_received: amountReceived,
+        situation: newSituation,
+      }
+    } else {
+      const { data, error: rpcError } = await supabase.rpc("confirm_driver_payment", {
+        p_assignment_id: assignment.id,
+        p_payment_method: params.paymentMethod,
+        p_amount_received: amountReceived,
+        p_installments: params.installments || 1,
+        p_payment_method_id: params.paymentMethodId || null,
+        p_note: params.note || null,
+        p_order_id: targetOrderId,
+      })
+
+      if (rpcError) {
+        return {
+          success: false as const,
+          error: normalizeError(rpcError, "Não foi possível registrar o recebimento."),
+        }
+      }
+      confirmedData = data
     }
 
-    const { getAdminClient } = await import("@/lib/supabase/admin")
-    const admin = getAdminClient()
+  // 1. Obter nome do entregador para os logs
+  const { data: driverProfile } = await admin
+    .from("user_profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle()
+  const driverName = driverProfile?.full_name?.trim() || "Entregador"
 
-    // 1. Obter nome do entregador para os logs
-    const { data: driverProfile } = await admin
-      .from("user_profiles")
-      .select("full_name")
-      .eq("user_id", user.id)
-      .maybeSingle()
-    const driverName = driverProfile?.full_name?.trim() || "Entregador"
-
-    const newSituation = (data as any)?.situation || "paid"
-    const confirmedAmount = Number((data as any)?.amount_received || amountReceived)
+  const newSituation = (confirmedData as any)?.situation || "paid"
+  const confirmedAmount = Number((confirmedData as any)?.amount_received || amountReceived)
     const { formatCurrency } = await import("@/lib/utils")
     const { getPaymentStatusLabel } = await import("@/lib/orders/status")
     const { formatPaymentMethodLabel } = await import("@/lib/utils/payment-method-label")
@@ -987,11 +1236,11 @@ export async function driverConfirmPaymentAction(params: {
     return {
       success: true as const,
       data: {
-        confirmedAt: (data as any)?.confirmed_at,
-        orderId: (data as any)?.order_id,
-        situation: (data as any)?.situation,
-        amountReceived: (data as any)?.amount_received,
-        paymentMethod: (data as any)?.payment_method,
+        confirmedAt: (confirmedData as any)?.confirmed_at,
+        orderId: (confirmedData as any)?.order_id,
+        situation: (confirmedData as any)?.situation,
+        amountReceived: (confirmedData as any)?.amount_received,
+        paymentMethod: (confirmedData as any)?.payment_method,
       },
     }
   } catch (err: any) {
@@ -1067,6 +1316,8 @@ export async function markSingleOrderDeliveredAction(params: {
   if (!["picked_up", "out_for_delivery"].includes(assignment.status)) {
     return { success: false as const, error: "A entrega precisa estar em retirada ou em rota para marcar pedidos individualmente." }
   }
+
+  await ensureDeliveryRecordForAssignment(admin, params.assignmentId, user.id)
 
   // Validar código OTP se exigido
   const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")

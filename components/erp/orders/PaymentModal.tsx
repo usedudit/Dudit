@@ -38,6 +38,7 @@ import { trackEvent } from '@/lib/analytics';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
 import { usePermissions } from '@/lib/permission-context';
+import ChangePaymentMethodModal from './ChangePaymentMethodModal';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { usePlanUpgrade } from '@/components/erp/subscription/PlanUpgradeModal';
 import { useModalLayer } from '@/lib/modal-stack';
@@ -428,7 +429,36 @@ const PaymentModal = ({
     const depositChargeAmount = hasPendingExistingDeposit ? existingDepositAmount : depositChargeAmountProp
     const { toast } = useToast();
     const { selectedStore } = useStore();
-    const { planSlug } = usePermissions();
+    const { planSlug, role: contextRole } = usePermissions();
+    const effectiveRole = String(role || contextRole || "").toLowerCase();
+    const canChangePaymentMethod = ["owner", "admin", "manager"].includes(effectiveRole);
+    const [showChangeMethodModal, setShowChangeMethodModal] = useState(false);
+    const [currentLockedMethod, setCurrentLockedMethod] = useState<string>(originalPaymentMethod || "");
+
+    useEffect(() => {
+        if (originalPaymentMethod) {
+            setCurrentLockedMethod(originalPaymentMethod);
+        }
+    }, [originalPaymentMethod]);
+
+    const handleMethodChanged = (newMethodName: string) => {
+        setCurrentLockedMethod(newMethodName);
+        const normalized = normalizePaymentMethodLabel(newMethodName);
+        const methodType = (() => {
+            if (normalized === 'Dinheiro') return 'cash';
+            if (normalized === 'Pix') return 'pix';
+            if (normalized === 'Cartão de Crédito') return 'credit_card';
+            if (normalized === 'Cartão de Débito') return 'debit_card';
+            if (normalized === 'Transferência') return 'bank_transfer';
+            return 'other';
+        })();
+        const matching = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === methodType);
+        if (matching.length > 0) {
+            setSelectedMethodId(matching[0].id);
+        }
+        setSelectedMethodType(methodType);
+        setView(getTargetViewForMethodType(methodType));
+    };
     const { openPlanUpgrade } = usePlanUpgrade();
     const { theme } = useTheme();
     const isDark = theme === "dark";
@@ -1229,7 +1259,7 @@ const PaymentModal = ({
         }
 
         // Single method restore/lock
-        const targetMethodLabel = originalPaymentMethod || 'Dinheiro';
+        const targetMethodLabel = currentLockedMethod || originalPaymentMethod || 'Dinheiro';
 
         const normalizedOriginal = normalizePaymentMethodLabel(targetMethodLabel);
         const methodType = (() => {
@@ -1261,7 +1291,7 @@ const PaymentModal = ({
 
         setSelectedMethodType(methodType);
         setView(getTargetViewForMethodType(methodType));
-    }, [isOpen, isDepositOrder, isLockedMarketplace, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
+    }, [isOpen, isDepositOrder, isLockedMarketplace, currentLockedMethod, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
 
     // Fetch MP connection status
     useEffect(() => {
@@ -2808,8 +2838,8 @@ const PaymentModal = ({
             const methodLeg = {
                 method: (() => {
                     const baseLabel = (() => {
-                        if (isLockedMarketplace && originalPaymentMethod) {
-                            return formatPaymentMethodToFullLabel(originalPaymentMethod);
+                        if (isLockedMarketplace && (currentLockedMethod || originalPaymentMethod)) {
+                            return formatPaymentMethodToFullLabel(currentLockedMethod || originalPaymentMethod);
                         }
                         const selectedMethodObj = selectedMethodId ? activeMethods.find((method: any) => method.id === selectedMethodId) : null;
                         if (selectedMethodObj) {
@@ -3435,6 +3465,39 @@ const PaymentModal = ({
                                     transition={standardTransition}
                                     className="h-full"
                                 >
+                                    {isLockedMarketplace && (currentLockedMethod || originalPaymentMethod) && (
+                                        <div className="mb-6 flex items-center justify-between gap-3 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-slate/40 dark:bg-dark-border/20">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                    <MoneyIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">
+                                                        Método escolhido pelo cliente no checkout
+                                                    </span>
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate block">
+                                                        {formatPaymentMethodToFullLabel(currentLockedMethod || originalPaymentMethod || "")}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {canChangePaymentMethod && orderId && !isAlreadyFullyPaid ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setShowChangeMethodModal(true)}
+                                                    className="shrink-0 text-xs h-9"
+                                                >
+                                                    Alterar método
+                                                </Button>
+                                            ) : (
+                                                <Tooltip text="Apenas Proprietário, Administrador ou Gerente podem alterar o método mediante solicitação">
+                                                    <span className="text-xs text-brand-inactive-text cursor-not-allowed">
+                                                        Fixo pelo cliente
+                                                    </span>
+                                                </Tooltip>
+                                            )}
+                                        </div>
+                                    )}
                                     {view === 'methods' && (
                                         <motion.div key="methods" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col">
                                             {/* Mobile Customer Info */}
@@ -4866,6 +4929,17 @@ const PaymentModal = ({
                     isOpen={!!printOrderId}
                     onClose={() => setPrintOrderId(null)}
                     orderId={printOrderId}
+                />
+            )}
+
+            {showChangeMethodModal && (
+                <ChangePaymentMethodModal
+                    isOpen={showChangeMethodModal}
+                    onClose={() => setShowChangeMethodModal(false)}
+                    orderId={orderId || ""}
+                    partnerId={partnerId}
+                    currentPaymentMethod={currentLockedMethod || originalPaymentMethod || ""}
+                    onSuccess={handleMethodChanged}
                 />
             )}
         </div>

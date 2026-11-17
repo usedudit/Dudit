@@ -70,7 +70,7 @@ export function DeliveryOtpCard({
           </span>
         ) : (
           <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-brand-green/15 text-brand-dark dark:bg-brand-green/20 dark:text-brand-green shrink-0">
-            Obrigatório
+            Aguardando Entrega
           </span>
         )}
       </div>

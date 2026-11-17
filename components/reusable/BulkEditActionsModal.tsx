@@ -8,7 +8,7 @@ import {
     MoneyIcon, Package, EyeIcon, TrashIcon, RemoveImageIcon, AlertTriangleIcon,
     UploadIcon, CheckIcon, EditIcon, ChevronLeftIcon,
     WrenchIcon, ClockIcon,
-    EyeOffIcon
+    EyeOffIcon, TruckIcon
 } from "@/lib/icons"
 
 import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
@@ -83,6 +83,7 @@ interface BulkEditActionsModalProps {
         cancelledCount: number
         installmentCount: number
     }
+    onCreateDelivery?: () => void
     financialCategories?: Array<{ id: string; name: string }>
     financeAccounts?: Array<{ id: string; name: string }>
     onApply: (payload: BulkActionPayload) => Promise<void>
@@ -145,6 +146,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     orderSelectionGuards,
     serviceOrderSelectionGuards,
     financialSelectionGuards,
+    onCreateDelivery,
     financialCategories,
     financeAccounts,
     onApply
@@ -347,6 +349,16 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         )}
                         {targetType === 'order' && (
                             <>
+                                {onCreateDelivery && (
+                                    <BulkActionCard
+                                        icon={TruckIcon}
+                                        label="Criar Entrega"
+                                        onClick={() => {
+                                            onClose()
+                                            onCreateDelivery()
+                                        }}
+                                    />
+                                )}
                                 <div className={isOrderPaymentFullyBlocked ? "opacity-50 pointer-events-none" : ""}>
                                     <BulkActionCard icon={MoneyIcon} label="Status de Pagamento" onClick={() => { setView('order_payment'); setOrderStatusConfig('paid') }} />
                                 </div>

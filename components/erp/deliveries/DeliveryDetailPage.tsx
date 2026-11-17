@@ -8,7 +8,7 @@ import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon, ShieldIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon, ShieldIcon, CheckCircleIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -22,6 +22,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "../orders/CreateOrder"
 import PaymentStatusModal from "../orders/PaymentStatusModal"
+import DriverPaymentModal from "@/components/delivery/DriverPaymentModal"
 import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
 import type { DuditPlatformDriver } from "./types"
 
@@ -96,6 +97,8 @@ export default function DeliveryDetailPage({
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
     const [activeLink, setActiveLink] = useState<any | null>(null)
     const [isOrderPaymentModalOpen, setIsOrderPaymentModalOpen] = useState(false)
+    const [isDriverPaymentModalOpen, setIsDriverPaymentModalOpen] = useState(false)
+    const [driverPaymentOrder, setDriverPaymentOrder] = useState<any | null>(null)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
@@ -825,6 +828,22 @@ export default function DeliveryDetailPage({
                 }}
             />
 
+            <DriverPaymentModal
+                isOpen={isDriverPaymentModalOpen}
+                onClose={() => {
+                    setIsDriverPaymentModalOpen(false)
+                    setDriverPaymentOrder(null)
+                }}
+                assignmentId={delivery?.id || deliveryId}
+                order={driverPaymentOrder}
+                partnerId={partnerId}
+                onSuccess={() => {
+                    setIsDriverPaymentModalOpen(false)
+                    setDriverPaymentOrder(null)
+                    loadDeliveryDetails()
+                }}
+            />
+
             {orderStatusModal && (
                 <DefaultModal
                     isOpen={orderStatusModal.isOpen}
@@ -1019,6 +1038,46 @@ export default function DeliveryDetailPage({
                                             </div>
                                         </div>
 
+                                        {(() => {
+                                            const isDelivered = (selectedLink?.status || order.delivery_status) === "delivered"
+                                            const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes(String(order.situation || "").toLowerCase())
+                                            const remaining = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
+
+                                            if (userRole === "delivery") {
+                                                if (!isPaid) {
+                                                    if (isDelivered) {
+                                                        return (
+                                                            <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <MoneyIcon size={20} className="text-brand-primary shrink-0" />
+                                                                    <div>
+                                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento Pendente</p>
+                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Valor restante: {formatCurrency(remaining)}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        setDriverPaymentOrder(order)
+                                                                        setIsDriverPaymentModalOpen(true)
+                                                                    }}
+                                                                >
+                                                                    Receber Pagamento
+                                                                </Button>
+                                                            </div>
+                                                        )
+                                                    }
+                                                    return (
+                                                        <InfoCard
+                                                            color="blue"
+                                                            message="O recebimento do pagamento poderá ser processado após a confirmação da entrega deste pedido."
+                                                        />
+                                                    )
+                                                }
+                                            }
+                                            return null
+                                        })()}
+
                                         <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
                                         <CustomerCard
@@ -1109,7 +1168,56 @@ export default function DeliveryDetailPage({
 
                         <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                             <div className="flex gap-3 w-full">
-                                {userRole !== "delivery" && (
+                                {userRole === "delivery" ? (
+                                    (() => {
+                                        const isDelivered = (selectedLink?.status || order.delivery_status) === "delivered"
+                                        const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes(String(order.situation || "").toLowerCase())
+
+                                        if (isPaid) {
+                                            return (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="flex-1 h-12"
+                                                    disabled
+                                                >
+                                                    <CheckCircleIcon size={16} className="text-brand-green mr-1.5" />
+                                                    Pago
+                                                </Button>
+                                            )
+                                        }
+
+                                        if (isDelivered) {
+                                            return (
+                                                <Button
+                                                    type="button"
+                                                    variant="default"
+                                                    className="flex-1 h-12 font-bold"
+                                                    onClick={() => {
+                                                        setDriverPaymentOrder(order)
+                                                        setIsDriverPaymentModalOpen(true)
+                                                    }}
+                                                >
+                                                    <MoneyIcon size={18} className="mr-1.5" />
+                                                    Processar Pagamento
+                                                </Button>
+                                            )
+                                        }
+
+                                        return (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="flex-1 h-12"
+                                                onClick={() => {
+                                                    toast.info("O recebimento do pagamento poderá ser processado após a confirmação da entrega.")
+                                                }}
+                                            >
+                                                Status de Pagamento
+                                            </Button>
+                                        )
+                                    })()
+                                ) : (
                                     <Button
                                         type="button"
                                         variant="outline"

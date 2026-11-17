@@ -8,6 +8,7 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { FetchedProduct, FetchedService, FetchedRecurringPlan, FetchedPartner, FetchedReview } from "@/lib/admin/types"
+import { MANAGEMENT_ROLES } from "@/lib/notifications/audience"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -814,7 +815,7 @@ export async function updatePartnerRiskScore(
         // ─── Dispatch In-App + Push Notification ──────────────────────────────
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
 
             if (teamUserIds.length > 0) {
                 const notifTitle = customTitle?.trim() || (clampedScore > previousScore

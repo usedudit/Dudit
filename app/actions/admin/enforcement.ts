@@ -16,6 +16,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireStepUp } from "@/lib/admin/step-up-auth"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
+import { MANAGEMENT_ROLES } from "@/lib/notifications/audience"
 
 // SECURITY FIX (MED-01): Sanitize wildcard chars in ILIKE queries
 function sanitizeIlike(input: string): string {
@@ -623,9 +624,10 @@ export async function updateStoreRiskScore(
             teamUserIds = await getStoreTeamUserIds({
                 partnerId: currentStore.partner_id,
                 storeId: storeId,
+                roles: MANAGEMENT_ROLES,
             })
             if (teamUserIds.length === 0) {
-                teamUserIds = await getPartnerTeamUserIds(currentStore.partner_id)
+                teamUserIds = await getPartnerTeamUserIds(currentStore.partner_id, MANAGEMENT_ROLES)
             }
         }
 
@@ -963,7 +965,7 @@ export async function enableTenantAccess(
     if (notifyOwner) {
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
             if (teamUserIds.length > 0) {
                 await createNotificationsForUsers(teamUserIds, (uid) => ({
                     userId: uid,
@@ -1320,7 +1322,7 @@ export async function suspendPartner(
     if (notifyOwner) {
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
             if (teamUserIds.length > 0) {
                 await createNotificationsForUsers(teamUserIds, (uid) => ({
                     userId: uid,
@@ -1447,7 +1449,7 @@ export async function unsuspendPartner(
     if (notifyOwner) {
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
             if (teamUserIds.length > 0) {
                 await createNotificationsForUsers(teamUserIds, (uid) => ({
                     userId: uid,
@@ -1565,9 +1567,10 @@ export async function suspendStore(
                 teamUserIds = await getStoreTeamUserIds({
                     partnerId: store.partner_id,
                     storeId: storeId,
+                    roles: MANAGEMENT_ROLES,
                 })
                 if (teamUserIds.length === 0) {
-                    teamUserIds = await getPartnerTeamUserIds(store.partner_id)
+                    teamUserIds = await getPartnerTeamUserIds(store.partner_id, MANAGEMENT_ROLES)
                 }
             }
 
@@ -1683,9 +1686,10 @@ export async function unsuspendStore(
                 teamUserIds = await getStoreTeamUserIds({
                     partnerId: store.partner_id,
                     storeId: storeId,
+                    roles: MANAGEMENT_ROLES,
                 })
                 if (teamUserIds.length === 0) {
-                    teamUserIds = await getPartnerTeamUserIds(store.partner_id)
+                    teamUserIds = await getPartnerTeamUserIds(store.partner_id, MANAGEMENT_ROLES)
                 }
             }
 
@@ -1815,7 +1819,7 @@ export async function disableTenantAccess(
     if (notifyOwner) {
         try {
             const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
-            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
             if (teamUserIds.length > 0) {
                 await createNotificationsForUsers(teamUserIds, (uid) => ({
                     userId: uid,

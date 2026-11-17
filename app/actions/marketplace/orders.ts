@@ -390,6 +390,14 @@ export async function confirmOrderFulfillmentAction(orderId: string) {
     if (!validDeliveryStates.includes(order.delivery_status || "")) {
       return { error: "Os produtos ainda não foram enviados para entrega." }
     }
+
+    const { doesOrderRequireDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+    const requirement = await doesOrderRequireDeliveryOtp(orderId, { adminClient: supabase, orderData: order })
+    if (requirement.requiresOtp && order.delivery_status !== "delivered") {
+      return {
+        error: "Este pedido exige validação pelo entregador através do código de confirmação de entrega. Forneça o código de 6 dígitos diretamente ao entregador.",
+      }
+    }
   }
 
   // 3. Enforce service execution date verification

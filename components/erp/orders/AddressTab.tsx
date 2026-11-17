@@ -123,9 +123,16 @@ export const AddressTab: React.FC<AddressTabProps> = ({
         (!adminContext && originalDeliveryStatus === 'delivered') || !canRbac("orders.edit")
 
     const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-        <div className="flex justify-between items-start text-[14px] gap-4">
+        <div className="flex justify-between items-center text-sm gap-4 py-2.5 border-b border-brand-border/40 dark:border-dark-border/40 last:border-0">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
-            <div className="text-right font-bold text-brand-dark dark:text-dark-heading">{value}</div>
+            <div className="text-right font-semibold text-brand-dark dark:text-dark-heading">{value}</div>
+        </div>
+    )
+
+    const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+        <div className="flex flex-col gap-1">
+            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
+            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{value}</span>
         </div>
     )
 
@@ -135,14 +142,14 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                 <div className="lg:col-span-8 flex flex-col gap-8">
                     <FormSection title="Endereço de Entrega">
                         {isAddressReadOnly ? (
-                            <div>
-                                <InfoRow label="CEP" value={cep || "-"} />
-                                <InfoRow label="Rua/Avenida" value={street || "-"} />
-                                <InfoRow label="Número" value={noNumber ? "S/N" : (number || "-")} />
-                                {complement && <InfoRow label="Complemento" value={complement} />}
-                                <InfoRow label="Bairro" value={neighborhood || "-"} />
-                                <InfoRow label="Cidade" value={city || "-"} />
-                                <InfoRow label="Estado" value={uf || "-"} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <InfoField label="CEP" value={cep || "-"} />
+                                <InfoField label="Rua/Avenida" value={street || "-"} />
+                                <InfoField label="Número" value={noNumber ? "S/N" : (number || "-")} />
+                                {complement && <InfoField label="Complemento" value={complement} />}
+                                <InfoField label="Bairro" value={neighborhood || "-"} />
+                                <InfoField label="Cidade" value={city || "-"} />
+                                <InfoField label="Estado" value={uf || "-"} />
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -209,8 +216,8 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                     )}
                     <SidebarCard hasSeparator hasTopStrip title="Informações da Entrega">
                         {isCarrierDelivery ? (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
+                            <div>
+                                <div className="flex items-center gap-3 pb-4 border-b border-brand-border/40 dark:border-dark-border/40">
                                     <img
                                         src={getCarrierBrandIcon(carrier.companyName, carrier.serviceName, existingCarrierShipment?.carrier, carrier.carrier)}
                                         alt={carrierName}
@@ -240,13 +247,13 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     />
                                 )}
                                 {canReQuoteCarrier && (
-                                    <Button className="w-full" onClick={onOpenCarrierShippingSheet}>
+                                    <Button className="w-full mt-4" onClick={onOpenCarrierShippingSheet}>
                                         Recalcular frete
                                     </Button>
                                 )}
                             </div>
                         ) : isPaidOrder ? (
-                            <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
+                            <div>
                                 <InfoRow label="Entregador" value={deliveryPeopleOptions.find(opt => opt.value === selectedDeliveryPersonId)?.label || "Entrega própria"} />
                                 <InfoRow label="Status" value={selectedStatusMeta.label} />
                                 {showDispatchFields && (

@@ -72,7 +72,19 @@ export async function POST(request: NextRequest) {
         .eq("order_id", order.id)
         .eq("driver_id", user.id)
         .maybeSingle()
-      if (da) isAssignedDriver = true
+      if (da) {
+        isAssignedDriver = true
+      } else if (order.partner_id) {
+        const { data: pu } = await adminClient
+          .from("partner_users")
+          .select("id, role")
+          .eq("partner_id", order.partner_id)
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (pu) {
+          isAssignedDriver = true
+        }
+      }
     }
 
     if (!isBuyer && !isPartnerStaff && !isAssignedDriver) {
@@ -211,7 +223,12 @@ export async function POST(request: NextRequest) {
           const isTicket = fetched.payment_method_id === "bolbradesco" || fetched.payment_method_id === "boleto" || fetched.payment_type_id === "ticket"
           const isPix = fetched.payment_method_id === "pix" || hasPixQr
 
-          if (fetched.status === "pending" && ((isPix && hasPixQr) || (isTicket && hasBoletoData))) {
+          const isExpired = fetched.date_of_expiration
+            ? new Date(fetched.date_of_expiration).getTime() <= Date.now()
+            : false
+          const isCancelledOrFailed = fetched.status === "cancelled" || fetched.status === "rejected"
+
+          if (!isExpired && !isCancelledOrFailed && fetched.status === "pending" && ((isPix && hasPixQr) || (isTicket && hasBoletoData))) {
             // Only reuse an existing pending payment if its amount matches the
             // expected charge amount. When the order is partially paid (deposit
             // flow), the existing mp_payment_id may be the deposit Pix whose
@@ -227,11 +244,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Se não encontrou dados e for staff do ERP, não gera novo pagamento.
+    // Se não encontrou dados e for staff do ERP (e não motorista/entregador), não gera novo pagamento.
     // Exception: when the existing MP payment was approved (e.g. a paid deposit)
     // and there's still a remaining balance (paidAmount > 0), we should still
     // allow generating a new Pix for the remaining balance.
-    if (!paymentData && isPartnerStaff && !(order.mp_payment_id && paidAmount > 0.009)) {
+    if (!paymentData && isPartnerStaff && !isAssignedDriver && !(order.mp_payment_id && paidAmount > 0.009)) {
       return NextResponse.json({
         error: "Cobrança não encontrada ou expirada no Mercado Pago.",
       }, { status: 404 })

@@ -48,6 +48,7 @@ import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/p
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { canPaySinal, getOrderDepositSummary } from "@/lib/payments/order-financial-state"
+import { isOnlineMarketplaceOrder } from "@/lib/orders/order-utils"
 import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
 import { normalizeCustomerForCard } from "@/lib/utils/customer"
 
@@ -401,7 +402,7 @@ export default function CreateOrder({
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
     const isPaidOrderLocked = !adminContext && Boolean(editOrderId && originalPaymentStatus === "paid")
-    const isMarketplaceOrder = originalOrderSource === "Online Store"
+    const isMarketplaceOrder = isOnlineMarketplaceOrder(originalOrderSource)
 
     const isAlreadyPaid = !adminContext && Boolean(
         editOrderId && (

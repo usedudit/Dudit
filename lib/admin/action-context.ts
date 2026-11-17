@@ -12,6 +12,7 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
+import { MANAGEMENT_ROLES } from "@/lib/notifications/audience"
 
 export type AdminActionContext = {
     /** Motivo/mensagem explicando a ação (enviado ao vendedor quando notifySeller). */
@@ -166,7 +167,7 @@ async function notifySellerTeam(params: {
     const { createNotificationsForUsers, getPartnerTeamUserIds } = await import(
         "@/lib/services/notification.service"
     )
-    const teamUserIds = await getPartnerTeamUserIds(params.partnerId)
+    const teamUserIds = await getPartnerTeamUserIds(params.partnerId, MANAGEMENT_ROLES)
     if (!teamUserIds.length) return
 
     await createNotificationsForUsers(teamUserIds, (uid) => ({

@@ -54,6 +54,9 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { ReceiptScallopEdge } from "../POSComponents";
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal";
 import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf";
+import { usePermissions } from "@/lib/permission-context";
+import { isOnlineMarketplaceOrder, UNDEFINED_PAYMENT_PLACEHOLDERS } from "@/lib/orders/order-utils";
+import ChangePaymentMethodModal from "./ChangePaymentMethodModal";
 
 const standardTransition = {
   type: "spring" as const,
@@ -285,6 +288,11 @@ export default function PaymentStatusModal({
   const [selectedReceiptLeg, setSelectedReceiptLeg] = useState<PaymentBreakdownLeg | null>(null);
   const loading = paymentStatus === "processing";
 
+  const { role } = usePermissions();
+  const userRole = String(role || "").toLowerCase();
+  const canChangePaymentMethod = ["owner", "admin", "manager"].includes(userRole);
+  const [showChangeMethodModal, setShowChangeMethodModal] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       setCurrentOrder(order);
@@ -510,7 +518,12 @@ export default function PaymentStatusModal({
       ? payWithAmount - Number(targetOrder?.total_amount || 0)
       : 0;
 
-  const lockedMethod = null;
+  const isOnlineOrder = isOnlineMarketplaceOrder(targetOrder?.order_source);
+  const orderPaymentMethod = targetOrder?.payment_method;
+  const isMethodPlaceholder = !orderPaymentMethod || UNDEFINED_PAYMENT_PLACEHOLDERS.includes(String(orderPaymentMethod).trim().toLowerCase());
+  const isCustomerChosenMarketplaceMethod = isOnlineOrder && !isMethodPlaceholder && !depositSummary?.usesDeposit;
+
+  const lockedMethod = isCustomerChosenMarketplaceMethod ? targetOrder.payment_method : null;
   const lockedInstallments = null;
 
   const pendingNewAmount = useMemo(
@@ -1019,6 +1032,39 @@ export default function PaymentStatusModal({
                   className="flex flex-col gap-6"
                 >
                   <div className="flex flex-col gap-4">
+                    {isCustomerChosenMarketplaceMethod && !isFullyPaid && (
+                      <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-slate/40 dark:bg-dark-border/20">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                            <MoneyIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">
+                              Método escolhido pelo cliente no checkout
+                            </span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate block">
+                              {formatPaymentMethodToFullLabel(targetOrder?.payment_method || "Não informado")}
+                            </span>
+                          </div>
+                        </div>
+                        {canChangePaymentMethod ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowChangeMethodModal(true)}
+                            className="shrink-0 text-xs h-9"
+                          >
+                            Alterar método
+                          </Button>
+                        ) : (
+                          <Tooltip text="Apenas Proprietário, Administrador ou Gerente podem alterar o método">
+                            <span className="text-xs text-brand-inactive-text cursor-not-allowed">
+                              Fixo pelo cliente
+                            </span>
+                          </Tooltip>
+                        )}
+                      </div>
+                    )}
                     {frozen && (
                       <InfoCard
                         color="orange"
@@ -1733,6 +1779,29 @@ export default function PaymentStatusModal({
         cancelText="Cancelar"
         isLoading={confirmingSinal}
       />
+
+      {showChangeMethodModal && (
+        <ChangePaymentMethodModal
+          isOpen={showChangeMethodModal}
+          onClose={() => setShowChangeMethodModal(false)}
+          orderId={targetOrderId}
+          partnerId={partnerId}
+          currentPaymentMethod={targetOrder?.payment_method || ""}
+          onSuccess={(newMethod) => {
+            setCurrentOrder((prev: any) => ({
+              ...prev,
+              payment_method: newMethod,
+              payment_breakdown: prev?.payment_breakdown?.map((leg: any) => {
+                if (Number(leg.amountReceived || 0) <= 0.009) {
+                  return { ...leg, method: newMethod };
+                }
+                return leg;
+              }),
+            }));
+            onSuccess?.();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3326,12 +3326,11 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
 
   if (linkRes.error) return { success: false as const, error: linkRes.error.message }
 
-  const orderLabel = `#${String(params.orderId).slice(0, 8).toUpperCase()}`
   let changeMsg = nextStatus === "delivered"
-    ? `Pedido ${orderLabel} entregue ao destinatário com sucesso`
+    ? "Pedido entregue ao destinatário com sucesso"
     : nextStatus === "delivery_failed"
-      ? `Tentativa de entrega do pedido ${orderLabel} falhou`
-      : `Status de entrega do pedido ${orderLabel} alterado para ${getDeliveryStatusHumanLabel(nextStatus)}`
+      ? "Tentativa de entrega do pedido falhou"
+      : `Status de entrega do pedido alterado para ${getDeliveryStatusHumanLabel(nextStatus)}`
 
   if (params.changeReason?.trim()) {
     changeMsg += ` (Motivo: ${params.changeReason.trim()})`

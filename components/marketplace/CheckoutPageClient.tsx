@@ -4810,12 +4810,11 @@ export function CheckoutPageClient() {
                                 icon={TagIcon}
                                 key={coupon.id}
                                 title={getCouponTitle(coupon)}
-                                description={`${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " • Válido apenas para alguns itens do pedido." : " • Aplicável a todo o pedido."}`}
-                                className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${
-                                    selectedCouponId === coupon.id
-                                        ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                        : "border-brand-border dark:border-dark-border"
-                                }`}
+                                description={`${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " Válido apenas para alguns itens do pedido." : " Aplicável a todo o pedido."}`}
+                                className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${selectedCouponId === coupon.id
+                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                    : "border-brand-border dark:border-dark-border"
+                                    }`}
                                 onClick={() => {
                                     setSelectedCouponId(coupon.id)
                                 }}

@@ -25,6 +25,7 @@ import { formatDateTime } from "@/lib/utils/formatters";
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { createNotification, buildIdempotencyKey, getPartnerTeamUserIds } from "@/lib/services/notification.service"
+import { MANAGEMENT_ROLES } from "@/lib/notifications/audience"
 
 // ─── Helper: delete image from R2 ──────────────────────────────────────────
 
@@ -599,7 +600,7 @@ export async function approveModeration(
             await applyRiskScore(entity.partner_id, options?.riskScore)
 
             if (options?.notifySeller && options?.reason?.trim()) {
-                const userIds = await getPartnerTeamUserIds(entity.partner_id)
+                const userIds = await getPartnerTeamUserIds(entity.partner_id, MANAGEMENT_ROLES)
                 const typeLabel = type === "service" ? "serviço" : "produto"
                 const notificationMessage = `Seu ${typeLabel} "${entity.name}" foi aprovado na moderação. Mensagem: ${options.reason.trim()}`
 
@@ -791,7 +792,7 @@ export async function rejectFlaggedImages(
 
         // Send notification to partner
         if (entity.partner_id && options?.notifySeller !== false) {
-            const userIds = await getPartnerTeamUserIds(entity.partner_id)
+            const userIds = await getPartnerTeamUserIds(entity.partner_id, MANAGEMENT_ROLES)
             const typeLabel = type === "service" ? "serviço" : "produto"
             const notificationMessage = `Todas as imagens do ${typeLabel} "${entity.name}" foram removidas. Motivo: ${effectiveReason}. Adicione novas imagens para que o item possa ser aprovado.`
 
@@ -901,7 +902,7 @@ export async function rejectFlaggedImages(
 
     // Send notification to partner
     if (entity.partner_id && options?.notifySeller !== false) {
-        const userIds = await getPartnerTeamUserIds(entity.partner_id)
+        const userIds = await getPartnerTeamUserIds(entity.partner_id, MANAGEMENT_ROLES)
         const typeLabel = type === "service" ? "serviço" : "produto"
         const notificationMessage = `${removedCount} ${removedWord} do ${typeLabel} "${entity.name}" foi removida. Motivo: ${effectiveReason}. O item foi aprovado com as imagens restantes.`
 
@@ -1039,7 +1040,7 @@ export async function removeModerationImage(
 
     // Send notification to partner if requested
     if (entity.partner_id && options?.notifySeller && reasonText) {
-        const userIds = await getPartnerTeamUserIds(entity.partner_id)
+        const userIds = await getPartnerTeamUserIds(entity.partner_id, MANAGEMENT_ROLES)
         const typeLabel = type === "service" ? "serviço" : "produto"
         const notificationMessage = `Uma imagem do ${typeLabel} "${entity.name}" foi removida pela moderação. Motivo: ${reasonText}.`
 
@@ -1303,7 +1304,7 @@ export async function rejectModeration(
 
         // Send notification to partner
         if (video.partner_id && options?.notifySeller !== false) {
-            const userIds = await getPartnerTeamUserIds(video.partner_id)
+            const userIds = await getPartnerTeamUserIds(video.partner_id, MANAGEMENT_ROLES)
             const notificationMessage = effectiveReason.length > 0
                 ? effectiveReason
                 : "Seu vídeo da comunidade não atendeu aos critérios de moderação e não foi aprovado."
@@ -1453,7 +1454,7 @@ export async function rejectModeration(
 
     // Send notification to partner
     if (entity.partner_id && options?.notifySeller !== false) {
-        const userIds = await getPartnerTeamUserIds(entity.partner_id)
+        const userIds = await getPartnerTeamUserIds(entity.partner_id, MANAGEMENT_ROLES)
         const itemName = isItem ? entity.name : "seu perfil"
         const typeLabel = type === "product" ? "produto" : type === "service" ? "serviço" : "perfil"
         const notificationMessage = effectiveReason.length > 0

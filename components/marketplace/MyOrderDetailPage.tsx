@@ -15,7 +15,7 @@ import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequ
 import { cancelBuyerOrderAction, confirmOrderFulfillmentAction, getOrderHistoryForBuyerAction } from '@/app/actions/marketplace/orders';
 import { getPartnerReturnPolicyPublicAction } from '@/app/actions/marketplace/store-policies';
 import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
-import { FileIcon } from '@/lib/icons';
+import { FileIcon, ShieldIcon } from '@/lib/icons';
 import { formatFileSize } from '@/components/erp/orders/OrderAttachmentsTab';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
 import { getProductUrl, getStoreUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
@@ -385,12 +385,7 @@ const getDeliveryTimelineSteps = (order: any) => {
         const transitActive = ["in_transit", "delivered"].includes(shipmentStatus);
         const deliveredActive = shipmentStatus === "delivered";
 
-        steps.push({ label: "Pedido realizado", active: true, ...fmtStep(order.created_at) });
-        steps.push({
-            label: isPaid ? "Pago" : "Aguardando pagamento",
-            active: true,
-            ...fmtStep(order.updated_at || order.created_at),
-        });
+        steps.push({ label: "Em preparação", active: true, ...fmtStep(order.created_at) });
 
         if (shipmentStatus === "cancelled" || shipmentStatus === "failed") {
             steps.push({
@@ -528,6 +523,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [deliveryOtp, setDeliveryOtp] = useState<any>(order?.delivery_otp || null);
+    const [isConfirmReceiptModalOpen, setIsConfirmReceiptModalOpen] = useState(false);
 
     useEffect(() => {
         if (order?.delivery_otp) {
@@ -843,7 +839,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }).filter((e: any) => e.change_lines.length > 0);
 
         return sanitized.sort((a: any, b: any) => {
-            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            // Most recent events first
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
     }, [buyerAuditEntries, depositHistoryEntries, order?.buyer_id, order?.customer_name, order?.store?.name]);
 
@@ -923,7 +920,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 <Button
                     variant="outline"
                     className="w-full h-12 font-bold border-brand-green text-brand-green hover:bg-brand-green/10"
-                    onClick={handleConfirmFulfillment}
+                    onClick={() => setIsConfirmReceiptModalOpen(true)}
                     disabled={isConfirming}
                 >
                     {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Recebimento"}
@@ -3046,6 +3043,80 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 title="Fotos e evidências"
                                 message="Esta loja realiza o atendimento de trocas e devoluções diretamente pelo WhatsApp. Se você possuir fotos ou vídeos do item, poderá enviá-los diretamente na conversa com o vendedor logo após abrir o aplicativo."
                             />
+                        </div>
+                    )}
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={isConfirmReceiptModalOpen}
+                    onClose={() => setIsConfirmReceiptModalOpen(false)}
+                    title={deliveryOtp?.requiresOtp && order.delivery_status !== "delivered" ? "Código de Confirmação de Entrega" : "Confirmar Recebimento"}
+                    maxWidth="sm"
+                    footer={
+                        deliveryOtp?.requiresOtp && order.delivery_status !== "delivered" ? (
+                            <div className="flex justify-end w-full">
+                                <Button variant="default" onClick={() => setIsConfirmReceiptModalOpen(false)}>
+                                    Entendi
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="flex justify-end gap-3 w-full">
+                                <Button variant="outline" onClick={() => setIsConfirmReceiptModalOpen(false)} disabled={isConfirming}>
+                                    Voltar
+                                </Button>
+                                <Button
+                                    variant="default"
+                                    onClick={async () => {
+                                        await handleConfirmFulfillment();
+                                        setIsConfirmReceiptModalOpen(false);
+                                    }}
+                                    disabled={isConfirming}
+                                >
+                                    {isConfirming ? <Spinner size={16} className="text-white mr-2" /> : "Confirmar Recebimento"}
+                                </Button>
+                            </div>
+                        )
+                    }
+                >
+                    {deliveryOtp?.requiresOtp && order.delivery_status !== "delivered" ? (
+                        <div className="flex flex-col gap-4 p-4 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center mx-auto">
+                                <ShieldIcon size={24} />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading">
+                                    Entrega protegida por código
+                                </h4>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                    Para sua segurança, a entrega deste pedido precisa ser confirmada diretamente pelo entregador no aplicativo dele utilizando o código de confirmação.
+                                </p>
+                            </div>
+                            {deliveryOtp.code && (
+                                <div className="p-4 rounded-xl bg-brand-surface dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                    <span className="text-xs font-semibold text-brand-inactive-text uppercase tracking-wider block mb-2">
+                                        Seu código para informar ao entregador
+                                    </span>
+                                    <div className="flex justify-center items-center gap-1.5">
+                                        {deliveryOtp.code.split("").map((digit: string, i: number) => (
+                                            <span key={i} className="w-9 h-11 flex items-center justify-center rounded-lg bg-white dark:bg-dark-background border border-gray-200 dark:border-dark-border font-mono text-xl font-black text-brand-dark dark:text-white shadow-2xs">
+                                                {digit}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Forneça este código ao entregador apenas quando ele estiver no local e você tiver conferido seus itens.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3 p-4">
+                            <p className="text-sm text-brand-dark dark:text-dark-body">
+                                Confirma que você já recebeu todos os produtos deste pedido em perfeitas condições?
+                            </p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Ao confirmar, o status do pedido será atualizado para <strong>Entregue</strong>.
+                            </p>
                         </div>
                     )}
                 </DefaultModal>

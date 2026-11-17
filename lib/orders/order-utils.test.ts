@@ -50,7 +50,7 @@ describe("resolveOrderPaymentMethodLabel", () => {
 
     it("falls back to payment_method when there is no breakdown", () => {
         expect(resolveOrderPaymentMethodLabel({ payment_method: "Dinheiro" })).toBe("Dinheiro")
-        expect(resolveOrderPaymentMethodLabel({ payment_method: "credit_card" })).toBe("Cartão De Crédito")
+        expect(resolveOrderPaymentMethodLabel({ payment_method: "credit_card" })).toBe("Cartão de Crédito")
         expect(resolveOrderPaymentMethodLabel({ payment_method: "Assinatura (Créditos)" })).toBe("Assinatura (Créditos)")
     })
 

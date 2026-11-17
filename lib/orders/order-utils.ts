@@ -37,6 +37,20 @@ export const UNDEFINED_PAYMENT_PLACEHOLDERS = [
   "",
 ]
 
+export const ONLINE_ORDER_SOURCES = [
+  "marketplace",
+  "vitrine online",
+  "online store",
+  "loja online",
+  "online",
+]
+
+export function isOnlineMarketplaceOrder(source?: string | null): boolean {
+  if (!source) return false
+  const normalized = String(source).trim().toLowerCase()
+  return ONLINE_ORDER_SOURCES.some((s) => normalized.includes(s))
+}
+
 interface PaymentMethodSource {
   payment_method?: string | null
   payment_breakdown?: unknown

@@ -96,18 +96,9 @@ export function DepositReceiptsSection({
             <ListItem
               key={`${entry.method}-${index}`}
               icon={MethodIcon}
-              title={
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                    {methodLabel}
-                  </span>
-                  <Badge variant="green" className="scale-90 origin-left">
-                    Recebido
-                  </Badge>
-                </div>
-              }
+              title={methodLabel}
               description={
-                <span className="text-xs font-semibold text-brand-green">
+                <span className="text-brand-green">
                   {formatCurrency(received)}
                 </span>
               }

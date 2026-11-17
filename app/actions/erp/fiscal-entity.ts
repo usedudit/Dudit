@@ -9,6 +9,7 @@ import {
   createNotificationsForUsers,
   getPartnerTeamUserIds,
 } from "@/lib/services/notification.service"
+import { getNotificationRecipientRoles } from "@/lib/notifications/audience"
 import { formatCurrency } from "@/lib/utils"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import {
@@ -664,9 +665,8 @@ async function maybeNotifyRevenueLimit(params: {
   const exceeded = snapshot.status === "excedido"
   const atOrAboveLimit = snapshot.status === "limite" || snapshot.status === "tolerancia"
 
-  // Nível do alerta = chave de idempotência. MEI usa a faixa de 20% (120);
-  // nano não tem tolerância, então o excesso gera um alerta próprio assim que
-  // passa do limite, sem esperar 120%.
+  // Nível do alerta serve apenas para escolher título/mensagem. A chave de
+  // idempotência abaixo é anual, então o aviso não se repete a cada faixa.
   let level: 80 | 90 | 100 | 120 | "excedido" | null = null
   if (exceeded) level = profile === "mei" ? 120 : "excedido"
   else if (atOrAboveLimit) level = 100
@@ -679,7 +679,10 @@ async function maybeNotifyRevenueLimit(params: {
   const isAtLimit = level === 100
 
   try {
-    const userIds = await getPartnerTeamUserIds(partnerId)
+    const userIds = await getPartnerTeamUserIds(
+      partnerId,
+      getNotificationRecipientRoles("revenue_limit_alert"),
+    )
     if (userIds.length === 0) return
 
     const limitLabel = formatCurrency(snapshot.limit)
@@ -714,7 +717,10 @@ async function maybeNotifyRevenueLimit(params: {
         percentage: snapshot.percentage,
         year,
       },
-      idempotencyKey: `revenue_limit:${entityId}:${year}:${level}:${userId}`,
+      // Um alerta por entidade fiscal/ano/usuário. Antes a chave incluía o
+      // nível (80/90/100/120), o que permitia o mesmo aviso reaparecer para
+      // cada faixa. Agora é uma única notificação no ano.
+      idempotencyKey: `revenue_limit:${entityId}:${year}:${userId}`,
       origin: "system",
     }))
   } catch (err) {

@@ -10,6 +10,7 @@ import {
     buildIdempotencyKey,
 } from "@/lib/services/notification.service"
 import { buildNotificationContent } from "@/lib/notifications/templates"
+import { getNotificationRecipientRoles } from "@/lib/notifications/audience"
 
 export async function notifyLowStockAction(productId: string) {
     try {
@@ -27,7 +28,10 @@ export async function notifyLowStockAction(productId: string) {
         if (!product.min_stock || product.min_stock <= 0) return
         if ((Number(product.stock_quantity) || 0) > Number(product.min_stock)) return
 
-        const userIds = await getPartnerTeamUserIds(product.partner_id)
+        const userIds = await getPartnerTeamUserIds(
+            product.partner_id,
+            getNotificationRecipientRoles("low_stock"),
+        )
         const { title, message } = buildNotificationContent("low_stock", "seller", {
             productName: product.name,
             stock: String(product.stock_quantity),
@@ -74,7 +78,10 @@ export async function notifyReplenishmentSuggestedAction() {
         if (!products || products.length === 0) return
 
         const count = products.length
-        const userIds = await getPartnerTeamUserIds(partnerId)
+        const userIds = await getPartnerTeamUserIds(
+            partnerId,
+            getNotificationRecipientRoles("replenishment_suggested"),
+        )
         const { title, message } = buildNotificationContent("replenishment_suggested", "seller", {
             count: String(count),
         })

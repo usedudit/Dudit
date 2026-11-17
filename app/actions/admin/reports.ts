@@ -758,6 +758,7 @@ export async function resolveReport(
     // Send notifications
     try {
         const { createNotification, createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+        const { MANAGEMENT_ROLES } = await import("@/lib/notifications/audience")
         const partnerId = r.partner_id as string | undefined
         const targetTypeLabel: Record<string, string> = {
             product: "produto", service: "serviço", partner: "loja",
@@ -789,7 +790,7 @@ export async function resolveReport(
 
         // Notify owner/partner team
         if (partnerId) {
-            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
             if (teamUserIds.length > 0) {
                 await createNotificationsForUsers(teamUserIds, (uid) => ({
                     userId: uid,

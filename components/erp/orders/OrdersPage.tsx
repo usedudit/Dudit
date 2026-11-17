@@ -41,6 +41,7 @@ import {
     PartiallyPaidIcon,
     StarIcon,
     ShieldIcon,
+    TruckIcon,
 } from "@/lib/icons"
 import { checkOrderDeliveryOtpRequirementAction } from "@/app/actions/delivery-otp"
 
@@ -55,7 +56,7 @@ import {
     isDatePeriodFilterActive,
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
-import { cleanOrderNotes, normalizeOrderSource, resolveOrderPaymentMethodLabel, UNDEFINED_PAYMENT_PLACEHOLDERS } from "@/lib/orders/order-utils"
+import { cleanOrderNotes, normalizeOrderSource, resolveOrderPaymentMethodLabel, UNDEFINED_PAYMENT_PLACEHOLDERS, isOnlineMarketplaceOrder } from "@/lib/orders/order-utils"
 
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
@@ -211,12 +212,6 @@ const hasDefinedPaymentMethod = (order: {
     return !isPlaceholder(checkoutMethod);
 };
 
-const ONLINE_ORDER_SOURCES = ["marketplace", "vitrine online", "online store", "loja online"];
-
-const isOnlineMarketplaceOrder = (source?: string | null): boolean => {
-    const normalized = String(source ?? "").trim().toLowerCase();
-    return ONLINE_ORDER_SOURCES.includes(normalized);
-};
 
 function doesTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
     if (currentStatus === "delivered" && nextStatus !== "delivered") {
@@ -799,6 +794,17 @@ export default function OrdersPage({
     }, [openEntity])
 
     const openDeliveryStatusModal = (order: Order) => {
+        const isPickup = order.delivery_type === "pickup"
+        const isCarrier = order.isCarrierDelivery
+
+        if (!isPickup && !isCarrier) {
+            const currentStatus = order.delivery_status
+            if (currentStatus === "not_sent" || currentStatus === "preparing" || currentStatus === "pending" || !currentStatus) {
+                router.push(`/erp/entregas?create=true&orders=${order.originalId}`)
+                return
+            }
+        }
+
         setDeliveryStatusModal({ open: true, order })
         setDeliveryOtpInput("")
         setBypassDeliveryOtp(false)
@@ -821,7 +827,6 @@ export default function OrdersPage({
             return
         }
         const status = order.delivery_status
-        const isPickup = order.delivery_type === "pickup"
         setDeliveryStatusValue(
             status === "not_sent" || status === "pending" ? "not_sent"
                 : status === "preparing" ? "preparing"
@@ -1147,6 +1152,40 @@ export default function OrdersPage({
             }
         })
     }
+
+    const handleCreateDeliveryFromSelected = useCallback(() => {
+        const selected = filteredOrders.filter((o: Order) => selection.ids.has(o.originalId))
+        if (selected.length === 0) return
+
+        const eligible = selected.filter((o: Order) => {
+            if (o.situation === "cancelled") return false
+            if (o.delivery_type === "pickup") return false
+            if (o.isCarrierDelivery) return false
+            if (o.hasOnlyServices) return false
+            const dStatus = String(o.delivery_status || "").toLowerCase()
+            return dStatus === "not_sent" || dStatus === "preparing" || dStatus === "pending" || !dStatus
+        })
+
+        if (eligible.length === 0) {
+            toast({
+                title: "Nenhum pedido elegível",
+                description: "Nenhum dos pedidos selecionados pode ser incluído em uma entrega local (pedidos de retirada, transportadora, cancelados ou já despachados foram desconsiderados).",
+                variant: "destructive",
+            })
+            return
+        }
+
+        const ignoredCount = selected.length - eligible.length
+        if (ignoredCount > 0) {
+            toast({
+                title: "Pedidos filtrados",
+                description: `${eligible.length} pedido(s) selecionado(s) para entrega. ${ignoredCount} pedido(s) foram ignorados por não atenderem aos critérios (retirada, transportadora ou já despachados).`,
+            })
+        }
+
+        const orderIds = eligible.map((o: Order) => o.originalId).join(",")
+        router.push(`/erp/entregas?create=true&orders=${orderIds}`)
+    }, [filteredOrders, selection.ids, router, toast])
 
     const confirmBulk = async (action: 'cancel', explicitIds?: string[]) => {
         const ids = explicitIds?.length ? explicitIds : (singleCancelId ? [singleCancelId] : Array.from(selection.ids))
@@ -1644,6 +1683,15 @@ export default function OrdersPage({
             >
                 <Button
                     variant="ghost"
+                    onClick={handleCreateDeliveryFromSelected}
+                    leftIcon={<TruckIcon size={18} />}
+                    className="h-10 px-3"
+                >
+                    Criar Entrega
+                </Button>
+
+                <Button
+                    variant="ghost"
                     onClick={() => setBulkEditModal({ isOpen: true })}
                     leftIcon={<EditIcon size={18} />}
                     className="h-10 px-3"
@@ -1708,6 +1756,7 @@ export default function OrdersPage({
                 onClose={() => setBulkEditModal({ isOpen: false })}
                 selectedCount={selection.ids.size}
                 targetType="order"
+                onCreateDelivery={handleCreateDeliveryFromSelected}
                 orderSelectionGuards={{
                     totalCount: selectedOrdersForBulkActions.length,
                     paidCount: selectedOrdersForBulkActions.filter((order) => order.situation === "paid").length,

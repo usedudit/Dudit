@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
@@ -110,7 +110,28 @@ export default function DeliveriesPage({
     const editDeliveryId = isEditingEntity ? entityState.entityId : null
     const wrapper = isCreatingEntity ? "create" : isEditingEntity ? "edit" : selectedDeliveryId ? "detail" : "list"
 
-    const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(null)
+    const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(() => {
+        if (typeof window === "undefined") return null
+        const params = new URLSearchParams(window.location.search)
+        const ordersParam = params.get("orders")
+        if (!ordersParam) return null
+        const ids = ordersParam.split(",").map((id) => id.trim()).filter(Boolean)
+        return ids.length > 0 ? ids : null
+    })
+
+    const searchParams = useSearchParams()
+    useEffect(() => {
+        const ordersParam = searchParams?.get("orders")
+        if (ordersParam) {
+            const ids = ordersParam.split(",").map((id) => id.trim()).filter(Boolean)
+            if (ids.length > 0) {
+                setCreatePrefillOrderIds(ids)
+                if (!entityState.isOpen || entityState.action !== "create") {
+                    openEntity("create")
+                }
+            }
+        }
+    }, [searchParams, openEntity, entityState.isOpen, entityState.action])
 
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
