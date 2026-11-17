@@ -9,7 +9,7 @@ import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, ArrowUpDownIcon, LinkIcon, TruckIcon, PrinterIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, ArrowUpDownIcon, LinkIcon, TruckIcon, PrinterIcon, ShieldIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import {
@@ -165,6 +165,9 @@ export default function DeliveriesPage({
         deliveryId: string
         nextStatus: string
     } | null>(null)
+    const [deliveryOtpInput, setDeliveryOtpInput] = useState("")
+    const [bypassDeliveryOtp, setBypassDeliveryOtp] = useState(false)
+    const [bypassReasonInput, setBypassReasonInput] = useState("")
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const observerTarget = useRef<HTMLDivElement>(null)
@@ -659,13 +662,23 @@ export default function DeliveriesPage({
         return false
     }, [filters, mode])
 
-    const executeStatusChange = async (deliveryId: string, nextStatus: string, reason?: string) => {
+    const executeStatusChange = async (
+        deliveryId: string,
+        nextStatus: string,
+        reason?: string,
+        deliveryOtp?: string,
+        bypassOtp?: boolean,
+        bypassReason?: string
+    ) => {
         setStatusOverrides(prev => ({ ...prev, [deliveryId]: nextStatus }))
         const res = await updateERPDeliveryStatusAction({
             deliveryId,
             partnerId,
             status: nextStatus as any,
             changeReason: reason || undefined,
+            deliveryOtp,
+            bypassOtp,
+            bypassReason,
         })
 
         if (!res.success) {
@@ -684,6 +697,9 @@ export default function DeliveriesPage({
                 title: "Status atualizado",
                 description: `A entrega foi atualizada para "${getDeliveryStatusMeta(nextStatus).label}".`,
             })
+            setDeliveryOtpInput("")
+            setBypassDeliveryOtp(false)
+            setBypassReasonInput("")
         }
     }
 
@@ -1388,22 +1404,109 @@ export default function DeliveriesPage({
                     }
                 />
 
-                <AlertModal
-                    isOpen={simpleConfirmModal?.isOpen ?? false}
-                    title="Confirmar Alteração de Status"
-                    description={`Tem certeza que deseja alterar o status desta entrega para ${getDeliveryStatusMeta(simpleConfirmModal?.nextStatus || "").label}?`}
-                    confirmText="Confirmar"
-                    cancelText="Cancelar"
-                    onClose={() => setSimpleConfirmModal(null)}
-                    onConfirm={async () => {
-                        if (simpleConfirmModal) {
-                            const { deliveryId, nextStatus } = simpleConfirmModal
+                {simpleConfirmModal?.isOpen && simpleConfirmModal.nextStatus === "delivered" ? (
+                    <DefaultModal
+                        isOpen={true}
+                        title="Confirmar Entrega"
+                        maxWidth="sm"
+                        onClose={() => {
                             setSimpleConfirmModal(null)
-                            await executeStatusChange(deliveryId, nextStatus)
+                            setDeliveryOtpInput("")
+                            setBypassDeliveryOtp(false)
+                            setBypassReasonInput("")
+                        }}
+                        footer={
+                            <div className="flex justify-end gap-3 w-full">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setSimpleConfirmModal(null)
+                                        setDeliveryOtpInput("")
+                                        setBypassDeliveryOtp(false)
+                                        setBypassReasonInput("")
+                                    }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={async () => {
+                                        const { deliveryId, nextStatus } = simpleConfirmModal
+                                        setSimpleConfirmModal(null)
+                                        await executeStatusChange(
+                                            deliveryId,
+                                            nextStatus,
+                                            undefined,
+                                            bypassDeliveryOtp ? undefined : deliveryOtpInput.trim() || undefined,
+                                            bypassDeliveryOtp,
+                                            bypassReasonInput.trim() || undefined
+                                        )
+                                    }}
+                                    disabled={!bypassDeliveryOtp && deliveryOtpInput.trim().length > 0 && deliveryOtpInput.trim().length !== 6}
+                                >
+                                    Confirmar Entrega
+                                </Button>
+                            </div>
                         }
-                    }}
-                    variant="warning"
-                />
+                    >
+                        <div className="flex flex-col gap-4 p-4">
+                            <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
+                                    <ShieldIcon size={18} />
+                                    <span>Código de Confirmação (OTP)</span>
+                                </div>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Se este pedido exigir confirmação de entrega, informe o código de 6 dígitos informado pelo cliente ou selecione o bypass administrativo.
+                                </p>
+                                {!bypassDeliveryOtp ? (
+                                    <Input
+                                        label="Código de 6 dígitos"
+                                        placeholder="000000"
+                                        value={deliveryOtpInput}
+                                        onChange={(e) => setDeliveryOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                        maxLength={6}
+                                        className="tracking-widest font-mono text-center text-lg font-bold"
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Motivo do Bypass Administrativo"
+                                        placeholder="Ex: Cliente sem celular / autorizado por telefone"
+                                        value={bypassReasonInput}
+                                        onChange={(e) => setBypassReasonInput(e.target.value)}
+                                    />
+                                )}
+                                <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
+                                    <input
+                                        type="checkbox"
+                                        id="erp-bypass-otp-page"
+                                        checked={bypassDeliveryOtp}
+                                        onChange={(e) => setBypassDeliveryOtp(e.target.checked)}
+                                        className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
+                                    />
+                                    <label htmlFor="erp-bypass-otp-page" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                                        Bypassar código (Autorização de Administrador)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </DefaultModal>
+                ) : (
+                    <AlertModal
+                        isOpen={simpleConfirmModal?.isOpen ?? false}
+                        title="Confirmar Alteração de Status"
+                        description={`Tem certeza que deseja alterar o status desta entrega para ${getDeliveryStatusMeta(simpleConfirmModal?.nextStatus || "").label}?`}
+                        confirmText="Confirmar"
+                        cancelText="Cancelar"
+                        onClose={() => setSimpleConfirmModal(null)}
+                        onConfirm={async () => {
+                            if (simpleConfirmModal) {
+                                const { deliveryId, nextStatus } = simpleConfirmModal
+                                setSimpleConfirmModal(null)
+                                await executeStatusChange(deliveryId, nextStatus)
+                            }
+                        }}
+                        variant="warning"
+                    />
+                )}
             </AnimatePresence>
 
             <FilterSheet

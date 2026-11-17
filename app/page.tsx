@@ -123,7 +123,7 @@ function HomeFeedSkeleton() {
                     <div className="h-6 w-48 bg-gray-200 rounded animate-pulse dark:bg-dark-border" />
                     <div className="flex gap-4 overflow-hidden">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
-                            <div key={i} className="w-[190px] sm:w-[210px] shrink-0 space-y-3">
+                            <div key={i} className="w-[150px] md:w-[230px] shrink-0 space-y-3">
                                 <div className="w-full aspect-square bg-gray-100 rounded-2xl animate-pulse dark:bg-dark-border/50" />
                                 <div className="h-4 bg-gray-100 rounded w-3/4 animate-pulse dark:bg-dark-border/50" />
                                 <div className="h-4 bg-gray-100 rounded w-1/2 animate-pulse dark:bg-dark-border/50" />

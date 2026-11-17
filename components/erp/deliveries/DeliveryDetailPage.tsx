@@ -8,7 +8,7 @@ import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon, ShieldIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -99,6 +99,9 @@ export default function DeliveryDetailPage({
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
+    const [deliveryOtp, setDeliveryOtp] = useState<string>("")
+    const [bypassOtp, setBypassOtp] = useState<boolean>(false)
+    const [bypassReason, setBypassReason] = useState<string>("")
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
     const [orderStatusModal, setOrderStatusModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string } | null>(null)
     const [orderNewStatus, setOrderNewStatus] = useState<string>("")
@@ -120,9 +123,15 @@ export default function DeliveryDetailPage({
                 deliveryId: delivery.id,
                 partnerId,
                 status: selectedNewStatus as any,
+                deliveryOtp: bypassOtp ? undefined : deliveryOtp.trim() || undefined,
+                bypassOtp,
+                bypassReason: bypassReason.trim() || undefined,
             })
             if (res.success) {
                 toast.success("Status da entrega atualizado com sucesso!")
+                setDeliveryOtp("")
+                setBypassOtp(false)
+                setBypassReason("")
             } else {
                 setDelivery(prevDelivery)
                 toast.error(res.error || "Erro ao atualizar status da entrega.")
@@ -132,7 +141,7 @@ export default function DeliveryDetailPage({
             toast.error(err?.message || "Erro inesperado ao atualizar status.")
         }
         setIsStatusModalOpen(false)
-    }, [delivery, selectedNewStatus, partnerId])
+    }, [delivery, selectedNewStatus, partnerId, deliveryOtp, bypassOtp, bypassReason])
 
     useEffect(() => {
         setHeaderOverride({
@@ -278,9 +287,15 @@ export default function DeliveryDetailPage({
                 orderId,
                 status: nextStatus as any,
                 changeReason: reason,
+                deliveryOtp: bypassOtp ? undefined : deliveryOtp.trim() || undefined,
+                bypassOtp,
+                bypassReason: bypassReason.trim() || undefined,
             })
             if (res.success) {
                 toast.success("Status do pedido atualizado com sucesso!")
+                setDeliveryOtp("")
+                setBypassOtp(false)
+                setBypassReason("")
                 if (res.deliveryStatus) {
                     setDelivery((current: any) => current ? { ...current, status: res.deliveryStatus } : current)
                 }
@@ -746,6 +761,47 @@ export default function DeliveryDetailPage({
                             { value: 'cancelled', label: 'Cancelada' }
                         ]}
                     />
+
+                    {selectedNewStatus === "delivered" && (
+                        <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
+                                <ShieldIcon size={18} />
+                                <span>Código de Confirmação (OTP)</span>
+                            </div>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Se este pedido exigir confirmação de entrega, informe o código de 6 dígitos do cliente ou selecione o bypass administrativo.
+                            </p>
+                            {!bypassOtp ? (
+                                <Input
+                                    label="Código de 6 dígitos"
+                                    placeholder="000000"
+                                    value={deliveryOtp}
+                                    onChange={(e) => setDeliveryOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    maxLength={6}
+                                    className="tracking-widest font-mono text-center text-lg font-bold"
+                                />
+                            ) : (
+                                <Input
+                                    label="Motivo do Bypass Administrativo"
+                                    placeholder="Ex: Cliente sem celular / autorizado por telefone"
+                                    value={bypassReason}
+                                    onChange={(e) => setBypassReason(e.target.value)}
+                                />
+                            )}
+                            <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
+                                <input
+                                    type="checkbox"
+                                    id="erp-bypass-otp-detail"
+                                    checked={bypassOtp}
+                                    onChange={(e) => setBypassOtp(e.target.checked)}
+                                    className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
+                                />
+                                <label htmlFor="erp-bypass-otp-detail" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                                    Bypassar código (Autorização de Administrador)
+                                </label>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </DefaultModal>
 
@@ -804,6 +860,47 @@ export default function DeliveryDetailPage({
                                 { value: 'cancelled', label: 'Cancelada' }
                             ]}
                         />
+
+                        {orderNewStatus === "delivered" && (
+                            <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
+                                    <ShieldIcon size={18} />
+                                    <span>Código de Confirmação (OTP)</span>
+                                </div>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Se este pedido exigir confirmação de entrega, informe o código de 6 dígitos do cliente ou selecione o bypass administrativo.
+                                </p>
+                                {!bypassOtp ? (
+                                    <Input
+                                        label="Código de 6 dígitos"
+                                        placeholder="000000"
+                                        value={deliveryOtp}
+                                        onChange={(e) => setDeliveryOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                        maxLength={6}
+                                        className="tracking-widest font-mono text-center text-lg font-bold"
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Motivo do Bypass Administrativo"
+                                        placeholder="Ex: Cliente sem celular / autorizado por telefone"
+                                        value={bypassReason}
+                                        onChange={(e) => setBypassReason(e.target.value)}
+                                    />
+                                )}
+                                <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
+                                    <input
+                                        type="checkbox"
+                                        id="erp-bypass-otp-single"
+                                        checked={bypassOtp}
+                                        onChange={(e) => setBypassOtp(e.target.checked)}
+                                        className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
+                                    />
+                                    <label htmlFor="erp-bypass-otp-single" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                                        Bypassar código (Autorização de Administrador)
+                                    </label>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </DefaultModal>
             )}

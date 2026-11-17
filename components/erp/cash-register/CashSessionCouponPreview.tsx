@@ -13,30 +13,13 @@ import {
     ReceiptThermalStoreHeader,
     ReceiptThermalTitle,
 } from "@/components/erp/orders/receipt/ReceiptComponents"
+import {
+    type CashSessionCouponData,
+    buildCashSessionCouponData,
+} from "@/lib/cash-register/cash-session-coupon"
 
-export type CashSessionCouponData = {
-    partnerName: string
-    partnerDoc: string
-    partnerPhone?: string | null
-    partnerAddress: string
-    sessionId: string
-    status: "open" | "closed"
-    openedAt: string
-    closedAt: string | null
-    openOperator: string
-    closeOperator: string | null
-    initialAmount: number
-    summaryByPaymentMethod: Array<{ label: string; calculated: number; counted: number | null; difference: number | null }>
-    totals: {
-        totalSalesAllMethods: number
-        totalWithdrawals: number
-        totalDeposits: number
-        calculatedDrawerTotal: number
-        informedDrawerTotal: number | null
-        difference: number | null
-    }
-    notes?: string | null
-}
+export type { CashSessionCouponData }
+export { buildCashSessionCouponData }
 
 type CashSessionCouponPreviewProps = {
     data: CashSessionCouponData
@@ -147,35 +130,4 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
             <ReceiptThermalFooter />
         </ReceiptThermalShell>
     )
-}
-
-export function buildCashSessionCouponData(details: any, partnerHeader: SaleReceiptPartnerHeader): CashSessionCouponData {
-    return {
-        partnerName: partnerHeader.fantasyName,
-        partnerDoc: partnerHeader.taxIdLine,
-        partnerPhone: partnerHeader.phone || null,
-        partnerAddress: partnerHeader.addressLine,
-        sessionId: details.session.id,
-        status: details.session.status,
-        openedAt: details.session.opened_at,
-        closedAt: details.session.closed_at || null,
-        openOperator: details.operators.open_name,
-        closeOperator: details.operators.close_name,
-        initialAmount: details.totals.initial,
-        summaryByPaymentMethod: (details.summaryByPaymentMethod || []).map((row: any) => ({
-            label: row.label,
-            calculated: row.calculated,
-            counted: row.counted,
-            difference: row.difference,
-        })),
-        totals: {
-            totalSalesAllMethods: details.totals.totalSalesAllMethods,
-            totalWithdrawals: details.totals.totalWithdrawals,
-            totalDeposits: details.totals.totalDeposits,
-            calculatedDrawerTotal: details.totals.calculatedDrawerTotal,
-            informedDrawerTotal: details.totals.informedDrawerTotal,
-            difference: details.totals.difference,
-        },
-        notes: details.session.notes || null,
-    }
 }

@@ -40,7 +40,9 @@ import {
     DeliveryFailedIcon,
     PartiallyPaidIcon,
     StarIcon,
+    ShieldIcon,
 } from "@/lib/icons"
+import { checkOrderDeliveryOtpRequirementAction } from "@/app/actions/delivery-otp"
 
 import { formatDate, formatTime, formatCurrency } from "@/lib/utils"
 import { getOrderDepositSummary, canPaySinal } from "@/lib/payments/order-financial-state"
@@ -331,6 +333,11 @@ export default function OrdersPage({
     const [deliveryStatusModal, setDeliveryStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
     const [carrierStatusValue, setCarrierStatusValue] = useState("pending")
+    const [deliveryOtpInput, setDeliveryOtpInput] = useState("")
+    const [bypassDeliveryOtp, setBypassDeliveryOtp] = useState(false)
+    const [bypassReasonInput, setBypassReasonInput] = useState("")
+    const [orderRequiresOtp, setOrderRequiresOtp] = useState(false)
+    const [checkingOtpRequirement, setCheckingOtpRequirement] = useState(false)
     const [paymentStatusModal, setPaymentStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [paymentStatusValue, setPaymentStatusValue] = useState("pending")
     const [sinalActionModal, setSinalActionModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
@@ -793,6 +800,21 @@ export default function OrdersPage({
 
     const openDeliveryStatusModal = (order: Order) => {
         setDeliveryStatusModal({ open: true, order })
+        setDeliveryOtpInput("")
+        setBypassDeliveryOtp(false)
+        setBypassReasonInput("")
+        setOrderRequiresOtp(false)
+        setCheckingOtpRequirement(true)
+
+        checkOrderDeliveryOtpRequirementAction({ orderId: order.originalId })
+            .then((res) => {
+                if (res.success && res.requiresOtp && !res.isConfirmed) {
+                    setOrderRequiresOtp(true)
+                }
+            })
+            .catch(() => {})
+            .finally(() => setCheckingOtpRequirement(false))
+
         const outboundShipment = order.order_shipments?.[0]
         if (order.isCarrierDelivery && outboundShipment) {
             setCarrierStatusValue(outboundShipment.status || "pending")
@@ -820,6 +842,9 @@ export default function OrdersPage({
                 actionType: "delivery_status",
                 statusValue: nextStatus,
                 changeReason: reason,
+                deliveryOtp: bypassDeliveryOtp ? undefined : deliveryOtpInput.trim() || undefined,
+                bypassOtp: bypassDeliveryOtp,
+                bypassReason: bypassReasonInput.trim() || undefined,
             })
             if (result.success) {
                 afterMutation(targetOrder.originalId)
@@ -1726,7 +1751,10 @@ export default function OrdersPage({
                         <Button variant="outline" onClick={() => setDeliveryStatusModal({ open: false, order: null })}>
                             Cancelar
                         </Button>
-                        <Button onClick={submitDeliveryStatusChange}>
+                        <Button
+                            onClick={submitDeliveryStatusChange}
+                            disabled={deliveryStatusValue === "delivered" && orderRequiresOtp && !bypassDeliveryOtp && deliveryOtpInput.trim().length !== 6}
+                        >
                             Salvar
                         </Button>
                     </div>
@@ -1752,6 +1780,47 @@ export default function OrdersPage({
                             setValue={setDeliveryStatusValue}
                             placeholder="Selecione o status"
                         />
+                    )}
+
+                    {deliveryStatusValue === "delivered" && orderRequiresOtp && (
+                        <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
+                                <ShieldIcon size={18} />
+                                <span>Confirmação de Entrega (OTP)</span>
+                            </div>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Este pedido exige o código de 6 dígitos fornecido pelo cliente para confirmar a entrega.
+                            </p>
+                            {!bypassDeliveryOtp ? (
+                                <Input
+                                    label="Código de 6 dígitos"
+                                    placeholder="000000"
+                                    value={deliveryOtpInput}
+                                    onChange={(e) => setDeliveryOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    maxLength={6}
+                                    className="tracking-widest font-mono text-center text-lg font-bold"
+                                />
+                            ) : (
+                                <Input
+                                    label="Motivo do Bypass Administrativo"
+                                    placeholder="Ex: Cliente sem celular / autorizado por telefone"
+                                    value={bypassReasonInput}
+                                    onChange={(e) => setBypassReasonInput(e.target.value)}
+                                />
+                            )}
+                            <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
+                                <input
+                                    type="checkbox"
+                                    id="erp-bypass-otp-orders"
+                                    checked={bypassDeliveryOtp}
+                                    onChange={(e) => setBypassDeliveryOtp(e.target.checked)}
+                                    className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
+                                />
+                                <label htmlFor="erp-bypass-otp-orders" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                                    Bypassar código (Autorização de Administrador)
+                                </label>
+                            </div>
+                        </div>
                     )}
                 </div>
             </DefaultModal>

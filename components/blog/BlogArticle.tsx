@@ -285,11 +285,10 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                                             <li key={item.id} className={item.level === 3 ? "pl-3" : ""}>
                                                 <a
                                                     href={`#${item.id}`}
-                                                    className={`block text-sm leading-snug ${
-                                                        activeId === item.id
-                                                            ? "font-semibold text-brand-green"
-                                                            : "text-brand-inactive-text hover:text-brand-dark dark:text-dark-body dark:hover:text-dark-heading"
-                                                    }`}
+                                                    className={`block text-sm leading-snug ${activeId === item.id
+                                                        ? "font-semibold text-brand-green"
+                                                        : "text-brand-inactive-text hover:text-brand-dark dark:text-dark-body dark:hover:text-dark-heading"
+                                                        }`}
                                                 >
                                                     {item.text}
                                                 </a>
@@ -323,7 +322,7 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                                 Ver todas as dicas
                             </Link>
                         </div>
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                             {related.map((item) => (
                                 <BlogCard key={item.id} post={item} />
                             ))}

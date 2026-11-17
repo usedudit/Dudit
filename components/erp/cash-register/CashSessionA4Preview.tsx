@@ -11,7 +11,7 @@ import {
     ReceiptA4StoreData,
     ReceiptA4Footer,
 } from "@/components/erp/orders/receipt/ReceiptComponents"
-import type { CashSessionCouponData } from "./CashSessionCouponPreview"
+import type { CashSessionCouponData } from "@/lib/cash-register/cash-session-coupon"
 
 type CashSessionA4PreviewProps = {
     data: CashSessionCouponData

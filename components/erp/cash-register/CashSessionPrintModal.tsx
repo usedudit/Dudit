@@ -14,10 +14,11 @@ import type { SaleReceiptPartnerHeader, SaleReceiptFormat } from "@/lib/sales/sa
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { downloadPdf } from "@/lib/pdf/download"
 import { toast } from "@/hooks/use-notification"
-import CashSessionCouponPreview, {
+import CashSessionCouponPreview from "./CashSessionCouponPreview"
+import {
     buildCashSessionCouponData,
     type CashSessionCouponData,
-} from "./CashSessionCouponPreview"
+} from "@/lib/cash-register/cash-session-coupon"
 import CashSessionA4Preview from "./CashSessionA4Preview"
 
 export type CashSessionPrintModalProps = {

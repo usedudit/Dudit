@@ -142,10 +142,11 @@ export default async function BlogCategoryPage({ params }: Props) {
                 ) : (
                     <div className="mx-auto max-w-2xl py-10">
                         <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/Artigos.png"
+                            imageAlt="Artigos"
                             title="Ainda não há artigos nesta categoria"
                             subtitle="Estamos preparando novos conteúdos. Enquanto isso, explore todas as dicas ou a Central de Ajuda."
-                            titleClass="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2"
-                            subtitleClass="text-brand-inactive-text dark:text-dark-body max-w-md mb-2 text-sm"
                             buttons={[
                                 { text: "Ver todas as dicas", action: "/blog" },
                                 { text: "Central de Ajuda", action: "/ajuda", variant: "outline" },

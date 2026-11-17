@@ -6,7 +6,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
 import type { LocationContext } from "@/lib/utils/location-label"
-import { IconPlaceholder, DefaultModal, SkeletonLoader, ListItem, Input, RadioButton, Button } from "@/components/reusable"
+import { IconPlaceholder, DefaultModal, SkeletonLoader, ListItem, Input, RadioButton, Button, ThreeDotsLoader } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
@@ -1691,7 +1691,7 @@ export function ExplorarPageClient({
                         subtitle={`Ofertas especiais em ${categoryName}`}
                         items={categoryPromos}
                         renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
-                        itemWidthClass="w-[190px] sm:w-[210px]"
+                        itemWidthClass="w-[150px] md:w-[230px]"
                     />
                 )}
                 {categoryTopRated.length >= 2 && (
@@ -1700,7 +1700,7 @@ export function ExplorarPageClient({
                         subtitle={`Os favoritos em ${categoryName}`}
                         items={categoryTopRated}
                         renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
-                        itemWidthClass="w-[190px] sm:w-[210px]"
+                        itemWidthClass="w-[150px] md:w-[230px]"
                     />
                 )}
                 {categoryStores.length >= 2 && (
@@ -1709,7 +1709,7 @@ export function ExplorarPageClient({
                         subtitle={`Vendedores de ${categoryName}`}
                         items={categoryStores}
                         renderItem={(item: any) => <VitrineCard vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />}
-                        itemWidthClass="w-[270px] sm:w-[320px]"
+                        itemWidthClass="w-[150px] md:w-[230px]"
                     />
                 )}
             </div>
@@ -1842,7 +1842,7 @@ export function ExplorarPageClient({
                                     title={`${theme.emoji} ${theme.title}`}
                                     items={theme.items}
                                     renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
-                                    itemWidthClass="w-[190px] sm:w-[210px]"
+                                    itemWidthClass="w-[150px] md:w-[230px]"
                                     onSeeAll={() => {
                                         const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === theme.category) || theme.slug
                                         router.push(`/explorar/${selectedCitySlug || "brasil"}/${catSlug}`)
@@ -2003,7 +2003,7 @@ export function ExplorarPageClient({
                                     )}
 
                                     {filteredResults.length > 0 ? (
-                                        <div className={`grid ${currentType === 'vitrines' || currentType === 'negocios' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`}>
+                                        <div className={`grid ${currentType === 'vitrines' || currentType === 'negocios' ? 'grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mt-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`}>
                                             {filteredResults.map((item, index) => renderListingItem(item, index < 6))}
 
                                             {hasNextPage && (
@@ -2013,8 +2013,7 @@ export function ExplorarPageClient({
                                                 >
                                                     {isFetchingNextPage ? (
                                                         <div className="flex flex-col items-center gap-2">
-                                                            <SkeletonLoader height={24} width={180} className="rounded" />
-                                                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opções...</span>
+                                                            <ThreeDotsLoader />
                                                         </div>
                                                     ) : null}
                                                 </div>

@@ -1310,13 +1310,12 @@ function DeliveryCalculatorBottomSheet({
                                                 }
                                             />
                                         ) : null}
-                                        <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${
-                                            calcResult.outOfRadius || calcResult.distanceKm == null
-                                                ? "text-brand-dark dark:text-dark-heading"
-                                                : calcResult.isFree
-                                                    ? "text-brand-green"
-                                                    : "text-brand-dark dark:text-dark-heading"
-                                        }`}>
+                                        <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${calcResult.outOfRadius || calcResult.distanceKm == null
+                                            ? "text-brand-dark dark:text-dark-heading"
+                                            : calcResult.isFree
+                                                ? "text-brand-green"
+                                                : "text-brand-dark dark:text-dark-heading"
+                                            }`}>
                                             {!calcResult.outOfRadius && calcResult.distanceKm != null
                                                 ? (calcResult.feeLabel || "A consultar")
                                                 : "A combinar"}
@@ -2493,11 +2492,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     : "text-brand-dark dark:text-dark-heading shrink-0"
                                             }
                                         />
-                                        <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${
-                                            deliveryInfo.isFreeDelivery
-                                                ? "text-brand-green"
-                                                : "text-brand-dark dark:text-dark-heading"
-                                        }`}>
+                                        <span className={`font-bold text-[13px] sm:text-[14px] truncate leading-tight ${deliveryInfo.isFreeDelivery
+                                            ? "text-brand-green"
+                                            : "text-brand-dark dark:text-dark-heading"
+                                            }`}>
                                             {deliveryInfo.feeLabel || "A consultar"}
                                         </span>
                                     </>
@@ -2792,7 +2790,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                             </div>
                                         ))}
                                         {!groupedItems.length && (
-                                            <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascotes/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
+                                            <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
                                         )}
                                     </div>
                                 </>

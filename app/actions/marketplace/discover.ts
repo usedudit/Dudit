@@ -162,6 +162,11 @@ function sectionDisplay(
     const cityName = ctx.city
 
     const MAP: Record<string, Record<string, [string, string?]>> = {
+        topVitrines: {
+            country: ["Lojas e vitrines locais"],
+            state: ["Lojas e vitrines pertinho de você!"],
+            city: ["Lojas e vitrines pertinho de você!"],
+        },
         trending: {
             country: ["Produtos na Dudit"],
             state: ["Produtos pertinho de você!"],
@@ -216,11 +221,6 @@ function sectionDisplay(
             country: ["Serviços e profissionais"],
             state: ["Serviços pertinho de você!"],
             city: ["Serviços pertinho de você!"],
-        },
-        topVitrines: {
-            country: ["Lojas e vitrines locais"],
-            state: ["Lojas e vitrines pertinho de você!"],
-            city: ["Lojas e vitrines pertinho de você!"],
         },
         popular: {
             country: ["Populares na Dudit", "O que está bombando por aqui"],
@@ -2036,8 +2036,8 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    // Filtrar itens até 10km para Produtos, Serviços e Lojas/Vitrines
-    // Fallback gracioso para os itens da cidade/região caso não dê para calcular ou não encontre nada em 10km
+    // Filtrar itens até 20km para Produtos, Serviços e Lojas/Vitrines
+    // Fallback gracioso para os itens da cidade/região caso não dê para calcular ou não encontre nada em 20km
     for (const section of sections) {
         const isProductSection = section.id === "trending" || section.id === "allProducts"
         const isServiceSection = section.id === "services"
@@ -2047,23 +2047,23 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             const typeParam = isServiceSection ? "servicos" : isVitrineSection ? "vitrines" : "produtos"
             const sectionName = isServiceSection ? "Serviços" : isVitrineSection ? "Lojas e vitrines" : "Produtos"
 
-            let filteredBy10km: any[] = []
+            let filteredBy20km: any[] = []
             if (ctx.coords) {
                 const candidates = (section._allItems && section._allItems.length > 0)
                     ? section._allItems
                     : section.items
 
-                filteredBy10km = candidates.filter((item: any) => {
+                filteredBy20km = candidates.filter((item: any) => {
                     const d = item.distance_km ?? item.partners?.distance_km
-                    return typeof d === "number" && !isNaN(d) && d <= 10
+                    return typeof d === "number" && !isNaN(d) && d <= 20
                 })
             }
 
-            if (filteredBy10km.length > 0) {
-                section.items = filteredBy10km.slice(0, 20)
+            if (filteredBy20km.length > 0) {
+                section.items = filteredBy20km.slice(0, 20)
                 section.title = `${sectionName} pertinho de você!`
-                section.subtitle = "Até 10km do seu endereço"
-                section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=10`
+                section.subtitle = "Até 20km do seu endereço"
+                section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=20`
             } else {
                 if (ctx.scope === "city" || ctx.scope === "state") {
                     section.title = `${sectionName} pertinho de você!`

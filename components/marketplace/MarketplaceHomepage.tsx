@@ -5,7 +5,6 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
 import { HeroBanner, HorizontalCarousel, ItemCard, VitrineCard } from "./shared-components"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
-import { HomeCategoryBar } from "./HomeCategoryBar"
 import { HomeSellerBanner } from "./HomeSellerBanner"
 import type { SponsoredAd } from "@/lib/ads/types"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
@@ -693,39 +692,10 @@ export default function MarketplaceHome({
                 <HeroBanner href={exploreHref} />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
-                    {/* Categorias (estilo Explorar, sem título "Categorias") */}
-                    <HomeCategoryBar selectedCitySlug={selectedCitySlug} />
+                    {/* Publicidade logo abaixo do banner do topo */}
+                    <SponsoredAdsCarousel ads={homeAds || []} slot="home" title="Patrocinados na sua região" className="!mb-0 !px-0" />
 
-                    {/* 1. Seção de Produtos */}
-                    {productSection && productSection.items.length > 0 && (
-                        <HorizontalCarousel
-                            key={productSection.id}
-                            title={productSection.title}
-                            subtitle={productSection.subtitle}
-                            items={productSection.items}
-                            onSeeAll={productSection.seeMoreLink ? () => router.push(productSection.seeMoreLink!) : undefined}
-                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
-                            itemWidthClass="w-[190px] sm:w-[210px]"
-                        />
-                    )}
-
-                    {/* 2. Seção de Serviços */}
-                    {serviceSection && serviceSection.items.length > 0 && (
-                        <HorizontalCarousel
-                            key={serviceSection.id}
-                            title={serviceSection.title}
-                            subtitle={serviceSection.subtitle}
-                            items={serviceSection.items}
-                            onSeeAll={serviceSection.seeMoreLink ? () => router.push(serviceSection.seeMoreLink!) : undefined}
-                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
-                            itemWidthClass="w-[190px] sm:w-[210px]"
-                        />
-                    )}
-
-                    {/* 3. Banner Chamada para Vender / Usar a Dudit */}
-                    <HomeSellerBanner />
-
-                    {/* 4. Seção de Lojas e Vitrines */}
+                    {/* 1. Seção de Lojas e Vitrines */}
                     {vitrineSection && vitrineSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={vitrineSection.id}
@@ -738,7 +708,33 @@ export default function MarketplaceHome({
                         />
                     )}
 
-                    {/* 5. Seção de Destaques em todo o Brasil */}
+                    {/* 2. Seção de Produtos */}
+                    {productSection && productSection.items.length > 0 && (
+                        <HorizontalCarousel
+                            key={productSection.id}
+                            title={productSection.title}
+                            subtitle={productSection.subtitle}
+                            items={productSection.items}
+                            onSeeAll={productSection.seeMoreLink ? () => router.push(productSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
+                            itemWidthClass="w-[150px] md:w-[230px]"
+                        />
+                    )}
+
+                    {/* 3. Seção de Serviços */}
+                    {serviceSection && serviceSection.items.length > 0 && (
+                        <HorizontalCarousel
+                            key={serviceSection.id}
+                            title={serviceSection.title}
+                            subtitle={serviceSection.subtitle}
+                            items={serviceSection.items}
+                            onSeeAll={serviceSection.seeMoreLink ? () => router.push(serviceSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
+                            itemWidthClass="w-[150px] md:w-[230px]"
+                        />
+                    )}
+
+                    {/* 4. Seção de Destaques em todo o Brasil */}
                     {brasilTodoSection && brasilTodoSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={brasilTodoSection.id}
@@ -754,9 +750,12 @@ export default function MarketplaceHome({
                                     className="w-full"
                                 />
                             )}
-                            itemWidthClass="w-[190px] sm:w-[210px]"
+                            itemWidthClass="w-[150px] md:w-[230px]"
                         />
                     )}
+
+                    {/* 5. Banner Venda na Dudit */}
+                    <HomeSellerBanner />
 
                     {/* 7. Outras seções eventuais */}
                     {otherSections.map((section) => {
@@ -782,13 +781,11 @@ export default function MarketplaceHome({
                                 items={section.items}
                                 onSeeAll={onSeeAll}
                                 renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
-                                itemWidthClass="w-[190px] sm:w-[210px]"
+                                itemWidthClass="w-[150px] md:w-[230px]"
                             />
                         )
                     })}
                 </div>
-
-                <SponsoredAdsCarousel ads={homeAds || []} slot="home" title="Patrocinados na sua região" />
 
                 <QuickAnnounceModal
                     isOpen={isAnnounceModalOpen}

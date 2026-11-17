@@ -6,6 +6,7 @@ import {
   getCustomerDeliveryOtp,
   invalidateDeliveryOtp,
   getOrderDeliveryOtpStatus,
+  bypassDeliveryOtp,
 } from "./delivery-otp.service"
 
 // Mock cryptoService so we don't need real environment variables in unit tests
@@ -436,6 +437,60 @@ describe("Delivery Confirmation OTP (Delivery OTP) Service", () => {
       await invalidateDeliveryOtp("ord_reassign", "driver_reassigned", { adminClient: mockAdminClient })
       expect(mockStore.order_delivery_otps[0].invalidated_at).toBeDefined()
       expect(mockStore.order_delivery_otps[0].invalidation_reason).toBe("driver_reassigned")
+    })
+
+    it("entrega própria com rota criada mas sem motorista específico designado com valor > R$ 500 EXIGE código", async () => {
+      mockStore.orders["ord_store_null_driver"] = {
+        id: "ord_store_null_driver",
+        total_amount: 889.29,
+        delivery_type: "delivery",
+        partner_id: "partner_1",
+      }
+      mockStore.deliveries["del_null_driver"] = {
+        id: "del_null_driver",
+        delivery_person_id: null,
+        partner_id: "partner_1",
+      }
+      mockStore.delivery_orders.push({
+        order_id: "ord_store_null_driver",
+        delivery_id: "del_null_driver",
+      })
+
+      const req = await doesOrderRequireDeliveryOtp("ord_store_null_driver", { adminClient: mockAdminClient })
+      expect(req.requiresOtp).toBe(true)
+      expect(req.modality).toBe("store_internal")
+      expect(req.eligibleAmount).toBe(889.29)
+    })
+
+    it("bypass administrativo autoriza entrega e marca OTP com registro de auditoria", async () => {
+      mockStore.orders["ord_bypass"] = {
+        id: "ord_bypass",
+        total_amount: 889.29,
+        delivery_type: "delivery",
+        partner_id: "partner_1",
+      }
+      mockStore.deliveries["del_bypass"] = {
+        id: "del_bypass",
+        delivery_person_id: null,
+        partner_id: "partner_1",
+      }
+      mockStore.delivery_orders.push({
+        order_id: "ord_bypass",
+        delivery_id: "del_bypass",
+      })
+
+      const bypassRes = await bypassDeliveryOtp({
+        orderId: "ord_bypass",
+        bypassedByUserId: "admin_user_1",
+        reason: "Cliente sem telefone no local",
+        adminClient: mockAdminClient,
+      })
+
+      expect(bypassRes.success).toBe(true)
+      expect(mockStore.order_delivery_otps.length).toBe(1)
+      expect(mockStore.order_delivery_otps[0].confirmed_at).toBeDefined()
+      expect(mockStore.order_delivery_otps[0].confirmed_by).toBe("admin_user_1")
+      expect(mockStore.order_delivery_otps[0].invalidation_reason).toContain("Bypass autorizado por administrador")
     })
   })
 })

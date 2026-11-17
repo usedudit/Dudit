@@ -92,11 +92,10 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                         <button
                             type="button"
                             onClick={() => setSelectedCategory("all")}
-                            className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                                selectedCategory === "all"
-                                    ? "border-brand-dark bg-brand-dark text-white dark:border-brand-green dark:bg-brand-green"
-                                    : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
-                            }`}
+                            className={`rounded-full border px-4 py-2 text-sm font-semibold ${selectedCategory === "all"
+                                ? "border-brand-dark bg-brand-dark text-white dark:border-brand-green dark:bg-brand-green"
+                                : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
+                                }`}
                         >
                             Todos
                         </button>
@@ -108,11 +107,10 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                                     key={category.id}
                                     type="button"
                                     onClick={() => setSelectedCategory(category.id)}
-                                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                                        active
-                                            ? `${accent.border} ${accent.softBg} ${accent.text}`
-                                            : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
-                                    }`}
+                                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${active
+                                        ? `${accent.border} ${accent.softBg} ${accent.text}`
+                                        : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
+                                        }`}
                                 >
                                     {category.shortLabel}
                                 </button>
@@ -185,7 +183,7 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                                         />
                                     </div>
                                 ) : (
-                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                                         {filtered.map((post) => (
                                             <BlogCard key={post.id} post={post} />
                                         ))}

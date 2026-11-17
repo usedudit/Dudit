@@ -2619,6 +2619,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     status: DeliveryStatusValue
     changeReason?: string
     deliveryOtp?: string
+    bypassOtp?: boolean
+    bypassReason?: string
   }) {
     const user = await requireUser()
     const actor = await getDeliveryActorScope(params.partnerId)
@@ -2660,7 +2662,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
       const orderIds = (dOrders || []).map((o: any) => o.order_id).filter(Boolean)
       if (orderIds.length > 0) {
-        const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+        const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp, bypassDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
         const otpRequiredOrderIds: string[] = []
         for (const oId of orderIds) {
           const req = await doesOrderRequireDeliveryOtp(oId)
@@ -2669,28 +2671,49 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           }
         }
 
-        if (otpRequiredOrderIds.length === 1) {
-          if (!params.deliveryOtp) {
-            return {
-              success: false as const,
-              error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+        if (otpRequiredOrderIds.length > 0) {
+          const isOwnerOrAdmin = actor.roleId === "owner" || actor.roleId === "admin" || (actor as any).isOwnerOrAdmin
+          if (params.bypassOtp) {
+            if (!isOwnerOrAdmin) {
+              return {
+                success: false as const,
+                error: "Apenas administradores e proprietários podem bypassar o código de entrega.",
+              }
             }
-          }
-          const verifyRes = await verifyAndConsumeDeliveryOtp({
-            orderId: otpRequiredOrderIds[0],
-            code: params.deliveryOtp,
-            confirmedByUserId: user.id,
-          })
-          if (!verifyRes.success) {
-            return {
-              success: false as const,
-              error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+            for (const oId of otpRequiredOrderIds) {
+              await bypassDeliveryOtp({
+                orderId: oId,
+                bypassedByUserId: user.id,
+                reason: params.bypassReason || params.changeReason || "Bypass autorizado pelo administrador no ERP",
+              })
             }
-          }
-        } else if (otpRequiredOrderIds.length > 1) {
-          return {
-            success: false as const,
-            error: "Esta rota contém múltiplos pedidos que exigem código de confirmação. Confirme cada parada individualmente informando o respectivo código.",
+          } else {
+            if (otpRequiredOrderIds.length === 1) {
+              if (!params.deliveryOtp) {
+                return {
+                  success: false as const,
+                  error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+                  requiresOtp: true,
+                }
+              }
+              const verifyRes = await verifyAndConsumeDeliveryOtp({
+                orderId: otpRequiredOrderIds[0],
+                code: params.deliveryOtp,
+                confirmedByUserId: user.id,
+              })
+              if (!verifyRes.success) {
+                return {
+                  success: false as const,
+                  error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+                }
+              }
+            } else if (otpRequiredOrderIds.length > 1) {
+              return {
+                success: false as const,
+                error: "Esta rota contém múltiplos pedidos que exigem código de confirmação. Confirme cada parada individualmente informando o respectivo código ou autorize o bypass administrativo.",
+                requiresOtp: true,
+              }
+            }
           }
         }
       }
@@ -3189,6 +3212,8 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   status: DeliveryStatusValue
   changeReason?: string
   deliveryOtp?: string
+  bypassOtp?: boolean
+  bypassReason?: string
 }) {
 
   const user = await requireUser()
@@ -3223,26 +3248,42 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
 
   // Se estiver marcando pedido como entregue, verificar se exige código de confirmação
   if (nextStatus === "delivered") {
-    const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
+    const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp, bypassDeliveryOtp } = await import("@/lib/services/delivery-otp.service")
     const requirement = await doesOrderRequireDeliveryOtp(params.orderId)
     if (requirement.requiresOtp) {
-      if (!params.deliveryOtp) {
-        return {
-          success: false as const,
-          error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+      const isOwnerOrAdmin = actor.roleId === "owner" || actor.roleId === "admin" || (actor as any).isOwnerOrAdmin
+      if (params.bypassOtp) {
+        if (!isOwnerOrAdmin) {
+          return {
+            success: false as const,
+            error: "Apenas administradores e proprietários podem bypassar o código de entrega.",
+          }
         }
-      }
+        await bypassDeliveryOtp({
+          orderId: params.orderId,
+          bypassedByUserId: user.id,
+          reason: params.bypassReason || params.changeReason || "Bypass autorizado pelo administrador no ERP",
+        })
+      } else {
+        if (!params.deliveryOtp) {
+          return {
+            success: false as const,
+            error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+            requiresOtp: true,
+          }
+        }
 
-      const verifyRes = await verifyAndConsumeDeliveryOtp({
-        orderId: params.orderId,
-        code: params.deliveryOtp,
-        confirmedByUserId: user.id,
-      })
+        const verifyRes = await verifyAndConsumeDeliveryOtp({
+          orderId: params.orderId,
+          code: params.deliveryOtp,
+          confirmedByUserId: user.id,
+        })
 
-      if (!verifyRes.success) {
-        return {
-          success: false as const,
-          error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+        if (!verifyRes.success) {
+          return {
+            success: false as const,
+            error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+          }
         }
       }
     }

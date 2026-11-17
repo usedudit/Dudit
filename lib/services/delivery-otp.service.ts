@@ -150,6 +150,8 @@ export async function doesOrderRequireDeliveryOtp(
     .eq("order_id", orderId)
     .maybeSingle()
 
+  let storeDelivery: any = null
+
   if (deliveryOrder?.delivery_id) {
     const { data: deliveryGroupAssignment } = await admin
       .from("delivery_assignments")
@@ -170,42 +172,62 @@ export async function doesOrderRequireDeliveryOtp(
       }
     }
 
-    // 4. Store Internal Delivery check
-    const { data: storeDelivery } = await admin
+    const { data: fetchedStoreDelivery } = await admin
       .from("deliveries")
       .select("id, delivery_person_id, partner_id")
       .eq("id", deliveryOrder.delivery_id)
       .maybeSingle()
 
-    if (storeDelivery?.delivery_person_id) {
-      let threshold = DEFAULT_INTERNAL_DELIVERY_THRESHOLD
-      if (storeDelivery.partner_id) {
-        const { data: settings } = await admin
-          .from("delivery_settings")
-          .select("otp_min_order_amount")
-          .eq("partner_id", storeDelivery.partner_id)
-          .maybeSingle()
+    storeDelivery = fetchedStoreDelivery
 
-        if (settings?.otp_min_order_amount != null) {
-          const customVal = Number(settings.otp_min_order_amount)
-          if (!Number.isNaN(customVal) && customVal >= 0) {
-            threshold = customVal
-          }
+    // If delivery explicitly assigned to Dudit platform driver or network
+    if (
+      storeDelivery?.delivery_person_id === "dudit_network" ||
+      storeDelivery?.delivery_person_id === "platform:dudit_network" ||
+      (typeof storeDelivery?.delivery_person_id === "string" && storeDelivery.delivery_person_id.startsWith("platform:"))
+    ) {
+      return {
+        requiresOtp: true,
+        modality: "dudit_platform",
+        reason: "Entregas realizadas pela Rede Dudit exigem código de confirmação obrigatoriamente.",
+        eligibleAmount,
+        hasActiveDriver: storeDelivery.delivery_person_id !== "platform:dudit_network" && storeDelivery.delivery_person_id !== "dudit_network",
+        driverType: "dudit_platform",
+      }
+    }
+  }
+
+  // 4. Store Internal Delivery check
+  // An order is store internal delivery if it is assigned to a delivery in `deliveries` (without Dudit platform assignment)
+  if (deliveryOrder?.delivery_id) {
+    let threshold = DEFAULT_INTERNAL_DELIVERY_THRESHOLD
+    const effectivePartnerId = order.partner_id || storeDelivery?.partner_id
+    if (effectivePartnerId) {
+      const { data: settings } = await admin
+        .from("delivery_settings")
+        .select("otp_min_order_amount")
+        .eq("partner_id", effectivePartnerId)
+        .maybeSingle()
+
+      if (settings?.otp_min_order_amount != null) {
+        const customVal = Number(settings.otp_min_order_amount)
+        if (!Number.isNaN(customVal) && customVal >= 0) {
+          threshold = customVal
         }
       }
+    }
 
-      const exceedsThreshold = eligibleAmount > threshold
-      return {
-        requiresOtp: exceedsThreshold,
-        modality: "store_internal",
-        thresholdAmount: threshold,
-        reason: exceedsThreshold
-          ? `Entrega própria da loja com valor (${eligibleAmount.toFixed(2)}) superior a R$ ${threshold.toFixed(2)} exige código de confirmação.`
-          : `Entrega própria da loja com valor (${eligibleAmount.toFixed(2)}) não superior a R$ ${threshold.toFixed(2)} não exige código.`,
-        eligibleAmount,
-        hasActiveDriver: true,
-        driverType: "store_internal",
-      }
+    const exceedsThreshold = eligibleAmount > threshold
+    return {
+      requiresOtp: exceedsThreshold,
+      modality: "store_internal",
+      thresholdAmount: threshold,
+      reason: exceedsThreshold
+        ? `Entrega própria da loja com valor (${eligibleAmount.toFixed(2)}) superior a R$ ${threshold.toFixed(2)} exige código de confirmação.`
+        : `Entrega própria da loja com valor (${eligibleAmount.toFixed(2)}) não superior a R$ ${threshold.toFixed(2)} não exige código.`,
+      eligibleAmount,
+      hasActiveDriver: Boolean(storeDelivery?.delivery_person_id),
+      driverType: "store_internal",
     }
   }
 
@@ -518,6 +540,49 @@ export async function verifyAndConsumeDeliveryOtp(
 }
 
 /**
+ * Authorizes an owner/admin to bypass OTP confirmation in ERP when required.
+ * Marks the active OTP as confirmed/bypassed with audit trails.
+ */
+export async function bypassDeliveryOtp(params: {
+  orderId: string
+  bypassedByUserId: string
+  reason?: string
+  adminClient?: any
+}): Promise<{ success: boolean; error?: string }> {
+  const admin = params.adminClient || getAdminClient()
+  const now = new Date().toISOString()
+
+  // Ensure an OTP record exists so that bypass is auditable
+  await getOrGenerateDeliveryOtp(params.orderId, { adminClient: admin })
+
+  // Find active OTP for this order
+  const { data: activeOtps } = await admin
+    .from("order_delivery_otps")
+    .select("id, confirmed_at, invalidated_at")
+    .eq("order_id", params.orderId)
+    .is("confirmed_at", null)
+    .is("invalidated_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+
+  const activeOtp = activeOtps?.[0]
+  if (activeOtp) {
+    const bypassNote = params.reason ? `Bypass autorizado por administrador: ${params.reason}` : "Bypass autorizado por administrador via ERP"
+    await admin
+      .from("order_delivery_otps")
+      .update({
+        confirmed_at: now,
+        confirmed_by: params.bypassedByUserId,
+        invalidation_reason: bypassNote,
+        updated_at: now,
+      })
+      .eq("id", activeOtp.id)
+  }
+
+  return { success: true }
+}
+
+/**
  * Retrieves the OTP code strictly for the authorized customer/buyer.
  */
 export async function getCustomerDeliveryOtp(params: {
@@ -527,10 +592,10 @@ export async function getCustomerDeliveryOtp(params: {
 }): Promise<{ success: boolean; data?: DeliveryOtpResult; error?: string }> {
   const admin = params.adminClient || getAdminClient()
 
-  // 1. Verify ownership: user must be order.buyer_id or linked customer
+  // 1. Verify ownership: user must be order.buyer_id or linked customer or store staff
   const { data: order } = await admin
     .from("orders")
-    .select("id, buyer_id, customer_id, situation, delivery_status")
+    .select("id, buyer_id, customer_id, partner_id, situation, delivery_status")
     .eq("id", params.orderId)
     .maybeSingle()
 
@@ -543,11 +608,24 @@ export async function getCustomerDeliveryOtp(params: {
   if (!isAuthorized && order.customer_id) {
     const { data: cust } = await admin
       .from("customers")
-      .select("user_id")
+      .select("user_id, marketplace_user_id")
       .eq("id", order.customer_id)
       .maybeSingle()
 
-    if (cust?.user_id === params.userId) {
+    if (cust?.user_id === params.userId || cust?.marketplace_user_id === params.userId) {
+      isAuthorized = true
+    }
+  }
+
+  if (!isAuthorized && order.partner_id) {
+    const { data: partnerUser } = await admin
+      .from("partner_users")
+      .select("id")
+      .eq("partner_id", order.partner_id)
+      .eq("user_id", params.userId)
+      .maybeSingle()
+
+    if (partnerUser) {
       isAuthorized = true
     }
   }

@@ -527,6 +527,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnModalTab, setReturnModalTab] = useState<string>("items");
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [deliveryOtp, setDeliveryOtp] = useState<any>(order?.delivery_otp || null);
+
+    useEffect(() => {
+        if (order?.delivery_otp) {
+            setDeliveryOtp(order.delivery_otp);
+            return;
+        }
+        if (order?.id && order.delivery_type !== "pickup" && order.situation !== "cancelled") {
+            import("@/app/actions/delivery-otp").then(({ getCustomerOrderDeliveryOtpAction }) => {
+                getCustomerOrderDeliveryOtpAction({ orderId: order.id }).then((res) => {
+                    if (res.success && res.data?.requiresOtp) {
+                        setDeliveryOtp(res.data);
+                    }
+                }).catch(() => {});
+            });
+        }
+    }, [order?.id, order?.delivery_otp, order?.delivery_type, order?.situation]);
     const [sellerReturnCapabilities, setSellerReturnCapabilities] = useState<{
         hasReturnsModule: boolean;
         phone: string | null;
@@ -2160,13 +2177,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     </FormSection>
 
                                     {/* Section Delivery Confirmation OTP */}
-                                    {order.delivery_otp?.requiresOtp && (
+                                    {deliveryOtp?.requiresOtp && (
                                         <div className="my-2">
                                             <DeliveryOtpCard
-                                                code={order.delivery_otp.code}
-                                                status={order.delivery_status === "delivered" ? "confirmed" : order.delivery_otp.status}
-                                                confirmedAt={order.delivery_otp.confirmedAt || order.delivery_completed_at}
-                                                expiresAt={order.delivery_otp.expiresAt}
+                                                code={deliveryOtp.code}
+                                                status={order.delivery_status === "delivered" ? "confirmed" : deliveryOtp.status}
+                                                confirmedAt={deliveryOtp.confirmedAt || order.delivery_completed_at}
+                                                expiresAt={deliveryOtp.expiresAt}
                                             />
                                         </div>
                                     )}

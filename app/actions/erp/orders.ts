@@ -5581,6 +5581,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
   expectedUpdatedAt?: string;
   expectedPaidAmount?: number;
   expectedTotalAmount?: number;
+  deliveryOtp?: string;
+  bypassOtp?: boolean;
+  bypassReason?: string;
 }) {
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
@@ -6607,6 +6610,56 @@ export async function updateOrdersStatusInBatchAction(payload: {
         continue;
       }
       eligibleDeliveryOrders.push(order);
+    }
+
+    if (payload.statusValue === "delivered") {
+      const { doesOrderRequireDeliveryOtp, verifyAndConsumeDeliveryOtp, bypassDeliveryOtp } = await import("@/lib/services/delivery-otp.service");
+      const otpRequiredOrders: any[] = [];
+      for (const order of eligibleDeliveryOrders) {
+        const req = await doesOrderRequireDeliveryOtp(order.id, { orderData: order });
+        if (req.requiresOtp) {
+          otpRequiredOrders.push(order);
+        }
+      }
+
+      if (otpRequiredOrders.length > 0) {
+        if (payload.bypassOtp) {
+          if (!isAdmin) {
+            return { error: "Apenas administradores e proprietários podem bypassar o código de confirmação de entrega." };
+          }
+          for (const order of otpRequiredOrders) {
+            await bypassDeliveryOtp({
+              orderId: order.id,
+              bypassedByUserId: user.id,
+              reason: payload.bypassReason || payload.changeReason || "Bypass autorizado pelo administrador no ERP",
+            });
+          }
+        } else {
+          if (otpRequiredOrders.length === 1) {
+            if (!payload.deliveryOtp) {
+              return {
+                error: "Este pedido exige o código de confirmação de entrega de 6 dígitos fornecido pelo cliente.",
+                requiresOtp: true,
+              };
+            }
+            const verifyRes = await verifyAndConsumeDeliveryOtp({
+              orderId: otpRequiredOrders[0].id,
+              code: payload.deliveryOtp,
+              confirmedByUserId: user.id,
+            });
+            if (!verifyRes.success) {
+              return {
+                error: verifyRes.error || "Código de confirmação de entrega incorreto.",
+              };
+            }
+          } else {
+            return {
+              error: "Esta seleção contém múltiplos pedidos que exigem código de confirmação. Confirme cada pedido individualmente ou autorize o bypass administrativo.",
+              requiresOtp: true,
+            };
+          }
+        }
+      }
     }
 
     const finalizeDeliveryOrders = capabilities.hasStockMovements

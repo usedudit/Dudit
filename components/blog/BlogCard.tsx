@@ -48,7 +48,7 @@ export default function BlogCard({ post, featured = false, className = "" }: Blo
                 </div>
 
                 <div className={`flex flex-1 flex-col p-5 ${featured ? "lg:p-6" : ""}`}>
-                    <h2 className={`font-bold tracking-tight text-brand-dark dark:text-dark-heading ${featured ? "text-2xl" : "text-lg"}`}>
+                    <h2 className={`font-bold tracking-tight text-brand-dark dark:text-dark-heading transition-all duration-300 hover:text-brand-green ${featured ? "text-2xl" : "text-lg"}`}>
                         {post.title}
                     </h2>
 
