@@ -21,6 +21,14 @@ import {
     type SuperFreteStatus,
     type SuperFreteConfig,
 } from "@/app/actions/shipping/superfrete"
+import {
+    getTinyStatusAction,
+    connectTinyAction,
+    disconnectTinyAction,
+    syncTinyProductsAction,
+    saveTinyConfigAction,
+    type TinyStatus,
+} from "@/app/actions/erp/integrations/tiny"
 import type { SuperFreteEnvironment } from "@/lib/services/shipping/superfrete"
 import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import {
@@ -111,9 +119,20 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | null>(null)
+    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
     const [sfKnowMoreStep, setSfKnowMoreStep] = useState(0)
+    const [tinyKnowMoreStep, setTinyKnowMoreStep] = useState(0)
+
+    // Tiny ERP integration state
+    const [tinyStatus, setTinyStatus] = useState<TinyStatus | null>(null)
+    const [tinyIsLoading, setTinyIsLoading] = useState(false)
+    const [tinyTokenInput, setTinyTokenInput] = useState("")
+    const [tinySyncStock, setTinySyncStock] = useState(true)
+    const [tinyAutoExportOrders, setTinyAutoExportOrders] = useState(true)
+    const [tinyIsConnecting, setTinyIsConnecting] = useState(false)
+    const [tinyIsSyncing, setTinyIsSyncing] = useState(false)
+    const [confirmTinyDisconnectOpen, setConfirmTinyDisconnectOpen] = useState(false)
 
     // Accepted payment methods state
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
@@ -519,12 +538,109 @@ export const IntegrationsSubPage = ({
         }
     }
 
+    const fetchTinyStatus = useCallback(async () => {
+        try {
+            const res = await getTinyStatusAction()
+            if (res.success && res.data) {
+                setTinyStatus(res.data)
+                if (res.data.config) {
+                    if (res.data.config.sync_stock !== undefined) setTinySyncStock(res.data.config.sync_stock)
+                    if (res.data.config.auto_export_orders !== undefined) setTinyAutoExportOrders(res.data.config.auto_export_orders)
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching Tiny status:", err)
+        }
+    }, [])
+
+    const handleTinyConnect = async () => {
+        if (!tinyTokenInput.trim()) {
+            toast.error("Informe o token de API do Tiny ERP.")
+            return
+        }
+        setTinyIsConnecting(true)
+        try {
+            const res = await connectTinyAction({
+                token: tinyTokenInput,
+                syncStock: tinySyncStock,
+                autoExportOrders: tinyAutoExportOrders,
+            })
+            if (res.success) {
+                toast.success("Tiny ERP conectado com sucesso!")
+                setTinyTokenInput("")
+                setActiveModal(null)
+                await fetchTinyStatus()
+            } else {
+                toast.error(res.error || "Erro ao conectar Tiny ERP")
+            }
+        } catch (err: any) {
+            toast.error("Erro inesperado ao conectar Tiny ERP")
+        } finally {
+            setTinyIsConnecting(false)
+        }
+    }
+
+    const handleTinyDisconnect = async () => {
+        setTinyIsLoading(true)
+        try {
+            const res = await disconnectTinyAction()
+            if (res.success) {
+                toast.success("Tiny ERP desconectado")
+                setTinyStatus({ connected: false })
+                setConfirmTinyDisconnectOpen(false)
+                setActiveModal(null)
+            } else {
+                toast.error(res.error || "Erro ao desconectar Tiny ERP")
+            }
+        } catch (err) {
+            toast.error("Erro inesperado")
+        } finally {
+            setTinyIsLoading(false)
+        }
+    }
+
+    const handleTinySyncProducts = async () => {
+        setTinyIsSyncing(true)
+        try {
+            const res = await syncTinyProductsAction(5)
+            if (res.success) {
+                toast.success(`Sincronização concluída! ${res.totalProcessed || 0} produtos processados (${res.totalCreated || 0} novos, ${res.totalUpdated || 0} atualizados).`)
+                await fetchTinyStatus()
+            } else {
+                toast.error(res.error || "Falha na sincronização com Tiny ERP")
+            }
+        } catch (err: any) {
+            toast.error("Erro inesperado na sincronização")
+        } finally {
+            setTinyIsSyncing(false)
+        }
+    }
+
+    const handleSaveTinyConfig = async () => {
+        try {
+            const res = await saveTinyConfigAction({
+                sync_stock: tinySyncStock,
+                auto_export_orders: tinyAutoExportOrders,
+            })
+            if (res.success) {
+                toast.success("Configurações do Tiny salvas!")
+                setActiveModal(null)
+                await fetchTinyStatus()
+            } else {
+                toast.error(res.error || "Erro ao salvar configurações")
+            }
+        } catch (err) {
+            toast.error("Erro inesperado ao salvar")
+        }
+    }
+
     useEffect(() => {
         checkPlan()
         fetchWaStatus()
         fetchMpAcceptedMethods()
         fetchSfStatus()
-    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus])
+        fetchTinyStatus()
+    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus, fetchTinyStatus])
 
     const handleConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -952,6 +1068,87 @@ export const IntegrationsSubPage = ({
                                                 }
                                             }}
                                             className={sfIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4 mt-8">Gestão & ERP</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
+                                <div>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                                            <span className="font-black text-orange-600 text-lg tracking-tight">tiny</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
+                                                    Tiny ERP (Olist)
+                                                </span>
+                                                {tinyStatus?.connected ? (
+                                                    <Badge variant="green"></Badge>
+                                                ) : (
+                                                    <Badge variant="gray"></Badge>
+                                                )}
+                                            </div>
+                                            <a
+                                                href="https://www.tiny.com.br"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-orange-600 hover:underline w-max mt-1 font-medium block"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                tiny.com.br
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
+                                        Sincronize catálogo de produtos, estoque e envie pedidos vendidos na Dudit diretamente para o seu Tiny ERP.
+                                    </p>
+                                    {tinyStatus?.connected && tinyStatus?.metadata?.last_sync_at && (
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
+                                            Última sincronização: {new Date(tinyStatus.metadata.last_sync_at).toLocaleString("pt-BR")}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="mt-4">
+                                    <hr className="my-4 border-brand-border dark:border-dark-border" />
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex justify-start gap-2">
+                                            <Button
+                                                variant="link"
+                                                onClick={() => {
+                                                    setTinyKnowMoreStep(0)
+                                                    setActiveModal("tinyKnowMore")
+                                                }}
+                                            >
+                                                Saber mais
+                                            </Button>
+                                            {tinyStatus?.connected && (
+                                                <Button
+                                                    variant="link"
+                                                    onClick={() => {
+                                                        setActiveModal("tinyConfig")
+                                                    }}
+                                                >
+                                                    Configurar
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Switch
+                                            checked={Boolean(tinyStatus?.connected)}
+                                            onCheckedChange={(checked) => {
+                                                if (tinyIsLoading) return
+                                                if (checked) {
+                                                    setActiveModal("tinyConfig")
+                                                } else {
+                                                    setConfirmTinyDisconnectOpen(true)
+                                                }
+                                            }}
+                                            className={tinyIsLoading ? "opacity-50 cursor-not-allowed" : ""}
                                         />
                                     </div>
                                 </div>
@@ -1879,6 +2076,240 @@ export const IntegrationsSubPage = ({
                     }}
                     title="Desconectar Mercado Pago"
                     message="Tem certeza que deseja desconectar sua conta do Mercado Pago? Você não poderá mais receber pagamentos online."
+                    confirmText="Desconectar"
+                    variant="danger"
+                    isDestructive
+                />
+
+                {/* Tiny ERP Configuration Modal */}
+                <DefaultModal
+                    isOpen={activeModal === "tinyConfig"}
+                    onClose={() => setActiveModal(null)}
+                    title="Tiny ERP (Olist)"
+                    maxWidth="md"
+                >
+                    <div className="space-y-6">
+                        {tinyStatus?.connected ? (
+                            <div className="space-y-4">
+                                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl p-4">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircleIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                        <span className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm">
+                                            Conexão ativa com o Tiny ERP
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">
+                                        Seus produtos e pedidos podem ser sincronizados automaticamente.
+                                    </p>
+                                    {tinyStatus.metadata?.last_sync_at && (
+                                        <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                                            Última sincronização: {new Date(tinyStatus.metadata.last_sync_at).toLocaleString("pt-BR")}
+                                            {tinyStatus.metadata.synced_count !== undefined && ` (${tinyStatus.metadata.synced_count} produtos)`}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/50 dark:bg-dark-surface/50 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Sincronizar Estoque
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Mantém as quantidades da Dudit atualizadas com o Tiny.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={tinySyncStock}
+                                            onCheckedChange={setTinySyncStock}
+                                        />
+                                    </div>
+
+                                    <hr className="border-brand-border dark:border-dark-border" />
+
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Exportar Pedidos Pagos
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Gera o pedido de venda no Tiny assim que aprovado no Mercado Pago.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={tinyAutoExportOrders}
+                                            onCheckedChange={setTinyAutoExportOrders}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
+                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                        Catálogo de Produtos
+                                    </p>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
+                                        Puxe os produtos cadastrados no seu Tiny ERP diretamente para o catálogo e vitrine da Dudit.
+                                    </p>
+                                    <Button
+                                        className="w-full"
+                                        variant="outline"
+                                        onClick={handleTinySyncProducts}
+                                        disabled={tinyIsSyncing}
+                                        isLoading={tinyIsSyncing}
+                                    >
+                                        {tinyIsSyncing ? "Sincronizando Catálogo..." : "Sincronizar Produtos Agora"}
+                                    </Button>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <Button
+                                        variant="outline"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200"
+                                        onClick={() => setConfirmTinyDisconnectOpen(true)}
+                                    >
+                                        Desconectar
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        onClick={handleSaveTinyConfig}
+                                    >
+                                        Salvar Preferências
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                    Cole o <strong>Token de API</strong> gerado na sua conta do Tiny ERP para vincular sua loja.
+                                </p>
+
+                                <Input
+                                    label="Token de API do Tiny ERP"
+                                    placeholder="Ex: a1b2c3d4e5f6g7h8..."
+                                    value={tinyTokenInput}
+                                    onChange={(e: any) => setTinyTokenInput(e.target.value)}
+                                    type="password"
+                                />
+
+                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/50 dark:bg-dark-surface/50 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Sincronizar Estoque
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Mantém as quantidades da Dudit atualizadas com o Tiny.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={tinySyncStock}
+                                            onCheckedChange={setTinySyncStock}
+                                        />
+                                    </div>
+
+                                    <hr className="border-brand-border dark:border-dark-border" />
+
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Exportar Pedidos Pagos
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Envia automaticamente os pedidos aprovados para o Tiny.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={tinyAutoExportOrders}
+                                            onCheckedChange={setTinyAutoExportOrders}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        disabled={tinyIsConnecting || !tinyTokenInput.trim()}
+                                        isLoading={tinyIsConnecting}
+                                        onClick={handleTinyConnect}
+                                    >
+                                        {tinyIsConnecting ? "Testando e Conectando..." : "Conectar Tiny ERP"}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DefaultModal>
+
+                {/* Tiny ERP Know More Modal */}
+                <DefaultModal
+                    isOpen={activeModal === "tinyKnowMore"}
+                    onClose={() => setActiveModal(null)}
+                    title="Como conectar o Tiny ERP à Dudit"
+                    maxWidth="md"
+                >
+                    <div className="space-y-4">
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/20">
+                                <div className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                                    1
+                                </div>
+                                <div className="text-sm text-brand-dark dark:text-dark-heading">
+                                    <p className="font-semibold">Ative a extensão Token API</p>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        No menu superior do Tiny, vá em <strong>Início &gt; Loja de Extensões</strong> e instale a extensão gratuita <strong>Token API</strong>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/20">
+                                <div className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                                    2
+                                </div>
+                                <div className="text-sm text-brand-dark dark:text-dark-heading">
+                                    <p className="font-semibold">Gere o Token</p>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        Acesse <strong>Menu &gt; Configurações &gt; E-commerce &gt; Token API</strong> e clique no botão <strong>Gerar token API</strong>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/20">
+                                <div className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                                    3
+                                </div>
+                                <div className="text-sm text-brand-dark dark:text-dark-heading">
+                                    <p className="font-semibold">Conecte na Dudit</p>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        Cole o token copiado no campo de integração aqui na Dudit e clique em <strong>Conectar</strong>.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <Button
+                                className="w-full"
+                                onClick={() => setActiveModal("tinyConfig")}
+                            >
+                                {tinyStatus?.connected ? "Abrir Configurações" : "Inserir meu Token agora"}
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
+
+                {/* Confirm Disconnect Tiny ERP */}
+                <AlertModal
+                    isOpen={confirmTinyDisconnectOpen}
+                    onClose={() => setConfirmTinyDisconnectOpen(false)}
+                    onConfirm={() => {
+                        setConfirmTinyDisconnectOpen(false)
+                        handleTinyDisconnect()
+                    }}
+                    title="Desconectar Tiny ERP"
+                    message="Tem certeza que deseja desconectar o Tiny ERP? A sincronização de estoque e o envio de novos pedidos deixarão de funcionar."
                     confirmText="Desconectar"
                     variant="danger"
                     isDestructive

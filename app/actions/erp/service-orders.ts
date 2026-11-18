@@ -1035,7 +1035,7 @@ export async function updateServiceOrderStatusAction(
 
     const { data: current } = await admin
       .from("service_orders")
-      .select("status, order_number, title, completed_at, assigned_user_id, created_by, store_id")
+      .select("status, order_number, title, completed_at, assigned_user_id, created_by, store_id, metadata, signature_image_key, signed_at")
       .eq("id", serviceOrderId)
       .eq("partner_id", partnerId)
       .single()
@@ -1067,6 +1067,16 @@ export async function updateServiceOrderStatusAction(
     // Ao retroceder de um status terminal (concluída/entregue), limpa o marco de conclusão.
     if ((currentStatus === "concluida" || currentStatus === "entregue") && !isCompletedStatus) {
       updateData.completed_at = null
+    }
+
+    if (status === "aberta" || status === "aguardando_aprovacao") {
+      updateData.completed_at = null
+      updateData.signature_image_key = null
+      updateData.signed_at = null
+      const currentMeta = { ...((current as any)?.metadata || {}) }
+      delete currentMeta.approved_at
+      delete currentMeta.approver_name
+      updateData.metadata = currentMeta
     }
 
     const { data, error } = await admin
@@ -2012,8 +2022,9 @@ export async function getServiceOrderByTokenAction(
     const safeMetadata = { ...(row.metadata || {}) }
     delete safeMetadata.plain_code
 
-    const approverName = typeof safeMetadata.approver_name === "string" ? safeMetadata.approver_name : null
-    const approvedAt = typeof safeMetadata.approved_at === "string" ? safeMetadata.approved_at : null
+    const isAwaitingApproval = row.status === "aberta" || row.status === "aguardando_aprovacao"
+    const approverName = !isAwaitingApproval && typeof safeMetadata.approver_name === "string" ? safeMetadata.approver_name : null
+    const approvedAt = !isAwaitingApproval && typeof safeMetadata.approved_at === "string" ? safeMetadata.approved_at : null
 
     const serviceOrder = {
       id: row.id,
@@ -2030,8 +2041,8 @@ export async function getServiceOrderByTokenAction(
       total_service_amount: row.total_service_amount,
       total_product_amount: row.total_product_amount,
       total_amount: row.total_amount,
-      signature_image_key: row.signature_image_key,
-      signed_at: row.signed_at,
+      signature_image_key: isAwaitingApproval ? null : row.signature_image_key,
+      signed_at: isAwaitingApproval ? null : row.signed_at,
       customer_name: customerName,
       customer_snapshot: customerForPortal,
       sale_id: row.sale_id,
@@ -2320,6 +2331,8 @@ export async function updateServiceOrderAction(
     if (shouldTriggerReapproval) {
       updateData.status = "aguardando_aprovacao"
       updateData.completed_at = null
+      updateData.signature_image_key = null
+      updateData.signed_at = null
 
       // Versioning
       const currentVersion = Number((current.metadata as any)?.version || 1)
@@ -2352,11 +2365,14 @@ export async function updateServiceOrderAction(
       const approvalHistory = Array.isArray((current.metadata as any)?.approval_history)
         ? [...(current.metadata as any).approval_history]
         : []
-      if ((current.metadata as any)?.approved_at) {
+      const prevApprovedAt = (current.metadata as any)?.approved_at || current.signed_at || null
+      if (prevApprovedAt) {
         approvalHistory.push({
           version: currentVersion,
-          approved_at: (current.metadata as any).approved_at,
-          approver_name: (current.metadata as any).approver_name || "Cliente",
+          approved_at: prevApprovedAt,
+          approver_name: (current.metadata as any)?.approver_name || "Cliente",
+          signature_image_key: current.signature_image_key || null,
+          signed_at: current.signed_at || null,
         })
       }
 
@@ -2387,6 +2403,15 @@ export async function updateServiceOrderAction(
         }
         if ((current.status === "concluida" || current.status === "entregue") && !isInputCompleted) {
           updateData.completed_at = null
+        }
+        if (input.status === "aberta" || input.status === "aguardando_aprovacao") {
+          updateData.completed_at = null
+          updateData.signature_image_key = null
+          updateData.signed_at = null
+          const nextMeta = { ...((current.metadata as any) || {}) }
+          delete nextMeta.approved_at
+          delete nextMeta.approver_name
+          updateData.metadata = nextMeta
         }
       }
     }
@@ -3082,7 +3107,12 @@ export async function approvePublicServiceOrderAction(
     }
 
     if (order.signature_image_key) {
-      return { success: false, error: "Esta ordem de serviço já foi assinada." }
+      // Se a OS está aguardando aprovação mas continha assinatura de versão anterior,
+      // limpa os campos de assinatura obsoletos para que a nova aprovação proceda sem conflito.
+      await admin
+        .from("service_orders")
+        .update({ signature_image_key: null, signed_at: null })
+        .eq("id", order.id)
     }
 
     let rawCustomer = order.customer_snapshot

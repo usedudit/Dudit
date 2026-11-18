@@ -1,0 +1,416 @@
+import "server-only"
+
+import { createAdminClient } from "@/lib/supabase/server"
+import { encrypt, decrypt } from "@/lib/cryptoService"
+import { createTinyClient, type TinyClient, type TinyProductDetail } from "./tiny-client"
+import { resolveOrderBuyerFiscal } from "@/lib/orders/buyer-fiscal"
+import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
+import { logAuditEvent } from "@/lib/services/timeline.service"
+import type { PartnerIntegrationRow } from "@/lib/services/integrations/types"
+
+export const TINY_PROVIDER = "tiny"
+
+export interface TinyIntegrationConfig {
+  sync_stock?: boolean
+  auto_export_orders?: boolean
+  default_deposit?: string | null
+}
+
+export interface TinyIntegrationMetadata {
+  last_sync_at?: string | null
+  synced_count?: number
+  last_export_at?: string | null
+  last_error?: string | null
+}
+
+/**
+ * Busca o registro de conexão do Tiny ERP para um parceiro
+ */
+export async function findTinyIntegration(
+  supabase: any,
+  partnerId: string
+): Promise<PartnerIntegrationRow | null> {
+  const { data, error } = await supabase
+    .from("partner_integrations")
+    .select("*")
+    .eq("partner_id", partnerId)
+    .eq("provider_slug", TINY_PROVIDER)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data as PartnerIntegrationRow
+}
+
+/**
+ * Instancia o cliente do Tiny descriptografando o token do parceiro
+ */
+export async function getValidTinyClient(partnerId: string): Promise<TinyClient> {
+  const supabase = createAdminClient()
+  const integration = await findTinyIntegration(supabase, partnerId)
+
+  if (!integration || integration.status !== "connected" || !integration.access_token_encrypted) {
+    throw new Error("Integração com Tiny ERP não está ativa para esta loja.")
+  }
+
+  let token: string
+  try {
+    token = decrypt(integration.access_token_encrypted, "tiny")
+  } catch (err) {
+    captureError(err, { module: "integrations", provider: "tiny", partnerId })
+    throw new Error("Falha ao descriptografar token do Tiny ERP.")
+  }
+
+  return createTinyClient(token)
+}
+
+/**
+ * Sincroniza catálogo de produtos do Tiny ERP para o banco da Dudit
+ */
+export async function syncTinyProductsToDudit(params: {
+  partnerId: string
+  storeId?: string | null
+  maxPages?: number
+}): Promise<{
+  success: boolean
+  totalProcessed: number
+  totalCreated: number
+  totalUpdated: number
+  errors: string[]
+}> {
+  const { partnerId, storeId } = params
+  const maxPages = params.maxPages || 5
+  const supabase = createAdminClient()
+  const client = await getValidTinyClient(partnerId)
+
+  let totalProcessed = 0
+  let totalCreated = 0
+  let totalUpdated = 0
+  const errors: string[] = []
+
+  addMonitoringBreadcrumb({
+    domain: "integrations",
+    message: "tiny.sync_products.started",
+    metadata: { partnerId, storeId, maxPages },
+  })
+
+  try {
+    let currentPage = 1
+    let hasMore = true
+
+    while (hasMore && currentPage <= maxPages) {
+      const searchRes = await client.searchProducts({ pagina: currentPage })
+      const items = searchRes.produtos || []
+
+      if (items.length === 0) {
+        break
+      }
+
+      for (const item of items) {
+        const summary = item.produto
+        if (!summary || !summary.id) continue
+
+        totalProcessed++
+
+        try {
+          // Busca detalhes completos do produto no Tiny
+          const detail: TinyProductDetail = await client.getProduct(summary.id)
+
+          const externalId = String(detail.id)
+          const sku = detail.codigo?.trim() || `TINY-${externalId}`
+          const name = detail.nome?.trim() || "Produto sem nome"
+          const price = Number(detail.preco || 0)
+          const promotionalPrice = detail.preco_promocional ? Number(detail.preco_promocional) : null
+          const unit = detail.unidade?.trim() || "UN"
+          const stock = Number(detail.saldo || 0)
+          const minStock = Number(detail.estoque_minimo || 0)
+          const ncm = detail.ncm?.trim() || null
+          const gtin = detail.gtin?.trim() || null
+          const description = detail.observacoes?.trim() || null
+
+          // Extrai URLs de imagens se houver
+          const images: string[] = []
+          if (Array.isArray(detail.anexos)) {
+            for (const att of detail.anexos) {
+              if (att && att.anexo) images.push(att.anexo)
+            }
+          } else if (Array.isArray(detail.imagens)) {
+            for (const img of detail.imagens) {
+              if (img && img.url) images.push(img.url)
+            }
+          }
+
+          // Checa se já existe na Dudit pelo external_id ou SKU
+          const { data: existingProduct } = await supabase
+            .from("products")
+            .select("id, stock_quantity")
+            .eq("partner_id", partnerId)
+            .or(`external_id.eq.${externalId},sku.eq.${sku}`)
+            .limit(1)
+            .maybeSingle()
+
+          const now = new Date().toISOString()
+
+          if (existingProduct) {
+            // Atualiza produto existente
+            const { error: updateErr } = await supabase
+              .from("products")
+              .update({
+                name,
+                price,
+                promotional_price: promotionalPrice,
+                sku,
+                gtin,
+                unit,
+                ncm,
+                min_stock: minStock,
+                stock_quantity: stock,
+                description: description || undefined,
+                images: images.length > 0 ? images : undefined,
+                external_id: externalId,
+                external_provider: TINY_PROVIDER,
+                last_external_sync_at: now,
+                updated_at: now,
+              })
+              .eq("id", existingProduct.id)
+
+            if (updateErr) {
+              errors.push(`Erro ao atualizar ${name} (${sku}): ${updateErr.message}`)
+            } else {
+              totalUpdated++
+            }
+          } else {
+            // Insere novo produto
+            const { error: insertErr } = await supabase
+              .from("products")
+              .insert({
+                partner_id: partnerId,
+                store_id: storeId || null,
+                name,
+                price,
+                promotional_price: promotionalPrice,
+                sku,
+                gtin,
+                unit,
+                ncm,
+                min_stock: minStock,
+                stock_quantity: stock,
+                description: description || "",
+                images: images.length > 0 ? images : [],
+                is_active: detail.situacao !== "I",
+                external_id: externalId,
+                external_provider: TINY_PROVIDER,
+                last_external_sync_at: now,
+                created_at: now,
+                updated_at: now,
+              })
+
+            if (insertErr) {
+              errors.push(`Erro ao criar ${name} (${sku}): ${insertErr.message}`)
+            } else {
+              totalCreated++
+            }
+          }
+        } catch (itemErr: any) {
+          errors.push(`Falha no produto ID ${summary.id}: ${itemErr?.message}`)
+        }
+      }
+
+      if (searchRes.numero_paginas && currentPage >= searchRes.numero_paginas) {
+        hasMore = false
+      } else {
+        currentPage++
+      }
+    }
+
+    // Atualiza metadados da integração
+    await supabase
+      .from("partner_integrations")
+      .update({
+        metadata: {
+          last_sync_at: new Date().toISOString(),
+          synced_count: totalProcessed,
+          last_sync_created: totalCreated,
+          last_sync_updated: totalUpdated,
+          last_error: errors.length > 0 ? errors[0] : null,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("partner_id", partnerId)
+      .eq("provider_slug", TINY_PROVIDER)
+
+    return {
+      success: true,
+      totalProcessed,
+      totalCreated,
+      totalUpdated,
+      errors,
+    }
+  } catch (err: any) {
+    captureError(err, { module: "integrations", provider: "tiny", partnerId })
+    return {
+      success: false,
+      totalProcessed,
+      totalCreated,
+      totalUpdated,
+      errors: [err?.message || "Erro desconhecido ao sincronizar com Tiny ERP"],
+    }
+  }
+}
+
+/**
+ * Exporta um pedido pago da Dudit para o Tiny ERP
+ */
+export async function exportDuditOrderToTiny(orderId: string): Promise<{
+  success: boolean
+  tinyOrderId?: string | number
+  tinyOrderNumber?: string | number
+  error?: string
+}> {
+  const supabase = createAdminClient()
+
+  // Busca dados completos do pedido
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      order_number,
+      total_amount,
+      paid_amount,
+      delivery_address,
+      payment_method,
+      partner_id,
+      customer_id,
+      buyer_id,
+      customer_name,
+      notes,
+      external_order_id,
+      external_sync_status,
+      order_items (
+        id,
+        product_id,
+        product_name,
+        product_price,
+        quantity,
+        subtotal
+      )
+    `)
+    .eq("id", orderId)
+    .single()
+
+  if (orderErr || !order) {
+    return { success: false, error: "Pedido não encontrado" }
+  }
+
+  // Se já foi exportado com sucesso, não duplica
+  if (order.external_sync_status === "synced" && order.external_order_id) {
+    return {
+      success: true,
+      tinyOrderId: order.external_order_id,
+      tinyOrderNumber: order.external_order_number,
+    }
+  }
+
+  const integration = await findTinyIntegration(supabase, order.partner_id)
+  if (!integration || integration.status !== "connected") {
+    // Integração não configurada para este parceiro - ignora
+    return { success: false, error: "Tiny ERP não conectado para esta loja." }
+  }
+
+  const config = (integration.config as TinyIntegrationConfig) || {}
+  if (config.auto_export_orders === false) {
+    return { success: false, error: "Exportação automática desativada nas configurações." }
+  }
+
+  try {
+    const client = await getValidTinyClient(order.partner_id)
+
+    // Resolve dados fiscais do comprador
+    const buyerFiscal = await resolveOrderBuyerFiscal(supabase, {
+      partner_id: order.partner_id,
+      customer_id: order.customer_id,
+      buyer_id: order.buyer_id,
+      customer_name: order.customer_name,
+    })
+
+    const customerName = buyerFiscal.name || order.customer_name || "Cliente Dudit"
+    const customerDocument = buyerFiscal.document?.replace(/\D/g, "") || undefined
+    const isPj = buyerFiscal.personType === "pj" || (customerDocument && customerDocument.length === 14)
+
+    // Monta itens do pedido para o Tiny
+    const items = (order.order_items || []).map((it: any) => ({
+      item: {
+        descricao: it.product_name,
+        quantidade: Number(it.quantity || 1),
+        valor_unitario: Number(it.product_price || 0),
+        unidade: "UN",
+      },
+    }))
+
+    const payload = {
+      pedido: {
+        cliente: {
+          nome: customerName,
+          tipo_pessoa: isPj ? ("J" as const) : ("F" as const),
+          cpf_cnpj: customerDocument,
+          endereco: order.delivery_address || undefined,
+        },
+        itens: items,
+        total_pedido: Number(order.total_amount || 0),
+        forma_pagamento: order.payment_method || "Mercado Pago",
+        meio_pagamento: "Mercado Pago",
+        numero_ordem_compra: order.order_number || String(order.id),
+        obs: `Pedido Dudit Marketplace #${order.order_number || order.id}. ${order.notes || ""}`.trim(),
+      },
+    }
+
+    const tinyRes = await client.createOrder(payload)
+
+    // Atualiza pedido na Dudit com as referências do Tiny
+    await supabase
+      .from("orders")
+      .update({
+        external_order_id: String(tinyRes.id),
+        external_order_number: String(tinyRes.numero),
+        external_provider: TINY_PROVIDER,
+        external_sync_status: "synced",
+        external_sync_error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId)
+
+    // Registra na timeline de auditoria
+    await logAuditEvent({
+      entity_type: "order",
+      entity_id: orderId,
+      action: "tiny_order_exported",
+      details: {
+        tinyOrderId: tinyRes.id,
+        tinyOrderNumber: tinyRes.numero,
+      },
+    })
+
+    return {
+      success: true,
+      tinyOrderId: tinyRes.id,
+      tinyOrderNumber: tinyRes.numero,
+    }
+  } catch (err: any) {
+    captureError(err, { module: "integrations", provider: "tiny", orderId })
+
+    // Salva status de erro no pedido
+    await supabase
+      .from("orders")
+      .update({
+        external_provider: TINY_PROVIDER,
+        external_sync_status: "error",
+        external_sync_error: err?.message || "Falha ao exportar pedido para o Tiny ERP",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId)
+
+    return {
+      success: false,
+      error: err?.message || "Erro ao exportar pedido para o Tiny ERP",
+    }
+  }
+}

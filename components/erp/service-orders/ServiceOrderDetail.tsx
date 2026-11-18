@@ -1055,9 +1055,16 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                 ) : (
                     <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
                         {order.status === "aberta" || order.status === "aguardando_aprovacao" ? (
-                            <p className="text-sm text-brand-inactive-text text-center">
-                                A assinatura ficará disponível após a aprovação da ordem de serviço.
-                            </p>
+                            <div className="text-center space-y-2">
+                                <p className="text-sm text-brand-inactive-text">
+                                    A assinatura desta versão ficará disponível após a aprovação da ordem de serviço.
+                                </p>
+                                {Array.isArray(order.metadata?.approval_history) && order.metadata.approval_history.length > 0 && (
+                                    <p className="text-xs text-brand-inactive-text border-t border-brand-border dark:border-dark-border pt-2 mt-2">
+                                        Histórico: Versão {order.metadata.approval_history[order.metadata.approval_history.length - 1].version} aprovada anteriormente em {formatDateTime(order.metadata.approval_history[order.metadata.approval_history.length - 1].approved_at || order.metadata.approval_history[order.metadata.approval_history.length - 1].signed_at)}.
+                                    </p>
+                                )}
+                            </div>
                         ) : (
                             <>
                                 <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>

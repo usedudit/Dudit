@@ -43,6 +43,8 @@ const CONTEXT_INFO = {
   superfrete: "superfrete-token-encryption",
   nfe_xml: "nfe-xml-encryption",
   delivery_otp: "delivery-otp-encryption",
+  tiny: "tiny-token-encryption",
+  bling: "bling-token-encryption",
 } as const
 
 type CryptoContext = keyof typeof CONTEXT_INFO

@@ -132,9 +132,10 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     }, [currentUser, customerEmail])
 
     const isDirectSigner = Boolean(order?.can_direct_sign || isClientEmailMatched)
+    const isWaitingApproval = order.status === "aberta" || order.status === "aguardando_aprovacao"
     // Quando a OS já foi aprovada pelo portal, o aceite final (assinatura) não
     // exige novo código.
-    const canSignWithoutCode = isDirectSigner || Boolean(order?.approved_at)
+    const canSignWithoutCode = isDirectSigner || (!isWaitingApproval && Boolean(order?.approved_at))
 
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
     const buildImageUrl = (key: string) => {
@@ -400,11 +401,11 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         }
     }
 
-    const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key
+    const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada"
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
-    const canReject = !order.signature_image_key && (order.status === "aberta" || order.status === "aguardando_aprovacao")
-    const canApprove = !order.signature_image_key && (order.status === "aberta" || order.status === "aguardando_aprovacao")
+    const canReject = isWaitingApproval
+    const canApprove = isWaitingApproval
     const canSign = !order.signature_image_key && (order.status === "concluida" || order.status === "entregue")
     const hasActions = canApprove || canSign || canReject
 
@@ -559,23 +560,42 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                         {/* ─── TAB: DADOS GERAIS ─── */}
                                         {activeTab === "Dados Gerais" && (
                                             <div className="space-y-8 text-left">
-                                                {(order.approved_at || order.signature_image_key || isFinalized) && (
+                                                {(isWaitingApproval || order.approved_at || order.signature_image_key || isFinalized) && (
                                                     <div className="space-y-3">
-                                                        {order.approved_at && order.status !== "cancelada" && (
-                                                            <InfoCard
-                                                                title='Aprovado pelo cliente'
-                                                                message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.approved_at)}`}
-                                                                color='green'
-                                                            />
-                                                        )}
-                                                        {order.signature_image_key ? (
-                                                            <InfoCard
-                                                                title='Assinado pelo cliente'
-                                                                message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`}
-                                                                color='green'
-                                                            />
-                                                        ) : isFinalized && (!order.approved_at || order.status === "cancelada") && (
-                                                            <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
+                                                        {isWaitingApproval ? (
+                                                            <>
+                                                                {Number(order.metadata?.version || 1) > 1 && (
+                                                                    <InfoCard
+                                                                        title={`Ordem de Serviço Revisada (Versão ${order.metadata.version})`}
+                                                                        message={`Esta ordem de serviço foi atualizada para a Versão ${order.metadata.version}. Por favor, confira os novos itens e valores e informe o novo código para aprovar.`}
+                                                                        color="orange"
+                                                                    />
+                                                                )}
+                                                                {Array.isArray(order.metadata?.approval_history) && order.metadata.approval_history.length > 0 && (
+                                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body px-1">
+                                                                        Aprovação anterior: Versão {order.metadata.approval_history[order.metadata.approval_history.length - 1].version} aprovada por {order.metadata.approval_history[order.metadata.approval_history.length - 1].approver_name || "Cliente"} em {formatDateTime(order.metadata.approval_history[order.metadata.approval_history.length - 1].approved_at || order.metadata.approval_history[order.metadata.approval_history.length - 1].signed_at)}. Uma nova aprovação é necessária para esta versão.
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {order.approved_at && order.status !== "cancelada" && (
+                                                                    <InfoCard
+                                                                        title='Aprovado pelo cliente'
+                                                                        message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.approved_at)}`}
+                                                                        color='green'
+                                                                    />
+                                                                )}
+                                                                {order.signature_image_key ? (
+                                                                    <InfoCard
+                                                                        title='Assinado pelo cliente'
+                                                                        message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`}
+                                                                        color='green'
+                                                                    />
+                                                                ) : isFinalized && (!order.approved_at || order.status === "cancelada") && (
+                                                                    <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                 )}

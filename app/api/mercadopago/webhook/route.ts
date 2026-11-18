@@ -1393,6 +1393,14 @@ async function processWebhookWithRetry(
       } catch (txErr: any) {
         console.error("[WEBHOOK] Error creating transaction:", txErr.message)
       }
+
+      // ── Export order to Tiny ERP if configured ──
+      try {
+        const { exportDuditOrderToTiny } = await import("@/lib/services/integrations/tiny/tiny-integration")
+        await exportDuditOrderToTiny(orderId)
+      } catch (tinyErr: any) {
+        console.warn("[WEBHOOK] Tiny ERP export skipped or failed:", tinyErr?.message)
+      }
     }
 
     // NOTE: Stock decrement is handled by sync-payment-status to avoid duplication
