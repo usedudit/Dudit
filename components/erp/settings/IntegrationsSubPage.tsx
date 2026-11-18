@@ -2,10 +2,10 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
-import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
+import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
 import {
     disconnectMercadoPagoAction,
     getMercadoPagoStatusAction,
@@ -19,7 +19,6 @@ import {
     setupSuperFreteWebhookAction,
     saveSuperFreteConfigAction,
     type SuperFreteStatus,
-    type SuperFreteConfig,
 } from "@/app/actions/shipping/superfrete"
 import {
     getTinyStatusAction,
@@ -604,7 +603,13 @@ export const IntegrationsSubPage = ({
         try {
             const res = await syncTinyProductsAction(5)
             if (res.success) {
-                toast.success(`Sincronização concluída! ${res.totalProcessed || 0} produtos processados (${res.totalCreated || 0} novos, ${res.totalUpdated || 0} atualizados).`)
+                if ((res.totalCreated || 0) > 0 || (res.totalUpdated || 0) > 0) {
+                    toast.success(`Sincronização concluída! ${res.totalProcessed || 0} produtos processados (${res.totalCreated || 0} novos, ${res.totalUpdated || 0} atualizados).`)
+                } else if (res.errors && res.errors.length > 0) {
+                    toast.error(`Atenção: ${res.errors[0]}`)
+                } else {
+                    toast.info(`Nenhum produto novo ou alterado no Tiny ERP (${res.totalProcessed || 0} verificados).`)
+                }
                 await fetchTinyStatus()
             } else {
                 toast.error(res.error || "Falha na sincronização com Tiny ERP")
@@ -719,6 +724,31 @@ export const IntegrationsSubPage = ({
         {
             title: "Como configurar?",
             description: "Clique em Conectar e cole o token de API gerado no painel da SuperFrete (sandbox.superfrete.com ou web.superfrete.com).\n\nEscolha entre sandbox (teste) e produção, e configure o CEP de origem e dimensões padrão para que os fretes sejam calculados corretamente.",
+        },
+    ]
+
+    const TINY_KNOW_MORE_STEPS: { title: string; description?: string; list?: string[] }[] = [
+        {
+            title: "O que é o Tiny ERP?",
+            description: "O Tiny ERP (do ecossistema Olist) é um dos sistemas de gestão e emissão fiscal mais utilizados no e-commerce brasileiro.\n\nCom a integração na Dudit, sua loja física, seu estoque e sua gestão financeira ficam conectados diretamente ao marketplace da Dudit, sem nenhum retrabalho de cadastro manual.\n\nTudo funciona de forma rápida, sincronizada e automática.",
+        },
+        {
+            title: "Como funciona a integração?",
+            description: "A integração é simples e direta via API do Tiny ERP.\n\nVocê conecta seu token em menos de 1 minuto. A partir daí, você pode importar todo o seu catálogo existente para a vitrine da Dudit com um clique.\n\nQuando um cliente comprar na Dudit e o pagamento for confirmado no Mercado Pago, o pedido é lançado automaticamente no Tiny.",
+        },
+        {
+            title: "Funcionalidades da integração",
+            list: [
+                "📦 Importação com 1 clique de produtos, fotos, preços, variações, códigos SKU e GTIN/EAN",
+                "🔄 Sincronização inteligente de saldo de estoque para evitar furos de vendas",
+                "⚡ Envio automático do pedido de venda para o Tiny assim que aprovado no Mercado Pago",
+                "🧾 Emissão rápida de Nota Fiscal Eletrônica (NF-e) dentro do seu painel habitual do Tiny",
+                "🏷️ Separação de pedidos e impressão de etiquetas com a sua operação de sempre",
+            ],
+        },
+        {
+            title: "Como obter o Token de API no Tiny?",
+            description: "Para conectar, você só precisa gerar o Token de API gratuito na sua conta do Tiny. Siga o passo a passo:\n\n1. Acesse o seu painel no Tiny ERP (tiny.com.br)\n2. No menu superior, vá em Início > Loja de Extensões\n3. Busque pela extensão gratuita 'Token API' e clique em Instalar\n4. Acesse Menu > Configurações > E-commerce > Token API\n5. Clique no botão 'Gerar token API' e copie a chave gerada\n\nDepois cole essa chave na Dudit e clique em Conectar!",
         },
     ]
 
@@ -2243,59 +2273,103 @@ export const IntegrationsSubPage = ({
                     </div>
                 </DefaultModal>
 
-                {/* Tiny ERP Know More Modal */}
+                {/* Tiny ERP Know More Modal (Multi-step) */}
                 <DefaultModal
                     isOpen={activeModal === "tinyKnowMore"}
                     onClose={() => setActiveModal(null)}
-                    title="Como conectar o Tiny ERP à Dudit"
-                    maxWidth="md"
+                    title="O que é o Tiny ERP?"
+                    maxWidth="lg"
                 >
-                    <div className="space-y-4">
-                        <div className="space-y-3">
-                            <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/20">
-                                <div className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                                    1
+                    <div className="flex flex-col min-h-[500px]">
+                        {/* Banner */}
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group h-[200px]">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                                <div className="w-20 h-20 rounded-2xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
+                                    <span className="font-black text-3xl tracking-tight">tiny</span>
                                 </div>
-                                <div className="text-sm text-brand-dark dark:text-dark-heading">
-                                    <p className="font-semibold">Ative a extensão Token API</p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        No menu superior do Tiny, vá em <strong>Início &gt; Loja de Extensões</strong> e instale a extensão gratuita <strong>Token API</strong>.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/20">
-                                <div className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                                    2
-                                </div>
-                                <div className="text-sm text-brand-dark dark:text-dark-heading">
-                                    <p className="font-semibold">Gere o Token</p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        Acesse <strong>Menu &gt; Configurações &gt; E-commerce &gt; Token API</strong> e clique no botão <strong>Gerar token API</strong>.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/20">
-                                <div className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                                    3
-                                </div>
-                                <div className="text-sm text-brand-dark dark:text-dark-heading">
-                                    <p className="font-semibold">Conecte na Dudit</p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        Cole o token copiado no campo de integração aqui na Dudit e clique em <strong>Conectar</strong>.
-                                    </p>
-                                </div>
+                                <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                                    Olist ERP
+                                </span>
                             </div>
                         </div>
 
-                        <div className="pt-2">
-                            <Button
-                                className="w-full"
-                                onClick={() => setActiveModal("tinyConfig")}
-                            >
-                                {tinyStatus?.connected ? "Abrir Configurações" : "Inserir meu Token agora"}
-                            </Button>
+                        <div className="p-8 flex-1 flex flex-col">
+                            <div className="mb-8">
+                                <div className="flex gap-2">
+                                    {TINY_KNOW_MORE_STEPS.map((_, i) => (
+                                        <motion.div
+                                            key={i}
+                                            layout
+                                            className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i <= tinyKnowMoreStep ? "bg-orange-500" : "bg-brand-gray dark:bg-dark-border"
+                                                }`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={tinyKnowMoreStep}
+                                    initial={{ opacity: 0, x: 10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="flex-1"
+                                >
+                                    <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
+                                        {TINY_KNOW_MORE_STEPS[tinyKnowMoreStep].title}
+                                    </h3>
+
+                                    {TINY_KNOW_MORE_STEPS[tinyKnowMoreStep].description && (
+                                        <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
+                                            {TINY_KNOW_MORE_STEPS[tinyKnowMoreStep].description}
+                                        </p>
+                                    )}
+
+                                    {TINY_KNOW_MORE_STEPS[tinyKnowMoreStep].list && (
+                                        <ul className="space-y-4 mt-6">
+                                            {TINY_KNOW_MORE_STEPS[tinyKnowMoreStep].list.map((item, i) => (
+                                                <li key={i} className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                    <span className="flex shrink-0 items-center justify-center text-md text-orange-500">
+                                                        ●
+                                                    </span>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+
+                            <div className="flex flex-col md:flex-row gap-3 mt-8">
+                                <Button
+                                    variant="outline"
+                                    disabled={tinyKnowMoreStep === 0}
+                                    onClick={() => setTinyKnowMoreStep(prev => prev - 1)}
+                                    className="flex-1 h-[46px]"
+                                >
+                                    Anterior
+                                </Button>
+
+                                {tinyKnowMoreStep === TINY_KNOW_MORE_STEPS.length - 1 ? (
+                                    <Button
+                                        className="flex-1 h-[46px]"
+                                        onClick={() => {
+                                            setActiveModal("tinyConfig")
+                                            setTinyKnowMoreStep(0)
+                                        }}
+                                    >
+                                        {tinyStatus?.connected ? "Abrir Configurações" : "Conectar Tiny ERP"}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="flex-1 h-[46px]"
+                                        onClick={() => setTinyKnowMoreStep(prev => prev + 1)}
+                                    >
+                                        Próximo
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </DefaultModal>

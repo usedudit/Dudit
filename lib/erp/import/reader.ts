@@ -1,6 +1,7 @@
 import "server-only"
 import { Readable } from "node:stream"
 import ExcelJS from "exceljs"
+import * as XLSX from "xlsx"
 import type { ReadResult } from "./types"
 import { fieldRegistry } from "./field-registry"
 
@@ -266,6 +267,47 @@ function detectCsvDelimiter(text: string): string {
   return best
 }
 
+function readWithSheetJS(buffer: ArrayBuffer): string[][] {
+  const wb = XLSX.read(Buffer.from(buffer), {
+    type: "buffer",
+    cellDates: true,
+    raw: false,
+    dateNF: "dd/mm/yyyy",
+  })
+
+  if (!wb.SheetNames || wb.SheetNames.length === 0) {
+    return []
+  }
+
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName]
+    if (!sheet) continue
+
+    const sheetRows = XLSX.utils.sheet_to_json<any[]>(sheet, {
+      header: 1,
+      raw: false,
+      defval: "",
+    })
+
+    const rawRows: string[][] = []
+    for (const row of sheetRows) {
+      const rowValues = (Array.isArray(row) ? row : []).map((c) => {
+        if (c == null) return ""
+        const s = String(c).trim()
+        if (s === "-" || s === "—" || s === "–") return ""
+        return s
+      })
+      rawRows.push(trimTrailingEmpty(rowValues))
+    }
+
+    if (rawRows.some((r) => countNonEmpty(r) > 0)) {
+      return rawRows
+    }
+  }
+
+  return []
+}
+
 export async function readSpreadsheet(
   buffer: ArrayBuffer,
   fileName: string,
@@ -284,28 +326,51 @@ export async function readSpreadsheet(
     )
   }
 
-  const workbook = new ExcelJS.Workbook()
+  let rawRows: string[][] = []
 
-  if (ext === "csv") {
-    const buf = Buffer.from(buffer)
-    await workbook.csv.read(Readable.from([buf]) as any, {
-      parserOptions: { delimiter: detectCsvDelimiter(buf.toString("utf-8")) },
-    })
+  if (ext === "xls") {
+    rawRows = readWithSheetJS(buffer)
+  } else if (ext === "csv") {
+    try {
+      const workbook = new ExcelJS.Workbook()
+      const buf = Buffer.from(buffer)
+      await workbook.csv.read(Readable.from([buf]) as any, {
+        parserOptions: { delimiter: detectCsvDelimiter(buf.toString("utf-8")) },
+      })
+      const worksheet = workbook.worksheets[0]
+      if (worksheet) {
+        worksheet.eachRow({ includeEmpty: false }, (row) => {
+          rawRows.push(trimTrailingEmpty(rowToValues(row)))
+        })
+      }
+    } catch {
+      // Fallback to SheetJS if ExcelJS fails
+    }
+    if (rawRows.length === 0) {
+      rawRows = readWithSheetJS(buffer)
+    }
   } else {
-    await workbook.xlsx.load(buffer)
+    // ext === "xlsx"
+    try {
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.load(buffer)
+      const worksheet = workbook.worksheets[0]
+      if (worksheet) {
+        worksheet.eachRow({ includeEmpty: false }, (row) => {
+          rawRows.push(trimTrailingEmpty(rowToValues(row)))
+        })
+      }
+    } catch {
+      // Fallback to SheetJS if ExcelJS fails
+    }
+    if (rawRows.length === 0) {
+      rawRows = readWithSheetJS(buffer)
+    }
   }
 
-  const worksheet = workbook.worksheets[0]
-
-  if (!worksheet) {
+  if (rawRows.length === 0) {
     throw new ImportReadError("Planilha vazia ou sem abas.")
   }
-
-  const rawRows: string[][] = []
-
-  worksheet.eachRow({ includeEmpty: false }, (row) => {
-    rawRows.push(trimTrailingEmpty(rowToValues(row)))
-  })
 
   const headerRowIndex = findHeaderRowIndex(rawRows)
 

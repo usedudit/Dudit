@@ -11,7 +11,7 @@ const productFields: FieldDef[] = [
     synonyms: [
       "nome do produto", "nome produto", "produto nome", "produto", "nome",
       "item", "product name", "name", "produto/serviço", "titulo", "título",
-      "título do produto", "titulo do produto", "designação"
+      "título do produto", "titulo do produto", "designação", "descrição", "descricao"
     ]
   },
   {
@@ -177,6 +177,7 @@ const productFields: FieldDef[] = [
       "descrição do produto", "descricao do produto", "descrição produto",
       "descricao produto", "descrição detalhada", "descricao detalhada",
       "descrição completa", "descricao completa", "sobre o produto",
+      "descrição complementar", "descricao complementar",
       "descrição", "descricao", "description", "detalhes", "desc",
       "observações", "observacoes", "obs", "especificações", "especificacoes"
     ]

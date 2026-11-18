@@ -87,10 +87,23 @@ export async function syncTinyProductsToDudit(params: {
   let totalUpdated = 0
   const errors: string[] = []
 
+  // Resolve storeId padrão se não fornecido
+  let effectiveStoreId = storeId
+  if (!effectiveStoreId) {
+    const { data: storeRow } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    effectiveStoreId = storeRow?.id || null
+  }
+
   addMonitoringBreadcrumb({
     domain: "integrations",
     message: "tiny.sync_products.started",
-    metadata: { partnerId, storeId, maxPages },
+    metadata: { partnerId, storeId: effectiveStoreId, maxPages },
   })
 
   try {
@@ -120,12 +133,13 @@ export async function syncTinyProductsToDudit(params: {
           const name = detail.nome?.trim() || "Produto sem nome"
           const price = Number(detail.preco || 0)
           const promotionalPrice = detail.preco_promocional ? Number(detail.preco_promocional) : null
+          const costPrice = Number((detail as any).preco_custo || 0) || 0
           const unit = detail.unidade?.trim() || "UN"
           const stock = Number(detail.saldo || 0)
           const minStock = Number(detail.estoque_minimo || 0)
-          const ncm = detail.ncm?.trim() || null
           const gtin = detail.gtin?.trim() || null
           const description = detail.observacoes?.trim() || null
+          const isActive = detail.situacao !== "I"
 
           // Extrai URLs de imagens se houver
           const images: string[] = []
@@ -140,32 +154,45 @@ export async function syncTinyProductsToDudit(params: {
           }
 
           // Checa se já existe na Dudit pelo external_id ou SKU
-          const { data: existingProduct } = await supabase
+          let { data: existingProduct } = await supabase
             .from("products")
             .select("id, stock_quantity")
             .eq("partner_id", partnerId)
-            .or(`external_id.eq.${externalId},sku.eq.${sku}`)
-            .limit(1)
+            .eq("external_id", externalId)
             .maybeSingle()
 
+          if (!existingProduct && sku) {
+            const { data: bySku } = await supabase
+              .from("products")
+              .select("id, stock_quantity")
+              .eq("partner_id", partnerId)
+              .eq("sku", sku)
+              .maybeSingle()
+            existingProduct = bySku
+          }
+
           const now = new Date().toISOString()
+          let targetProductId: string | null = null
 
           if (existingProduct) {
-            // Atualiza produto existente
+            targetProductId = existingProduct.id
+            // Atualiza produto existente (sem ncm na tabela products)
             const { error: updateErr } = await supabase
               .from("products")
               .update({
                 name,
                 price,
                 promotional_price: promotionalPrice,
+                cost_price: costPrice,
                 sku,
                 gtin,
                 unit,
-                ncm,
                 min_stock: minStock,
                 stock_quantity: stock,
                 description: description || undefined,
                 images: images.length > 0 ? images : undefined,
+                is_active: isActive,
+                status: isActive ? "ativo" : "inativo",
                 external_id: externalId,
                 external_provider: TINY_PROVIDER,
                 last_external_sync_at: now,
@@ -179,35 +206,82 @@ export async function syncTinyProductsToDudit(params: {
               totalUpdated++
             }
           } else {
-            // Insere novo produto
-            const { error: insertErr } = await supabase
+            // Insere novo produto (sem ncm na tabela products)
+            const { data: createdProduct, error: insertErr } = await supabase
               .from("products")
               .insert({
                 partner_id: partnerId,
-                store_id: storeId || null,
+                store_id: effectiveStoreId,
                 name,
                 price,
                 promotional_price: promotionalPrice,
+                cost_price: costPrice,
                 sku,
                 gtin,
                 unit,
-                ncm,
                 min_stock: minStock,
                 stock_quantity: stock,
                 description: description || "",
                 images: images.length > 0 ? images : [],
-                is_active: detail.situacao !== "I",
+                is_active: isActive,
+                status: isActive ? "ativo" : "inativo",
+                product_type: "Físico",
+                condition: "Novo",
+                show_price_in_store: true,
+                show_in_marketplace: true,
                 external_id: externalId,
                 external_provider: TINY_PROVIDER,
                 last_external_sync_at: now,
                 created_at: now,
                 updated_at: now,
               })
+              .select("id")
+              .single()
 
             if (insertErr) {
               errors.push(`Erro ao criar ${name} (${sku}): ${insertErr.message}`)
             } else {
+              targetProductId = createdProduct?.id || null
               totalCreated++
+            }
+          }
+
+          // Se tiver dados fiscais (NCM), grava na tabela product_fiscal_profiles
+          if (targetProductId && detail.ncm) {
+            try {
+              await supabase
+                .from("product_fiscal_profiles")
+                .upsert(
+                  {
+                    product_id: targetProductId,
+                    store_id: effectiveStoreId,
+                    ncm: detail.ncm.trim(),
+                    origin: Number(detail.origem || 0),
+                    updated_at: now,
+                  },
+                  { onConflict: "product_id" }
+                )
+            } catch (fErr: any) {
+              console.warn(`[TINY] Aviso fiscal produto ${targetProductId}:`, fErr?.message)
+            }
+          }
+
+          // Se tiver peso/dimensões, grava na tabela product_logistics
+          if (targetProductId && (detail.peso_bruto || detail.peso_liquido)) {
+            try {
+              await supabase
+                .from("product_logistics")
+                .upsert(
+                  {
+                    product_id: targetProductId,
+                    weight_gross: Number(detail.peso_bruto || 0),
+                    weight_net: Number(detail.peso_liquido || 0),
+                    updated_at: now,
+                  },
+                  { onConflict: "product_id" }
+                )
+            } catch (lErr: any) {
+              console.warn(`[TINY] Aviso logística produto ${targetProductId}:`, lErr?.message)
             }
           }
         } catch (itemErr: any) {

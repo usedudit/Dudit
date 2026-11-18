@@ -131,6 +131,18 @@ export function suggestMapping(
     return samples
   })
 
+  const hasExplicitNameHeader = normalizedHeaders.some(
+    (h) =>
+      h === "nome" ||
+      h === "nome do produto" ||
+      h === "nome produto" ||
+      h === "produto nome" ||
+      h === "nome do servico" ||
+      h === "nome servico" ||
+      h.startsWith("nome ") ||
+      h.endsWith(" nome"),
+  )
+
   // Step 2: Score each (column, field) pair
   interface CandidateMatch {
     colIndex: number
@@ -146,6 +158,11 @@ export function suggestMapping(
     const sampleValues = columnSamples[colIndex]
 
     for (const field of fields) {
+      // SEO headers (e.g. "Título SEO", "Descrição SEO") should not map to product name or description
+      if (header.includes("seo") && (field.name === "name" || field.name === "description")) {
+        continue
+      }
+
       const searchTerms = [
         field.label,
         field.name,
@@ -162,26 +179,43 @@ export function suggestMapping(
         let confidence = 0
         let exactness = 0
 
+        const isCanonical = term === field.label || term === field.name
+        let canonicalBonus = isCanonical ? 1000 : 0
+
+        // In Brazil, if there is no explicit "Nome" column, "Descrição" is the product/service name
+        if (
+          !hasExplicitNameHeader &&
+          (entityType === "products" || entityType === "services") &&
+          header === "descricao" &&
+          (normalizedTerm === "descricao" || normalizedTerm === "descrição")
+        ) {
+          if (field.name === "name") {
+            canonicalBonus = 2000
+          } else if (field.name === "description") {
+            canonicalBonus = 0
+          }
+        }
+
         if (header === normalizedTerm) {
           confidence = 1.0
-          exactness = 1000 + normalizedTerm.length
+          exactness = 1000 + canonicalBonus + normalizedTerm.length
         } else if (header.startsWith(normalizedTerm)) {
           const ratio = normalizedTerm.length / header.length
           confidence = ratio > 0.6 ? 0.95 : 0.9
-          exactness = 500 + normalizedTerm.length
+          exactness = 500 + canonicalBonus + normalizedTerm.length
         } else if (normalizedTerm.startsWith(header)) {
           const ratio = header.length / normalizedTerm.length
           confidence = ratio > 0.6 ? 0.92 : 0.88
-          exactness = 400 + header.length
+          exactness = 400 + canonicalBonus + header.length
         } else if (header.includes(normalizedTerm)) {
           if (normalizedTerm.length > 3) {
             confidence = 0.82
-            exactness = 200 + normalizedTerm.length
+            exactness = 200 + canonicalBonus + normalizedTerm.length
           }
         } else if (normalizedTerm.includes(header)) {
           if (header.length > 3) {
             confidence = 0.8
-            exactness = 100 + header.length
+            exactness = 100 + canonicalBonus + header.length
           }
         }
 
@@ -248,7 +282,12 @@ export function suggestMapping(
   // Step 3: Optimal global assignment - sort candidates by highest confidence & exactness
   allCandidates.sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence
-    return b.exactness - a.exactness
+    if (b.exactness !== a.exactness) return b.exactness - a.exactness
+    const aField = fields.find((f) => f.name === a.fieldName)
+    const bField = fields.find((f) => f.name === b.fieldName)
+    if (aField?.required && !bField?.required) return -1
+    if (!aField?.required && bField?.required) return 1
+    return 0
   })
 
   const assignedFields = new Set<string>()

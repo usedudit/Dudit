@@ -115,6 +115,41 @@ describe("readSpreadsheet", () => {
     expect(result.rows[0][1]).toBe("15/04/1988")
   })
 
+  it("lê com sucesso planilha no formato .xls (BIFF8 / Excel 97-2004) como a do Tiny ERP", async () => {
+    const XLSX = await import("xlsx")
+    const wb = XLSX.utils.book_new()
+    const data = [
+      ["Código (SKU)", "Descrição", "Unidade", "Preço", "Estoque", "Descrição complementar", "Título SEO"],
+      ["JOG-IA", "Jogo Imagem & Ação", "Un", "79.99", "10", "Jogo clássico infantil", ""],
+      ["CAM-01", "Camiseta Algodão", "Un", "129.90", "20", "Camiseta 100% algodão", "Camiseta SEO"],
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    XLSX.utils.book_append_sheet(wb, ws, "Planilha 1")
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xls" })
+
+    const res = await readSpreadsheet(asArrayBuffer(buffer), "produtos.xls")
+    expect(res.headers).toEqual([
+      "Código (SKU)",
+      "Descrição",
+      "Unidade",
+      "Preço",
+      "Estoque",
+      "Descrição complementar",
+      "Título SEO",
+    ])
+    expect(res.totalRows).toBe(2)
+    expect(res.rows[0][0]).toBe("JOG-IA")
+    expect(res.rows[0][1]).toBe("Jogo Imagem & Ação")
+
+    const mapping = suggestMapping(res.headers, "products", res.rows)
+    const mapped = new Map(mapping.map((m) => [m.header, m.field]))
+    expect(mapped.get("Código (SKU)")).toBe("sku")
+    expect(mapped.get("Descrição")).toBe("name")
+    expect(mapped.get("Descrição complementar")).toBe("description")
+    expect(mapped.get("Preço")).toBe("price")
+    expect(mapped.get("Estoque")).toBe("stock_quantity")
+  })
+
   it("mapeia automaticamente os campos obrigatórios de produtos, clientes e serviços exportados", async () => {
     const cases = [
       {

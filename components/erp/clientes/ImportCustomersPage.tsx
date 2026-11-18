@@ -706,14 +706,11 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                         {step === "mapping" && (
                             <div className="flex flex-col gap-4">
                                 {hasDuplicateMapping && (
-                                    <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
-                                        <AlertCircleIcon size={18} className="shrink-0" />
-                                        <span>Existem campos do sistema atribuídos a mais de uma coluna da planilha. Por favor, desmarque as duplicadas para prosseguir.</span>
-                                    </div>
+                                    <InfoCard message="Existem campos do sistema atribuídos a mais de uma coluna da planilha. Por favor, desmarque as duplicadas para prosseguir." color="red" />
                                 )}
 
                                 {/* Desktop Table View */}
-                                <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
+                                <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface rounded-xl">
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
@@ -737,7 +734,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                 </div>
 
                                 {/* Mobile Card List View */}
-                                <div className="md:hidden bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
+                                <div className="md:hidden bg-white dark:bg-dark-surface rounded-xl">
                                     {mapping.map((col) => (
                                         <MappingMobileItem
                                             key={col.headerIndex}

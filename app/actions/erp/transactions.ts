@@ -2011,7 +2011,23 @@ export async function getOrderInstallmentsAction(input: {
         if (groupIds.length > 0) {
             rowsQuery = rowsQuery.in("installment_group_id", groupIds)
         } else if (sanitizedOrderId) {
-            rowsQuery = rowsQuery.eq("order_id", sanitizedOrderId).not("installment_group_id", "is", null)
+            // public.transactions NÃO tem order_id. O vínculo com o pedido vem de
+            // payments.order_id -> transactions.payment_id (grupos legados podem
+            // não ter installment_groups.order_id preenchido).
+            const { data: orderPayments, error: orderPaymentsErr } = await supabase
+                .from("payments")
+                .select("id")
+                .eq("partner_id", input.partnerId)
+                .eq("order_id", sanitizedOrderId)
+
+            if (orderPaymentsErr) throw orderPaymentsErr
+
+            const paymentIds = (orderPayments || []).map((p: any) => p.id).filter(Boolean)
+            if (paymentIds.length === 0) {
+                return { success: true as const, data: [] }
+            }
+
+            rowsQuery = rowsQuery.in("payment_id", paymentIds).not("installment_group_id", "is", null)
         } else {
             return { success: true as const, data: [] }
         }
