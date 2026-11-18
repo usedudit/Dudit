@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance, enrichMarketplaceDistance, formatDistanceLabel } from "@/lib/services/location.service"
+import { applySellerDiversity, calcTrendingScore } from "@/lib/marketplace/ranking"
 
 const DISCOVER_DEBUG = false
 
@@ -460,11 +461,11 @@ const BASE_FIELDS = `id, short_id, store_id, partner_id, name, price, promotiona
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
-    id, is_showcase_active
+    id, is_showcase_active, marketplace_reputation
 ),
 stores!left(
     id, short_id, name, slug, description, logo_url, banner_url,
-    phone, is_showcase_active,
+    phone, is_showcase_active, marketplace_reputation,
     addresses!store_id!left(city, state, neighborhood, latitude, longitude),
     delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)
 )`
@@ -588,52 +589,78 @@ function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
 const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string[]): Promise<RawProduct[]> => {
     if (allIdsKey !== "all" && allIds.length === 0) return []
     const supabase = getAdminClient()
-    let query = supabase
-        .from("products")
-        .select(`${BASE_FIELDS}, ${STATS_FIELDS}, marketplace_score, condition, created_at, category_id, ${PARTNER_JOIN}`)
-        // Products can use either the legacy Portuguese status or the newer
-        // normalized value. Services already accept both; keep the homepage
-        // consistent so branch products are not filtered out.
-        .in("status", ["ativo", "active"])
-        .is("deleted_at", null)
-        .eq("show_in_marketplace", true)
 
-    if (allIdsKey !== "all") {
-        query = query.in("partner_id", allIds)
+    const makeQuery = () => {
+        let q = supabase
+            .from("products")
+            .select(`${BASE_FIELDS}, ${STATS_FIELDS}, marketplace_score, condition, created_at, category_id, ${PARTNER_JOIN}`)
+            .in("status", ["ativo", "active"])
+            .is("deleted_at", null)
+            .eq("show_in_marketplace", true)
+
+        if (allIdsKey !== "all") {
+            q = q.in("partner_id", allIds)
+        }
+        return q
     }
 
-    const { data, error } = await query
-        .order("created_at", { ascending: false })
-        .limit(150)
+    // Busca balanceada: top scored + produtos recém-chegados em paralelo
+    const [topScoredRes, recentRes] = await Promise.all([
+        makeQuery().order("marketplace_score", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(150),
+        makeQuery().order("created_at", { ascending: false }).limit(75),
+    ])
 
-    if (error || !data) return []
-    return data as RawProduct[]
+    const topScored = (topScoredRes.data || []) as RawProduct[]
+    const recent = (recentRes.data || []) as RawProduct[]
+
+    const seen = new Set<string>()
+    const pool: RawProduct[] = []
+    for (const item of [...topScored, ...recent]) {
+        if (!seen.has(item.id)) {
+            seen.add(item.id)
+            pool.push(item)
+        }
+    }
+
+    return pool
 })
 
 const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string[]): Promise<any[]> => {
     if (allIdsKey !== "all" && allIds.length === 0) return []
     const supabase = getAdminClient()
-    let query = supabase
-        .from("services")
-        .select(`id, short_id, store_id, partner_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
-        .in("status", ["ativo", "active"])
-        .is("deleted_at", null)
-        .eq("show_in_marketplace", true)
 
-    if (allIdsKey !== "all") {
-        query = query.in("partner_id", allIds)
+    const makeQuery = () => {
+        let q = supabase
+            .from("services")
+            .select(`id, short_id, store_id, partner_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_score, views_count, bookings_last_30_days, favorites_count, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+            .in("status", ["ativo", "active"])
+            .is("deleted_at", null)
+            .eq("show_in_marketplace", true)
+
+        if (allIdsKey !== "all") {
+            q = q.in("partner_id", allIds)
+        }
+        return q
     }
 
-    const { data, error } = await query
-        .order("created_at", { ascending: false })
-        .limit(60)
+    const [topScoredRes, recentRes] = await Promise.all([
+        makeQuery().order("marketplace_score", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(60),
+        makeQuery().order("created_at", { ascending: false }).limit(40),
+    ])
 
-    if (error) {
-        console.error("[Discover] getSharedHomeServicesPool error:", error)
-        return []
+    const topScored = (topScoredRes.data || []) as any[]
+    const recent = (recentRes.data || []) as any[]
+
+    const seen = new Set<string>()
+    const pool: any[] = []
+    for (const item of [...topScored, ...recent]) {
+        if (!seen.has(item.id)) {
+            seen.add(item.id)
+            pool.push(item)
+        }
     }
-    if (!data) return []
-    return data as any[]
+
+    return pool
 })
 
 const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]): Promise<any[]> => {
@@ -643,15 +670,16 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
         .from("stores")
         .select(`
             id, short_id, name, slug, description, logo_url, banner_url,
-            phone, rating, is_showcase_active, partner_id,
+            phone, rating, is_showcase_active, partner_id, marketplace_reputation,
             addresses!store_id!left(city, state, neighborhood, latitude, longitude),
             delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer),
-            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+            partners!inner(id, category_id, marketplace_reputation, completed_orders_count, vendas_totais, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
         .in("partner_id", allIds)
+        .order("marketplace_reputation", { ascending: false, nullsFirst: false })
         .order("rating", { ascending: false, nulls: "last" })
-        .limit(30)
+        .limit(50)
 
 
     if (error || !data) return []
@@ -678,9 +706,9 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const tagged = applyTierSort(trendingData as RawProduct[], tiers, item => {
         const r = item as RawProduct
-        const engagement = (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
-        const score = engagement > 0 ? engagement : ((r as any).marketplace_score ?? 0)
-        return score + recencyBoost(r.created_at)
+        const dbScore = Number((r as any).marketplace_score || 0)
+        const trending = calcTrendingScore(r)
+        return Math.max(dbScore, trending) + recencyBoost(r.created_at) / 10
     }, ctx.city, ctx.state)
 
     // Mantém todos os candidatos: itens sem sinal de engajamento apenas ranqueiam
@@ -696,7 +724,8 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "trending",
@@ -704,7 +733,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.trending,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?type=produtos`,
     }
 }
@@ -809,7 +838,10 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    const tagged = applyTierSort(products as RawProduct[], tiers, () => 0, ctx.city, ctx.state)
+    const tagged = applyTierSort(products as RawProduct[], tiers, item => {
+        const r = item as RawProduct
+        return Math.max(Number((r as any).marketplace_score || 0), calcTrendingScore(r))
+    }, ctx.city, ctx.state)
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("endingSoon", ctx, displayScope)
 
@@ -819,7 +851,8 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const endsAt = endsAtMap.get(campaignIds[0])
         let timeLeft = "Acaba hoje"
@@ -840,7 +873,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.endingSoon,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=ending-soon`,
     }
 }
@@ -973,6 +1006,8 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         ...taggedProducts.map(item => ({ ...item, _itemType: "produto" as const })),
         ...taggedServices.map(item => ({ ...item, _itemType: "servico" as const })),
     ].sort((a, b) => {
+        const tierDiff = (a._tier ?? 0) - (b._tier ?? 0)
+        if (tierDiff !== 0) return tierDiff
         const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
         const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
         return bTime - aTime
@@ -1031,8 +1066,8 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return processProduct(item as RawProduct)
     }
 
-
-    const items = scoped.slice(0, 20).map(recentMapper)
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(recentMapper)
 
     return {
         id: "recent",
@@ -1040,7 +1075,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.recent,
         items,
-        _allItems: scoped.map(recentMapper),
+        _allItems: diversified.map(recentMapper),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=recent`,
     }
 }
@@ -1101,7 +1136,8 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const origPrice = Number(raw.price) > 0
             ? Number(raw.price)
@@ -1123,7 +1159,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.gems,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=gems`,
     }
 }
@@ -1241,7 +1277,8 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "personalized",
@@ -1249,7 +1286,7 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.personalized,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=for-you`,
     }
 }
@@ -1284,7 +1321,8 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "bestSellers",
@@ -1292,7 +1330,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.bestSellers,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=best-sellers`,
     }
 }
@@ -1327,7 +1365,8 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw)
     })
@@ -1338,7 +1377,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.topRated,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=top-rated`,
     }
 }
@@ -1384,7 +1423,8 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => {
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const origPrice = Number(raw.price) > 0
             ? Number(raw.price)
@@ -1404,7 +1444,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.promos,
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=promos`,
     }
 }
@@ -1487,7 +1527,8 @@ async function fetchThemedSection(
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) return null
 
-    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: theme.id,
@@ -1495,7 +1536,7 @@ async function fetchThemedSection(
         subtitle: theme.subtitle,
         gatilho: GATILHOS_MAP[theme.id] || "desejo",
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}/${theme.slug}`,
     }
 }
@@ -1515,7 +1556,19 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const tagged = applyTierSort(data as any[], tiers, item => item.rating ?? 0, ctx.city, ctx.state)
+    const tagged = applyTierSort(data as any[], tiers, item => {
+        const dbScore = Number(item.marketplace_score || 0)
+        const trending = calcTrendingScore({
+            bookings_last_30_days: item.bookings_last_30_days,
+            views_count: item.views_count,
+            favorites_count: item.favorites_count,
+            rating: item.rating,
+            created_at: item.created_at,
+            itemType: "servico"
+        })
+        const score = Math.max(dbScore, trending)
+        return score > 0 ? score : (Number(item.rating || 0) / 5)
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("services", ctx, displayScope)
@@ -1586,7 +1639,8 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         }
     }
 
-    const items = scoped.slice(0, 20).map(serviceMapper)
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(serviceMapper)
 
     return {
         id: "services",
@@ -1594,7 +1648,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.services,
         items,
-        _allItems: scoped.map(serviceMapper),
+        _allItems: diversified.map(serviceMapper),
         seeMoreLink: `/explorar/${ctx.citySlug}?type=servicos`,
     }
 }
@@ -1615,7 +1669,11 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const tagged = applyTierSort(data as any[], tiers, item => item.rating ?? 0, ctx.city, ctx.state)
+    const tagged = applyTierSort(data as any[], tiers, item => {
+        const rep = Number(item.marketplace_reputation ?? item.partners?.marketplace_reputation ?? 0)
+        const rating = Number(item.rating ?? 0) / 5
+        return rep > 0 ? (rep * 0.7 + rating * 0.3) : rating
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topVitrines", ctx, displayScope)
@@ -1698,7 +1756,8 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     const tagged = applyTierSort(pool, tiers, item => {
         const r = item as RawProduct
-        return r.created_at ? new Date(r.created_at).getTime() : 0
+        const score = Math.max(Number((r as any).marketplace_score || 0), calcTrendingScore(r))
+        return score > 0 ? score : (r.created_at ? new Date(r.created_at).getTime() : 0)
     }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
@@ -1712,7 +1771,8 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         return null
     }
 
-    const items = scoped.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const diversified = applySellerDiversity(scoped)
+    const items = diversified.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "allProducts",
@@ -1720,7 +1780,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         subtitle,
         gatilho: "variedade",
         items,
-        _allItems: scoped.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?type=produtos`,
     }
 }
@@ -1744,31 +1804,13 @@ async function fetchBrasilTodo(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     const sorted = [...pool].sort((a, b) => {
         const rA = a as RawProduct
         const rB = b as RawProduct
-        const engA = (rA.views_last_30_days ?? 0) + (rA.favorites_count ?? 0) * 2 + (rA.sales_last_30_days ?? 0) * 5
-        const scoreA = (engA > 0 ? engA : ((rA as any).marketplace_score ?? 0)) + recencyBoost(rA.created_at)
-        const engB = (rB.views_last_30_days ?? 0) + (rB.favorites_count ?? 0) * 2 + (rB.sales_last_30_days ?? 0) * 5
-        const scoreB = (engB > 0 ? engB : ((rB as any).marketplace_score ?? 0)) + recencyBoost(rB.created_at)
+        const scoreA = Math.max(Number((rA as any).marketplace_score || 0), calcTrendingScore(rA)) + recencyBoost(rA.created_at)
+        const scoreB = Math.max(Number((rB as any).marketplace_score || 0), calcTrendingScore(rB)) + recencyBoost(rB.created_at)
         return scoreB - scoreA
     })
 
-    // Limitar para diversidade (máximo 2 produtos por parceiro/loja)
-    const partnerCounts = new Map<string, number>()
-    const diversified: RawProduct[] = []
-    const overflow: RawProduct[] = []
-
-    for (const item of sorted) {
-        const pid = item.partner_id || "unknown"
-        const count = partnerCounts.get(pid) || 0
-        if (count < 2) {
-            partnerCounts.set(pid, count + 1)
-            diversified.push(item)
-        } else {
-            overflow.push(item)
-        }
-    }
-
-    const finalCandidates = [...diversified, ...overflow]
-    const items = finalCandidates.slice(0, 20).map(item => processProduct(item as RawProduct))
+    const diversified = applySellerDiversity(sorted)
+    const items = diversified.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "brasilTodo",
@@ -1776,7 +1818,7 @@ async function fetchBrasilTodo(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         subtitle: "Descubra produtos e novidades de lojas de todo o país",
         gatilho: "curiosidade",
         items,
-        _allItems: finalCandidates.map(item => processProduct(item as RawProduct)),
+        _allItems: diversified.map(item => processProduct(item as RawProduct)),
         seeMoreLink: "/explorar/brasil",
     }
 }

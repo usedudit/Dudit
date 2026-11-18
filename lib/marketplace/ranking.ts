@@ -6,8 +6,11 @@ export type RankableItem = {
   id: string
   partner_id?: string
   store_id?: string
-  partners?: { id?: string; store_id?: string } | null
+  partners?: { id?: string; store_id?: string; marketplace_reputation?: number; seller_reputation?: number } | null
+  stores?: { id?: string; partner_id?: string; marketplace_reputation?: number } | null
   marketplace_score?: number
+  seller_reputation?: number
+  marketplace_reputation?: number
   rating?: number
   created_at?: string
   _searchRank?: number
@@ -56,11 +59,29 @@ export function calcTrendingScore(item: {
 
 /** Category browse: 50% popularity, 20% relevance placeholder, 15% freshness, 10% rating, 5% seller rep */
 export function calcCategoryBrowseScore(
-  item: RankableItem & { marketplace_score?: number; seller_reputation?: number },
+  item: RankableItem & {
+    marketplace_score?: number
+    seller_reputation?: number
+    marketplace_reputation?: number
+    sales_last_30_days?: number
+    bookings_last_30_days?: number
+    views_last_30_days?: number
+    views_count?: number
+    favorites_count?: number
+    itemType?: string
+  },
 ): number {
-  const popularity = Number(item.marketplace_score ?? 0)
+  const dbScore = Number(item.marketplace_score ?? 0)
+  const trending = calcTrendingScore(item)
+  const popularity = Math.max(dbScore, trending)
   const rating = Number(item.rating ?? 0)
-  const sellerRep = Number(item.seller_reputation ?? 0)
+  const sellerRep = Number(
+    item.seller_reputation ??
+    item.marketplace_reputation ??
+    (item.partners as any)?.marketplace_reputation ??
+    (item.stores as any)?.marketplace_reputation ??
+    0
+  )
   const fresh = freshnessFactor(item.created_at)
 
   return (
@@ -144,7 +165,7 @@ export function calcVendorItemScore(item: any): number {
   if (!item) return 0
   const dbScore = Number(item.marketplace_score || 0)
   const trending = calcTrendingScore(item)
-  const hasPromo = (item.promotional_price || item.is_on_promotion) ? 0.1 : 0
+  const hasPromo = (item.promotional_price || item.is_on_promotion || (Array.isArray(item._promotions) && item._promotions.length > 0)) ? 0.1 : 0
 
   return Math.max(dbScore, trending) + hasPromo
 }

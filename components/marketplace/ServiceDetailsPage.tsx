@@ -608,7 +608,7 @@ export function ServiceDetailsPageClient({
         if (!selectedAddress || !targetPartnerId) return
         let active = true
 
-         async function calculateForAddress() {
+        async function calculateForAddress() {
             // Só cobra/valida entrega cuando o serviço aceita atendimento a domicílio.
             // Para serviços apenas "no estabelecimento", cotar o frete de entrega
             // jogava "fora do raio de entrega" indevidamente.
@@ -1201,7 +1201,7 @@ export function ServiceDetailsPageClient({
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">
                                         {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.totalDiscountPercent}% OFF
                                     </span>
                                 </div>
@@ -1241,7 +1241,7 @@ export function ServiceDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -1267,7 +1267,7 @@ export function ServiceDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>

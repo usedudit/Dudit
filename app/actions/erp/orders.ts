@@ -3130,6 +3130,17 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         }),
       );
     }
+
+    // Export order to Tiny ERP if configured (non-blocking)
+    try {
+      import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
+        exportDuditOrderToTiny(order.id).catch((err) => {
+          console.error("[createOrderAction] Tiny export failed:", err)
+        })
+      }).catch((tinyErr) => {
+        console.error("[createOrderAction] Error loading Tiny integration:", tinyErr)
+      })
+    } catch {}
   }
 
   if (
@@ -4840,6 +4851,17 @@ export async function updateERPOrderAction(
       createdByUserId: user.id,
       storeId: (currentOrder as any).store_id || data.storeId || null,
     });
+
+    // Export order to Tiny ERP if configured (non-blocking)
+    try {
+      import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
+        exportDuditOrderToTiny(orderId).catch((err) => {
+          console.error("[saveOrderAction] Tiny export failed:", err)
+        })
+      }).catch((tinyErr) => {
+        console.error("[saveOrderAction] Error loading Tiny integration:", tinyErr)
+      })
+    } catch {}
   }
 
   // Sync payment status to linked appointments
@@ -6102,6 +6124,15 @@ export async function updateOrdersStatusInBatchAction(payload: {
         console.error("[orders_cancel_commissions_goals] error:", err);
       });
 
+      const tinyCancelPromise = (async () => {
+        try {
+          const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
+          await updateTinyOrderStatus({ orderId: order.id, situacao: "cancelado" })
+        } catch (tinyErr) {
+          console.error("[orders_cancel_tiny] error:", tinyErr)
+        }
+      })()
+
       await Promise.all([
         appointmentsSyncPromise,
         financialSyncPromise,
@@ -6109,6 +6140,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         refundPromise,
         commissionsGoalsPromise,
         carrierLabelPromise,
+        tinyCancelPromise,
       ]);
 
       return {
@@ -6551,6 +6583,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
             storeId: order.store_id || null,
           });
         }
+
+        // Export order to Tiny ERP if configured (non-blocking)
+        try {
+          import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
+            exportDuditOrderToTiny(order.id).catch((err) => {
+              console.error("[updateOrderStatusAction] Tiny export failed:", err)
+            })
+          }).catch((tinyErr) => {
+            console.error("[updateOrderStatusAction] Error loading Tiny integration:", tinyErr)
+          })
+        } catch {}
       }
 
       if (capabilities.hasFinancial) {

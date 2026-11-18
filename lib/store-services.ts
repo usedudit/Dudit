@@ -76,7 +76,7 @@ export async function listStoreServices(
 ): Promise<ResolvedService[]> {
     const supabase = createAdminClient()
 
-    const limit = options?.limit ?? 100
+    const limit = options?.limit ?? 250
     const offset = options?.offset ?? 0
 
     let query = supabase

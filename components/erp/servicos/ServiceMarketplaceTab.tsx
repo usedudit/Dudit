@@ -167,7 +167,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         isEditing={false}
                     />
 
-                    <SidebarCard hasSeparator title="Tags e Buscas">
+                    <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (
@@ -398,7 +398,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
 
                     <FormSection
-                        title="Tags e Buscas"
+                        title="Palavras-chave de busca"
                         description="Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca."
                         hasSeparator
                     >
@@ -493,7 +493,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
 
                     {/* Card de Tags */}
-                    <SidebarCard hasSeparator title="Tags e Buscas">
+                    <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                         <div className="space-y-3">
                             <p className="text-sm text-brand-inactive-text mb-2">
                                 Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca.
@@ -515,7 +515,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                 tags={tags}
                 onChange={(t) => manualChange("tags", t)}
                 disabled={!isEditing}
-                title="Tags e Buscas"
+                title="Palavras-chave de busca"
                 description="Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca."
             />
         </div>

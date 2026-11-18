@@ -1,11 +1,11 @@
 ﻿"use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input, FormDropdown, RichTextEditor, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard } from "@/components/reusable"
 import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
 import { TagsListItem } from "@/components/erp/shared/TagsListItem"
-import { TrashIcon, PlusIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
+import { TrashIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
 import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import ProductVideoSection from "./ProductVideoSection"
 import { ProductAddonsSection } from "./ProductAddonsSection"

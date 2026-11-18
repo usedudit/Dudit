@@ -1506,7 +1506,7 @@ export function ProductDetailsPageClient({
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">
                                         {formatMoney(pricing.original)}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.totalDiscountPercent}% OFF
                                     </span>
                                 </div>
@@ -1546,7 +1546,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -1572,7 +1572,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>

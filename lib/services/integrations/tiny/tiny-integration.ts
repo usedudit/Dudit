@@ -56,7 +56,12 @@ export async function getValidTinyClient(partnerId: string): Promise<TinyClient>
   try {
     token = decrypt(integration.access_token_encrypted, "tiny")
   } catch (err) {
-    captureError(err, { module: "integrations", provider: "tiny", partnerId })
+    captureError(err, {
+      module: "integrations",
+      action: "getValidTinyClient",
+      partnerId,
+      metadata: { provider: "tiny" },
+    })
     throw new Error("Falha ao descriptografar token do Tiny ERP.")
   }
 
@@ -101,7 +106,7 @@ export async function syncTinyProductsToDudit(params: {
   }
 
   addMonitoringBreadcrumb({
-    domain: "integrations",
+    domain: "stock",
     message: "tiny.sync_products.started",
     metadata: { partnerId, storeId: effectiveStoreId, maxPages },
   })
@@ -191,8 +196,10 @@ export async function syncTinyProductsToDudit(params: {
                 stock_quantity: stock,
                 description: description || undefined,
                 images: images.length > 0 ? images : undefined,
-                is_active: isActive,
                 status: isActive ? "ativo" : "inativo",
+                deleted_at: null,
+                deleted_by: null,
+                deleted_reason: null,
                 external_id: externalId,
                 external_provider: TINY_PROVIDER,
                 last_external_sync_at: now,
@@ -223,7 +230,6 @@ export async function syncTinyProductsToDudit(params: {
                 stock_quantity: stock,
                 description: description || "",
                 images: images.length > 0 ? images : [],
-                is_active: isActive,
                 status: isActive ? "ativo" : "inativo",
                 product_type: "Físico",
                 condition: "Novo",
@@ -320,7 +326,12 @@ export async function syncTinyProductsToDudit(params: {
       errors,
     }
   } catch (err: any) {
-    captureError(err, { module: "integrations", provider: "tiny", partnerId })
+    captureError(err, {
+      module: "integrations",
+      action: "syncTinyProductsToDudit",
+      partnerId,
+      metadata: { provider: "tiny" },
+    })
     return {
       success: false,
       totalProcessed,
@@ -454,10 +465,14 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 
     // Registra na timeline de auditoria
     await logAuditEvent({
-      entity_type: "order",
-      entity_id: orderId,
-      action: "tiny_order_exported",
-      details: {
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "tiny_order_exported",
+      changeLines: [`Pedido exportado para o Tiny ERP (Nº ${tinyRes.numero || tinyRes.id})`],
+      source: "system",
+      metadata: {
         tinyOrderId: tinyRes.id,
         tinyOrderNumber: tinyRes.numero,
       },
@@ -469,7 +484,12 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       tinyOrderNumber: tinyRes.numero,
     }
   } catch (err: any) {
-    captureError(err, { module: "integrations", provider: "tiny", orderId })
+    captureError(err, {
+      module: "integrations",
+      action: "exportDuditOrderToTiny",
+      entityId: orderId,
+      metadata: { provider: "tiny" },
+    })
 
     // Salva status de erro no pedido
     await supabase
@@ -485,6 +505,64 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     return {
       success: false,
       error: err?.message || "Erro ao exportar pedido para o Tiny ERP",
+    }
+  }
+}
+
+/**
+ * Atualiza a situação de um pedido existente no Tiny ERP (ex: cancelado, aprovado)
+ */
+export async function updateTinyOrderStatus(params: {
+  orderId: string
+  situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
+}): Promise<{ success: boolean; error?: string }> {
+  const { orderId, situacao } = params
+  const supabase = createAdminClient()
+
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select("id, partner_id, external_order_id, external_provider, external_sync_status")
+    .eq("id", orderId)
+    .single()
+
+  if (orderErr || !order) {
+    return { success: false, error: "Pedido não encontrado" }
+  }
+
+  // Se o pedido não foi exportado para o Tiny, não há o que atualizar lá
+  if (order.external_provider !== TINY_PROVIDER || !order.external_order_id) {
+    return { success: true }
+  }
+
+  try {
+    const client = await getValidTinyClient(order.partner_id)
+    await client.updateOrderStatus(order.external_order_id, situacao)
+
+    await logAuditEvent({
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "tiny_order_status_updated",
+      changeLines: [`Situação no Tiny ERP atualizada para: ${situacao}`],
+      source: "system",
+      metadata: {
+        tinyOrderId: order.external_order_id,
+        situacao,
+      },
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    captureError(err, {
+      module: "integrations",
+      action: "updateTinyOrderStatus",
+      entityId: orderId,
+      metadata: { provider: "tiny", situacao },
+    })
+    return {
+      success: false,
+      error: err?.message || "Erro ao atualizar situação do pedido no Tiny ERP",
     }
   }
 }

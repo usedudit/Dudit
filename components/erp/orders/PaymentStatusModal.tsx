@@ -336,22 +336,34 @@ export default function PaymentStatusModal({
   };
 
   const targetOrder = currentOrder || order;
-  const breakdown = targetOrder ? normalizeBreakdown(targetOrder) : [];
-  const depositSummary = targetOrder
-    ? getOrderDepositSummary(targetOrder)
-    : null;
-  const totalOrder = targetOrder ? getOrderTotalAmount(targetOrder) : 0;
-  const totalPaid = targetOrder ? getOrderPaidAmount(targetOrder) : 0;
-  const totalRemaining = targetOrder
-    ? getOrderRemainingBalance(targetOrder)
-    : 0;
-  const baseFrozen = targetOrder
-    ? isOrderFinanciallyFrozen(targetOrder)
-    : false;
+  const targetOrderId = targetOrder?.id || targetOrder?.originalId;
+  const targetOrderNumber = targetOrder?.order_number;
+
+  const breakdown = useMemo(() => (targetOrder ? normalizeBreakdown(targetOrder) : []), [targetOrder]);
+  const depositSummary = useMemo(() => (targetOrder ? getOrderDepositSummary(targetOrder) : null), [targetOrder]);
+  const totalOrder = useMemo(() => (targetOrder ? getOrderTotalAmount(targetOrder) : 0), [targetOrder]);
+  const totalPaid = useMemo(() => (targetOrder ? getOrderPaidAmount(targetOrder) : 0), [targetOrder]);
+  const totalRemaining = useMemo(() => (targetOrder ? getOrderRemainingBalance(targetOrder) : 0), [targetOrder]);
+  const baseFrozen = useMemo(() => (targetOrder ? isOrderFinanciallyFrozen(targetOrder) : false), [targetOrder]);
   const frozen =
     baseFrozen && !(depositSummary?.usesDeposit && totalRemaining > 0.009);
 
-  const targetOrderId = targetOrder?.id || targetOrder?.originalId;
+  const handleClearTargetLeg = useCallback(() => setSelectedReceiptLeg(null), []);
+  const handleSelectLeg = useCallback((leg: PaymentBreakdownLeg) => setSelectedReceiptLeg({ ...leg }), []);
+  const handlePayInstallment = useCallback((inst: OrderInstallmentItem) => setSelectedInstallmentForPayment(inst), []);
+  const handleValidityChange = useCallback((valid: boolean) => {
+    setCanSubmitBalance((prev) => (prev === valid ? prev : valid));
+  }, []);
+  const handleHeaderStateChange = useCallback(
+    (header: { title: string; canGoBack: boolean; onGoBack: () => void }) => {
+      setCollectorHeader((prev) =>
+        prev.title === header.title && prev.canGoBack === header.canGoBack
+          ? prev
+          : header,
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isOpen || !targetOrderId) return;
@@ -389,7 +401,7 @@ export default function PaymentStatusModal({
       const res = await getOrderInstallmentsAction({
         partnerId,
         orderId: String(targetOrderId),
-        orderNumber: targetOrder?.order_number,
+        orderNumber: targetOrderNumber,
       });
       if (res.success && Array.isArray(res.data)) {
         setOrderInstallments(res.data);
@@ -400,13 +412,13 @@ export default function PaymentStatusModal({
       console.error("Erro ao carregar parcelas do pedido:", err);
       setOrderInstallments([]);
     }
-  }, [targetOrderId, partnerId, targetOrder?.order_number]);
+  }, [targetOrderId, partnerId, targetOrderNumber]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && targetOrderId && partnerId) {
       void fetchOrderInstallments();
     }
-  }, [isOpen, fetchOrderInstallments]);
+  }, [isOpen, targetOrderId, partnerId, fetchOrderInstallments]);
 
   const isMpOrder = Boolean(
     targetOrder?.payment_provider === "Mercado Pago" ||
@@ -1514,10 +1526,10 @@ export default function PaymentStatusModal({
                         : undefined
                     }
                     syncing={syncing}
-                    onSelectLeg={(leg) => setSelectedReceiptLeg({ ...leg })}
+                    onSelectLeg={handleSelectLeg}
                     hasRemainingBalance={!isFullyPaid && totalRemaining > 0.009}
                     installments={orderInstallments}
-                    onPayInstallment={(inst) => setSelectedInstallmentForPayment(inst)}
+                    onPayInstallment={handlePayInstallment}
                   />
 
                   {!isFullyPaid &&
@@ -1530,13 +1542,13 @@ export default function PaymentStatusModal({
                       remainingBalance={totalRemaining}
                       disabled={loading || syncing}
                       onLegsReady={onLegsReady}
-                      onValidityChange={setCanSubmitBalance}
+                      onValidityChange={handleValidityChange}
                       lockedMethodLabel={lockedMethod}
                       lockedInstallments={lockedInstallments}
                       targetLeg={selectedReceiptLeg}
-                      onClearTargetLeg={() => setSelectedReceiptLeg(null)}
+                      onClearTargetLeg={handleClearTargetLeg}
                       onConfirmPayment={handleSubmit}
-                      onHeaderStateChange={setCollectorHeader}
+                      onHeaderStateChange={handleHeaderStateChange}
                     />
                   ) : isFullyPaid ? (
                     <div className="my-auto py-10">

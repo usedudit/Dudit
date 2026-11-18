@@ -226,6 +226,21 @@ export class TinyClient {
       numero: registros.numero,
     }
   }
+
+  /**
+   * Altera a situação de um pedido no Tiny ERP
+   * Situações aceitas: 'aberto', 'aprovado', 'preparando_envio', 'faturado', 'pronto_envio', 'enviado', 'entregue', 'cancelado', 'nao_entregue'
+   */
+  async updateOrderStatus(
+    id: string | number,
+    situacao: "aberto" | "aprovado" | "preparando_envio" | "faturado" | "pronto_envio" | "enviado" | "entregue" | "cancelado" | "nao_entregue"
+  ): Promise<boolean> {
+    await this.request("pedido.alterar.situacao.php", {
+      id: String(id),
+      situacao,
+    })
+    return true
+  }
 }
 
 export function createTinyClient(token: string): TinyClient {

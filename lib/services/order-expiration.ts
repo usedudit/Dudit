@@ -344,6 +344,14 @@ export async function checkAndExpireOrder(
     console.error("[order-expiration] Error syncing appointments for expired order:", syncErr)
   }
 
+  // Sync cancellation to external ERP (Tiny) if order was exported
+  try {
+    const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
+    await updateTinyOrderStatus({ orderId, situacao: "cancelado" })
+  } catch (tinyErr) {
+    console.error("[order-expiration] Error syncing cancellation to Tiny:", tinyErr)
+  }
+
   try {
     const { revalidateMarketplace } = await import("@/lib/utils/revalidation")
     await revalidateMarketplace()
