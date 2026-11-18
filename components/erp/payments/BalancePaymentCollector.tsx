@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { formatCurrency } from "@/lib/utils"
 import { Button, AlertModal } from "@/components/reusable"
 import { ChevronLeftIcon } from "@/lib/icons"
@@ -127,6 +127,11 @@ export function BalancePaymentCollector({
 
   const canGoBack = !isLocked && view !== "methods"
 
+  const onClearTargetLegRef = useRef(onClearTargetLeg)
+  onClearTargetLegRef.current = onClearTargetLeg
+  const onValidityChangeRef = useRef(onValidityChange)
+  onValidityChangeRef.current = onValidityChange
+
   const handleGoBack = useCallback(() => {
     if (view === "method_type_select" || view === "split_method_select") {
       setView(view === "split_method_select" ? "split" : "methods")
@@ -134,13 +139,23 @@ export function BalancePaymentCollector({
     }
     setView("methods")
     setSelectedMethod(null)
-    onClearTargetLeg?.()
-    onValidityChange?.(false)
-  }, [view, onClearTargetLeg, onValidityChange])
+    onClearTargetLegRef.current?.()
+    onValidityChangeRef.current?.(false)
+  }, [view])
 
+  const lastHeaderStateRef = useRef<{ title: string; canGoBack: boolean } | null>(null)
   useEffect(() => {
+    const title = getCollectorTitle()
+    if (
+      lastHeaderStateRef.current &&
+      lastHeaderStateRef.current.title === title &&
+      lastHeaderStateRef.current.canGoBack === canGoBack
+    ) {
+      return
+    }
+    lastHeaderStateRef.current = { title, canGoBack }
     onHeaderStateChange?.({
-      title: getCollectorTitle(),
+      title,
       canGoBack,
       onGoBack: handleGoBack,
     })

@@ -198,6 +198,41 @@ export async function applySuperFreteShipmentStatus(params: {
     }
   }
 
+  // Sincroniza rastreio e status logísticos com o Tiny ERP (quando aplicável)
+  if (shipment.order_id && shipment.kind !== "return") {
+    if (trackingChanged && data.tracking) {
+      import("@/lib/services/integrations/tiny/tiny-integration").then(({ syncOrderTrackingToTiny }) => {
+        syncOrderTrackingToTiny({
+          orderId: String(shipment.order_id),
+          trackingCode: data.tracking!,
+          trackingUrl: shipmentPatch.tracking_url as string | undefined,
+        }).catch((err) => {
+          console.error("[superfrete-status-sync] Tiny tracking sync failed:", err)
+        })
+      }).catch(() => {})
+    }
+
+    if (shipmentStatus === "delivered") {
+      import("@/lib/services/integrations/tiny/tiny-integration").then(({ updateTinyOrderStatus }) => {
+        updateTinyOrderStatus({
+          orderId: String(shipment.order_id),
+          situacao: "entregue",
+        }).catch((err) => {
+          console.error("[superfrete-status-sync] Tiny delivered status sync failed:", err)
+        })
+      }).catch(() => {})
+    } else if (shipmentStatus === "posted") {
+      import("@/lib/services/integrations/tiny/tiny-integration").then(({ updateTinyOrderStatus }) => {
+        updateTinyOrderStatus({
+          orderId: String(shipment.order_id),
+          situacao: "enviado",
+        }).catch((err) => {
+          console.error("[superfrete-status-sync] Tiny posted status sync failed:", err)
+        })
+      }).catch(() => {})
+    }
+  }
+
   // Logística reversa: o item voltou para a loja → o pedido de
   // devolução sai de WAITING_ITEM_RETURN e entra em PROCESSING.
   if (shipment.kind === "return" && shipment.return_request_id && shipmentStatus === "delivered") {

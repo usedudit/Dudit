@@ -59,7 +59,7 @@ function toSponsoredAd(row: Advertisement, matchTier: AdTargetMode): SponsoredAd
 
 function getRoundedNowString(): string {
     const d = new Date()
-    const ms = 10 * 60 * 1000 // 10 minutes
+    const ms = 30 * 60 * 1000 // 30 minutes
     const rounded = new Date(Math.round(d.getTime() / ms) * ms)
     return rounded.toISOString()
 }
@@ -84,7 +84,7 @@ const getCachedActiveAds = (roundedNow: string) => unstable_cache(
     [`active-advertisements-${roundedNow}`],
     {
         tags: [TAGS.advertisements],
-        revalidate: 300 // 5 minutes TTL
+        revalidate: AD_CACHE_TTL_SECONDS // 30 minutes TTL (explicitly revalidated on admin changes)
     }
 )
 

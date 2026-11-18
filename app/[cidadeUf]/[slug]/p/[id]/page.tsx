@@ -14,6 +14,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
+import { buildProductSeo } from "@/lib/seo/catalog-seo"
 
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
@@ -29,47 +30,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 
   const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
-  const address = p?.addresses?.[0] || p?.address || p || {}
-  const city = address?.city || "Brasil"
-
-  // Formatação de preço para o Meta Tag
-  const priceFormatted = formatCurrency(product.promotional_price || product.price);
+  const storeObj = Array.isArray(product.stores) ? product.stores[0] : product.stores
+  const address = p?.addresses?.[0] || storeObj?.addresses?.[0] || p?.address || storeObj?.address || p || {}
+  const city = address?.city || product.store_city || storeObj?.city || "Brasil"
 
   const productUrl = `https://dudit.com.br${getProductUrl(product)}`
 
-  // Título mais "chamativo" sem o preço
-  const title = `${product.name} | Dudit em ${city}`
+  const { metadata } = buildProductSeo({
+    product,
+    city,
+    productUrl,
+  })
 
-  // Descrição com gatilho de "Conexão Direta" e Localização
-  const description = `Oferta em ${city}: ${product.name}. Compre direto do vendedor pela Dudit e economize!`
-
-  return {
-    title: title,
-    description: description,
-    alternates: { canonical: productUrl },
-    openGraph: {
-      title: title,
-      description: description,
-      url: productUrl,
-      siteName: 'Dudit',
-      images: [
-        {
-          url: product.image_url || 'https://img.dudit.com.br/static/Logo.png',
-          width: 1200, // Tamanho ideal para redes sociais
-          height: 630,
-          alt: `Comprar ${product.name} em ${city}`,
-        },
-      ],
-      locale: 'pt_BR',
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image', // FOTO GRANDE NO TWITTER/X
-      title: title,
-      description: description,
-      images: [product.image_url || 'https://img.dudit.com.br/static/Logo.png'],
-    },
-  }
+  return metadata
 }
 export default async function ProductDetailsPage({
   params,
@@ -141,41 +114,18 @@ export default async function ProductDetailsPage({
     ? Math.min(...variants.map((v: any) => v.price))
     : product.price;
 
-  // Aggregate de Reviews para Schema
-  const reviewCount = reviews?.length || 0;
-  const avgRating = reviewCount > 0
-    ? (reviews.reduce((acc: number, cur: any) => acc + cur.rating, 0) / reviewCount).toFixed(1)
-    : 5.0; // rating neutro padrão
+  const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
+  const storeObj = Array.isArray(product.stores) ? product.stores[0] : product.stores
+  const address = p?.addresses?.[0] || storeObj?.addresses?.[0] || p?.address || storeObj?.address || p || {}
+  const city = address?.city || product.store_city || storeObj?.city || "Brasil"
 
-  // Schema Orgânico Focado para Produtos
-  const schemaJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    description: product.description || `Produto ${product.name} na Dudit.`,
-    image: product.image_url || 'https://img.dudit.com.br/static/Logo.png',
-    sku: product.id,
-    brand: {
-      '@type': 'Brand',
-      name: product.partner_id ? 'Loja Parceira Dudit' : 'Dudit'
-    },
-    offers: {
-      '@type': 'Offer',
-      url: `https://dudit.com.br${getProductUrl(product)}`,
-      priceCurrency: 'BRL',
-      price: minPrice,
-      availability: 'https://schema.org/InStock',
-      seller: {
-        '@type': 'Organization',
-        name: product.partner_id ? 'Dudit Associado' : 'Dudit'
-      }
-    },
-    aggregateRating: reviewCount > 0 ? {
-      '@type': 'AggregateRating',
-      ratingValue: avgRating,
-      reviewCount: reviewCount
-    } : undefined
-  };
+  const { schemaJsonLd } = buildProductSeo({
+    product,
+    city,
+    productUrl: `https://dudit.com.br${correctUrl}`,
+    minPrice,
+    reviews: reviews || [],
+  })
 
   return (
     <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col">

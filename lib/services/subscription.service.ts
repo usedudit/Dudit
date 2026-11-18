@@ -161,9 +161,9 @@ interface CacheEntry<T> {
  * so this TTL only matters for the gap between a webhook updating the DB
  * and the next plan resolution call.
  */
-const PARTNER_PLAN_TTL_MS = 30_000     // 30 seconds
-const ALL_PLANS_TTL_MS = 60_000         // 60 seconds
-const USAGE_COUNTERS_TTL_MS = 15_000    // 15 seconds
+const PARTNER_PLAN_TTL_MS = 120_000    // 2 minutes (webhooks/updates invalidate immediately)
+const ALL_PLANS_TTL_MS = 600_000       // 10 minutes
+const USAGE_COUNTERS_TTL_MS = 45_000   // 45 seconds (mutations invalidate immediately)
 
 const partnerPlanCache = new Map<string, CacheEntry<Plan>>()
 const usageCountersCache = new Map<string, CacheEntry<UsageCounters | null>>()

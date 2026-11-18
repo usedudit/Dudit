@@ -2,7 +2,7 @@ import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/server"
 import { encrypt, decrypt } from "@/lib/cryptoService"
-import { createTinyClient, type TinyClient, type TinyProductDetail } from "./tiny-client"
+import { createTinyClient, type TinyClient, type TinyProductDetail, type TinyOrderPayload } from "./tiny-client"
 import { resolveOrderBuyerFiscal } from "@/lib/orders/buyer-fiscal"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -14,6 +14,7 @@ export interface TinyIntegrationConfig {
   sync_stock?: boolean
   auto_export_orders?: boolean
   default_deposit?: string | null
+  webhook_secret?: string | null
 }
 
 export interface TinyIntegrationMetadata {
@@ -56,7 +57,12 @@ export async function getValidTinyClient(partnerId: string): Promise<TinyClient>
   try {
     token = decrypt(integration.access_token_encrypted, "tiny")
   } catch (err) {
-    captureError(err, { module: "integrations", provider: "tiny", partnerId })
+    captureError(err, {
+      module: "integrations",
+      action: "getValidTinyClient",
+      partnerId,
+      metadata: { provider: "tiny" },
+    })
     throw new Error("Falha ao descriptografar token do Tiny ERP.")
   }
 
@@ -101,7 +107,7 @@ export async function syncTinyProductsToDudit(params: {
   }
 
   addMonitoringBreadcrumb({
-    domain: "integrations",
+    domain: "stock",
     message: "tiny.sync_products.started",
     metadata: { partnerId, storeId: effectiveStoreId, maxPages },
   })
@@ -191,8 +197,10 @@ export async function syncTinyProductsToDudit(params: {
                 stock_quantity: stock,
                 description: description || undefined,
                 images: images.length > 0 ? images : undefined,
-                is_active: isActive,
                 status: isActive ? "ativo" : "inativo",
+                deleted_at: null,
+                deleted_by: null,
+                deleted_reason: null,
                 external_id: externalId,
                 external_provider: TINY_PROVIDER,
                 last_external_sync_at: now,
@@ -223,7 +231,6 @@ export async function syncTinyProductsToDudit(params: {
                 stock_quantity: stock,
                 description: description || "",
                 images: images.length > 0 ? images : [],
-                is_active: isActive,
                 status: isActive ? "ativo" : "inativo",
                 product_type: "Físico",
                 condition: "Novo",
@@ -320,7 +327,12 @@ export async function syncTinyProductsToDudit(params: {
       errors,
     }
   } catch (err: any) {
-    captureError(err, { module: "integrations", provider: "tiny", partnerId })
+    captureError(err, {
+      module: "integrations",
+      action: "syncTinyProductsToDudit",
+      partnerId,
+      metadata: { provider: "tiny" },
+    })
     return {
       success: false,
       totalProcessed,
@@ -350,6 +362,9 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       order_number,
       total_amount,
       paid_amount,
+      delivery_fee,
+      delivery_type,
+      delivery_breakdown,
       delivery_address,
       payment_method,
       partner_id,
@@ -358,6 +373,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       customer_name,
       notes,
       external_order_id,
+      external_order_number,
       external_sync_status,
       order_items (
         id,
@@ -366,6 +382,17 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
         product_price,
         quantity,
         subtotal
+      ),
+      order_shipments (
+        id,
+        status,
+        kind,
+        carrier,
+        service_name,
+        service_code,
+        price,
+        tracking_number,
+        tracking_url
       )
     `)
     .eq("id", orderId)
@@ -410,6 +437,84 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     const customerDocument = buyerFiscal.document?.replace(/\D/g, "") || undefined
     const isPj = buyerFiscal.personType === "pj" || (customerDocument && customerDocument.length === 14)
 
+    // Resolve dados de contato e endereço estruturado do cliente
+    const targetCustomerId = buyerFiscal.customerId || order.customer_id
+    let customerPhone: string | undefined
+    let customerEmail: string | undefined
+    let addressData: {
+      street?: string | null
+      number?: string | null
+      complement?: string | null
+      neighborhood?: string | null
+      city?: string | null
+      state?: string | null
+      zip_code?: string | null
+    } | null = null
+
+    if (targetCustomerId) {
+      const [{ data: custRow }, { data: addrRow }] = await Promise.all([
+        supabase
+          .from("customers")
+          .select("email, phone, phone_fixed")
+          .eq("id", targetCustomerId)
+          .maybeSingle(),
+        supabase
+          .from("addresses")
+          .select("street, number, complement, neighborhood, city, state, zip_code")
+          .eq("customer_id", targetCustomerId)
+          .order("is_default", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+
+      customerPhone = custRow?.phone || custRow?.phone_fixed || undefined
+      customerEmail = custRow?.email || undefined
+      if (addrRow) {
+        addressData = addrRow
+      }
+    }
+
+    const rawDeliveryAddress = String(order.delivery_address || "").trim()
+    const cepMatch = rawDeliveryAddress.match(/\b\d{5}-?\d{3}\b/)
+    const extractedCep = cepMatch ? cepMatch[0].replace(/\D/g, "") : undefined
+
+    const clientStreet = addressData?.street || rawDeliveryAddress || undefined
+    const clientNumber = addressData?.number || undefined
+    const clientComplement = addressData?.complement || undefined
+    const clientNeighborhood = addressData?.neighborhood || undefined
+    const clientCity = addressData?.city || undefined
+    const clientUf = addressData?.state || undefined
+    const clientCep = addressData?.zip_code?.replace(/\D/g, "") || extractedCep || undefined
+
+    // Resolve dados de frete e transporte
+    const deliveryFee = Number(order.delivery_fee || 0)
+    const isPickup = String(order.delivery_type || "").toLowerCase() === "pickup"
+    const activeShipment = Array.isArray(order.order_shipments)
+      ? order.order_shipments.find((s: any) => s.kind !== "return")
+      : null
+
+    let formaEnvio = isPickup ? "Retirada" : undefined
+    let formaFrete: string | undefined = undefined
+    if (!isPickup) {
+      if (activeShipment?.carrier) {
+        formaEnvio = activeShipment.carrier
+      } else if (order.delivery_breakdown?.carrier) {
+        formaEnvio = order.delivery_breakdown.carrier
+      } else {
+        formaEnvio = "Entrega"
+      }
+
+      if (activeShipment?.service_name) {
+        formaFrete = activeShipment.service_name
+      } else if (order.delivery_breakdown?.service_name) {
+        formaFrete = order.delivery_breakdown.service_name
+      }
+    }
+
+    const fretePorConta: "R" | "S" = isPickup ? "S" : deliveryFee > 0 ? "R" : "S"
+    const trackingCode = activeShipment?.tracking_number || undefined
+    const trackingUrl = activeShipment?.tracking_url || undefined
+
     // Monta itens do pedido para o Tiny
     const items = (order.order_items || []).map((it: any) => ({
       item: {
@@ -420,16 +525,45 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       },
     }))
 
-    const payload = {
+    const payload: TinyOrderPayload = {
       pedido: {
         cliente: {
           nome: customerName,
           tipo_pessoa: isPj ? ("J" as const) : ("F" as const),
           cpf_cnpj: customerDocument,
-          endereco: order.delivery_address || undefined,
+          email: customerEmail,
+          fone: customerPhone,
+          endereco: clientStreet,
+          numero: clientNumber,
+          complemento: clientComplement,
+          bairro: clientNeighborhood,
+          cidade: clientCity,
+          uf: clientUf,
+          cep: clientCep,
         },
+        endereco_entrega: rawDeliveryAddress
+          ? {
+              nome_destinatario: customerName,
+              tipo_pessoa: isPj ? ("J" as const) : ("F" as const),
+              cpf_cnpj: customerDocument,
+              endereco: clientStreet,
+              numero: clientNumber,
+              complemento: clientComplement,
+              bairro: clientNeighborhood,
+              cidade: clientCity,
+              uf: clientUf,
+              cep: clientCep,
+              fone: customerPhone,
+            }
+          : undefined,
         itens: items,
         total_pedido: Number(order.total_amount || 0),
+        valor_frete: deliveryFee > 0 ? deliveryFee : undefined,
+        forma_envio: formaEnvio,
+        forma_frete: formaFrete,
+        frete_por_conta: fretePorConta,
+        codigo_rastreamento: trackingCode,
+        url_rastreamento: trackingUrl,
         forma_pagamento: order.payment_method || "Mercado Pago",
         meio_pagamento: "Mercado Pago",
         numero_ordem_compra: order.order_number || String(order.id),
@@ -454,10 +588,14 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 
     // Registra na timeline de auditoria
     await logAuditEvent({
-      entity_type: "order",
-      entity_id: orderId,
-      action: "tiny_order_exported",
-      details: {
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "tiny_order_exported",
+      changeLines: [`Pedido exportado para o Tiny ERP (Nº ${tinyRes.numero || tinyRes.id})`],
+      source: "system",
+      metadata: {
         tinyOrderId: tinyRes.id,
         tinyOrderNumber: tinyRes.numero,
       },
@@ -469,7 +607,12 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       tinyOrderNumber: tinyRes.numero,
     }
   } catch (err: any) {
-    captureError(err, { module: "integrations", provider: "tiny", orderId })
+    captureError(err, {
+      module: "integrations",
+      action: "exportDuditOrderToTiny",
+      entityId: orderId,
+      metadata: { provider: "tiny" },
+    })
 
     // Salva status de erro no pedido
     await supabase
@@ -486,5 +629,480 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       success: false,
       error: err?.message || "Erro ao exportar pedido para o Tiny ERP",
     }
+  }
+}
+
+/**
+ * Atualiza a situação de um pedido existente no Tiny ERP (ex: cancelado, aprovado)
+ */
+export async function updateTinyOrderStatus(params: {
+  orderId: string
+  situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
+}): Promise<{ success: boolean; error?: string }> {
+  const { orderId, situacao } = params
+  const supabase = createAdminClient()
+
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select("id, partner_id, external_order_id, external_provider, external_sync_status")
+    .eq("id", orderId)
+    .single()
+
+  if (orderErr || !order) {
+    return { success: false, error: "Pedido não encontrado" }
+  }
+
+  // Se o pedido não foi exportado para o Tiny, não há o que atualizar lá
+  if (order.external_provider !== TINY_PROVIDER || !order.external_order_id) {
+    return { success: true }
+  }
+
+  try {
+    const client = await getValidTinyClient(order.partner_id)
+    await client.updateOrderStatus(order.external_order_id, situacao)
+
+    await logAuditEvent({
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "tiny_order_status_updated",
+      changeLines: [`Situação no Tiny ERP atualizada para: ${situacao}`],
+      source: "system",
+      metadata: {
+        tinyOrderId: order.external_order_id,
+        situacao,
+      },
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    captureError(err, {
+      module: "integrations",
+      action: "updateTinyOrderStatus",
+      entityId: orderId,
+      metadata: { provider: "tiny", situacao },
+    })
+    return {
+      success: false,
+      error: err?.message || "Erro ao atualizar situação do pedido no Tiny ERP",
+    }
+  }
+}
+
+/**
+ * Sincroniza o código e link de rastreamento com o Tiny ERP se o pedido estiver integrado
+ */
+export async function syncOrderTrackingToTiny(params: {
+  orderId: string
+  trackingCode: string
+  trackingUrl?: string | null
+}): Promise<{ success: boolean; error?: string }> {
+  const { orderId, trackingCode, trackingUrl } = params
+  if (!trackingCode) return { success: true }
+
+  const supabase = createAdminClient()
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select("id, partner_id, external_order_id, external_provider")
+    .eq("id", orderId)
+    .single()
+
+  if (orderErr || !order) {
+    return { success: false, error: "Pedido não encontrado" }
+  }
+
+  if (order.external_provider !== TINY_PROVIDER || !order.external_order_id) {
+    return { success: true }
+  }
+
+  try {
+    const client = await getValidTinyClient(order.partner_id)
+    await client.updateOrderTracking({
+      id: order.external_order_id,
+      codigoRastreamento: trackingCode,
+      urlRastreamento: trackingUrl || undefined,
+      enviarEmail: "N",
+    })
+
+    await logAuditEvent({
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "tiny_order_tracking_updated",
+      changeLines: [`Código de rastreio sincronizado no Tiny ERP: ${trackingCode}`],
+      source: "system",
+      metadata: {
+        tinyOrderId: order.external_order_id,
+        trackingCode,
+        trackingUrl,
+      },
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    captureError(err, {
+      module: "integrations",
+      action: "syncOrderTrackingToTiny",
+      entityId: orderId,
+      metadata: { provider: "tiny", trackingCode },
+    })
+    return {
+      success: false,
+      error: err?.message || "Erro ao atualizar rastreamento no Tiny ERP",
+    }
+  }
+}
+
+/**
+ * Processa eventos de webhook enviados pelo Tiny ERP (estoque em tempo real, NF-e emitida, etc.)
+ */
+export async function processTinyWebhook(
+  partnerId: string,
+  rawPayload: any
+): Promise<{ success: boolean; event: string; affectedCount: number; details?: any }> {
+  const supabase = createAdminClient()
+  let payload = rawPayload
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload)
+    } catch {
+      return { success: false, event: "unknown", affectedCount: 0, details: "Invalid JSON" }
+    }
+  }
+
+  // Desencapsula campos caso o Tiny envie em 'dados'
+  const root = payload?.dados || payload
+  const event = String(root?.evento || root?.event || root?.tipo || "").toLowerCase()
+  let affectedCount = 0
+
+  // ─── 1. Atualização de Estoque em Tempo Real ───
+  if (
+    event.includes("estoque") ||
+    event === "atualizacao_estoque" ||
+    Array.isArray(root?.produtos) ||
+    root?.produto
+  ) {
+    const rawProducts = Array.isArray(root.produtos)
+      ? root.produtos
+      : root.produto
+      ? [root.produto]
+      : []
+
+    for (const item of rawProducts) {
+      const externalId = item.id ? String(item.id) : null
+      const sku = item.sku || item.codigo ? String(item.sku || item.codigo).trim() : null
+      const newStock = Math.max(0, Number(item.saldo ?? item.quantidade ?? 0))
+
+      if (!externalId && !sku) continue
+
+      let productQuery = supabase
+        .from("products")
+        .select("id, name, stock_quantity")
+        .eq("partner_id", partnerId)
+        .is("deleted_at", null)
+
+      if (externalId && sku) {
+        productQuery = productQuery.or(`external_id.eq.${externalId},sku.eq.${sku}`)
+      } else if (externalId) {
+        productQuery = productQuery.eq("external_id", externalId)
+      } else if (sku) {
+        productQuery = productQuery.eq("sku", sku)
+      }
+
+      const { data: matchedProducts } = await productQuery
+
+      for (const prod of matchedProducts || []) {
+        await supabase
+          .from("products")
+          .update({
+            stock_quantity: newStock,
+            last_external_sync_at: new Date().toISOString(),
+          })
+          .eq("id", prod.id)
+
+        try {
+          const { invalidateProductCache } = await import("@/lib/cache/invalidation")
+          await invalidateProductCache(prod.id, partnerId, "update", { silent: true })
+        } catch {}
+
+        affectedCount++
+      }
+    }
+
+    return {
+      success: true,
+      event: "atualizacao_estoque",
+      affectedCount,
+    }
+  }
+
+  // ─── 2. Envio de Nota Fiscal (NF-e) ───
+  if (
+    event.includes("nota_fiscal") ||
+    event.includes("nfe") ||
+    Array.isArray(root?.notas) ||
+    root?.nota_fiscal ||
+    root?.nota
+  ) {
+    const rawNotas = Array.isArray(root.notas)
+      ? root.notas
+      : root.nota_fiscal
+      ? [root.nota_fiscal]
+      : root.nota
+      ? [root.nota]
+      : []
+
+    for (const nota of rawNotas) {
+      const nfeNumber = String(nota.numero || "").trim()
+      const nfeSeries = String(nota.serie || "1").trim()
+      const nfeAccessKey = String(nota.chave_acesso || "").replace(/\D/g, "")
+      const nfeIssuedAt = nota.data_emissao
+        ? new Date(nota.data_emissao).toISOString()
+        : new Date().toISOString()
+      const danfeUrl = nota.danfe_url || nota.link_danfe || null
+      const xmlUrl = nota.xml_url || nota.link_xml || null
+      const pedidoId = nota.pedido_id ? String(nota.pedido_id) : null
+      const pedidoNumero = nota.pedido_numero ? String(nota.pedido_numero).trim() : null
+
+      if (!pedidoId && !pedidoNumero && !nfeAccessKey) continue
+
+      let orderQuery = supabase
+        .from("orders")
+        .select("id, order_number, partner_id, nfe_number")
+        .eq("partner_id", partnerId)
+
+      if (pedidoId && pedidoNumero) {
+        orderQuery = orderQuery.or(
+          `external_order_id.eq.${pedidoId},external_order_number.eq.${pedidoNumero},order_number.eq.${pedidoNumero}`
+        )
+      } else if (pedidoId) {
+        orderQuery = orderQuery.eq("external_order_id", pedidoId)
+      } else if (pedidoNumero) {
+        orderQuery = orderQuery.or(
+          `external_order_number.eq.${pedidoNumero},order_number.eq.${pedidoNumero}`
+        )
+      }
+
+      const { data: matchedOrders } = await orderQuery
+
+      for (const order of matchedOrders || []) {
+        // Atualiza campos fiscais no pedido
+        await supabase
+          .from("orders")
+          .update({
+            nfe_number: nfeNumber || order.nfe_number,
+            nfe_series: nfeSeries || null,
+            nfe_access_key: nfeAccessKey || null,
+            nfe_issued_at: nfeIssuedAt,
+            fiscal_document_type: "nfe",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", order.id)
+
+        // Anexa DANFE (PDF) aos anexos do pedido (se fornecido)
+        if (danfeUrl) {
+          const danfeFileName = `DANFE-NF-${nfeNumber || "e"}.pdf`
+          const { data: existingDanfe } = await supabase
+            .from("order_attachments")
+            .select("id")
+            .eq("order_id", order.id)
+            .or(`file_name.eq.${danfeFileName},file_key.eq.${danfeUrl}`)
+            .maybeSingle()
+
+          if (!existingDanfe) {
+            let finalDanfeKey = danfeUrl
+            let danfeSize: number | null = null
+
+            // Baixa o PDF do Tiny e armazena com segurança no bucket privado dudit-private
+            try {
+              const res = await fetch(danfeUrl, { signal: AbortSignal.timeout(15000) })
+              if (res.ok) {
+                const arrayBuffer = await res.arrayBuffer()
+                const buffer = Buffer.from(arrayBuffer)
+                danfeSize = buffer.length
+                const r2Key = `orders/attachments/${order.id}/${danfeFileName}`
+                const { uploadBufferToR2 } = await import("@/lib/r2/server")
+                await uploadBufferToR2({
+                  buffer,
+                  key: r2Key,
+                  contentType: "application/pdf",
+                })
+                finalDanfeKey = r2Key
+              }
+            } catch (fetchErr) {
+              console.warn("[tiny-integration] Não foi possível salvar DANFE no R2 (dudit-private), usando URL externa:", fetchErr)
+            }
+
+            await supabase.from("order_attachments").insert({
+              order_id: order.id,
+              file_name: danfeFileName,
+              file_key: finalDanfeKey,
+              file_type: "application/pdf",
+              file_size: danfeSize,
+            })
+          }
+        }
+
+        // Anexa XML aos anexos do pedido (se fornecido)
+        if (xmlUrl) {
+          const xmlFileName = `NFE-${nfeNumber || "e"}.xml`
+          const { data: existingXml } = await supabase
+            .from("order_attachments")
+            .select("id")
+            .eq("order_id", order.id)
+            .or(`file_name.eq.${xmlFileName},file_key.eq.${xmlUrl}`)
+            .maybeSingle()
+
+          if (!existingXml) {
+            let finalXmlKey = xmlUrl
+            let xmlSize: number | null = null
+
+            // Baixa o XML do Tiny e armazena com segurança no bucket privado dudit-private
+            try {
+              const res = await fetch(xmlUrl, { signal: AbortSignal.timeout(15000) })
+              if (res.ok) {
+                const arrayBuffer = await res.arrayBuffer()
+                const buffer = Buffer.from(arrayBuffer)
+                xmlSize = buffer.length
+                const r2Key = `orders/attachments/${order.id}/${xmlFileName}`
+                const { uploadBufferToR2 } = await import("@/lib/r2/server")
+                await uploadBufferToR2({
+                  buffer,
+                  key: r2Key,
+                  contentType: "application/xml",
+                })
+                finalXmlKey = r2Key
+              }
+            } catch (fetchErr) {
+              console.warn("[tiny-integration] Não foi possível salvar XML no R2 (dudit-private), usando URL externa:", fetchErr)
+            }
+
+            await supabase.from("order_attachments").insert({
+              order_id: order.id,
+              file_name: xmlFileName,
+              file_key: finalXmlKey,
+              file_type: "application/xml",
+              file_size: xmlSize,
+            })
+          }
+        }
+
+        // Registra evento de auditoria
+        await logAuditEvent({
+          partnerId,
+          actorUserId: null,
+          entityType: "order",
+          entityId: order.id,
+          actionType: "tiny_nfe_received",
+          changeLines: [
+            `Nota Fiscal nº ${nfeNumber} emitida no Tiny ERP e vinculada ao pedido.`,
+            nfeAccessKey ? `Chave: ${nfeAccessKey}` : "",
+          ].filter(Boolean),
+          source: "webhook",
+          metadata: {
+            nfeNumber,
+            nfeSeries,
+            nfeAccessKey,
+            danfeUrl,
+            xmlUrl,
+          },
+        })
+
+        try {
+          const { revalidateOrders } = await import("@/lib/utils/revalidation")
+          await revalidateOrders(partnerId)
+        } catch {}
+
+        affectedCount++
+      }
+    }
+
+    return {
+      success: true,
+      event: "envio_nota_fiscal",
+      affectedCount,
+    }
+  }
+
+  // ─── 3. Atualização de Situação de Pedido (ex: faturado, enviado, entregue) ───
+  if (
+    event.includes("situacao_pedido") ||
+    event.includes("status_pedido") ||
+    Array.isArray(root?.pedidos) ||
+    root?.pedido
+  ) {
+    const rawOrders = Array.isArray(root.pedidos)
+      ? root.pedidos
+      : root.pedido
+      ? [root.pedido]
+      : []
+
+    for (const p of rawOrders) {
+      const pedidoId = p.id ? String(p.id) : null
+      const pedidoNumero = p.numero ? String(p.numero).trim() : null
+      const situacaoAtual = String(p.situacao_atual || p.situacao || "").toLowerCase()
+
+      if (!pedidoId && !pedidoNumero) continue
+
+      let orderQuery = supabase
+        .from("orders")
+        .select("id, order_number, partner_id, delivery_status, situation")
+        .eq("partner_id", partnerId)
+
+      if (pedidoId && pedidoNumero) {
+        orderQuery = orderQuery.or(
+          `external_order_id.eq.${pedidoId},external_order_number.eq.${pedidoNumero},order_number.eq.${pedidoNumero}`
+        )
+      } else if (pedidoId) {
+        orderQuery = orderQuery.eq("external_order_id", pedidoId)
+      } else if (pedidoNumero) {
+        orderQuery = orderQuery.or(
+          `external_order_number.eq.${pedidoNumero},order_number.eq.${pedidoNumero}`
+        )
+      }
+
+      const { data: matchedOrders } = await orderQuery
+
+      for (const order of matchedOrders || []) {
+        const patch: Record<string, any> = { updated_at: new Date().toISOString() }
+
+        // Se faturado com dados de nota fiscal
+        if (p.nota_fiscal && (situacaoAtual === "faturado" || p.nota_fiscal.numero)) {
+          patch.nfe_number = String(p.nota_fiscal.numero || "").trim()
+          if (p.nota_fiscal.serie) patch.nfe_series = String(p.nota_fiscal.serie).trim()
+          if (p.nota_fiscal.chave_acesso) {
+            patch.nfe_access_key = String(p.nota_fiscal.chave_acesso).replace(/\D/g, "")
+          }
+          patch.fiscal_document_type = "nfe"
+        }
+
+        if (situacaoAtual === "enviado" || situacaoAtual === "pronto_envio") {
+          patch.delivery_status = "sent"
+        } else if (situacaoAtual === "entregue") {
+          patch.delivery_status = "delivered"
+        } else if (situacaoAtual === "cancelado" && order.situation !== "cancelled") {
+          patch.situation = "cancelled"
+        }
+
+        if (Object.keys(patch).length > 1) {
+          await supabase.from("orders").update(patch).eq("id", order.id)
+          affectedCount++
+        }
+      }
+    }
+
+    return {
+      success: true,
+      event: "atualizacao_situacao_pedido",
+      affectedCount,
+    }
+  }
+
+  return {
+    success: true,
+    event: event || "unhandled",
+    affectedCount: 0,
   }
 }

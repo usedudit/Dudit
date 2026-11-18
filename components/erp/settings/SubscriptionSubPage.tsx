@@ -105,8 +105,8 @@ const PlanCard: React.FC<PlanCardProps> = ({
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className={`rounded-3xl p-6 md:p-8 flex flex-col h-full relative transition-all duration-300 ${isDark
-                ? "bg-brand-dark border-2 border-brand-dark text-white md:-translate-y-2 shadow-xl z-10"
+            className={`rounded-2xl p-6 flex flex-col h-full relative transition-all duration-300 ${isDark
+                ? "bg-brand-dark border-brand-dark text-white md:-translate-y-2 shadow-xl z-10"
                 : popular
                     ? "bg-white dark:bg-dark-surface border-2 border-brand-green z-10 shadow-lg"
                     : "bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border"
@@ -138,7 +138,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
                             {price > 0 ? formatCurrency(displayPrice) : "Grátis"}
                         </span>
                         {price > 0 && (
-                            <span className={`text-sm ${isDark ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>
+                            <span className={`text-sm ${isDark ? "text-brand-inactive-text/80" : "text-gray-300"}`}>
                                 /mês
                             </span>
                         )}
@@ -219,7 +219,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 
 const PlanCardSkeleton = () => (
-    <div className="rounded-3xl p-8 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface animate-pulse">
+    <div className="rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface animate-pulse">
         <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-4" />
         <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-8" />
         <div className="space-y-3">
@@ -1093,16 +1093,13 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">
 
                             {/* Card 1: Current Plan */}
-                            <div className={`rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface flex flex-col justify-between relative transition-all duration-300 ${planTheme.border}`}>
+                            <div className={`rounded-2xl p-6 bg-white dark:bg-dark-surface flex flex-col justify-between relative transition-all duration-300 ${planTheme.border}`}>
                                 <div>
                                     <div className="flex items-center justify-between mb-4 h-9">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
                                                 Plano atual
                                             </span>
-                                            <Badge variant={planTheme.badgeVariant} icon={planTheme.badgeIcon}>
-                                                {planTheme.badgeText}
-                                            </Badge>
                                         </div>
                                         <Dropdown
                                             trigger={
@@ -1165,9 +1162,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
                                 <div className="pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     <div className="mb-4">
-                                        <span className="text-[11px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-2.5">
-                                            Limites inclusos no plano
-                                        </span>
                                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                                             {getHardcodedPlan(displayPlanSlug).limits.slice(0, 4).map((limit, i) => (
                                                 <li key={i} className="flex items-center gap-2 text-brand-dark/80 dark:text-dark-body font-medium">
@@ -1188,7 +1182,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status === "past_due" && (
                                                 <Button
                                                     variant="destructive"
-                                                    className="h-10 text-xs px-3"
+                                                    className="h-10"
                                                     onClick={handleGenerateManualPayment}
                                                     disabled={manualPaymentModal.loading}
                                                     isLoading={manualPaymentModal.loading}
@@ -1200,7 +1194,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             {displayPlanSlug !== "escalar" ? (
                                                 <Button
                                                     variant="default"
-                                                    className="h-10 text-xs px-4"
+                                                    className="h-10"
                                                     onClick={() => setPlansOpen(true)}
                                                     leftIcon={<ArrowUpIcon size={16} />}
                                                 >
@@ -1209,7 +1203,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             ) : (
                                                 <Button
                                                     variant="outline"
-                                                    className="h-10 text-xs px-4"
+                                                    className="h-10"
                                                     onClick={() => setPlansOpen(true)}
                                                 >
                                                     Ver outros planos
@@ -1221,7 +1215,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                             </div>
 
                             {/* Card 2: Cobrança / Renovação */}
-                            <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative transition-all duration-300">
+                            <div className="rounded-2xl p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative transition-all duration-300">
                                 <div>
                                     <div className="flex items-center justify-between mb-4 h-9">
                                         <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
@@ -1236,27 +1230,27 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                             : "Faturamento & Cobranças"}
                                         </span>
                                         {isScheduledToCancel ? (
-                                            <Badge variant="gray">
+                                            <Badge variant="gray" icon={null}>
                                                 Cancelamento agendado
                                             </Badge>
                                         ) : isPendingPayment ? (
-                                            <Badge variant="orange">
+                                            <Badge variant="orange" icon={null}>
                                                 Aguardando pagamento
                                             </Badge>
                                         ) : isPastDue ? (
-                                            <Badge variant="red">
+                                            <Badge variant="red" icon={null}>
                                                 Tolerância ativa
                                             </Badge>
                                         ) : hasScheduledChange ? (
-                                            <Badge variant="blue">
+                                            <Badge variant="blue" icon={null}>
                                                 Troca agendada
                                             </Badge>
                                         ) : !hasBillingInfo ? (
-                                            <Badge variant="gray">
+                                            <Badge variant="gray" icon={null}>
                                                 Sem mensalidade
                                             </Badge>
                                         ) : (
-                                            <Badge variant="green">
+                                            <Badge variant="green" icon={null}>
                                                 Renovação automática
                                             </Badge>
                                         )}
@@ -1270,12 +1264,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     : formatCurrency(shownAmount)
                                             ) : "..."}
                                         </h2>
-                                        {hasBillingInfo && !isScheduledToCancel && shownDueDate && (
-                                            <span className="text-[11px] font-bold text-brand-green bg-brand-green/10 dark:bg-brand-green/20 border border-brand-green/20 px-2.5 py-1 rounded-full flex items-center gap-1">
-                                                <ClockIcon size={12} />
-                                                Previsto para {formatDate(shownDueDate)}
-                                            </span>
-                                        )}
                                     </div>
 
                                     <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-6">

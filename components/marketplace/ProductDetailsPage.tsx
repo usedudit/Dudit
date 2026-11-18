@@ -46,6 +46,7 @@ import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/p
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
 import type { SponsoredAd } from "@/lib/ads/types"
+import { extractSpecifications } from "@/lib/utils/specifications"
 
 const getQuantityLabel = (qty: number, unit?: string | null) => {
     return formatQuantityWithUnit(qty, unit, "full");
@@ -444,6 +445,8 @@ export function ProductDetailsPageClient({
             accepts_trades: Boolean(product.accepts_trades ?? rawSpecs.accepts_trades),
         }
     }, [product])
+
+    const specifications = useMemo(() => extractSpecifications(product), [product])
 
     const [selectedAddonOptionIds, setSelectedAddonOptionIds] = useState<Record<string, string[]>>({})
 
@@ -1506,7 +1509,7 @@ export function ProductDetailsPageClient({
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">
                                         {formatMoney(pricing.original)}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.totalDiscountPercent}% OFF
                                     </span>
                                 </div>
@@ -1546,7 +1549,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -1572,7 +1575,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -3047,15 +3050,22 @@ export function ProductDetailsPageClient({
                             })()}
 
                             {/* Technical specs */}
-                            {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (
+                            {specifications.length > 0 && (
                                 <FormSection title="Especificações" hasSeparator>
-                                    <div className="border border-brand-border rounded-xl overflow-hidden">
-                                        {product.technical_specs.map((spec: any, i: number, arr: any[]) => (
-                                            <div key={i} className={`flex justify-between items-center px-4 py-3
-                        ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"}
-                        ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
-                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{spec.label || spec.name || ""}</span>
-                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">{spec.value || ""}</span>
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden">
+                                        {specifications.map((spec, i) => (
+                                            <div
+                                                key={i}
+                                                className={`flex justify-between items-center px-4 py-3 gap-4 ${
+                                                    i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"
+                                                } ${i < specifications.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                            >
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium break-words">
+                                                    {spec.name}
+                                                </span>
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right break-words">
+                                                    {spec.value}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>

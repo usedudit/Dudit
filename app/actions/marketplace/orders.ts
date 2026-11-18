@@ -272,6 +272,14 @@ export async function cancelBuyerOrderAction(orderId: string) {
     source: "marketplace",
   })
 
+  // Sync cancellation to external ERP (Tiny) if order was exported
+  try {
+    const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
+    await updateTinyOrderStatus({ orderId, situacao: "cancelado" })
+  } catch (tinyErr) {
+    console.error("[cancelMarketplaceOrderAction] Error syncing cancellation to Tiny:", tinyErr)
+  }
+
   revalidateOrdersCache()
   return { success: true }
 }
@@ -298,7 +306,7 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
   }
 
   const { getOrderHistoryEntries } = await import("@/lib/services/order-history.service")
-  const { resolveTimelineActorName, humanizeTimelineChangeLine } = await import("@/lib/utils/formatters")
+  const { resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine } = await import("@/lib/utils/formatters")
   try {
     const rawEntries = await getOrderHistoryEntries(orderId, order.partner_id)
     const storeName = (order.stores as any)?.name || null
@@ -318,7 +326,8 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
         changeLines = changeLines.filter(
           (l) =>
             !l.toLowerCase().includes("observações do pedido atualizadas") &&
-            !l.toLowerCase().includes("alterou as observações do pedido"),
+            !l.toLowerCase().includes("alterou as observações do pedido") &&
+            !isInternalStockTimelineLine(l),
         )
 
         // Filter false refund/credit lines on rejected returns

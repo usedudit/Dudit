@@ -104,18 +104,19 @@ export default function FerramentasHubPage() {
                                     >
                                         <Link
                                             href={tool.href}
-                                            className="group h-full bg-white dark:bg-dark-surface rounded-3xl p-8 border border-brand-border hover:border-brand-green/40 transition-colors flex flex-col justify-between"
+                                            className="group h-full bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border hover:border-brand-green/40 transition-colors flex flex-col justify-between"
                                         >
                                             <div>
-                                                <div className="w-10 h-10 rounded-xl bg-brand-dark flex items-center justify-center mb-5">
-                                                    <IconComponent className="w-5 h-5 text-white" />
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                                                        <IconComponent className="w-[18px] h-[18px] text-brand-dark dark:text-dark-heading" />
+                                                    </div>
+                                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight group-hover:text-brand-green transition-colors">
+                                                        {tool.title}
+                                                    </h2>
                                                 </div>
 
-                                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2 group-hover:text-brand-green transition-colors">
-                                                    {tool.title}
-                                                </h2>
-
-                                                <p className="text-sm text-brand-inactive-text leading-relaxed">
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                                     {tool.description}
                                                 </p>
                                             </div>

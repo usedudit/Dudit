@@ -81,12 +81,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+const RESERVED_ROOT_ROUTES = new Set([
+  "ajuda", "institucional", "banned", "mapa", "mapa-do-site", "blog", "ferramentas",
+  "segmentos", "explorar", "sacola", "pedidos", "perfil", "favoritos", "checkout",
+  "auth", "assinaturas", "colecoes", "services", "vitrine", "produto", "ddt-admin",
+  "erp", "api", "invite", "os", "quote", "payment", "reembolso", "print"
+])
+
 export default async function CityTermPage({ params }: Props) {
   const { cidadeUf, slug } = await params
 
-  // Evitar que rotas institucionais, de ajuda ou do sistema sejam capturadas pela rota dinâmica de cidade/termo
-  if (cidadeUf === "ajuda" || cidadeUf === "institucional" || cidadeUf === "banned") {
-    redirect(`/${cidadeUf}${slug ? `/${slug}` : ""}`)
+  // Evitar que rotas reservadas ou do sistema sejam capturadas pela rota dinâmica de cidade/termo
+  if (RESERVED_ROOT_ROUTES.has(cidadeUf?.toLowerCase())) {
+    notFound()
   }
 
   if (slug === "banned") {

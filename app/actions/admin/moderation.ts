@@ -21,7 +21,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
-import { formatDateTime } from "@/lib/utils/formatters";
+import { formatDateTime, isDuditTeamActorName } from "@/lib/utils/formatters";
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { createNotification, buildIdempotencyKey, getPartnerTeamUserIds } from "@/lib/services/notification.service"
@@ -1883,7 +1883,7 @@ export async function getAdminEntityTimeline(
             const isDudit = Boolean(
                 aLog.metadata?.is_admin_action ||
                 aLog.metadata?.dudit_action ||
-                (aLog.actor_name && aLog.actor_name.toLowerCase().includes("dudit"))
+                isDuditTeamActorName(aLog.actor_name)
             )
             const rawActor = aLog.actor_name || profileMap.get(aLog.actor_user_id) || (isDudit ? "Equipe Dudit" : storeName)
             const actorName = isDudit && !rawActor.includes("Dudit") ? `${rawActor} (Dudit)` : rawActor

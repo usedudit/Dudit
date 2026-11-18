@@ -29,8 +29,11 @@ export function getProductUrl(product: any, partner?: any): string {
 
     // As vezes o endereço está em p.addresses[0], as vezes na raiz (p.address ou p direto se já normalizado)
     const address = p.addresses?.[0] || p.address || p
-    const city = p.city || address?.city
-    const state = p.state || address?.state
+    const storeObj = (Array.isArray(product.stores) ? product.stores[0] : product.stores) || (Array.isArray(product.store) ? product.store[0] : product.store) || {}
+    const storeAddr = (Array.isArray(storeObj?.addresses) ? storeObj?.addresses[0] : storeObj?.addresses) || storeObj?.address || {}
+
+    const city = p.city || address?.city || product.store_city || storeAddr?.city || storeObj?.city
+    const state = p.state || address?.state || product.store_state || storeAddr?.state || storeObj?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
@@ -79,8 +82,11 @@ export function getServiceUrl(service: any, partner?: any): string {
 
     const p = partner || (Array.isArray(service.partners) ? service.partners[0] : service.partners) || {}
     const address = p.addresses?.[0] || p.address || p
-    const city = p.city || address?.city
-    const state = p.state || address?.state
+    const storeObj = (Array.isArray(service.stores) ? service.stores[0] : service.stores) || (Array.isArray(service.store) ? service.store[0] : service.store) || {}
+    const storeAddr = (Array.isArray(storeObj?.addresses) ? storeObj?.addresses[0] : storeObj?.addresses) || storeObj?.address || {}
+
+    const city = p.city || address?.city || service.store_city || storeAddr?.city || storeObj?.city
+    const state = p.state || address?.state || service.store_state || storeAddr?.state || storeObj?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 

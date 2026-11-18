@@ -19,6 +19,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { isDuditTeamActorName } from "@/lib/utils/formatters"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
@@ -596,8 +597,8 @@ export async function getReturnRequestDetailsAction(
                     actorName = "Equipe Dudit"
                 }
             } else if (e.actor_user_id) {
-                actorName = namesByUserId.get(e.actor_user_id) || (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit") ? e.actor_name : "Usuário")
-            } else if (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit")) {
+                actorName = namesByUserId.get(e.actor_user_id) || (e.actor_name && !isDuditTeamActorName(e.actor_name) ? e.actor_name : "Usuário")
+            } else if (e.actor_name && !isDuditTeamActorName(e.actor_name)) {
                 actorName = e.actor_name
             } else {
                 actorName = "Sistema"
@@ -728,8 +729,8 @@ export async function getReturnAuditLogsAction(
                     actorName = "Equipe Dudit"
                 }
             } else if (e.actor_user_id) {
-                actorName = namesByUserId.get(e.actor_user_id) || (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit") ? e.actor_name : "Usuário")
-            } else if (e.actor_name && !String(e.actor_name).toLowerCase().includes("dudit")) {
+                actorName = namesByUserId.get(e.actor_user_id) || (e.actor_name && !isDuditTeamActorName(e.actor_name) ? e.actor_name : "Usuário")
+            } else if (e.actor_name && !isDuditTeamActorName(e.actor_name)) {
                 actorName = e.actor_name
             } else {
                 actorName = "Sistema"

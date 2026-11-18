@@ -77,9 +77,11 @@ export function useNotifications() {
       return result.count ?? 0
     },
     enabled: Boolean(user?.id),
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
   })
 
   const listQuery = useInfiniteQuery({

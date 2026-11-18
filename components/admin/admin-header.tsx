@@ -234,7 +234,7 @@ export function AdminHeader({
                                             className="w-8 h-8 rounded-full object-contain shrink-0"
                                         />
                                         <div className="hidden sm:flex flex-col text-left">
-                                            <span className="text-md font-semibold text-brand-dark dark:text-dark-heading line-clamp-1 leading-tight">
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading line-clamp-1 leading-tight">
                                                 Painel admin
                                             </span>
                                             <span className="text-xs text-brand-green leading-tight">

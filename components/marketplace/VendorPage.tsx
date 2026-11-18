@@ -48,7 +48,7 @@ import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
-import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
+import { sortByVendorRelevance, calcVendorItemScore } from "@/lib/marketplace/ranking"
 import { buildVendorLocationPopupHtml } from "@/lib/map/mapbox-popup"
 import { applyVendorUrgencyBadges } from "@/lib/marketplace/badges"
 
@@ -1812,11 +1812,19 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             const name = normalizeCategory(item.category)
             map.set(name, [...(map.get(name) || []), item])
         })
-        return Array.from(map.entries()).map(([name, items]) => ({
-            name,
-            id: categoryId(name),
-            items: sortVendorItems(items),
-        }))
+        return Array.from(map.entries())
+            .map(([name, items]) => ({
+                name,
+                id: categoryId(name),
+                items: sortVendorItems(items),
+            }))
+            .sort((a, b) => {
+                const topScoreA = a.items[0] ? calcVendorItemScore(a.items[0]) : 0
+                const topScoreB = b.items[0] ? calcVendorItemScore(b.items[0]) : 0
+                const diffScore = topScoreB - topScoreA
+                if (Math.abs(diffScore) > 0.001) return diffScore
+                return b.items.length - a.items.length
+            })
     }, [filteredItems, sortVendorItems])
 
     const allTabs = useMemo(() => [

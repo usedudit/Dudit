@@ -12,10 +12,17 @@ type Props = {
     params: Promise<{ cidadeUf: string }>
 }
 
+const RESERVED_ROOT_ROUTES = new Set([
+    "ajuda", "institucional", "banned", "mapa", "mapa-do-site", "blog", "ferramentas",
+    "segmentos", "explorar", "sacola", "pedidos", "perfil", "favoritos", "checkout",
+    "auth", "assinaturas", "colecoes", "services", "vitrine", "produto", "ddt-admin",
+    "erp", "api", "invite", "os", "quote", "payment", "reembolso", "print"
+])
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { cidadeUf } = await params
 
-    if (!isValidCitySlug(cidadeUf)) {
+    if (RESERVED_ROOT_ROUTES.has(cidadeUf?.toLowerCase()) || !isValidCitySlug(cidadeUf)) {
         return {
             title: "Página não encontrada",
             robots: { index: false, follow: false },
@@ -44,9 +51,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityPage({ params }: Props) {
     const { cidadeUf } = await params
 
-    // Evitar que rotas institucionais, de ajuda ou do sistema sejam capturadas pela rota dinâmica de cidade
-    if (cidadeUf === "ajuda" || cidadeUf === "institucional" || cidadeUf === "banned") {
-        redirect(`/${cidadeUf}`)
+    // Evitar que rotas reservadas ou do sistema sejam capturadas pela rota dinâmica de cidade
+    if (RESERVED_ROOT_ROUTES.has(cidadeUf?.toLowerCase())) {
+        notFound()
     }
 
     if (!isValidCitySlug(cidadeUf)) {

@@ -1,5 +1,23 @@
 import { describe, it, expect } from "vitest"
-import { humanizeTimelineChangeLine, resolveTimelineActorName } from "./formatters"
+import { humanizeTimelineChangeLine, resolveTimelineActorName, isDuditTeamActorName, isInternalStockTimelineLine } from "./formatters"
+
+describe("isDuditTeamActorName", () => {
+  it("matches only the official Dudit team label", () => {
+    expect(isDuditTeamActorName("Equipe Dudit")).toBe(true)
+    expect(isDuditTeamActorName("equipe dudit (Ana)")).toBe(true)
+    expect(isDuditTeamActorName("Dudit")).toBe(false)
+    expect(isDuditTeamActorName("Dudit Store")).toBe(false)
+    expect(isDuditTeamActorName(null)).toBe(false)
+  })
+})
+
+describe("isInternalStockTimelineLine", () => {
+  it("flags internal stock reservation/release lines", () => {
+    expect(isInternalStockTimelineLine("liberou a reserva de estoque dos itens do pedido")).toBe(true)
+    expect(isInternalStockTimelineLine("restaurou o estoque dos itens do pedido")).toBe(true)
+    expect(isInternalStockTimelineLine("cancelou o pedido")).toBe(false)
+  })
+})
 
 describe("humanizeTimelineChangeLine", () => {
   it("standardizes delivery status lines cleanly", () => {
@@ -279,5 +297,22 @@ describe("resolveTimelineActorName", () => {
       orderCustomerName: "Murilo Storari",
       storeName: "Dudit Store",
     })).toBe("Roberta Funcionária")
+  })
+
+  it("keeps a seller whose name/store is literally 'Dudit' visible in the ERP history", () => {
+    const sellerNamedDudit = {
+      actor_user_id: "user-owner-1",
+      actor_name: "Dudit",
+      metadata: {},
+      source: "erp",
+    }
+
+    expect(resolveTimelineActorName({
+      entry: sellerNamedDudit,
+      viewer: "seller",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit",
+    })).toBe("Dudit")
   })
 })

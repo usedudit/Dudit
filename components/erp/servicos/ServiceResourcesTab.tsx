@@ -113,6 +113,7 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                                     productBucket.loadBucket()
                                 }}
                                 onFocus={() => productBucket.loadBucket()}
+                                variant="full-rounded"
                                 className="mb-0"
                             />
                         )}

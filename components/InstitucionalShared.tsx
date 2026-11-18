@@ -5,16 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     MenuIcon,
     XIcon,
-    SparklesIcon,
-    FacebookIcon,
-    TwitterIcon,
-    LinkedinIcon,
-    InstagramIcon
+    SparklesIcon
 } from '@/lib/icons';
 import { Button } from '@/components/reusable/Button';
 import { Badge } from '@/components/reusable/Badge';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import MarketplaceFooter from '@/components/marketplace/MarketplaceFooter';
 
 export const GridLines = ({ dark = false }: { dark?: boolean }) => null;
 
@@ -259,141 +256,55 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
     );
 };
 
-export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
-    return (
-        <footer className="bg-brand-dark py-16 border-t border-white/10 relative mt-auto w-full">
-            <div className="max-w-[1400px] mx-auto px-4 lg:px-2 relative z-10">
-
-                {/* Seção Superior */}
-                <div className="flex flex-col md:flex-row justify-between gap-12 mb-16">
-
-                    {/* Logo + Descrição Local & Nacional */}
-                    <div className="md:w-1/3">
-                        <Link href="/" prefetch={true} className="inline-block mb-6">
-                            <img
-                                src="https://img.dudit.com.br/static/Logo.png"
-                                alt="Dudit"
-                                width={140}
-                                height={40}
-                                className="h-10 w-auto object-contain"
-                            />
-                        </Link>
-                        <p className="text-gray-400 dark:text-dark-body text-sm leading-relaxed max-w-sm">
-                            Compre de quem tá perto ou receba de qualquer lugar do Brasil. Uma vitrine simples para vender na sua cidade e enviar para todo o país com 0% de comissão.
-                        </p>
-                    </div>
-
-                    {/* Colunas de Links */}
-                    <div className="flex-1 flex flex-wrap justify-between gap-8">
-
-                        {/* Coluna 1: Comprar e Vender */}
-                        <div>
-                            <h4 className="text-sm font-semibold text-white mb-6">Comprar e Vender</h4>
-                            <ul className="space-y-4">
-                                <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Explorar produtos e cidades</Link></li>
-                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Criar minha loja grátis</Link></li>
-                                <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Soluções por segmento</Link></li>
-                                <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Planos com 0% de comissão</Link></li>
-                                <li><Link href="/mapa-do-site" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Mapa do Site</Link></li>
-                            </ul>
-                        </div>
-
-                        {/* Coluna 2: Calculadoras para Negócios */}
-                        <div>
-                            <h4 className="text-sm font-semibold text-white mb-6">Calculadoras do Negócio</h4>
-                            <ul className="space-y-4">
-                                <li><Link href="/ferramentas/calculadora-taxas-marketplace" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Calculadora de Taxas</Link></li>
-                                <li><Link href="/ferramentas/calculadora-margem-lucro-preco-venda" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Preço de Venda & Markup</Link></li>
-                                <li><Link href="/ferramentas/calculadora-ponto-equilibrio" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Ponto de Equilíbrio</Link></li>
-                                <li><Link href="/ferramentas/gerador-link-whatsapp" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Link de WhatsApp para Bio</Link></li>
-                                <li><Link href="/ferramentas" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Todas as calculadoras</Link></li>
-                            </ul>
-                        </div>
-
-                        {/* Coluna 3: A Dudit */}
-                        <div>
-                            <h4 className="text-sm font-semibold text-white mb-6">A Dudit</h4>
-                            <ul className="space-y-4">
-                                <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Como a Dudit funciona</Link></li>
-                                <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Por que a Dudit existe</Link></li>
-                                <li><Link href="/blog" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Blog do Dino</Link></li>
-                                <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
-                                <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 dark:text-dark-body hover:text-brand-green transition-colors">Fale com a gente</Link></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Barra Inferior: Legal + Redes Sociais */}
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
-                    <div className="text-center md:text-left order-2 md:order-1 flex flex-col md:flex-row items-center gap-2 md:gap-4">
-                        <p className="text-gray-500 dark:text-dark-body text-xs">
-                            © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
-                        </p>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-dark-body">
-                            <Link href="/institucional/termos" prefetch={false} className="hover:text-gray-300 transition-colors">Termos</Link>
-                            <span>•</span>
-                            <Link href="/institucional/privacidade" prefetch={false} className="hover:text-gray-300 transition-colors">Privacidade</Link>
-                            <span>•</span>
-                            <Link href="/institucional/dpa" prefetch={false} className="hover:text-gray-300 transition-colors">DPA (ERP)</Link>
-                            <span>•</span>
-                            <Link href="/mapa-do-site" prefetch={false} className="hover:text-brand-green transition-colors">Mapa do Site</Link>
-                        </div>
-                    </div>
-
-                    {/* Redes Sociais com Links Reais e Target Blank */}
-                    <div className="flex gap-4 order-1 md:order-2">
-                        <a
-                            href="https://instagram.com/usedudit"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
-                            title="Siga a Dudit no Instagram"
-                        >
-                            <InstagramIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
-                        </a>
-                        <a
-                            href="https://twitter.com/usedudit"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
-                            title="Siga a Dudit no Twitter"
-                        >
-                            <TwitterIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
-                        </a>
-                    </div>
-                </div>
-
-            </div>
-        </footer>
-    )
-}
+export const Footer = ({ onNavigate: _onNavigate }: { onNavigate?: (page: string) => void }) => (
+    <MarketplaceFooter showOnMobile />
+);
 
 export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <section className="py-10 px-4 bg-white dark:bg-dark-surface relative">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto relative z-10">
-                <div className="bg-brand-dark rounded-3xl p-8 md:p-10 text-center overflow-hidden relative">
+                <div className="bg-brand-dark dark:bg-[#061814] rounded-2xl md:rounded-3xl border border-[#0e3b2e] shadow-sm overflow-hidden relative">
                     {/* Background decorative faint rings */}
-                    <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white rounded-full"></div>
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white rounded-full"></div>
+                    <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] sm:w-[800px] sm:h-[800px] lg:w-[1000px] lg:h-[1000px] border border-white rounded-full" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] sm:w-[600px] sm:h-[600px] lg:w-[750px] lg:h-[750px] border border-white rounded-full" />
                     </div>
 
-                    <h2 className="text-4xl md:text-4xl font-bold text-white mb-6">
-                        Pronto para vender na sua cidade <br />e em todo o Brasil?
-                    </h2>
-                    <h3 className="text-xl md:text-xl text-gray-300 mb-10 max-w-xl mx-auto">
-                        Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda sem comissão.
-                    </h3>
+                    {/* Conteúdo: texto + botão à esquerda, mascote à direita */}
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-10 px-6 py-8 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
+                        <div className="flex-1 w-full max-w-2xl text-left">
+                            <h2 className="text-2xl sm:text-3xl md:text-[34px] lg:text-[40px] font-black leading-tight text-white mb-3 sm:mb-4">
+                                Pronto para vender na sua cidade e em todo o Brasil?
+                            </h2>
+                            <p className="text-sm sm:text-base md:text-lg text-gray-300 leading-relaxed mb-6 sm:mb-8 max-w-xl">
+                                Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda sem comissão.
+                            </p>
 
-                    <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button asChild className="h-12">
-                            <Link href="/auth/login?mode=partner" prefetch={false}>
-                                Começar Grátis
-                            </Link>
-                        </Button>
+                            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                                <Button asChild className="h-11 sm:h-12 px-6 sm:px-8 text-sm sm:text-base">
+                                    <Link href="/auth/login?mode=partner" prefetch={false}>
+                                        Começar Grátis
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 flex items-center justify-center w-[150px] sm:w-[190px] md:w-[220px] lg:w-[260px]">
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/Carousel2.png"
+                                alt="Dino vendedor Dudit"
+                                className="w-full h-auto object-contain select-none pointer-events-none"
+                                loading="lazy"
+                                onError={(e) => {
+                                    const target = e.currentTarget
+                                    if (!target.src.includes("Carousel1.png")) {
+                                        target.src = "https://img.dudit.com.br/static/mascots/Carousel1.png"
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

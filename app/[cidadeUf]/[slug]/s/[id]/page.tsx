@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
+import { buildServiceSeo } from "@/lib/seo/catalog-seo"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const dynamic = 'force-dynamic'
@@ -26,41 +27,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     }
 
     const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
-    const address = p?.addresses?.[0] || {}
-    const city = address?.city || "Brasil"
+    const storeObj = Array.isArray(service.stores) ? service.stores[0] : service.stores
+    const address = p?.addresses?.[0] || storeObj?.addresses?.[0] || p?.address || storeObj?.address || p || {}
+    const city = address?.city || service.store_city || storeObj?.city || "Brasil"
 
     const serviceUrl = `https://dudit.com.br${getServiceUrl(service)}`
 
-    const title = `${service.name} - Agendar em ${city}`
-    const description = `Agende ${service.name} em ${city}. Reserve online pela Dudit com horários disponíveis em tempo real!`
+    const { metadata } = buildServiceSeo({
+        service,
+        city,
+        serviceUrl,
+    })
 
-    return {
-        title,
-        description,
-        alternates: { canonical: serviceUrl },
-        openGraph: {
-            title,
-            description,
-            url: serviceUrl,
-            siteName: 'Dudit',
-            images: [
-                {
-                    url: (service.images && service.images[0]) || p?.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
-                    width: 1200,
-                    height: 630,
-                    alt: `Agendar ${service.name} em ${city}`,
-                },
-            ],
-            locale: 'pt_BR',
-            type: 'website',
-        },
-        twitter: {
-            card: 'summary_large_image',
-            title,
-            description,
-            images: [(service.images && service.images[0]) || p?.store_image_url || 'https://img.dudit.com.br/static/Logo.png'],
-        },
-    }
+    return metadata
 }
 
 export default async function ServiceDetailsPage({
@@ -123,43 +102,17 @@ export default async function ServiceDetailsPage({
     ])
     const detailAd = detailAds[0] ?? null
 
-    // Schema.org JSON-LD for Service
-    const reviewCount = reviews?.length || 0
-    const avgRating = reviewCount > 0
-        ? (reviews.reduce((acc: number, cur: any) => acc + cur.rating, 0) / reviewCount).toFixed(1)
-        : 5.0
+    const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
+    const storeObj = Array.isArray(service.stores) ? service.stores[0] : service.stores
+    const address = p?.addresses?.[0] || storeObj?.addresses?.[0] || p?.address || storeObj?.address || p || {}
+    const city = address?.city || service.store_city || storeObj?.city || "Brasil"
 
-    const schemaJsonLd = {
-        '@context': 'https://schema.org',
-        '@type': 'Service',
-        name: service.name,
-        description: service.description || `Serviço ${service.name} disponível para agendamento na Dudit.`,
-        image: (service.images && service.images[0]) || partner?.store_image_url || 'https://img.dudit.com.br/static/Logo.png',
-        provider: {
-            '@type': 'LocalBusiness',
-            name: partner?.store_name || 'Profissional Dudit',
-            address: partner?.addresses?.[0] ? {
-                '@type': 'PostalAddress',
-                streetAddress: partner.addresses[0].street,
-                addressLocality: partner.addresses[0].city,
-                addressRegion: partner.addresses[0].state,
-                postalCode: partner.addresses[0].zip_code,
-                addressCountry: 'BR',
-            } : undefined,
-        },
-        offers: {
-            '@type': 'Offer',
-            url: `https://dudit.com.br${getServiceUrl(service)}`,
-            priceCurrency: 'BRL',
-            price: service.price,
-            availability: 'https://schema.org/InStock',
-        },
-        aggregateRating: reviewCount > 0 ? {
-            '@type': 'AggregateRating',
-            ratingValue: avgRating,
-            reviewCount: reviewCount,
-        } : undefined,
-    }
+    const { schemaJsonLd } = buildServiceSeo({
+        service,
+        city,
+        serviceUrl: `https://dudit.com.br${correctUrl}`,
+        reviews: reviews || [],
+    })
 
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col">

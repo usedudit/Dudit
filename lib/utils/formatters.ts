@@ -493,6 +493,30 @@ const KNOWN_STATUS_LABELS: Record<string, string> = {
 
 export type TimelineViewer = "customer" | "seller" | "admin"
 
+/**
+ * Identifica o rótulo oficial da equipe Dudit (ex.: "Equipe Dudit", "Equipe Dudit (Ana)").
+ *
+ * Nunca use `includes("dudit")` para isso: lojas/usuários legítimos podem se chamar
+ * "Dudit" e passariam a ser tratados como ação administrativa.
+ */
+export function isDuditTeamActorName(name?: string | null): boolean {
+  if (!name) return false
+  return /^equipe\s+dudit\b/i.test(String(name).trim())
+}
+
+/**
+ * Linhas de movimentação/reserva de estoque geradas pelo ERP.
+ * São úteis para o lojista, mas não devem aparecer no histórico do cliente.
+ */
+export function isInternalStockTimelineLine(line?: string | null): boolean {
+  if (!line) return false
+  const lower = String(line).toLowerCase()
+  return (
+    lower.includes("liberou a reserva de estoque dos itens do pedido") ||
+    lower.includes("restaurou o estoque dos itens do pedido")
+  )
+}
+
 export interface ResolveTimelineActorParams {
   entry: {
     actor_user_id?: string | null
@@ -525,7 +549,7 @@ export function resolveTimelineActorName({
     entry.source === "admin" ||
     metadata.is_admin_action ||
     (metadata.dudit_action && (entry.source === "admin" || !entry.actor_user_id)) ||
-    (rawActor.includes("dudit") && entry.source === "admin")
+    (isDuditTeamActorName(entry.actor_name) && entry.source === "admin")
   )
   const isSystem = Boolean(
     (!entry.actor_user_id && !isDuditAction && !metadata.admin_actor_name && (!entry.actor_name || entry.actor_name.toLowerCase() === "sistema")) ||
@@ -588,7 +612,7 @@ export function resolveTimelineActorName({
     if (viewer === "customer") {
       return "Você"
     }
-    const customerDisplayName = orderCustomerName || (entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit") ? entry.actor_name : "Cliente")
+    const customerDisplayName = orderCustomerName || (entry.actor_name && !isDuditTeamActorName(entry.actor_name) ? entry.actor_name : "Cliente")
     return `${customerDisplayName} (Cliente)`
   }
 
@@ -605,7 +629,7 @@ export function resolveTimelineActorName({
 
   // 5. Ação do Vendedor / Lojista
   const resolvedSellerActorName =
-    entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit")
+    entry.actor_name && !isDuditTeamActorName(entry.actor_name)
       ? entry.actor_name
       : "Vendedor"
 

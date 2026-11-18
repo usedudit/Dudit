@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { getErpSidebarBadgesAction, type ErpSidebarBadgesRawData } from "@/app/actions/erp/badges"
 
 const SEEN_PREFIX = "dudit_seen_"
+const BADGES_REFRESH_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes (visible tab only)
 
 interface ErpBadgesState {
     orders: number
@@ -65,8 +66,11 @@ export function useErpBadges(partnerId?: string, storeId?: string | null) {
     }, [pathname, partnerId])
 
     // Fetch raw badge data from server
+    const lastFetchedAtRef = useRef(0)
+
     const fetchBadges = useCallback(async () => {
         if (!partnerId) return
+        lastFetchedAtRef.current = Date.now()
         try {
             const data = await getErpSidebarBadgesAction(storeId)
             setRawData(data)
@@ -78,9 +82,24 @@ export function useErpBadges(partnerId?: string, storeId?: string | null) {
     useEffect(() => {
         fetchBadges()
 
-        // Periodically refresh every 90 seconds
-        const interval = setInterval(fetchBadges, 90000)
-        return () => clearInterval(interval)
+        // Only refresh while the tab is visible to avoid idle background Supabase calls
+        const interval = setInterval(() => {
+            if (typeof document !== "undefined" && document.visibilityState !== "visible") return
+            fetchBadges()
+        }, BADGES_REFRESH_INTERVAL_MS)
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== "visible") return
+            if (Date.now() - lastFetchedAtRef.current >= BADGES_REFRESH_INTERVAL_MS) {
+                fetchBadges()
+            }
+        }
+
+        document.addEventListener("visibilitychange", handleVisibilityChange)
+        return () => {
+            clearInterval(interval)
+            document.removeEventListener("visibilitychange", handleVisibilityChange)
+        }
     }, [fetchBadges])
 
     // Compute badges based on what hasn't been seen yet

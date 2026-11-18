@@ -24,6 +24,7 @@ export interface TinyStatus {
   connectedAt?: string | null
   config?: TinyIntegrationConfig | null
   metadata?: TinyIntegrationMetadata | null
+  webhookUrl?: string | null
 }
 
 /**
@@ -44,6 +45,24 @@ export async function getTinyStatusAction(): Promise<{
     const integration = await findTinyIntegration(supabase, ctx.partnerId)
 
     const connected = integration?.status === "connected" && Boolean(integration.access_token_encrypted)
+    let webhookUrl: string | null = null
+
+    if (connected && integration) {
+      let webhookSecret = (integration.config as TinyIntegrationConfig)?.webhook_secret
+      if (!webhookSecret) {
+        webhookSecret = crypto.randomUUID().replace(/-/g, "")
+        const updatedConfig = {
+          ...((integration.config as any) || {}),
+          webhook_secret: webhookSecret,
+        }
+        await supabase
+          .from("partner_integrations")
+          .update({ config: updatedConfig })
+          .eq("id", integration.id)
+      }
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+      webhookUrl = `${baseUrl}/api/integrations/tiny/webhook?partnerId=${ctx.partnerId}&token=${webhookSecret}`
+    }
 
     return {
       success: true,
@@ -52,6 +71,7 @@ export async function getTinyStatusAction(): Promise<{
         connectedAt: integration?.connected_at || null,
         config: (integration?.config as TinyIntegrationConfig) || null,
         metadata: (integration?.metadata as TinyIntegrationMetadata) || null,
+        webhookUrl,
       },
     }
   } catch (err: any) {
@@ -106,9 +126,11 @@ export async function connectTinyAction(payload: {
     const existingConfig = (existing?.config as Record<string, any> | null) || {}
 
     const encryptedToken = encrypt(token, "tiny")
+    const webhookSecret = existingConfig.webhook_secret || crypto.randomUUID().replace(/-/g, "")
 
     const nextConfig: TinyIntegrationConfig = {
       ...existingConfig,
+      webhook_secret: webhookSecret,
       sync_stock: payload.syncStock ?? existingConfig.sync_stock ?? true,
       auto_export_orders: payload.autoExportOrders ?? existingConfig.auto_export_orders ?? true,
     }
@@ -203,7 +225,7 @@ export async function syncTinyProductsAction(maxPages = 5): Promise<{
   try {
     const res = await syncTinyProductsToDudit({
       partnerId: ctx.partnerId,
-      storeId: ctx.storeId,
+      storeId: ctx.activeStoreId,
       maxPages,
     })
 

@@ -63,6 +63,7 @@ import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY 
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
+import { extractSpecifications } from "@/lib/utils/specifications"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getStoreUrl, getServiceUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
@@ -187,6 +188,8 @@ export function ServiceDetailsPageClient({
     const router = useRouter()
     const { user, supabase } = useSupabase()
     const { success: notifySuccess, error: notifyError } = useNotification()
+
+    const specifications = useMemo(() => extractSpecifications(service), [service])
 
     const [userId, setUserId] = useState<string | null | undefined>(initialUserId || user?.id)
     const [step, setStep] = useState<BookingStep>("info")
@@ -608,7 +611,7 @@ export function ServiceDetailsPageClient({
         if (!selectedAddress || !targetPartnerId) return
         let active = true
 
-         async function calculateForAddress() {
+        async function calculateForAddress() {
             // Só cobra/valida entrega cuando o serviço aceita atendimento a domicílio.
             // Para serviços apenas "no estabelecimento", cotar o frete de entrega
             // jogava "fora do raio de entrega" indevidamente.
@@ -1201,7 +1204,7 @@ export function ServiceDetailsPageClient({
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">
                                         {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.totalDiscountPercent}% OFF
                                     </span>
                                 </div>
@@ -1241,7 +1244,7 @@ export function ServiceDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -1267,7 +1270,7 @@ export function ServiceDetailsPageClient({
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(pricing.original)}</span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-[10px] md:text-[11px] font-extrabold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                         {pricing.discountPercent}% OFF
                                     </span>
                                 </div>
@@ -2484,15 +2487,22 @@ export function ServiceDetailsPageClient({
                             })()}
 
                             {/* Technical specs */}
-                            {Array.isArray(service.technical_details) && service.technical_details.length > 0 && (
+                            {specifications.length > 0 && (
                                 <FormSection title="Especificações" hasSeparator>
                                     <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden">
-                                        {service.technical_details.map((spec: any, i: number, arr: any[]) => (
-                                            <div key={i} className={`flex justify-between items-center px-4 py-3
-                        ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"}
-                        ${i < arr.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}>
-                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{spec.label || spec.name || ""}</span>
-                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">{spec.value || ""}</span>
+                                        {specifications.map((spec, i) => (
+                                            <div
+                                                key={i}
+                                                className={`flex justify-between items-center px-4 py-3 gap-4 ${
+                                                    i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"
+                                                } ${i < specifications.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                            >
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium break-words">
+                                                    {spec.name}
+                                                </span>
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right break-words">
+                                                    {spec.value}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>

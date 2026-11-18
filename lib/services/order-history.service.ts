@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
-import { formatCurrency, humanizeTimelineChangeLine } from "@/lib/utils/formatters"
+import { formatCurrency, humanizeTimelineChangeLine, isDuditTeamActorName } from "@/lib/utils/formatters"
 
 const MAX_MERGED_ENTRIES = 50
 
@@ -169,12 +169,12 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
       const resolved = namesByUserId.get(entry.actor_user_id)
       if (resolved && resolved !== "Usuário") {
         actorName = resolved
-      } else if (entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit") && entry.actor_name !== "Sistema") {
+      } else if (entry.actor_name && !isDuditTeamActorName(entry.actor_name) && entry.actor_name !== "Sistema") {
         actorName = entry.actor_name
       } else {
         actorName = resolved || "Usuário"
       }
-    } else if (entry.actor_name && !entry.actor_name.toLowerCase().includes("dudit")) {
+    } else if (entry.actor_name && !isDuditTeamActorName(entry.actor_name)) {
       actorName = entry.actor_name
     } else {
       actorName = "Sistema"

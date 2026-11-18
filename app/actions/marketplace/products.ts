@@ -35,7 +35,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       subcategory_id, subcategory:product_categories!subcategory_id(name),
       brand, brand_id, brand_entity:brands!brand_id(name),
       location, location_id, location_entity:storage_locations!location_id(name),
-      images, rating, partner_id, sku, 
+      images, rating, partner_id, sku, gtin, warranty, tags,
       condition, show_in_marketplace, technical_specs, created_at,
       show_price_in_store,
       fulfillment_modes,

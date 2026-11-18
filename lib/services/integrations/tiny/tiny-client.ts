@@ -60,6 +60,20 @@ export interface TinyOrderCustomer {
   email?: string
 }
 
+export interface TinyOrderDeliveryAddress {
+  nome_destinatario?: string
+  tipo_pessoa?: "F" | "J"
+  cpf_cnpj?: string
+  endereco?: string
+  numero?: string
+  complemento?: string
+  bairro?: string
+  cep?: string
+  cidade?: string
+  uf?: string
+  fone?: string
+}
+
 export interface TinyOrderItem {
   item: {
     codigo?: string
@@ -74,15 +88,21 @@ export interface TinyOrderPayload {
   pedido: {
     data_pedido?: string
     cliente: TinyOrderCustomer
+    endereco_entrega?: TinyOrderDeliveryAddress
     itens: TinyOrderItem[]
     forma_pagamento?: string
     meio_pagamento?: string
+    forma_envio?: string
+    forma_frete?: string
+    frete_por_conta?: "R" | "D" | "T" | "3" | "4" | "S"
     valor_frete?: number
     valor_desconto?: number
     outras_despesas?: number
     total_produtos?: number
     total_pedido?: number
     numero_ordem_compra?: string
+    codigo_rastreamento?: string
+    url_rastreamento?: string
     obs?: string
   }
 }
@@ -225,6 +245,39 @@ export class TinyClient {
       id: registros.id,
       numero: registros.numero,
     }
+  }
+
+  /**
+   * Altera a situação de um pedido no Tiny ERP
+   * Situações aceitas: 'aberto', 'aprovado', 'preparando_envio', 'faturado', 'pronto_envio', 'enviado', 'entregue', 'cancelado', 'nao_entregue'
+   */
+  async updateOrderStatus(
+    id: string | number,
+    situacao: "aberto" | "aprovado" | "preparando_envio" | "faturado" | "pronto_envio" | "enviado" | "entregue" | "cancelado" | "nao_entregue"
+  ): Promise<boolean> {
+    await this.request("pedido.alterar.situacao.php", {
+      id: String(id),
+      situacao,
+    })
+    return true
+  }
+
+  /**
+   * Atualiza o código e URL de rastreamento de um pedido no Tiny ERP
+   */
+  async updateOrderTracking(params: {
+    id: string | number
+    codigoRastreamento: string
+    urlRastreamento?: string
+    enviarEmail?: "S" | "N"
+  }): Promise<boolean> {
+    await this.request("pedido.atualizar.rastreamento.php", {
+      id: String(params.id),
+      codigo_rastreamento: params.codigoRastreamento,
+      url_rastreamento: params.urlRastreamento || "",
+      enviar_email: params.enviarEmail || "N",
+    })
+    return true
   }
 }
 

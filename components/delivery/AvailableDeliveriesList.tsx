@@ -235,56 +235,75 @@ export default function AvailableDeliveriesList() {
         void loadOffers()
     }, [loadOffers])
 
-    // 2. Supabase Realtime: instant push notification (< 80ms) when a delivery is dispatched or changed
+    // 2. Supabase Realtime: instant push notification (< 80ms) while tab is visible.
+    // Pauses subscription when the tab is hidden to avoid keeping WAL polling alive when idle.
     useEffect(() => {
         if (!supabaseClient) return
 
         let debounceTimer: ReturnType<typeof setTimeout> | null = null
+        let channel: ReturnType<typeof supabaseClient.channel> | null = null
 
-        const channel = supabaseClient
-            .channel("realtime:delivery_assignments")
-            .on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "delivery_assignments",
-                },
-                () => {
-                    if (debounceTimer) clearTimeout(debounceTimer)
-                    debounceTimer = setTimeout(() => {
-                        void loadOffers(true, true)
-                    }, 400)
-                }
-            )
-            .subscribe()
-
-        return () => {
-            if (debounceTimer) clearTimeout(debounceTimer)
-            try {
-                supabaseClient.removeChannel(channel)
-            } catch { }
-        }
-    }, [supabaseClient, loadOffers])
-
-    // 3. Fallbacks: slow 60s background safety interval + immediate refresh on tab visibility return
-    useEffect(() => {
-        // Slow safety interval (60s instead of 6s eliminates 90% of requests)
-        const interval = setInterval(() => {
-            void loadOffers(true, true)
-        }, 60000)
-
-        // Visibility fallback: when driver brings Dudit back to foreground, sync instantly
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") {
-                void loadOffers(true, true)
+        const unsubscribe = () => {
+            if (debounceTimer) {
+                clearTimeout(debounceTimer)
+                debounceTimer = null
+            }
+            if (channel) {
+                try {
+                    supabaseClient.removeChannel(channel)
+                } catch { }
+                channel = null
             }
         }
+
+        const subscribe = () => {
+            if (channel || document.visibilityState !== "visible") return
+            channel = supabaseClient
+                .channel("realtime:delivery_assignments")
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "*",
+                        schema: "public",
+                        table: "delivery_assignments",
+                    },
+                    () => {
+                        if (debounceTimer) clearTimeout(debounceTimer)
+                        debounceTimer = setTimeout(() => {
+                            void loadOffers(true, true)
+                        }, 400)
+                    }
+                )
+                .subscribe()
+        }
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                subscribe()
+                void loadOffers(true, true)
+            } else {
+                unsubscribe()
+            }
+        }
+
+        subscribe()
         document.addEventListener("visibilitychange", handleVisibilityChange)
 
         return () => {
-            clearInterval(interval)
             document.removeEventListener("visibilitychange", handleVisibilityChange)
+            unsubscribe()
+        }
+    }, [supabaseClient, loadOffers])
+
+    // 3. Fallback: slow 60s safety interval (only while tab is visible)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (document.visibilityState !== "visible") return
+            void loadOffers(true, true)
+        }, 60000)
+
+        return () => {
+            clearInterval(interval)
         }
     }, [loadOffers])
 

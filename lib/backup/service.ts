@@ -160,7 +160,23 @@ function createEncryptedDumpStream(config: DatabaseBackupConfig, createdAt: Date
   const gzip = createGzip({ level: 9 })
   const child = spawn(
     config.pgDumpBinary,
-    ["--format=custom", "--no-owner", "--no-acl", "--no-password", "--dbname", safeConnectionString],
+    [
+      "--format=custom",
+      "--no-owner",
+      "--no-acl",
+      "--no-password",
+      // Skip disposable Supabase runtime logs/queues so daily backups don't waste egress.
+      // Preserves cron.job definitions, public, auth, storage, vault, and migrations.
+      "--exclude-table-data=cron.job_run_details",
+      "--exclude-table-data=net._http_response",
+      "--exclude-table-data=net.http_request_queue",
+      "--exclude-schema=realtime",
+      "--exclude-schema=pgbouncer",
+      "--exclude-schema=graphql",
+      "--exclude-schema=graphql_public",
+      "--dbname",
+      safeConnectionString,
+    ],
     {
       env: {
         ...process.env,

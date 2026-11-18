@@ -169,7 +169,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         // --- Products ---
         const products = productsResponse.data || []
         const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => ({
-            url: `https://dudit.com.br${getProductUrl(prod, { id: prod.partner_id })}`,
+            url: `https://dudit.com.br${getProductUrl(prod, {
+                id: prod.partner_id,
+                city: prod.store_city,
+                state: prod.store_state,
+                addresses: [{ city: prod.store_city, state: prod.store_state }],
+            })}`,
             lastModified: new Date(prod.updated_at || prod.created_at),
             changeFrequency: "daily",
             priority: 0.8,

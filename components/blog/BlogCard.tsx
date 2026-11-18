@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRightIcon, ClockIcon, ImageIcon } from "@/lib/icons"
+import { ClockIcon, ImageIcon } from "@/lib/icons"
 import { Badge } from "@/components/reusable"
 import { getBlogCategory } from "@/lib/blog/categories"
 import { formatBlogDateShort, getBlogPostUrl } from "@/lib/blog/utils"
@@ -58,18 +58,13 @@ export default function BlogCard({ post, featured = false, className = "" }: Blo
                         </p>
                     )}
 
-                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-brand-border/70 pt-4 text-xs font-medium text-brand-inactive-text dark:border-dark-border dark:text-dark-body">
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-brand-border pt-4 text-xs font-medium text-brand-inactive-text dark:border-dark-border dark:text-dark-body">
                         <span>{formatBlogDateShort(post.published_at)}</span>
                         <span className="flex items-center gap-1.5">
                             <ClockIcon size={13} />
                             {post.reading_time_minutes} min de leitura
                         </span>
                     </div>
-
-                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-green">
-                        Ler dica
-                        <ArrowRightIcon size={14} />
-                    </span>
                 </div>
             </Link>
         </article>

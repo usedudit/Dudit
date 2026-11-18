@@ -1,6 +1,6 @@
 "use client"
 
-import { formatCurrency, resolveTimelineActorName, humanizeTimelineChangeLine, type TimelineViewer } from "@/lib/utils"
+import { formatCurrency, resolveTimelineActorName, humanizeTimelineChangeLine, isDuditTeamActorName, type TimelineViewer } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import type { ReturnEvent } from "./types"
@@ -73,8 +73,8 @@ function mapReturnEventToHistoryEntry(
         metadata.dudit_action ||
         event.source === "admin" ||
         metadata?.is_admin_action ||
-        (event.actor_name && String(event.actor_name).toLowerCase().includes("dudit")) ||
-        (actorName && String(actorName).toLowerCase().includes("dudit"))
+        isDuditTeamActorName(event.actor_name) ||
+        isDuditTeamActorName(actorName)
     )
 
     if (actionType === "created") {

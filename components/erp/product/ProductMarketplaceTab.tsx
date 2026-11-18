@@ -1,11 +1,12 @@
 ﻿"use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { extractSpecifications } from "@/lib/utils/specifications"
 import { Input, FormDropdown, RichTextEditor, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard } from "@/components/reusable"
 import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
 import { TagsListItem } from "@/components/erp/shared/TagsListItem"
-import { TrashIcon, PlusIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
+import { TrashIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
 import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import ProductVideoSection from "./ProductVideoSection"
 import { ProductAddonsSection } from "./ProductAddonsSection"
@@ -68,6 +69,11 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
     const attributes = Array.isArray(productData?.attributes) ? productData.attributes : []
     const tags = Array.isArray(productData?.tags) ? productData.tags : []
+
+    const viewSpecifications = useMemo(() => {
+        if (attributes.length > 0) return attributes
+        return extractSpecifications(productData)
+    }, [attributes, productData])
 
     // --- Lógica dos Atributos ---
     const addAttribute = () => {
@@ -144,15 +150,15 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
                     {/* Especificações */}
                     <FormSection hasSeparator title="Especificações">
-                        {attributes.length > 0 ? (
+                        {viewSpecifications.length > 0 ? (
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                {attributes.map((spec: any, i: number) => (
+                                {viewSpecifications.map((spec: any, i: number) => (
                                     <div
                                         key={i}
                                         className={`flex justify-between items-center px-5 py-3.5 ${i % 2 === 0
                                             ? "bg-brand-gray dark:bg-dark-border/30"
                                             : "bg-white dark:bg-dark-surface"
-                                            } ${i < attributes.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                            } ${i < viewSpecifications.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
                                     >
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                             {spec.name || spec.label || ""}

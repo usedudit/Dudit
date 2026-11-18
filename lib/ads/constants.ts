@@ -15,4 +15,4 @@ export const BRAZILIAN_UFS = [
 
 export const DEFAULT_COUNTRY = "BR"
 
-export const AD_CACHE_TTL_SECONDS = 300
+export const AD_CACHE_TTL_SECONDS = 1800

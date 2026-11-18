@@ -4,6 +4,8 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import { MapPageClient } from "@/components/map/MapPageClient"
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: "Mapa de Lojas e Parceiros",
   description: "Encontre as melhores lojas e parceiros Dudit próximos a você pelo mapa interativo.",

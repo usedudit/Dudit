@@ -4,6 +4,7 @@ import { sanitizeMonitoringData } from "@/lib/sentry/sanitize"
 export type MonitoringContext = {
   module: string
   action?: string
+  provider?: string
   route?: string
   userId?: string | null
   partnerId?: string | null
@@ -14,7 +15,7 @@ export type MonitoringContext = {
 }
 
 type BreadcrumbContext = {
-  domain: "checkout" | "payment" | "stock" | "returns" | "orders"
+  domain: "checkout" | "payment" | "stock" | "returns" | "orders" | "integrations"
   message: string
   metadata?: Record<string, unknown> | null
 }
@@ -50,11 +51,13 @@ function normalizeError(error: unknown): Error {
 function applyContext(scope: Sentry.Scope, context: MonitoringContext) {
   const module = safeTag(context.module)
   const action = safeTag(context.action)
+  const provider = safeTag(context.provider)
   const route = safeTag(context.route)
   const errorCode = safeTag(context.errorCode)
 
   if (module) scope.setTag("monitoring.module", module)
   if (action) scope.setTag("monitoring.action", action)
+  if (provider) scope.setTag("monitoring.provider", provider)
   if (route) scope.setTag("monitoring.route", route)
   if (errorCode) scope.setTag("monitoring.error_code", errorCode)
 

@@ -738,11 +738,12 @@ async function performLabelCheckout(
     // buscado antes (em paralelo com a criação da etiqueta).
     let sandboxSkipReason: string | null = null
     let shipmentServiceCode: string | null = null
+    let shipmentOrderId: string | null = null
     try {
       const [{ data: shipmentRow }, balanceRes] = await Promise.all([
         supabase
           .from("order_shipments")
-          .select("price, service_code")
+          .select("order_id, price, service_code")
           .eq("partner_id", partnerId)
           .eq("external_label_id", labelId)
           .maybeSingle(),
@@ -753,6 +754,7 @@ async function performLabelCheckout(
         ),
       ])
       shipmentServiceCode = (shipmentRow?.service_code as string | null) ?? null
+      shipmentOrderId = shipmentRow?.order_id ? String(shipmentRow.order_id) : null
       if (balanceRes.error) {
         console.warn("[SuperFrete] Balance pre-check failed (continuing):", balanceRes.error)
       } else {
@@ -824,6 +826,21 @@ async function performLabelCheckout(
       })
       .eq("partner_id", partnerId)
       .eq("external_label_id", labelId)
+
+    // Sincroniza rastreio no Tiny ERP se o pedido estiver integrado
+    const trackingCode: string | undefined = orderData.tracking
+    const trackingOrderId = shipmentOrderId
+    if (trackingCode && trackingOrderId) {
+      import("@/lib/services/integrations/tiny/tiny-integration").then(({ syncOrderTrackingToTiny }) => {
+        syncOrderTrackingToTiny({
+          orderId: trackingOrderId,
+          trackingCode,
+          trackingUrl,
+        }).catch((err) => {
+          console.error("[SuperFrete] Error syncing tracking to Tiny:", err)
+        })
+      }).catch(() => { })
+    }
 
     revalidateOrders(partnerId)
 

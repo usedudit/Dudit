@@ -44,27 +44,41 @@ export function SupabaseProvider({
             document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0"
         }
 
-        // Only fetch user client-side if SSR didn't provide one.
-        // When initialUser is available (the common case), this avoids a redundant
-        // Supabase GoTrue API round-trip (~50-150ms) on every page load.
+        // Only fetch user client-side if SSR didn't provide one AND an auth cookie exists.
+        // Avoids redundant GoTrue API round-trips and 3x retry loops for anonymous visitors.
         if (!initialUser) {
-            const fetchUserWithRetry = async (attempt = 0) => {
-                try {
-                    const { data, error } = await supabase.auth.getUser()
-                    if (error) throw error
-                    if (data?.user) {
-                        setUser(data.user)
+            const hasAuthCookie =
+                typeof document !== "undefined" &&
+                document.cookie.split(";").some((c) => {
+                    const name = c.trim().split("=")[0]
+                    return name.startsWith("sb-") && name.includes("-auth-token")
+                })
+
+            if (hasAuthCookie) {
+                const fetchUserWithRetry = async (attempt = 0) => {
+                    try {
+                        const { data, error } = await supabase.auth.getUser()
+                        if (error) {
+                            // Don't retry definitive auth/session errors (missing/invalid session)
+                            if (error.name === "AuthSessionMissingError" || (error.status && error.status >= 400 && error.status < 500)) {
+                                return
+                            }
+                            throw error
+                        }
+                        if (data?.user) {
+                            setUser(data.user)
+                        }
+                    } catch (err) {
+                        // Transient network errors are common on mobile - retry up to 2 times
+                        if (attempt < 2) {
+                            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+                            return fetchUserWithRetry(attempt + 1)
+                        }
+                        console.warn("[SupabaseProvider] getUser failed after retries:", err)
                     }
-                } catch (err) {
-                    // Transient network errors are common on mobile - retry up to 2 times
-                    if (attempt < 2) {
-                        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
-                        return fetchUserWithRetry(attempt + 1)
-                    }
-                    console.warn("[SupabaseProvider] getUser failed after retries:", err)
                 }
+                fetchUserWithRetry()
             }
-            fetchUserWithRetry()
         }
 
         const {

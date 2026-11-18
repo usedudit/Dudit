@@ -7585,6 +7585,110 @@ Não. Conforme os Termos de Uso, a plataforma Dudit atua como facilitadora tecno
 `
             }
         ]
+    },
+    {
+        id: "integracoes",
+        title: "Integrações & ERPs",
+        icon: "🔌",
+        articles: [
+            {
+                id: "como-integrar-tiny-erp-dudit",
+                title: "Como integrar o Tiny ERP com a Dudit (Estoque, Catálogo e Pedidos)",
+                description: "Aprenda a conectar sua conta do Tiny ERP à Dudit: sincronize estoque em tempo real, exporte pedidos automaticamente e emita notas fiscais com 0% de comissão.",
+                slug: "como-integrar-tiny-erp-dudit",
+                category: "integracoes",
+                content: `
+## Visão geral
+
+A Dudit oferece integração nativa com o **Tiny ERP**, um dos principais sistemas de gestão empresarial e emissão fiscal do Brasil. Com essa integração, você pode vender online no seu catálogo digital, na sua cidade ou para todo o Brasil pela Dudit com **0% de comissão por venda**, enquanto toda a sua operação de separação, controle de estoque centralizado e emissão de notas fiscais (NF-e) continua acontecendo perfeitamente dentro do Tiny ERP.
+
+![Integração Tiny ERP e Dudit](https://img.dudit.com.br/static/og-image.png)
+
+## Vantagens da integração
+
+*   **0% de comissão nas vendas:** Venda pelo catálogo da Dudit sem pagar porcentagens sobre seus pedidos.
+*   **Exportação automática de pedidos:** Cada venda aprovada na Dudit é enviada imediatamente para o Tiny ERP com dados completos do comprador (nome, CPF/CNPJ, endereço, telefone, itens comprados e valor do frete).
+*   **Emissão simplificada de NF-e:** Como os pedidos entram automaticamente no Tiny, você emite a nota fiscal eletrônica com um clique.
+*   **Sincronização de estoque:** O estoque dos seus produtos pode ser atualizado via webhooks ou sincronização periódica, evitando que você venda um produto esgotado.
+*   **Sincronização de status:** Se um pedido for cancelado ou alterado, a integração comunica o status entre as plataformas.
+
+---
+
+## O que é necessário para integrar?
+
+1.  Uma conta ativa na Dudit com plano com acesso ao ERP.
+2.  Uma conta ativa no **Tiny ERP** (com módulo de API/Integrações disponível no seu plano do Tiny).
+3.  O **Token de API** gerado no painel do Tiny ERP.
+
+---
+
+## Passo a passo para configurar a integração
+
+### 1. Obter o Token de API no Tiny ERP
+
+1.  Acesse sua conta no [Tiny ERP](https://tiny.com.br).
+2.  No menu superior, vá em **Configurações** (ícone de engrenagem) > aba **Geral** > **API**.
+3.  Se ainda não houver um token gerado, clique em **Gerar Token**.
+4.  Copie o código do token de API exibido.
+
+> [!IMPORTANT]
+> O Token de API é a chave de acesso do seu Tiny ERP. Mantenha-o em segurança e nunca compartilhe publicamente. Na Dudit, seu token é armazenado com criptografia de ponta a ponta.
+
+### 2. Conectar o Tiny ERP na Dudit
+
+1.  Acesse o painel gestor da Dudit em **ERP > Configurações > Integrações**.
+2.  Localize o card do **Tiny ERP** e clique em **Conectar**.
+3.  Cole o **Token de API** que você copiou do Tiny ERP.
+4.  Clique em **Salvar e Testar Conexão**. O sistema fará uma validação imediata com os servidores do Tiny para confirmar que o token está ativo.
+
+### 3. Configurar as opções de sincronização
+
+Após a conexão ser estabelecida, você pode ajustar as preferências de funcionamento:
+
+| Opção | Como funciona |
+| :--- | :--- |
+| **Sincronizar Estoque** | Atualiza automaticamente a quantidade em estoque na Dudit com base no saldo registrado no Tiny ERP. |
+| **Exportação Automática de Pedidos** | Envia novos pedidos confirmados na Dudit diretamente para a fila de pedidos do Tiny ERP sem necessidade de clique manual. |
+| **Depósito Padrão** | Permite escolher de qual depósito físico cadastrado no Tiny será considerada a contagem de estoque. |
+
+### 4. Configurar Webhooks de Estoque no Tiny ERP (Tempo Real)
+
+Para que alterações de estoque feitas no Tiny (por compras de fornecedores ou vendas em outros canais) reflitam instantaneamente na Dudit:
+
+1.  Na página de configuração do Tiny na Dudit, copie a **URL de Webhook de Estoque**.
+2.  No painel do Tiny, acesse **Configurações > E-commerce > Webhooks**.
+3.  Adicione um novo webhook para o evento **Estoque / Atualização de saldo de produto**.
+4.  Cole a URL fornecida pela Dudit e salve.
+
+---
+
+## Como os pedidos chegam no Tiny ERP?
+
+Quando um cliente compra pelo seu catálogo ou vitrine na Dudit:
+
+1.  O pedido é criado com status aprovado/pago na Dudit.
+2.  A Dudit envia um payload seguro via API para o endpoint de inclusão de pedidos do Tiny.
+3.  O pedido aparece em **Vendas > Pedidos de Venda** no Tiny ERP.
+4.  O Tiny faz a reserva do estoque correspondente e permite que você gere a etiqueta de envio e emita a Nota Fiscal Eletrônica (NF-e).
+
+---
+
+## Perguntas frequentes (FAQ)
+
+**A Dudit cobra taxa adicional para usar a integração com o Tiny ERP?**  
+Não. A integração com o Tiny ERP é nativa e está inclusa nos planos da Dudit, sem custo por transação e com 0% de comissão sobre os pedidos exportados.
+
+**O que acontece se o cliente cancelar o pedido na Dudit?**  
+Se o pedido for cancelado na Dudit antes do faturamento, o status correspondente é atualizado no Tiny ERP para que o estoque reservado seja liberado.
+
+**Consigo importar meus produtos do Tiny ERP para a Dudit?**  
+Sim. A integração oferece suporte para carregar seu catálogo de produtos cadastrados no Tiny direto para a sua loja na Dudit, incluindo descrição, preço, SKU e fotos.
+
+**Posso usar o PDV da Dudit e o Tiny ERP juntos?**  
+Sim! Você pode realizar vendas presenciais no PDV frente de caixa da Dudit no balcão e sincronizar o estoque com o Tiny, mantendo tudo integrado em um único lugar.
+`
+            }
+        ]
     }
 ]
 

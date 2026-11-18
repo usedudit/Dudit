@@ -52,7 +52,7 @@ export function getNotificationHref(params: {
   }
 
   if (entityType === "product") {
-    if (entityId) return `/erp/produtos?product=${encodeURIComponent(entityId)}`
+    if (entityId) return `/erp/produtos?view=${encodeURIComponent(entityId)}`
     return "/erp/produtos"
   }
 

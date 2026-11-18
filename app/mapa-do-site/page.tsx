@@ -162,22 +162,22 @@ export default function MapaDoSitePage() {
                             return (
                                 <div
                                     key={idx}
-                                    className="bg-brand-slate/40 dark:bg-dark-border/20 border border-gray-100 dark:border-dark-border rounded-3xl p-8 hover:border-brand-green/30 transition-colors flex flex-col justify-between"
+                                    className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border hover:border-brand-green/40 transition-colors flex flex-col"
                                 >
                                     <div>
                                         {/* Header da seção */}
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <div className="w-10 h-10 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-dark dark:text-dark-heading">
-                                                <IconComponent className="w-5 h-5 text-brand-green" />
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                                                <IconComponent className="w-[18px] h-[18px] text-brand-dark dark:text-dark-heading" />
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{section.title}</h2>
-                                                <p className="text-xs text-brand-inactive-text">{section.description}</p>
+                                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{section.title}</h2>
+                                                <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">{section.description}</p>
                                             </div>
                                         </div>
 
                                         {/* Links da seção */}
-                                        <ul className="divide-y divide-gray-100 dark:divide-dark-border mt-6">
+                                        <ul className="divide-y divide-gray-100 dark:divide-dark-border">
                                             {section.links.map((link, linkIdx) => (
                                                 <li key={linkIdx} className="py-3.5 first:pt-0 last:pb-0">
                                                     <Link

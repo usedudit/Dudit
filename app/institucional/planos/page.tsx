@@ -160,9 +160,9 @@ const PricingCards = () => {
                            {plan.objective}
                         </p>
                         <div className="flex items-baseline gap-1">
-                           <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>R$</span>
+                           <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-gray-300'}`}>R$</span>
                            <span className={`text-5xl font-bold ${plan.isDark ? 'text-white' : 'text-brand-dark dark:text-dark-heading'}`}>{plan.price}</span>
-                           <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-brand-inactive-text'}`}>/mês</span>
+                           <span className={`text-sm ${plan.isDark ? 'text-brand-inactive-text/80' : 'text-gray-300'}`}>/mês</span>
                         </div>
                      </div>
 

@@ -508,6 +508,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         <Checkbox
                             checked={stockConfig.ignoreNegative} onChange={c => setStockConfig(p => ({ ...p, ignoreNegative: c }))}
                             label={`Ignorar ${targetLabel} com estoque negativo`}
+                            className="mb-2"
                         />
                     </div>
                 )

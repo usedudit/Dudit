@@ -522,13 +522,38 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
+  // Also skip /api/* routes because every API route handles its own auth
+  // (cron secrets, webhooks, or getCurrentUser()), avoiding duplicate GoTrue calls.
   const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/sacola", "/banned", "/checkout"]
   const isPost = request.method === "POST"
-  const needsAuthCheck = !isServerAction && (isPost || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
+  const isApiRoute = pathname.startsWith("/api/")
+  const needsAuthCheck = !isServerAction && !isApiRoute && (isPost || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/")))
 
   if (needsAuthCheck) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    const protectedPrefixes = ["/erp", "/perfil", "/pedidos", "/select-erp", "/ddt-admin", "/banned"]
+    const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
+    const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith("sb-") && c.name.includes("-auth-token"))
+
+    // FAST-FAIL: If there are NO Supabase auth cookies at all, never instantiate
+    // a Supabase client or call auth.getUser().
+    if (!hasAuthCookie) {
+      if (isProtected) {
+        const loginUrl = new URL("/auth/login", request.url)
+        const responseRedirect = NextResponse.redirect(loginUrl)
+        responseRedirect.cookies.delete("active_partner_id")
+        responseRedirect.cookies.delete("active_store_id")
+        return responseRedirect
+      }
+
+      if (request.cookies.has("active_partner_id") || request.cookies.has("active_store_id")) {
+        response.cookies.delete("active_partner_id")
+        response.cookies.delete("active_store_id")
+      }
+      return response
+    }
 
     if (supabaseUrl && supabaseKey) {
       const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -557,22 +582,6 @@ export async function middleware(request: NextRequest) {
 
       // Verifica usuário apenas para proteger rotas ERP
       try {
-        const protectedPrefixes = ["/erp", "/perfil", "/pedidos", "/select-erp", "/ddt-admin", "/banned"]
-        const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
-
-        // FAST-FAIL: If it's a protected route and there are NO supabase cookies at all, 
-        // don't even waste time calling auth.getUser()
-        if (isProtected) {
-          const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
-          if (!hasAuthCookie) {
-            const loginUrl = new URL("/auth/login", request.url)
-            const responseRedirect = NextResponse.redirect(loginUrl)
-            responseRedirect.cookies.delete("active_partner_id")
-            responseRedirect.cookies.delete("active_store_id")
-            return responseRedirect
-          }
-        }
-
         const { data: { user } } = await supabase.auth.getUser()
 
         if (user) {

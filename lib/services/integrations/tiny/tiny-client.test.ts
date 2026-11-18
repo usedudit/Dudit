@@ -119,4 +119,55 @@ describe("TinyClient", () => {
     expect(res.id).toBe(998877)
     expect(res.numero).toBe(54321)
   })
+
+  it("updateOrderStatus should send status change request to Tiny", async () => {
+    const client = createTinyClient(fakeToken)
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        retorno: {
+          status_processamento: 3,
+          status: "OK",
+        },
+      }),
+    } as any)
+
+    const success = await client.updateOrderStatus(998877, "cancelado")
+    expect(success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const callArgs = fetchSpy.mock.calls[0]
+    expect(callArgs[0]).toContain("pedido.alterar.situacao.php")
+    expect(callArgs[1]?.body).toContain("situacao=cancelado")
+    expect(callArgs[1]?.body).toContain("id=998877")
+  })
+
+  it("updateOrderTracking should send tracking number and url to Tiny", async () => {
+    const client = createTinyClient(fakeToken)
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        retorno: {
+          status_processamento: 3,
+          status: "OK",
+        },
+      }),
+    } as any)
+
+    const success = await client.updateOrderTracking({
+      id: 998877,
+      codigoRastreamento: "BR123456789BR",
+      urlRastreamento: "https://rastreio.exemplo.com",
+    })
+    expect(success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const callArgs = fetchSpy.mock.calls[0]
+    expect(callArgs[0]).toContain("pedido.atualizar.rastreamento.php")
+    expect(callArgs[1]?.body).toContain("codigo_rastreamento=BR123456789BR")
+    expect(callArgs[1]?.body).toContain("url_rastreamento=https%3A%2F%2Frastreio.exemplo.com")
+    expect(callArgs[1]?.body).toContain("id=998877")
+  })
 })

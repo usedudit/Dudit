@@ -54,9 +54,13 @@ export const metadata: Metadata = {
         template: "%s | Dudit",
     },
     description:
-        "Sistema de gestão comercial e vendas com 0% de comissão para autônomos e pequenos negócios: venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios. Catálogo digital, agendamento, ordens de serviço e controle de estoque na Dudit.",
+        "Sistema de gestão comercial e vendas com 0% de comissão para autônomos e pequenos negócios: integração com Tiny ERP, venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios. Catálogo digital, agendamento, ordens de serviço e controle de estoque na Dudit.",
     keywords: [
         "sistema de gestao comercial",
+        "integracao tiny erp",
+        "catalogo integrado tiny erp",
+        "pdv integrado tiny",
+        "tiny erp vendas online",
         "vender online brasil",
         "envio nacional transportadora",
         "frete correios superfrete",
@@ -162,6 +166,8 @@ const jsonLd = {
             },
             knowsAbout: [
                 "Sistema de Gestão Comercial (ERP)",
+                "Integração com Tiny ERP",
+                "Sincronização de Estoque e Pedidos via ERP",
                 "PDV Frente de Caixa",
                 "Vendas Online com Envio Nacional",
                 "Integração Logística e Fretes com Transportadoras e Correios",
@@ -223,6 +229,7 @@ const jsonLd = {
             },
             featureList: [
                 "0% de comissão por venda (o valor da venda fica com o comerciante)",
+                "Integração nativa com Tiny ERP para sincronização de estoque e envio automático de pedidos",
                 "Envios para todo o Brasil via transportadoras e Correios integrados",
                 "Vendas locais com entrega própria, retirada no balcão ou motoboy",
                 "PDV balcão para frente de caixa e vendas presenciais",

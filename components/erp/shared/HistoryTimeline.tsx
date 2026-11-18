@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon, CheckCircleIcon, RouteIcon } from "@/lib/icons"
-import { formatDateTime, cn, humanizeTimelineChangeLine } from "@/lib/utils"
+import { formatDateTime, cn, humanizeTimelineChangeLine, isDuditTeamActorName } from "@/lib/utils"
 import { IconPlaceholder } from "@/components/reusable"
 
 export interface HistoryEntry {
@@ -110,12 +110,12 @@ export function HistoryTimeline({
                     const isErp = (entry as any).source === "erp" || entry.metadata?.source === "erp"
                     const isDudit = !disableDuditHighlight && !isErp && Boolean(
                         entry.highlight ||
-                        entry.actor_name?.toLowerCase().includes("dudit") ||
+                        isDuditTeamActorName(entry.actor_name) ||
                         entry.metadata?.dudit_action ||
                         (entry.metadata as any)?.is_admin_action ||
                         entry.metadata?.admin_actor_name
                     )
-                    const actorDisplayName = (isErp && entry.actor_name && entry.actor_name.toLowerCase().includes("dudit"))
+                    const actorDisplayName = (isErp && isDuditTeamActorName(entry.actor_name))
                         ? "Vendedor"
                         : entry.actor_name
                     const isDriver = Boolean(

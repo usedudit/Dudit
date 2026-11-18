@@ -1,8 +1,9 @@
 ﻿"use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { extractSpecifications } from "@/lib/utils/specifications"
 import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, FormSection, Badge, SidebarCard } from "@/components/reusable"
 import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
 import { TagsListItem } from "@/components/erp/shared/TagsListItem"
@@ -35,6 +36,11 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
     const technicalDetails = Array.isArray(serviceData?.technical_details) ? serviceData.technical_details : []
     const tags = Array.isArray(serviceData?.tags) ? serviceData.tags : []
+
+    const viewSpecifications = useMemo(() => {
+        if (technicalDetails.length > 0) return technicalDetails
+        return extractSpecifications(serviceData)
+    }, [technicalDetails, serviceData])
 
     // --- Lógica dos Atributos (Ficha Técnica) ---
     const addAttribute = () => {
@@ -98,15 +104,15 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
                     {/* Especificações */}
                     <FormSection hasSeparator title="Especificações">
-                        {technicalDetails.length > 0 ? (
+                        {viewSpecifications.length > 0 ? (
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden shadow-xs">
-                                {technicalDetails.map((spec: any, i: number) => (
+                                {viewSpecifications.map((spec: any, i: number) => (
                                     <div
                                         key={i}
                                         className={`flex justify-between items-center px-5 py-3.5 ${i % 2 === 0
                                             ? "bg-brand-gray dark:bg-dark-border/30"
                                             : "bg-white dark:bg-dark-surface"
-                                            } ${i < technicalDetails.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                            } ${i < viewSpecifications.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
                                     >
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                             {spec.name || spec.label || ""}
@@ -167,7 +173,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         isEditing={false}
                     />
 
-                    <SidebarCard hasSeparator title="Tags e Buscas">
+                    <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (
@@ -398,7 +404,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
 
                     <FormSection
-                        title="Tags e Buscas"
+                        title="Palavras-chave de busca"
                         description="Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca."
                         hasSeparator
                     >
@@ -493,7 +499,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
 
                     {/* Card de Tags */}
-                    <SidebarCard hasSeparator title="Tags e Buscas">
+                    <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                         <div className="space-y-3">
                             <p className="text-sm text-brand-inactive-text mb-2">
                                 Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca.
@@ -515,7 +521,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                 tags={tags}
                 onChange={(t) => manualChange("tags", t)}
                 disabled={!isEditing}
-                title="Tags e Buscas"
+                title="Palavras-chave de busca"
                 description="Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca."
             />
         </div>

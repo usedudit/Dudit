@@ -54,7 +54,7 @@ export const TagsListItem: React.FC<TagsListItemProps> = ({
             showChevron
             onClick={onClick}
             disabled={disabled}
-            className={disabled ? className : `cursor-pointer ${className}`}
+            className={`px-4 py-3 ${!disabled ? "cursor-pointer" : ""} ${className}`}
         />
     )
 }

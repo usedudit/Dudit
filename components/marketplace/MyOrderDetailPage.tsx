@@ -24,7 +24,7 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal, type OrderDepositSummary } from '@/lib/payments/order-financial-state';
@@ -812,7 +812,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             changeLines = changeLines.filter(
                 (l: string) =>
                     !l.toLowerCase().includes("observações do pedido atualizadas") &&
-                    !l.toLowerCase().includes("alterou as observações do pedido"),
+                    !l.toLowerCase().includes("alterou as observações do pedido") &&
+                    !isInternalStockTimelineLine(l),
             );
 
             // If event was a return rejection, filter out false refund/credit/exchange lines
@@ -1777,6 +1778,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
                             <span>Pedido #{orderNumber}</span>
                             {isErpOrder && <Badge variant="gray" icon={null}>Via loja</Badge>}
+                            {order.nfe_number && (
+                                <Badge variant="green" className="text-xs">
+                                    NF-e #{order.nfe_number}
+                                </Badge>
+                            )}
                         </h1>
                         <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{dateStrFull}</p>
                     </div>
@@ -1849,6 +1855,30 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 label="Data do Pedido"
                                                 value={`${dateStrFull}`}
                                             />
+                                            {order.nfe_number && (
+                                                <DetailRow
+                                                    label="Nota Fiscal (NF-e)"
+                                                    value={
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                Nº {order.nfe_number}{order.nfe_series ? ` (Série ${order.nfe_series})` : ""}
+                                                            </span>
+                                                            {attachments.some((a: any) => a.file_name?.includes("DANFE") || a.file_name?.includes("NF")) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const danfeAtt = attachments.find((a: any) => a.file_name?.includes("DANFE") || a.file_name?.includes("NF"))
+                                                                        if (danfeAtt) handleDownloadAttachment(danfeAtt.file_key, danfeAtt.file_name)
+                                                                    }}
+                                                                    className="text-xs text-brand-green font-semibold underline hover:text-emerald-700 cursor-pointer"
+                                                                >
+                                                                    Baixar DANFE (PDF)
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    }
+                                                />
+                                            )}
                                         </FormSection>
                                     </div>
 

@@ -21,6 +21,10 @@ export const INSTITUTIONAL_FAQ: InstitutionalFaqItem[] = [
         answer: "O lojista tem autonomia completa: pode habilitar a retirada no balcão físico, configurar entrega local com cálculo por distância e raio de atendimento, e ativar fretes nacionais com cálculo automático, geração de etiquetas e rastreio integrado via transportadoras e Correios."
     },
     {
+        question: "A Dudit possui integração com sistemas de gestão e ERPs como o Tiny ERP?",
+        answer: "Sim! A Dudit possui integração nativa com o Tiny ERP. Você pode conectar sua conta do Tiny via API para sincronizar o estoque dos seus produtos em tempo real e exportar automaticamente os pedidos realizados na Dudit (com dados fiscais do cliente, itens e frete) direto para o seu Tiny ERP, facilitando a separação e a emissão de notas fiscais (NF-e) sem retrabalho manual e com 0% de comissão por venda."
+    },
+    {
         question: "Quais segmentos de negócios podem utilizar a Dudit?",
         answer: "A Dudit atende lojas de roupas, calçados, autopeças, cosméticos, eletrônicos, confeitarias e alimentação, assistências técnicas e oficinas mecânicas, salões de beleza, barbearias, prestadores de serviços e autônomos que desejam vender mais e gerenciar seu negócio sem burocracia."
     }

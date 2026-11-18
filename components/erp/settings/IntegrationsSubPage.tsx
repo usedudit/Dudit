@@ -1109,9 +1109,11 @@ export const IntegrationsSubPage = ({
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
                                 <div>
                                     <div className="flex gap-4 items-start">
-                                        <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
-                                            <span className="font-black text-orange-600 text-lg tracking-tight">tiny</span>
-                                        </div>
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/brands/TinyIcon.svg"
+                                            alt="Tiny ERP"
+                                            className="w-12 h-12 rounded-md object-contain shrink-0"
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
@@ -1127,13 +1129,14 @@ export const IntegrationsSubPage = ({
                                                 href="https://www.tiny.com.br"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-xs text-orange-600 hover:underline w-max mt-1 font-medium block"
+                                                className="text-xs text-brand-blue hover:underline w-max mt-1 font-medium block"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 tiny.com.br
                                             </a>
                                         </div>
                                     </div>
+
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
                                         Sincronize catálogo de produtos, estoque e envie pedidos vendidos na Dudit diretamente para o seu Tiny ERP.
                                     </p>
@@ -1502,15 +1505,19 @@ export const IntegrationsSubPage = ({
                                     transition={{ duration: 0.2 }}
                                     className="flex-1"
                                 >
-                                    {SF_KNOW_MORE_STEPS[sfKnowMoreStep].description && (
+                                    <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
+                                        {KNOW_MORE_STEPS[knowMoreStep].title}
+                                    </h3>
+
+                                    {KNOW_MORE_STEPS[knowMoreStep].description && (
                                         <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
-                                            {SF_KNOW_MORE_STEPS[sfKnowMoreStep].description}
+                                            {KNOW_MORE_STEPS[knowMoreStep].description}
                                         </p>
                                     )}
 
-                                    {SF_KNOW_MORE_STEPS[sfKnowMoreStep].list && (
+                                    {KNOW_MORE_STEPS[knowMoreStep].list && (
                                         <ul className="space-y-4 mt-6">
-                                            {SF_KNOW_MORE_STEPS[sfKnowMoreStep].list.map((item, i) => (
+                                            {KNOW_MORE_STEPS[knowMoreStep].list.map((item, i) => (
                                                 <li key={i} className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
                                                     <span className="flex shrink-0 items-center justify-center text-md">
                                                         ●
@@ -2120,93 +2127,124 @@ export const IntegrationsSubPage = ({
                 >
                     <div className="space-y-6">
                         {tinyStatus?.connected ? (
-                            <div className="space-y-4">
-                                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl p-4">
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                                        <span className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm">
-                                            Conexão ativa com o Tiny ERP
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">
+                            <><InfoCard
+                                title="Conexão ativa com o Tiny ERP"
+                                message={<div>
+                                    <p>
                                         Seus produtos e pedidos podem ser sincronizados automaticamente.
                                     </p>
+
                                     {tinyStatus.metadata?.last_sync_at && (
                                         <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                                            Última sincronização: {new Date(tinyStatus.metadata.last_sync_at).toLocaleString("pt-BR")}
-                                            {tinyStatus.metadata.synced_count !== undefined && ` (${tinyStatus.metadata.synced_count} produtos)`}
+                                            Última sincronização:{" "}
+                                            {new Date(
+                                                tinyStatus.metadata.last_sync_at
+                                            ).toLocaleString("pt-BR")}
+
+                                            {tinyStatus.metadata.synced_count !== undefined && (
+                                                <> ({tinyStatus.metadata.synced_count} produtos)</>
+                                            )}
                                         </p>
                                     )}
-                                </div>
-
-                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/50 dark:bg-dark-surface/50 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Sincronizar Estoque
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                Mantém as quantidades da Dudit atualizadas com o Tiny.
-                                            </p>
+                                </div>} /><div className="space-y-4">
+                                    <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/50 dark:bg-dark-surface/50 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    Sincronizar Estoque
+                                                </p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Mantém as quantidades da Dudit atualizadas com o Tiny.
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                checked={tinySyncStock}
+                                                onCheckedChange={setTinySyncStock} />
                                         </div>
-                                        <Switch
-                                            checked={tinySyncStock}
-                                            onCheckedChange={setTinySyncStock}
-                                        />
+
+                                        <hr className="border-brand-border dark:border-dark-border" />
+
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    Exportar Pedidos Pagos
+                                                </p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Gera o pedido de venda no Tiny assim que aprovado no Mercado Pago.
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                checked={tinyAutoExportOrders}
+                                                onCheckedChange={setTinyAutoExportOrders} />
+                                        </div>
                                     </div>
 
-                                    <hr className="border-brand-border dark:border-dark-border" />
-
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Exportar Pedidos Pagos
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                Gera o pedido de venda no Tiny assim que aprovado no Mercado Pago.
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            checked={tinyAutoExportOrders}
-                                            onCheckedChange={setTinyAutoExportOrders}
-                                        />
+                                    <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
+                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            Catálogo de Produtos
+                                        </p>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
+                                            Puxe os produtos cadastrados no seu Tiny ERP diretamente para o catálogo e vitrine da Dudit.
+                                        </p>
+                                        <Button
+                                            className="w-full"
+                                            variant="outline"
+                                            onClick={handleTinySyncProducts}
+                                            disabled={tinyIsSyncing}
+                                            isLoading={tinyIsSyncing}
+                                        >
+                                            {tinyIsSyncing ? "Sincronizando Catálogo..." : "Sincronizar Produtos Agora"}
+                                        </Button>
                                     </div>
-                                </div>
 
-                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
-                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                        Catálogo de Produtos
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
-                                        Puxe os produtos cadastrados no seu Tiny ERP diretamente para o catálogo e vitrine da Dudit.
-                                    </p>
-                                    <Button
-                                        className="w-full"
-                                        variant="outline"
-                                        onClick={handleTinySyncProducts}
-                                        disabled={tinyIsSyncing}
-                                        isLoading={tinyIsSyncing}
-                                    >
-                                        {tinyIsSyncing ? "Sincronizando Catálogo..." : "Sincronizar Produtos Agora"}
-                                    </Button>
-                                </div>
+                                    {tinyStatus?.webhookUrl && (
+                                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    Webhook em Tempo Real (Estoque & NF-e)
+                                                </p>
+                                                <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                                    Ativo
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Cole esta URL nas configurações de Webhooks do Tiny para atualizar estoque em tempo real e anexar automaticamente as Notas Fiscais (NF-e/DANFE) nos pedidos:
+                                            </p>
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <input
+                                                    readOnly
+                                                    value={tinyStatus.webhookUrl}
+                                                    className="flex-1 text-xs font-mono px-3 py-2 rounded-lg bg-brand-light-bg/60 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading select-all outline-none"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(tinyStatus.webhookUrl || "")
+                                                        toast({ title: "URL copiada!", description: "Cole a URL nas configurações de Webhooks do Tiny ERP." })
+                                                    }}
+                                                >
+                                                    Copiar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                <div className="flex gap-3 pt-2">
-                                    <Button
-                                        variant="outline"
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200"
-                                        onClick={() => setConfirmTinyDisconnectOpen(true)}
-                                    >
-                                        Desconectar
-                                    </Button>
-                                    <Button
-                                        className="flex-1"
-                                        onClick={handleSaveTinyConfig}
-                                    >
-                                        Salvar Preferências
-                                    </Button>
-                                </div>
-                            </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <Button
+                                            variant="outlinered"
+                                            onClick={() => setConfirmTinyDisconnectOpen(true)}
+                                        >
+                                            Desconectar
+                                        </Button>
+                                        <Button
+                                            className="flex-1"
+                                            onClick={handleSaveTinyConfig}
+                                        >
+                                            Salvar Preferências
+                                        </Button>
+                                    </div>
+                                </div></>
                         ) : (
                             <div className="space-y-4">
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
@@ -2281,16 +2319,8 @@ export const IntegrationsSubPage = ({
                     maxWidth="lg"
                 >
                     <div className="flex flex-col min-h-[500px]">
-                        {/* Banner */}
                         <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group h-[200px]">
-                            <div className="flex flex-col items-center justify-center gap-2">
-                                <div className="w-20 h-20 rounded-2xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
-                                    <span className="font-black text-3xl tracking-tight">tiny</span>
-                                </div>
-                                <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                                    Olist ERP
-                                </span>
-                            </div>
+                            <img src="https://img.dudit.com.br/static/banners/LogoTiny.svg" alt="" className="w-full h-full object-contain" />
                         </div>
 
                         <div className="p-8 flex-1 flex flex-col">
@@ -2300,7 +2330,7 @@ export const IntegrationsSubPage = ({
                                         <motion.div
                                             key={i}
                                             layout
-                                            className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i <= tinyKnowMoreStep ? "bg-orange-500" : "bg-brand-gray dark:bg-dark-border"
+                                            className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i <= tinyKnowMoreStep ? "bg-brand-green" : "bg-brand-gray dark:bg-dark-border"
                                                 }`}
                                         />
                                     ))}
