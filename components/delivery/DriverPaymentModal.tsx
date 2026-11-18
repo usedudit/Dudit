@@ -10,6 +10,7 @@ import {
   Input,
   Barcode,
   IconPlaceholder,
+  MoneyInput,
 } from "@/components/reusable"
 import {
   CheckCircleIcon,
@@ -42,6 +43,7 @@ interface DriverPaymentModalProps {
   order: any
   partnerId?: string
   onSuccess?: () => void
+  canConfirm?: boolean
 }
 
 const TransactionReceiptContent = ({
@@ -137,12 +139,38 @@ const TransactionReceiptContent = ({
   </div>
 )
 
+function detectPaymentCategory(
+  order: any,
+  breakdown: any[],
+  isMpOrder: boolean
+): "mp" | "pix" | "dinheiro" | "cartao_credito" | "cartao_debito" | "cartao_generic" | "split" | "fallback" {
+  if (isMpOrder) return "mp"
+  if (Array.isArray(breakdown) && breakdown.length > 1) return "split"
+
+  const rawMethod = String(
+    order?.payment_method || breakdown[0]?.method || ""
+  ).toLowerCase().trim()
+
+  if (rawMethod.includes("pix")) return "pix"
+  if (rawMethod.includes("dinheiro") || rawMethod.includes("cash") || rawMethod.includes("money")) return "dinheiro"
+  if (rawMethod.includes("débito") || rawMethod.includes("debito") || rawMethod.includes("debit")) return "cartao_debito"
+  if (rawMethod.includes("crédito") || rawMethod.includes("credito") || rawMethod.includes("credit")) return "cartao_credito"
+  if (rawMethod.includes("cartão") || rawMethod.includes("cartao") || rawMethod.includes("card")) return "cartao_generic"
+
+  if (rawMethod.includes("não definido") || rawMethod.includes("metodo nao definido") || !rawMethod) {
+    return "fallback"
+  }
+
+  return "fallback"
+}
+
 export default function DriverPaymentModal({
   isOpen,
   onClose,
   assignmentId,
   order: initialOrder,
   onSuccess,
+  canConfirm = true,
 }: DriverPaymentModalProps) {
   const { toast } = useToast()
   const zIndex = useModalLayer(isOpen) ?? 50
@@ -173,7 +201,9 @@ export default function DriverPaymentModal({
   const [copiedPix, setCopiedPix] = useState(false)
   const [printOrderId, setPrintOrderId] = useState<string | null>(null)
   const [fallbackMethod, setFallbackMethod] = useState<string>("Dinheiro")
-  const [selectedPaymentCategory, setSelectedPaymentCategory] = useState<"auto" | "pix" | "dinheiro" | "cartao">("auto")
+
+  // Cash change handling
+  const [cashGiven, setCashGiven] = useState<number>(0)
 
   useEffect(() => {
     if (isOpen) {
@@ -184,7 +214,6 @@ export default function DriverPaymentModal({
       setLocalPixQrData(null)
       setCopiedPix(false)
       setPrintOrderId(null)
-      setSelectedPaymentCategory("auto")
       const id = setTimeout(() => setIsAnimating(true), 50)
       return () => clearTimeout(id)
     } else {
@@ -244,8 +273,6 @@ export default function DriverPaymentModal({
     return []
   }, [targetOrder])
 
-  const isSplit = breakdown.length > 1
-
   const isMpOrder = useMemo(() => {
     return Boolean(
       targetOrder?.payment_provider === "Mercado Pago" ||
@@ -257,6 +284,21 @@ export default function DriverPaymentModal({
       })
     )
   }, [targetOrder, breakdown])
+
+  // Payment Category detection - strictly locked to customer choice
+  const category = useMemo(() => {
+    return detectPaymentCategory(targetOrder, breakdown, isMpOrder)
+  }, [targetOrder, breakdown, isMpOrder])
+
+  const resolvedMethodName = useMemo(() => {
+    if (category === "mp") return "Pix Mercado Pago"
+    if (category === "pix") return "Pix"
+    if (category === "dinheiro") return "Dinheiro"
+    if (category === "cartao_debito") return "Cartão de Débito"
+    if (category === "cartao_credito") return "Cartão de Crédito"
+    if (category === "cartao_generic") return "Cartão"
+    return String(targetOrder?.payment_method || breakdown[0]?.method || "Dinheiro")
+  }, [category, targetOrder, breakdown])
 
   // Cash change analysis
   const cashEntry = breakdown.find((leg) => {
@@ -276,7 +318,21 @@ export default function DriverPaymentModal({
       }
       return null
     })()
-  const cashChangeAmount = wantsChange && payWithAmount ? Math.max(0, payWithAmount - totalOrder) : 0
+  const cashChangeAmount = wantsChange && payWithAmount ? Math.max(0, payWithAmount - totalRemaining) : 0
+
+  useEffect(() => {
+    if (payWithAmount && payWithAmount >= totalRemaining) {
+      setCashGiven(payWithAmount)
+    } else {
+      setCashGiven(totalRemaining)
+    }
+  }, [payWithAmount, totalRemaining, isOpen])
+
+  const handleQuickBill = (val: number) => {
+    setCashGiven((prev) => Math.max(0, Number((Number(prev || 0) + val).toFixed(2))))
+  }
+
+  const calculatedChange = Math.max(0, Number((cashGiven - totalRemaining).toFixed(2)))
 
   // Fetch Mercado Pago details if needed
   useEffect(() => {
@@ -367,25 +423,8 @@ export default function DriverPaymentModal({
   }
 
   // Generate local Pix if order is Pix and not Mercado Pago
-  const resolvedMethodName = String(
-    targetOrder?.payment_method || breakdown[0]?.method || ""
-  ).trim()
-
-  const activeCategory = useMemo(() => {
-    if (selectedPaymentCategory !== "auto") return selectedPaymentCategory
-    if (isMpOrder) return "pix"
-    if (resolvedMethodName.toLowerCase().includes("pix") || fallbackMethod.toLowerCase().includes("pix")) return "pix"
-    if (resolvedMethodName.toLowerCase().includes("dinheiro") || resolvedMethodName.toLowerCase().includes("cash")) return "dinheiro"
-    if (resolvedMethodName.toLowerCase().includes("cartão") || resolvedMethodName.toLowerCase().includes("cartao") || resolvedMethodName.toLowerCase().includes("crédito") || resolvedMethodName.toLowerCase().includes("débito")) return "cartao"
-    return "fallback"
-  }, [selectedPaymentCategory, isMpOrder, resolvedMethodName, fallbackMethod])
-
-  const isPixMethod =
-    !isMpOrder &&
-    (activeCategory === "pix" || resolvedMethodName.toLowerCase().includes("pix") || fallbackMethod.toLowerCase().includes("pix"))
-
   useEffect(() => {
-    if (!isOpen || isFullyPaid || !isPixMethod) return
+    if (!isOpen || isFullyPaid || category !== "pix") return
     if (localPixQrData || generatingLocalPix) return
 
     const key = storePixKey || methods.find((m) => m.type === "pix")?.pix_key
@@ -414,7 +453,7 @@ export default function DriverPaymentModal({
   }, [
     isOpen,
     isFullyPaid,
-    isPixMethod,
+    category,
     storePixKey,
     storePixKeyType,
     methods,
@@ -431,17 +470,7 @@ export default function DriverPaymentModal({
       return
     }
 
-    const finalMethod =
-      methodOverride ||
-      (activeCategory === "pix"
-        ? (isMpOrder ? "Pix Mercado Pago" : "Pix")
-        : activeCategory === "dinheiro"
-        ? "Dinheiro"
-        : activeCategory === "cartao"
-        ? (resolvedMethodName.toLowerCase().includes("débito") ? "Cartão de Débito" : "Cartão de Crédito")
-        : (resolvedMethodName && !resolvedMethodName.toLowerCase().includes("não definido")
-          ? resolvedMethodName
-          : fallbackMethod))
+    const finalMethod = methodOverride || resolvedMethodName
 
     setStep("processing")
     try {
@@ -452,12 +481,18 @@ export default function DriverPaymentModal({
       const targetOrderId = targetOrder?.id || targetOrder?.order_id || null
       const targetAssignmentId = assignmentId || initialOrder?.delivery_id || targetOrderId || ""
 
+      const noteText =
+        category === "dinheiro" && calculatedChange > 0.009
+          ? `Troco devolvido: ${formatCurrency(calculatedChange)}`
+          : undefined
+
       const res = await driverConfirmPaymentAction({
         assignmentId: targetAssignmentId,
         orderId: targetOrderId,
         paymentMethod: finalMethod,
         amountReceived: totalRemaining,
         installments,
+        note: noteText,
       })
 
       if (res.success) {
@@ -568,14 +603,6 @@ export default function DriverPaymentModal({
                     transition={standardTransition}
                     className="flex flex-col gap-5 my-auto"
                   >
-                    {/* Alerta de troco */}
-                    {wantsChange && payWithAmount !== null && (
-                      <InfoCard
-                        color="blue"
-                        message={`O cliente solicitou troco para ${formatCurrency(payWithAmount)}. Troco a devolver: ${formatCurrency(cashChangeAmount)}.`}
-                      />
-                    )}
-
                     {/* Pedido já totalmente pago */}
                     {isFullyPaid ? (
                       <div className="py-10 text-center flex flex-col items-center">
@@ -591,56 +618,8 @@ export default function DriverPaymentModal({
                       </div>
                     ) : (
                       <>
-                        {/* Seletor rápido de forma de recebimento */}
-                        <div className="flex items-center gap-1.5 mb-4 bg-brand-gray dark:bg-dark-border/40 p-1 rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPaymentCategory("auto")}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
-                              selectedPaymentCategory === "auto"
-                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-dark dark:text-dark-heading"
-                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                            }`}
-                          >
-                            Padrão ({resolvedMethodName || "Pedido"})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPaymentCategory("pix")}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
-                              activeCategory === "pix"
-                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-primary"
-                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                            }`}
-                          >
-                            Pix
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPaymentCategory("dinheiro")}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
-                              activeCategory === "dinheiro"
-                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-primary"
-                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                            }`}
-                          >
-                            Dinheiro
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPaymentCategory("cartao")}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all truncate ${
-                              activeCategory === "cartao"
-                                ? "bg-white dark:bg-dark-surface shadow-sm text-brand-primary"
-                                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                            }`}
-                          >
-                            Cartão
-                          </button>
-                        </div>
-
-                        {isMpOrder && (activeCategory === "pix" || activeCategory === "fallback") ? (
-                          /* MERCADO PAGO CASE */
+                        {/* 2.1 MERCADO PAGO CASE */}
+                        {category === "mp" && (
                           <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-3">
@@ -810,269 +789,461 @@ export default function DriverPaymentModal({
                               </div>
                             )}
 
-                            <div className="pt-2">
-                              <Button
-                                className="w-full h-11"
-                                onClick={() => handleConfirmReceipt("Pix Mercado Pago")}
-                              >
-                                Confirmar Recebimento do Cliente
-                              </Button>
-                            </div>
-                          </div>
-                        ) : activeCategory === "pix" || isPixMethod ? (
-                          /* PIX DA LOJA CASE */
-                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center shrink-0 border border-teal-100 dark:border-teal-900/30">
-                            <QRCodeIcon size={24} className="text-teal-600 dark:text-teal-400" />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                              Pix da Loja ({storeName})
-                              <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
-                            </h4>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                              {storePixKey
-                                ? `Chave: ${storePixKey}`
-                                : "Chave Pix configurada pela loja"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* QR Code gerado */}
-                        {localPixQrData?.qrDataUrl ? (
-                          <div className="flex flex-col items-center gap-3 pt-2">
-                            <div className="w-44 h-44 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center shadow-sm">
-                              <img
-                                src={localPixQrData.qrDataUrl}
-                                alt="PIX QR Code"
-                                className="w-full h-full object-contain"
+                            {canConfirm ? (
+                              <div className="pt-2">
+                                <Button
+                                  className="w-full h-11 font-bold"
+                                  onClick={() => handleConfirmReceipt("Pix Mercado Pago")}
+                                >
+                                  Confirmar Recebimento do Cliente
+                                </Button>
+                              </div>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
                               />
-                            </div>
-                            <div className="text-center">
-                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a transferir</span>
-                              <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(totalRemaining)}
-                              </span>
-                            </div>
-                            {storePixKey && (
-                              <div className="w-full flex gap-2">
-                                <Input
-                                  variant="full-rounded"
-                                  readOnly
-                                  value={storePixKey}
-                                  className="flex-1 h-10 truncate"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(storePixKey)
-                                    setCopiedPix(true)
-                                    toast({ title: "Copiado!", description: "Chave Pix copiada." })
-                                    setTimeout(() => setCopiedPix(false), 2000)
-                                  }}
-                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
-                                  title="Copiar chave Pix"
-                                >
-                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
-                                </Button>
-                              </div>
                             )}
-                          </div>
-                        ) : generatingLocalPix ? (
-                          <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
-                            <Spinner size={24} className="text-brand-primary mb-2" />
-                            <span className="text-xs">Gerando QR Code Pix da loja...</span>
-                          </div>
-                        ) : (
-                          <div className="text-center py-4">
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Valor a receber</span>
-                            <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mb-2">
-                              {formatCurrency(totalRemaining)}
-                            </span>
-                            {storePixKey ? (
-                              <div className="w-full flex gap-2 mt-2">
-                                <Input
-                                  variant="full-rounded"
-                                  readOnly
-                                  value={storePixKey}
-                                  className="flex-1 h-10 truncate"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(storePixKey)
-                                    setCopiedPix(true)
-                                    toast({ title: "Copiado!", description: "Chave Pix copiada." })
-                                    setTimeout(() => setCopiedPix(false), 2000)
-                                  }}
-                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
-                                >
-                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
-                                </Button>
-                              </div>
-                            ) : null}
                           </div>
                         )}
 
-                        <InfoCard
-                          color="blue"
-                          message="Solicite ao cliente o pagamento via Pix. Após conferir o comprovante, confirme o recebimento."
-                        />
-
-                        <Button
-                          className="w-full h-11"
-                          onClick={() => handleConfirmReceipt("Pix")}
-                        >
-                          Confirmar Recebimento do Pix
-                        </Button>
-                      </div>
-                    ) : activeCategory === "cartao" || (!isMpOrder && !isPixMethod && (resolvedMethodName.toLowerCase().includes("cartão") || resolvedMethodName.toLowerCase().includes("cartao") || resolvedMethodName.toLowerCase().includes("crédito") || resolvedMethodName.toLowerCase().includes("débito"))) ? (
-                      /* CARTÃO CRÉDITO OU DÉBITO */
-                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/30">
-                            <CreditCardIcon size={24} className="text-purple-600 dark:text-purple-400" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                              {resolvedMethodName}
-                              <Badge variant="orange" className="text-[10px] scale-90">Na Maquininha</Badge>
-                            </h4>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                              Valor pré-definido pelo vendedor
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-2">
-                          <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a passar na maquininha</span>
-                          <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mt-0.5">
-                            {formatCurrency(totalRemaining)}
-                          </span>
-                          {breakdown[0]?.installmentNumber > 1 && (
-                            <span className="text-xs font-semibold text-brand-primary block mt-1">
-                              {breakdown[0].installmentNumber}x de {formatCurrency(totalRemaining / breakdown[0].installmentNumber)}
-                            </span>
-                          )}
-                        </div>
-
-                        <InfoCard
-                          color="blue"
-                          message="Passe o cartão do cliente na maquininha. Assim que a maquininha aprovar a transação, confirme abaixo."
-                        />
-
-                        <Button
-                          variant="default"
-                          className="w-full h-11 font-bold"
-                          onClick={() => handleConfirmReceipt(resolvedMethodName)}
-                        >
-                          Confirmar Recebimento no Cartão
-                        </Button>
-                      </div>
-                    ) : activeCategory === "dinheiro" || (!isMpOrder && !isPixMethod && (resolvedMethodName.toLowerCase().includes("dinheiro") || resolvedMethodName.toLowerCase().includes("cash"))) ? (
-                      /* DINHEIRO (CASH) */
-                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/30">
-                            <MoneyIcon size={24} className="text-emerald-600 dark:text-emerald-400" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                              Pagamento em Dinheiro
-                              <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
-                            </h4>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                              Recebimento presencial na entrega
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-2">
-                          <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a receber</span>
-                          <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mt-0.5">
-                            {formatCurrency(totalRemaining)}
-                          </span>
-                          {wantsChange && payWithAmount ? (
-                            <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border flex justify-around text-xs">
-                              <span>Paga com: <strong>{formatCurrency(payWithAmount)}</strong></span>
-                              <span className="text-brand-orange">Troco: <strong>{formatCurrency(cashChangeAmount)}</strong></span>
+                        {/* 2.2 PIX DA LOJA CASE */}
+                        {category === "pix" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center shrink-0 border border-teal-100 dark:border-teal-900/30">
+                                <QRCodeIcon size={24} className="text-teal-600 dark:text-teal-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                  Pix da Loja ({storeName})
+                                  <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
+                                </h4>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                  {storePixKey
+                                    ? `Chave: ${storePixKey}`
+                                    : "Chave Pix configurada pela loja"}
+                                </p>
+                              </div>
                             </div>
-                          ) : null}
-                        </div>
 
-                        <Button
-                          variant="default"
-                          className="w-full h-11 font-bold"
-                          onClick={() => handleConfirmReceipt("Dinheiro")}
-                        >
-                          Confirmar Recebimento em Dinheiro
-                        </Button>
-                      </div>
-                    ) : isSplit ? (
-                      /* SPLIT BREAKDOWN */
-                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
-                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                          Pagamento Dividido ({breakdown.length} formas)
-                        </h4>
-                        <div className="space-y-2">
-                          {breakdown.map((leg, idx) => (
-                            <div key={idx} className="flex justify-between items-center p-3 rounded-lg border bg-brand-gray dark:bg-dark-border/30 text-sm">
-                              <div>
-                                <span className="font-bold text-brand-dark dark:text-dark-heading block">{leg.method || "Método"}</span>
-                                {leg.installmentNumber > 1 && (
-                                  <span className="text-xs text-brand-inactive-text">{leg.installmentNumber}x</span>
+                            {/* QR Code gerado */}
+                            {localPixQrData?.qrDataUrl ? (
+                              <div className="flex flex-col items-center gap-3 pt-2">
+                                <div className="w-44 h-44 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center shadow-sm">
+                                  <img
+                                    src={localPixQrData.qrDataUrl}
+                                    alt="PIX QR Code"
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                                <div className="text-center">
+                                  <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a transferir</span>
+                                  <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(totalRemaining)}
+                                  </span>
+                                </div>
+                                {storePixKey && (
+                                  <div className="w-full flex gap-2">
+                                    <Input
+                                      variant="full-rounded"
+                                      readOnly
+                                      value={storePixKey}
+                                      className="flex-1 h-10 truncate text-xs"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(storePixKey)
+                                        setCopiedPix(true)
+                                        toast({ title: "Copiado!", description: "Chave Pix copiada." })
+                                        setTimeout(() => setCopiedPix(false), 2000)
+                                      }}
+                                      className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                      title="Copiar chave Pix"
+                                    >
+                                      {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
-                              <span className="font-bold text-brand-primary">{formatCurrency(leg.amount || leg.effectiveAmount || 0)}</span>
+                            ) : generatingLocalPix ? (
+                              <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
+                                <Spinner size={24} className="text-brand-primary mb-2" />
+                                <span className="text-xs">Gerando QR Code Pix da loja...</span>
+                              </div>
+                            ) : (
+                              <div className="text-center py-4">
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Valor a receber</span>
+                                <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mb-2">
+                                  {formatCurrency(totalRemaining)}
+                                </span>
+                                {storePixKey ? (
+                                  <div className="w-full flex gap-2 mt-2">
+                                    <Input
+                                      variant="full-rounded"
+                                      readOnly
+                                      value={storePixKey}
+                                      className="flex-1 h-10 truncate text-xs"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(storePixKey)
+                                        setCopiedPix(true)
+                                        toast({ title: "Copiado!", description: "Chave Pix copiada." })
+                                        setTimeout(() => setCopiedPix(false), 2000)
+                                      }}
+                                      className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                    >
+                                      {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+
+                            {canConfirm ? (
+                              <Button
+                                className="w-full h-11 font-bold"
+                                onClick={() => handleConfirmReceipt("Pix")}
+                              >
+                                Confirmar Recebimento do Pix
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2.3 DINHEIRO (CASH) CASE */}
+                        {category === "dinheiro" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+                                <MoneyIcon size={24} className="text-emerald-600 dark:text-emerald-400" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                  Pagamento em Dinheiro
+                                  <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
+                                </h4>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                  Recebimento presencial na entrega
+                                </p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                        <Button
-                          variant="default"
-                          className="w-full h-11 font-bold mt-2"
-                          onClick={() => handleConfirmReceipt(targetOrder?.payment_method || "Múltiplos Meios")}
-                        >
-                          Confirmar Recebimento de Todas as Formas
-                        </Button>
-                      </div>
-                    ) : (
-                      /* FALLBACK: SELECTOR RÁPIDO */
-                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
-                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                          Selecione como o cliente está pagando:
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          {["Dinheiro", "Pix", "Cartão de Crédito", "Cartão de Débito"].map((m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setFallbackMethod(m)}
-                              className={`p-3 rounded-xl border text-sm font-bold transition-all text-left ${fallbackMethod === m ? "border-brand-primary bg-brand-primary/5 text-brand-primary" : "border-brand-border dark:border-dark-border hover:bg-gray-50"}`}
-                            >
-                              {m}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="p-3 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center">
-                          <span className="text-xs text-brand-inactive-text block">Valor a confirmar</span>
-                          <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            {formatCurrency(totalRemaining)}
-                          </span>
-                        </div>
-                        <Button
-                          variant="default"
-                          className="w-full h-11 font-bold"
-                          onClick={() => handleConfirmReceipt(fallbackMethod)}
-                        >
-                          Confirmar Recebimento em {fallbackMethod}
-                        </Button>
-                      </div>
+
+                            {/* Alerta de troco pedido pelo cliente */}
+                            {wantsChange && payWithAmount !== null && (
+                              <InfoCard
+                                color="blue"
+                                message={`O cliente solicitou troco para ${formatCurrency(payWithAmount)}. Troco a devolver: ${formatCurrency(cashChangeAmount)}.`}
+                              />
+                            )}
+
+                            <div className="p-4 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a receber</span>
+                              <span className="text-3xl font-black text-brand-dark dark:text-dark-heading block mt-0.5">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                            </div>
+
+                            {/* Calculadora de troco dinâmica */}
+                            <div className="space-y-2">
+                              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                Valor entregue pelo cliente:
+                              </label>
+                              <MoneyInput
+                                value={cashGiven}
+                                onChange={(val: number) => setCashGiven(val)}
+                                className="font-bold text-base"
+                              />
+
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                {[5, 10, 20, 50, 100].map((amt) => (
+                                  <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => handleQuickBill(amt)}
+                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 dark:bg-dark-border/40 hover:bg-gray-200 dark:hover:bg-dark-border/70 text-brand-dark dark:text-dark-heading transition-colors"
+                                  >
+                                    + R$ {amt}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => setCashGiven(totalRemaining)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors ml-auto"
+                                >
+                                  Valor exato
+                                </button>
+                              </div>
+                            </div>
+
+                            {calculatedChange > 0.009 && (
+                              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                                  Troco a devolver ao cliente:
+                                </span>
+                                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                                  {formatCurrency(calculatedChange)}
+                                </span>
+                              </div>
+                            )}
+
+                            {canConfirm ? (
+                              <Button
+                                variant="default"
+                                className="w-full h-11 font-bold mt-1"
+                                onClick={() => handleConfirmReceipt("Dinheiro")}
+                              >
+                                Confirmar Recebimento em Dinheiro
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2.4 CARTÃO DE DÉBITO CASE */}
+                        {category === "cartao_debito" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/30">
+                                <CreditCardIcon size={24} className="text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                  Cartão de Débito
+                                  <Badge variant="orange" className="text-[10px] scale-90">Na Maquininha</Badge>
+                                </h4>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                  Cobrança no ato da entrega
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="p-5 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-1">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Valor a cobrar na maquininha</span>
+                              <span className="text-3xl font-black text-brand-dark dark:text-dark-heading block">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                            </div>
+
+                            <InfoCard
+                              color="blue"
+                              message="Aproxime ou insira o cartão de débito do cliente na maquininha. Após a aprovação, confirme abaixo."
+                            />
+
+                            {canConfirm ? (
+                              <Button
+                                variant="default"
+                                className="w-full h-11 font-bold"
+                                onClick={() => handleConfirmReceipt("Cartão de Débito")}
+                              >
+                                Confirmar Recebimento no Débito
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2.5 CARTÃO DE CRÉDITO CASE */}
+                        {category === "cartao_credito" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/30">
+                                <CreditCardIcon size={24} className="text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                  Cartão de Crédito
+                                  <Badge variant="orange" className="text-[10px] scale-90">Na Maquininha</Badge>
+                                </h4>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                  Cobrança no ato da entrega
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="p-5 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-1">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Valor a cobrar na maquininha</span>
+                              <span className="text-3xl font-black text-brand-dark dark:text-dark-heading block">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                              {breakdown[0]?.installmentNumber > 1 && (
+                                <span className="text-xs font-semibold text-brand-primary block mt-1.5">
+                                  {breakdown[0].installmentNumber}x de {formatCurrency(totalRemaining / breakdown[0].installmentNumber)}
+                                </span>
+                              )}
+                            </div>
+
+                            <InfoCard
+                              color="blue"
+                              message="Aproxime ou insira o cartão de crédito do cliente na maquininha. Após a aprovação, confirme abaixo."
+                            />
+
+                            {canConfirm ? (
+                              <Button
+                                variant="default"
+                                className="w-full h-11 font-bold"
+                                onClick={() => handleConfirmReceipt("Cartão de Crédito")}
+                              >
+                                Confirmar Recebimento no Crédito
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2.6 CARTÃO GENÉRICO CASE */}
+                        {category === "cartao_generic" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/30">
+                                <CreditCardIcon size={24} className="text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                  Cartão na Maquininha
+                                  <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
+                                </h4>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                  Cobrança no ato da entrega
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="p-5 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-1">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Valor a passar na maquininha</span>
+                              <span className="text-3xl font-black text-brand-dark dark:text-dark-heading block">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                            </div>
+
+                            <InfoCard
+                              color="blue"
+                              message="Passe o cartão do cliente na maquininha. Assim que a máquina aprovar, confirme abaixo."
+                            />
+
+                            {canConfirm ? (
+                              <Button
+                                variant="default"
+                                className="w-full h-11 font-bold"
+                                onClick={() => handleConfirmReceipt(resolvedMethodName || "Cartão")}
+                              >
+                                Confirmar Recebimento no Cartão
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2.7 SPLIT BREAKDOWN CASE */}
+                        {category === "split" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                              Pagamento Dividido ({breakdown.length} formas)
+                            </h4>
+                            <div className="space-y-2">
+                              {breakdown.map((leg, idx) => (
+                                <div key={idx} className="flex justify-between items-center p-3 rounded-lg border bg-brand-gray dark:bg-dark-border/30 text-sm">
+                                  <div>
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading block">{leg.method || "Método"}</span>
+                                    {leg.installmentNumber > 1 && (
+                                      <span className="text-xs text-brand-inactive-text">{leg.installmentNumber}x</span>
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-brand-primary">{formatCurrency(leg.amount || leg.effectiveAmount || 0)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="p-3 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center mt-1">
+                              <span className="text-xs text-brand-inactive-text block">Saldo restante a receber</span>
+                              <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                            </div>
+                            {canConfirm ? (
+                              <Button
+                                variant="default"
+                                className="w-full h-11 font-bold"
+                                onClick={() => handleConfirmReceipt(targetOrder?.payment_method || "Múltiplos Meios")}
+                              >
+                                Confirmar Recebimento das Formas
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2.8 FALLBACK (ONLY IF UNKNOWN/UNDEFINED) */}
+                        {category === "fallback" && (
+                          <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                              Selecione como o cliente está pagando:
+                            </h4>
+                            <div className="grid grid-cols-2 gap-3">
+                              {["Dinheiro", "Pix", "Cartão de Crédito", "Cartão de Débito"].map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setFallbackMethod(m)}
+                                  className={`p-3 rounded-xl border text-sm font-bold transition-all text-left ${fallbackMethod === m ? "border-brand-primary bg-brand-primary/5 text-brand-primary" : "border-brand-border dark:border-dark-border hover:bg-gray-50"}`}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="p-3 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center">
+                              <span className="text-xs text-brand-inactive-text block">Valor a confirmar</span>
+                              <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                            </div>
+                            {canConfirm ? (
+                              <Button
+                                variant="default"
+                                className="w-full h-11 font-bold"
+                                onClick={() => handleConfirmReceipt(fallbackMethod)}
+                              >
+                                Confirmar Recebimento em {fallbackMethod}
+                              </Button>
+                            ) : (
+                              <InfoCard
+                                color="blue"
+                                message="O recebimento do pagamento poderá ser confirmado após a entrega do pedido."
+                              />
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
                   </motion.div>
                 )}
 

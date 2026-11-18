@@ -70,7 +70,13 @@ export function SplitPaymentView({
               className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{leg.method ? formatPaymentMethodToFullLabel(leg.method) : `Selecionar método ${idx + 1}`}</span>
+                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                  {(() => {
+                    const baseLabel = leg.method ? formatPaymentMethodToFullLabel(leg.method) : `Selecionar método ${idx + 1}`
+                    const showInstallmentBadge = Boolean(leg.installmentNumber && leg.installmentNumber > 1 && !baseLabel.includes("x)"))
+                    return showInstallmentBadge ? `${baseLabel} (${leg.installmentNumber}x)` : baseLabel
+                  })()}
+                </span>
                 {onRemoveLeg && legs.length > 2 && !disableLegEdit && (
                   <button
                     type="button"

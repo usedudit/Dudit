@@ -133,15 +133,17 @@ describe("service-order status helpers", () => {
       }
     })
 
-    it("restricts items and core fields once approved", () => {
+    it("allows item and scope editing once approved (for revisions)", () => {
       const policy = getServiceOrderEditPolicy("aprovada")
       expect(policy.readOnly).toBe(false)
       expect(policy.canEditAll).toBe(false)
-      expect(policy.canEditItems).toBe(false)
+      expect(policy.canEditItems).toBe(true)
       expect(policy.canEditAssignment).toBe(true)
       expect(policy.canChangeStatus).toBe(true)
       expect(policy.canEditSpecs).toBe(true)
       expect(policy.canEditNotes).toBe(true)
+      expect(policy.canEditDiagnosis).toBe(true)
+      expect(policy.canEditFinancial).toBe(true)
       expect(policy.canAttach).toBe(true)
     })
 

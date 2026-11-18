@@ -57,6 +57,8 @@ import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf";
 import { usePermissions } from "@/lib/permission-context";
 import { isOnlineMarketplaceOrder, UNDEFINED_PAYMENT_PLACEHOLDERS } from "@/lib/orders/order-utils";
 import ChangePaymentMethodModal from "./ChangePaymentMethodModal";
+import { getOrderInstallmentsAction, type OrderInstallmentItem } from "@/app/actions/erp/transactions";
+import { RegisterInstallmentPaymentModal } from "@/components/erp/transactions/RegisterInstallmentPaymentModal";
 
 const standardTransition = {
   type: "spring" as const,
@@ -240,6 +242,8 @@ export default function PaymentStatusModal({
   const [syncing, setSyncing] = useState(false);
   const [pendingLegs, setPendingLegs] = useState<PaymentBreakdownLeg[]>([]);
   const [canSubmitBalance, setCanSubmitBalance] = useState(false);
+  const [orderInstallments, setOrderInstallments] = useState<OrderInstallmentItem[]>([]);
+  const [selectedInstallmentForPayment, setSelectedInstallmentForPayment] = useState<OrderInstallmentItem | null>(null);
   const [printOrderId, setPrintOrderId] = useState<string | null>(null);
   const [currentOrder, setCurrentOrder] = useState<any>(order);
   const [collectorHeader, setCollectorHeader] = useState<{
@@ -375,6 +379,34 @@ export default function PaymentStatusModal({
       cancelled = true;
     };
   }, [isOpen, targetOrderId, partnerId]);
+
+  const fetchOrderInstallments = useCallback(async () => {
+    if (!targetOrderId || !partnerId) {
+      setOrderInstallments([]);
+      return;
+    }
+    try {
+      const res = await getOrderInstallmentsAction({
+        partnerId,
+        orderId: String(targetOrderId),
+        orderNumber: targetOrder?.order_number,
+      });
+      if (res.success && Array.isArray(res.data)) {
+        setOrderInstallments(res.data);
+      } else {
+        setOrderInstallments([]);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar parcelas do pedido:", err);
+      setOrderInstallments([]);
+    }
+  }, [targetOrderId, partnerId, targetOrder?.order_number]);
+
+  useEffect(() => {
+    if (isOpen) {
+      void fetchOrderInstallments();
+    }
+  }, [isOpen, fetchOrderInstallments]);
 
   const isMpOrder = Boolean(
     targetOrder?.payment_provider === "Mercado Pago" ||
@@ -1484,6 +1516,8 @@ export default function PaymentStatusModal({
                     syncing={syncing}
                     onSelectLeg={(leg) => setSelectedReceiptLeg({ ...leg })}
                     hasRemainingBalance={!isFullyPaid && totalRemaining > 0.009}
+                    installments={orderInstallments}
+                    onPayInstallment={(inst) => setSelectedInstallmentForPayment(inst)}
                   />
 
                   {!isFullyPaid &&
@@ -1798,6 +1832,33 @@ export default function PaymentStatusModal({
                 return leg;
               }),
             }));
+            onSuccess?.();
+          }}
+        />
+      )}
+
+      {selectedInstallmentForPayment && (
+        <RegisterInstallmentPaymentModal
+          isOpen={Boolean(selectedInstallmentForPayment)}
+          onClose={() => setSelectedInstallmentForPayment(null)}
+          partnerId={partnerId}
+          installment={selectedInstallmentForPayment}
+          onSuccess={() => {
+            void fetchOrderInstallments();
+            if (targetOrderId) {
+              getFreshOrderPaymentDataAction(targetOrderId, partnerId).then((res) => {
+                if (res.success && res.order) {
+                  setCurrentOrder((prev: any) => ({
+                    ...(prev || {}),
+                    ...res.order,
+                    paid_amount: res.order.paid_amount,
+                    paidAmount: res.order.paid_amount,
+                    situation: res.order.situation,
+                    payment_breakdown: res.order.payment_breakdown,
+                  }));
+                }
+              });
+            }
             onSuccess?.();
           }}
         />

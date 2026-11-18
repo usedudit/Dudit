@@ -4145,7 +4145,13 @@ const PaymentModal = ({
                                                                 <div className="flex items-center justify-between gap-2 mb-2">
                                                                     <div className="flex items-center gap-2">
                                                                         {getIconForMethod(p.method, p.paymentMethodId)({})}
-                                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{p.method || `Selecionar método ${idx + 1}`}</span>
+                                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                            {(() => {
+                                                                                const baseLabel = p.method || `Selecionar método ${idx + 1}`;
+                                                                                const showInst = Boolean(p.installmentNumber && p.installmentNumber > 1 && !baseLabel.includes("x)"));
+                                                                                return showInst ? `${baseLabel} (${p.installmentNumber}x)` : baseLabel;
+                                                                            })()}
+                                                                        </span>
                                                                     </div>
                                                                     {payments.length > 2 && !isLockedMarketplace && existingPaidAmount <= 0.009 && (
                                                                         <Button

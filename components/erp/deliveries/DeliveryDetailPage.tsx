@@ -837,6 +837,7 @@ export default function DeliveryDetailPage({
                 assignmentId={delivery?.id || deliveryId}
                 order={driverPaymentOrder}
                 partnerId={partnerId}
+                canConfirm={(selectedLink?.status || driverPaymentOrder?.delivery_status) === "delivered"}
                 onSuccess={() => {
                     setIsDriverPaymentModalOpen(false)
                     setDriverPaymentOrder(null)
@@ -1179,10 +1180,13 @@ export default function DeliveryDetailPage({
                                                     type="button"
                                                     variant="outline"
                                                     className="flex-1 h-12"
-                                                    disabled
+                                                    onClick={() => {
+                                                        setDriverPaymentOrder(order)
+                                                        setIsDriverPaymentModalOpen(true)
+                                                    }}
                                                 >
                                                     <CheckCircleIcon size={16} className="text-brand-green mr-1.5" />
-                                                    Pago
+                                                    Pago (Ver Detalhes)
                                                 </Button>
                                             )
                                         }
@@ -1210,7 +1214,8 @@ export default function DeliveryDetailPage({
                                                 variant="outline"
                                                 className="flex-1 h-12"
                                                 onClick={() => {
-                                                    toast.info("O recebimento do pagamento poderá ser processado após a confirmação da entrega.")
+                                                    setDriverPaymentOrder(order)
+                                                    setIsDriverPaymentModalOpen(true)
                                                 }}
                                             >
                                                 Status de Pagamento

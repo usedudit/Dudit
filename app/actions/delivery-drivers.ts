@@ -1060,32 +1060,60 @@ export async function driverConfirmPaymentAction(params: {
 
   try {
     if ((assignment as any).isStoreDelivery) {
-      const isFull = amountReceived >= totalAmount - 0.01
+      const alreadyPaid = Number(order.paid_amount || 0)
+      const totalNewPaid = Math.min(totalAmount, alreadyPaid + amountReceived)
+      const isFull = totalNewPaid >= totalAmount - 0.01
       const newSituation = isFull ? "paid" : "partially_paid"
       const nowIso = new Date().toISOString()
 
       let breakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
-        ? order.payment_breakdown
-        : [
-            {
-              method: params.paymentMethod,
-              amount: totalAmount,
-              effectiveAmount: amountReceived,
-              amountReceived: amountReceived,
-              paymentMethodId: params.paymentMethodId || null,
-              installmentNumber: params.installments || 1,
-              adjustmentType: "none",
-              adjustmentPercent: 0,
-              adjustmentAmount: 0,
-            }
-          ]
+        ? order.payment_breakdown.map((l: any) => ({ ...l }))
+        : []
+
+      if (breakdown.length > 0) {
+        const legIndex = breakdown.findIndex(
+          (l: any) => !l.amountReceived || Number(l.amountReceived) < Number(l.amount || 0)
+        )
+        if (legIndex >= 0) {
+          breakdown[legIndex].amountReceived = Number(
+            (Number(breakdown[legIndex].amountReceived || 0) + amountReceived).toFixed(2)
+          )
+          breakdown[legIndex].method = params.paymentMethod
+        } else {
+          breakdown.push({
+            method: params.paymentMethod,
+            amount: amountReceived,
+            effectiveAmount: amountReceived,
+            amountReceived: amountReceived,
+            paymentMethodId: params.paymentMethodId || null,
+            installmentNumber: params.installments || 1,
+            adjustmentType: "none",
+            adjustmentPercent: 0,
+            adjustmentAmount: 0,
+          })
+        }
+      } else {
+        breakdown = [
+          {
+            method: params.paymentMethod,
+            amount: totalAmount,
+            effectiveAmount: totalNewPaid,
+            amountReceived: totalNewPaid,
+            paymentMethodId: params.paymentMethodId || null,
+            installmentNumber: params.installments || 1,
+            adjustmentType: "none",
+            adjustmentPercent: 0,
+            adjustmentAmount: 0,
+          },
+        ]
+      }
 
       const { error: updateOrderError } = await admin
         .from("orders")
         .update({
           payment_method: params.paymentMethod,
-          paid_amount: amountReceived,
-          amount_paid: amountReceived,
+          paid_amount: totalNewPaid,
+          amount_paid: totalNewPaid,
           paid_at: isFull ? (order.paid_at || nowIso) : order.paid_at,
           situation: newSituation,
           payment_breakdown: breakdown,

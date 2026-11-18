@@ -98,15 +98,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         : null
     const isPaid = editData?.payment_status === "paid" || editData?.payment_status === "partially_paid"
     const isReadOnly = Boolean(editPolicy?.readOnly)
-    // `isLocked` permanece como lock da área de itens (serviços/produtos),
-    // que é o uso predominante na UI. Campos "core" usam `isCoreLocked`.
-    const isLocked = isPaid || (editPolicy ? !editPolicy.canEditItems : false)
-    const isCoreLocked = isPaid || (editPolicy ? !editPolicy.canEditAll : false)
+    const isCustomerLocked = isPaid || (editPolicy ? !editPolicy.canEditAll : false)
+    const isFinancialLocked = Boolean(editPolicy ? !editPolicy.canEditFinancial : false)
+    const isLocked = Boolean(editPolicy ? !editPolicy.canEditItems : false)
+    const isCoreLocked = isCustomerLocked
     const isFieldLocked = (field: string) => {
-        if (isPaid) {
-            const unlockedFields = ["status", "priority", "expected_completion_date", "expected_completion_time", "estimated_hours", "internal_notes", "attachments"]
-            return !unlockedFields.includes(field)
-        }
         if (editPolicy) {
             switch (field) {
                 case "status": return !editPolicy.canChangeStatus
@@ -115,11 +111,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                 case "expected_completion_time":
                 case "estimated_hours":
                 case "assigned_user_id": return !editPolicy.canEditAssignment
+                case "customer_id": return !editPolicy.canEditAll
+                case "diagnosis": return !editPolicy.canEditDiagnosis
+                case "discount": return !editPolicy.canEditFinancial
                 case "title":
-                case "description":
-                case "diagnosis":
-                case "customer_id":
-                case "discount": return !editPolicy.canEditAll
+                case "description": return editPolicy.readOnly
                 case "services":
                 case "products": return !editPolicy.canEditItems
                 case "specifications": return !editPolicy.canEditSpecs
@@ -130,6 +126,15 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         }
         return false
     }
+
+    const [excessPaymentModal, setExcessPaymentModal] = useState<{
+        isOpen: boolean
+        paidAmount: number
+        newTotal: number
+        excessAmount: number
+        isFullyPaid: boolean
+        generateStoreCredit: boolean
+    } | null>(null)
 
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 
@@ -603,6 +608,28 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
             return
         }
 
+        // Intercepta se o valor total caiu abaixo do valor já pago
+        const originalPaid = Number(editData?.paid_amount || 0)
+        const newTotal = pricingPreview.finalTotal
+        const excessAmount = Math.max(0, originalPaid - newTotal)
+        const hasExcess = Boolean(editData && originalPaid > newTotal + 0.009)
+
+        if (hasExcess) {
+            setExcessPaymentModal({
+                isOpen: true,
+                paidAmount: originalPaid,
+                newTotal,
+                excessAmount,
+                isFullyPaid: editData.payment_status === "paid",
+                generateStoreCredit: true,
+            })
+            return
+        }
+
+        await executeSave()
+    }
+
+    const executeSave = async (generateStoreCredit?: boolean) => {
         setSaving(true)
 
         const [year, month, day] = openingDate.split("-").map(Number)
@@ -610,22 +637,34 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         const localDate = new Date(year, month - 1, day, hour, minute, 0)
         const createdAt = localDate.toISOString()
 
-        const canEditCore = isPaid ? false : (editPolicy ? editPolicy.canEditAll : true)
-        const canEditScheduling = isPaid ? true : (editPolicy ? editPolicy.canEditAssignment : true)
-        const canEditStatus = isPaid ? true : (editPolicy ? editPolicy.canChangeStatus : true)
-        const canEditAssigned = isPaid ? false : (editPolicy ? editPolicy.canEditAssignment : true)
-        const canEditItemsField = isPaid ? false : (editPolicy ? editPolicy.canEditItems : true)
-        const canEditSpecsField = isPaid ? false : (editPolicy ? editPolicy.canEditSpecs : true)
+        const canEditCustomer = editPolicy ? editPolicy.canEditAll : true
+        const canEditScheduling = editPolicy ? editPolicy.canEditAssignment : true
+        const canEditStatus = editPolicy ? editPolicy.canChangeStatus : true
+        const canEditAssigned = editPolicy ? editPolicy.canEditAssignment : true
+        const canEditItemsField = editPolicy ? editPolicy.canEditItems : true
+        const canEditSpecsField = editPolicy ? editPolicy.canEditSpecs : true
+        const canEditDiagnosis = editPolicy ? editPolicy.canEditDiagnosis : true
+        const canEditFinancial = editPolicy ? editPolicy.canEditFinancial : true
+        const canEditScope = !editPolicy?.readOnly
 
         const payload: Record<string, any> = {
             internal_notes: internalNotes.trim() || "",
         }
 
-        if (canEditCore) {
+        if (canEditScope) {
             payload.title = title.trim()
             payload.description = description.trim() || ""
+        }
+
+        if (canEditDiagnosis) {
             payload.diagnosis = diagnosis.trim() || ""
+        }
+
+        if (canEditCustomer) {
             payload.customer_id = customerId || null
+        }
+
+        if (canEditFinancial) {
             payload.discount_value = discountValue
             payload.discount_type = discountType
             payload.coupon_id = couponId
@@ -677,6 +716,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                     services: canEditItemsField ? servicesPayload : undefined,
                     products: canEditItemsField ? productsPayload : undefined,
                     specifications: canEditSpecsField ? specsPayload : undefined,
+                    generate_store_credit: generateStoreCredit,
                 }
                 const overrideRes = await onSaveOverride(savePayload, editData)
                 if (!overrideRes.success) {
@@ -694,6 +734,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                     services: canEditItemsField ? servicesPayload : undefined,
                     products: canEditItemsField ? productsPayload : undefined,
                     specifications: canEditSpecsField ? specsPayload : undefined,
+                    generate_store_credit: generateStoreCredit,
                 })
 
                 if (!res.success) {
@@ -1251,18 +1292,24 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                     <div className="mb-6">
                                                         <InfoCard
                                                             title="Ordem de Serviço com Pagamento"
-                                                            message="Esta OS possui pagamentos registrados. Apenas status, prioridade, data/hora prevista, tempo estimado, anexos e observações podem ser editados."
+                                                            message="Esta OS possui pagamentos registrados. Ao alterar itens ou valores, qualquer excedente gerará crédito para o cliente."
                                                             color="orange"
                                                         />
                                                     </div>
-                                                ) : (editPolicy && !editPolicy.canEditAll) ? (
+                                                ) : isReadOnly ? (
                                                     <div className="mb-6">
                                                         <InfoCard
-                                                            title={isReadOnly ? "Ordem de Serviço finalizada" : "Edição restrita"}
-                                                            message={isReadOnly
-                                                                ? "Esta ordem de serviço está finalizada. Apenas observações e anexos podem ser alterados."
-                                                                : "Esta ordem de serviço já foi aprovada. Apenas responsável, previsão, prioridade, status, especificações, observações e anexos podem ser editados."}
+                                                            title="Ordem de Serviço finalizada"
+                                                            message="Esta ordem de serviço está finalizada. Apenas observações e anexos podem ser alterados."
                                                             color="orange"
+                                                        />
+                                                    </div>
+                                                ) : (editData?.status === "aprovada") ? (
+                                                    <div className="mb-6">
+                                                        <InfoCard
+                                                            title="OS Aprovada"
+                                                            message="Ao alterar diagnóstico, peças, serviços ou valores, a OS retornará automaticamente para 'Aguardando Aprovação' (nova versão) para aprovação do cliente."
+                                                            color="blue"
                                                         />
                                                     </div>
                                                 ) : null}
@@ -1320,11 +1367,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         icon={TagIcon}
                                                         title="Aplicar desconto"
                                                         description={couponId || discountValue > 0 ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique na OS"}
-                                                        onClick={isCoreLocked ? undefined : () => setIsDiscountModalOpen(true)}
+                                                        onClick={isFinancialLocked ? undefined : () => setIsDiscountModalOpen(true)}
                                                         className="px-4 py-3 gap-4 cursor-pointer border border-brand-border dark:border-dark-border rounded-xl"
                                                     />
 
-                                                    {!isCoreLocked && (
+                                                    {!isFinancialLocked && (
                                                         <MoneyInput
                                                             label="Outros Custos"
                                                             value={otherCosts}
@@ -2349,6 +2396,110 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                 cancelText="Cancelar"
                 variant="warning"
             />
+
+            {excessPaymentModal && (
+                <DefaultModal
+                    isOpen={excessPaymentModal.isOpen}
+                    onClose={() => setExcessPaymentModal(null)}
+                    title="Ajuste de Valor e Pagamento"
+                    footer={
+                        <div className="flex gap-3 justify-end w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => setExcessPaymentModal(null)}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    const genCredit = excessPaymentModal.generateStoreCredit
+                                    setExcessPaymentModal(null)
+                                    executeSave(genCredit)
+                                }}
+                            >
+                                Confirmar e Salvar
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4 text-sm">
+                        <InfoCard
+                            title="Redução no valor total da OS"
+                            message="O valor total desta ordem de serviço foi reduzido e é menor do que o montante já pago pelo cliente."
+                            color="orange"
+                        />
+
+                        <div className="bg-brand-surface dark:bg-dark-surface p-4 rounded-xl space-y-2 border border-brand-border dark:border-dark-border">
+                            <div className="flex justify-between items-center">
+                                <span className="text-brand-inactive-text">Valor já pago:</span>
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(excessPaymentModal.paidAmount)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-brand-inactive-text">Novo valor total:</span>
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(excessPaymentModal.newTotal)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-brand-border dark:border-dark-border">
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">Saldo excedente a favor do cliente:</span>
+                                <span className="font-bold text-lg text-brand-green">
+                                    {formatCurrency(excessPaymentModal.excessAmount)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {excessPaymentModal.isFullyPaid ? (
+                            <p className="text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                Como a ordem de serviço já foi totalmente quitada, um <strong className="text-brand-dark dark:text-dark-heading">Crédito em Loja (Vale-Compra)</strong> de <strong className="text-brand-green">{formatCurrency(excessPaymentModal.excessAmount)}</strong> será gerado automaticamente para o cliente utilizar em compras ou serviços futuros.
+                            </p>
+                        ) : (
+                            <div className="space-y-3 pt-1">
+                                <p className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                    Como deseja tratar o saldo excedente do pagamento parcial?
+                                </p>
+                                <div className="space-y-2">
+                                    <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="excess_choice"
+                                            checked={excessPaymentModal.generateStoreCredit}
+                                            onChange={() => setExcessPaymentModal(prev => prev ? { ...prev, generateStoreCredit: true } : null)}
+                                            className="mt-0.5 text-brand-primary"
+                                        />
+                                        <div>
+                                            <span className="font-semibold text-brand-dark dark:text-dark-heading block">
+                                                Gerar Crédito em Loja de {formatCurrency(excessPaymentModal.excessAmount)} agora
+                                            </span>
+                                            <span className="text-xs text-brand-inactive-text block">
+                                                O saldo ficará imediatamente disponível para o cliente na loja.
+                                            </span>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="excess_choice"
+                                            checked={!excessPaymentModal.generateStoreCredit}
+                                            onChange={() => setExcessPaymentModal(prev => prev ? { ...prev, generateStoreCredit: false } : null)}
+                                            className="mt-0.5 text-brand-primary"
+                                        />
+                                        <div>
+                                            <span className="font-semibold text-brand-dark dark:text-dark-heading block">
+                                                Não gerar crédito agora
+                                            </span>
+                                            <span className="text-xs text-brand-inactive-text block">
+                                                O acerto ou estorno da diferença será feito diretamente com o cliente na conclusão da OS.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DefaultModal>
+            )}
 
             <SavingStatusModal isOpen={saving} text="Salvando ordem de serviço..." />
         </FadeIn >

@@ -503,7 +503,14 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 )}
                                                 <div>
                                                     <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">{partnerName}</span>
-                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider">Ordem de Serviço #{order.order_number}</span>
+                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider flex items-center gap-1.5">
+                                                        Ordem de Serviço #{order.order_number}
+                                                        {Number(order.metadata?.version || 1) > 1 && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-light-primary text-brand-primary dark:bg-dark-accent dark:text-dark-primary">
+                                                                v{order.metadata.version}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                             </div>
 
@@ -638,6 +645,15 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 {/* Action Buttons */}
                                                 {hasActions && (
                                                     <div className="pt-6 border-t border-brand-border dark:border-dark-border space-y-3">
+                                                        {canApprove && Number(order.metadata?.version || 1) > 1 && (
+                                                            <div className="mb-3">
+                                                                <InfoCard
+                                                                    title="Ordem de Serviço Revisada"
+                                                                    message={`Esta ordem de serviço foi atualizada para a Versão ${order.metadata.version}. Por favor, confira os itens e informe o novo código para aprovar.`}
+                                                                    color="orange"
+                                                                />
+                                                            </div>
+                                                        )}
                                                         {canApprove && (
                                                             <Button
                                                                 onClick={() => {

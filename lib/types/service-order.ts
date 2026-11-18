@@ -124,7 +124,7 @@ export const SERVICE_ORDER_STATUS_ORDER: ServiceOrderStatus[] = [
 export const SERVICE_ORDER_ALLOWED_TRANSITIONS: Record<ServiceOrderStatus, ServiceOrderStatus[]> = {
   aberta:               ["aguardando_aprovacao", "aprovada", "em_andamento", "aguardando_peca", "concluida", "cancelada"],
   aguardando_aprovacao: ["aprovada", "cancelada"],
-  aprovada:             ["em_andamento", "aguardando_peca", "concluida", "cancelada"],
+  aprovada:             ["em_andamento", "aguardando_peca", "concluida", "cancelada", "aguardando_aprovacao"],
   em_andamento:         ["aguardando_peca", "concluida", "cancelada"],
   aguardando_peca:      ["em_andamento", "concluida", "cancelada"],
   concluida:            ["entregue", "em_andamento", "cancelada"],
@@ -147,10 +147,11 @@ export function getServiceOrderNextStatuses(from: ServiceOrderStatus): ServiceOr
 }
 
 // Política de edição por status: define o que pode ser alterado em cada etapa.
-// - aberta / aguardando_aprovacao: tudo editável.
-// - aprovada: apenas responsável, previsão, prioridade, status, especificações,
-//   observações e anexos (não itens/valores/cliente).
-// - em_andamento / aguardando_peca: idem + itens (serviços/produtos).
+// - aberta / aguardando_aprovacao: tudo editável (incluindo cliente e loja).
+// - aprovada: itens (mão de obra e produtos), diagnóstico, especificações,
+//   valores/descontos, responsável, previsão, prioridade, status, observações e anexos.
+//   (A alteração de itens/diagnóstico/valores retrocede a OS para aguardando_aprovacao).
+// - em_andamento / aguardando_peca: idem (sem retroceder status, registrando histórico).
 // - concluida / entregue / cancelada: somente leitura (exceto anexos e observações).
 export interface ServiceOrderEditPolicy {
   readOnly: boolean
@@ -160,6 +161,8 @@ export interface ServiceOrderEditPolicy {
   canEditItems: boolean
   canEditSpecs: boolean
   canEditNotes: boolean
+  canEditDiagnosis: boolean
+  canEditFinancial: boolean
   canAttach: boolean
 }
 
@@ -175,6 +178,8 @@ export function getServiceOrderEditPolicy(status: ServiceOrderStatus): ServiceOr
         canEditItems: true,
         canEditSpecs: true,
         canEditNotes: true,
+        canEditDiagnosis: true,
+        canEditFinancial: true,
         canAttach: true,
       }
     case "aprovada":
@@ -183,9 +188,11 @@ export function getServiceOrderEditPolicy(status: ServiceOrderStatus): ServiceOr
         canEditAll: false,
         canChangeStatus: true,
         canEditAssignment: true,
-        canEditItems: false,
+        canEditItems: true,
         canEditSpecs: true,
         canEditNotes: true,
+        canEditDiagnosis: true,
+        canEditFinancial: true,
         canAttach: true,
       }
     case "em_andamento":
@@ -198,6 +205,8 @@ export function getServiceOrderEditPolicy(status: ServiceOrderStatus): ServiceOr
         canEditItems: true,
         canEditSpecs: true,
         canEditNotes: true,
+        canEditDiagnosis: true,
+        canEditFinancial: true,
         canAttach: true,
       }
     case "concluida":
@@ -212,6 +221,8 @@ export function getServiceOrderEditPolicy(status: ServiceOrderStatus): ServiceOr
         canEditItems: false,
         canEditSpecs: false,
         canEditNotes: true,
+        canEditDiagnosis: false,
+        canEditFinancial: false,
         canAttach: true,
       }
   }

@@ -2,8 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { ActionsDropdown, Badge, Checkbox, DropdownItem } from "@/components/reusable"
-import { CreditCardIcon, MoneyIcon, InstallmentIcon, RepeatIcon } from "@/lib/icons"
+import { ActionsDropdown, Badge, Checkbox, DropdownItem, Tooltip } from "@/components/reusable"
+import { MoneyIcon, InstallmentIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import { formatBrazilDateFromDbInput, formatTime } from "@/lib/utils/formatters"
@@ -38,14 +38,6 @@ const BoletoIcon = ({ className }: { className?: string }) => (
     <img src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className={className} />
 )
 
-const getPaymentIcon = (paymentType: string) => {
-    const normalized = paymentType.toLowerCase()
-
-    if (normalized.includes("credit")) return CreditCardIcon
-    if (normalized.includes("boleto")) return BoletoIcon
-    return MoneyIcon
-}
-
 const TransactionListItem = React.memo(
     ({ transaction, columns, selected, selectable = true, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrint, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
@@ -58,15 +50,19 @@ const TransactionListItem = React.memo(
                                     {transaction.description}
                                 </span>
                                 {transaction.installmentGroupId && (
-                                    <Badge variant="orange" icon={<InstallmentIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0"></Badge>
+                                    <Tooltip text="Faturamento: Parcelado">
+                                        <Badge variant="orange" icon={<InstallmentIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                                 {!transaction.isInstallmentGroup && transaction.installmentNumber && transaction.installmentTotalCount && (
-                                    <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
-                                        {transaction.installmentNumber}/{transaction.installmentTotalCount}
-                                    </Badge>
+                                    <Tooltip text={`Parcela: ${transaction.installmentNumber}/${transaction.installmentTotalCount}`}>
+                                        <Badge variant="gray" icon={<InstallmentIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
-                                    <Badge variant="purple" icon={<RepeatIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0"></Badge>
+                                    <Tooltip text="Faturamento: Recorrente">
+                                        <Badge variant="purple" icon={<RepeatIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                             </div>
                             <div className="mt-1 flex items-center">

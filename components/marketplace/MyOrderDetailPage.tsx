@@ -27,7 +27,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
-import { getReturnStatusLabel } from '@/lib/returns/types';
 import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal, type OrderDepositSummary } from '@/lib/payments/order-financial-state';
 import {
     DeliveryStatusTimeline,
@@ -37,7 +36,7 @@ import {
     isCarrierDeliveryOrder,
     type DeliveryDriverInfo,
 } from "@/components/erp/shared/DeliveryTabContent"
-import { DeliveryOtpCard } from "@/components/marketplace/DeliveryOtpCard"
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -536,7 +535,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     if (res.success && res.data?.requiresOtp) {
                         setDeliveryOtp(res.data);
                     }
-                }).catch(() => {});
+                }).catch(() => { });
             });
         }
     }, [order?.id, order?.delivery_otp, order?.delivery_type, order?.situation]);
@@ -2173,72 +2172,48 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         </div>
                                     </FormSection>
 
-                                    {/* Section Delivery Confirmation OTP */}
-                                    {deliveryOtp?.requiresOtp && (
-                                        <div className="my-2">
-                                            <DeliveryOtpCard
-                                                code={deliveryOtp.code}
-                                                status={order.delivery_status === "delivered" ? "confirmed" : deliveryOtp.status}
-                                                confirmedAt={deliveryOtp.confirmedAt || order.delivery_completed_at}
-                                                expiresAt={deliveryOtp.expiresAt}
-                                            />
-                                        </div>
-                                    )}
-
                                     {/* Section 4: Entregador */}
                                     {isDelivery && order.delivery_driver && (
                                         <FormSection title="Entregador">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex items-center gap-3.5 min-w-0">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
-                                                        {order.delivery_driver.avatarUrl ? (
-                                                            <img
-                                                                src={order.delivery_driver.avatarUrl}
-                                                                alt={order.delivery_driver.name}
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            <TruckIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                                        )}
+                                            <ListItem
+                                                title={
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {order.delivery_driver.name || "Entregador"}
+                                                        </span>
+                                                        <Tooltip text="Entregador da Rede Dudit">
+                                                            <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                                                        </Tooltip>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                {order.delivery_driver.name}
-                                                            </span>
-                                                            {order.delivery_driver.isPlatformDriver && (
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 dark:text-brand-primary">
-                                                                    Dudit
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                                            {order.delivery_driver.isPlatformDriver ? (
-                                                                <span>
-                                                                    {order.delivery_driver.totalDeliveries > 0
-                                                                        ? `${order.delivery_driver.totalDeliveries} entregas realizadas`
-                                                                        : "Entregador Parceiro"}
-                                                                    {order.delivery_driver.vehicleType ? ` • ${order.delivery_driver.vehicleType}` : ""}
-                                                                </span>
-                                                            ) : (
-                                                                <span>Entrega própria do estabelecimento</span>
-                                                            )}
-                                                        </div>
+                                                }
+                                                description={
+                                                    <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                        {order.delivery_driver.totalDeliveries && order.delivery_driver.totalDeliveries > 0 && <span>{order.delivery_driver.totalDeliveries} entregas realizadas</span>}
+                                                        {order.delivery_driver.vehicleType && <span>• {order.delivery_driver.vehicleType}</span>}
                                                     </div>
-                                                </div>
-                                                {order.delivery_driver.phone && ["sent", "out_for_delivery"].includes(order.delivery_status) && (
-                                                    <a
-                                                        href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, '')}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="shrink-0 p-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                                                        title="Conversar no WhatsApp"
-                                                    >
-                                                        <WhatsappIcon size={16} className="text-[#25D366]" />
-                                                        <span className="hidden sm:inline">Contato</span>
-                                                    </a>
-                                                )}
-                                            </div>
+                                                }
+                                                left={
+                                                    <UserProfileImage
+                                                        fullName={order.delivery_driver.name || "Entregador"}
+                                                        imageUrl={order.delivery_driver.avatarUrl}
+                                                        className="w-10 h-10"
+                                                    />
+                                                }
+                                                right={
+                                                    order.delivery_driver.phone &&
+                                                        ["sent", "out_for_delivery", "assigned", "accepted"].includes(
+                                                            order.delivery_driver.driverStatus || order.delivery_status
+                                                        ) ? (
+                                                        <a href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                            <Button
+                                                                variant="outline"
+                                                                leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}
+                                                            >
+                                                            </Button>
+                                                        </a>
+                                                    ) : null
+                                                }
+                                            />
                                         </FormSection>
                                     )}
 
@@ -3051,7 +3026,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     isOpen={isConfirmReceiptModalOpen}
                     onClose={() => setIsConfirmReceiptModalOpen(false)}
                     title={deliveryOtp?.requiresOtp && order.delivery_status !== "delivered" ? "Código de Confirmação de Entrega" : "Confirmar Recebimento"}
-                    maxWidth="sm"
+                    maxWidth="md"
                     footer={
                         deliveryOtp?.requiresOtp && order.delivery_status !== "delivered" ? (
                             <div className="flex justify-end w-full">
@@ -3080,29 +3055,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 >
                     {deliveryOtp?.requiresOtp && order.delivery_status !== "delivered" ? (
                         <div className="flex flex-col gap-4 p-4 text-center">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center mx-auto">
-                                <ShieldIcon size={24} />
-                            </div>
-                            <div className="space-y-1">
-                                <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                    Entrega protegida por código
-                                </h4>
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                    Para sua segurança, a entrega deste pedido precisa ser confirmada diretamente pelo entregador no aplicativo dele utilizando o código de confirmação.
-                                </p>
-                            </div>
+                            <IconPlaceholder
+                                icon={ShieldIcon}
+                                title="Entrega protegida por código"
+                                subtitle="Para sua segurança, a entrega deste pedido precisa ser confirmada diretamente pelo entregador utilizando o código de confirmação."
+                            />
+
                             {deliveryOtp.code && (
-                                <div className="p-4 rounded-xl bg-brand-surface dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs font-semibold text-brand-inactive-text uppercase tracking-wider block mb-2">
-                                        Seu código para informar ao entregador
-                                    </span>
-                                    <div className="flex justify-center items-center gap-1.5">
-                                        {deliveryOtp.code.split("").map((digit: string, i: number) => (
-                                            <span key={i} className="w-9 h-11 flex items-center justify-center rounded-lg bg-white dark:bg-dark-background border border-gray-200 dark:border-dark-border font-mono text-xl font-black text-brand-dark dark:text-white shadow-2xs">
-                                                {digit}
-                                            </span>
-                                        ))}
-                                    </div>
+                                <div className="flex justify-center items-center gap-1.5">
+                                    {deliveryOtp.code.split("").map((digit: string, i: number) => (
+                                        <span key={i} className="w-10 h-10 sm:w-12 sm:h-12 text-center text-xl sm:text-2xl font-black rounded-xl border border-brand-border dark:border-dark-border focus:border-brand-green outline-hidden transition-all text-brand-dark dark:text-dark-heading">
+                                            {digit}
+                                        </span>
+                                    ))}
                                 </div>
                             )}
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">

@@ -1295,7 +1295,7 @@ function DeliveryCalculatorBottomSheet({
                         )}
 
                         {/* Cards de Entrega e Tempo Estimado exatamente iguais ao card da página */}
-                        <div className="bg-white dark:bg-dark-card border border-brand-border dark:border-dark-border rounded-lg p-3">
+                        <div className="border border-brand-border dark:border-dark-border rounded-lg p-3">
                             <div className="grid grid-cols-2 divide-x divide-brand-border dark:divide-dark-border">
                                 {/* Entrega */}
                                 <div className="flex flex-col items-center justify-center text-center px-1 py-0.5 min-w-0">
@@ -2436,7 +2436,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             {/* Tablet / Mobile (lg:hidden): Card de Horário, Entrega e Cálculo de Tempo Estimado no estilo da imagem */}
             <div className="lg:hidden px-4 md:px-6 mb-4">
                 {/* 3-Column Pill Card */}
-                <div className="bg-white dark:bg-dark-card border border-brand-border dark:border-dark-border rounded-lg p-3">
+                <div className="border border-brand-border dark:border-dark-border rounded-lg p-3">
                     <div className="grid grid-cols-3 divide-x divide-brand-border dark:divide-dark-border">
                         {/* 1. Coisa de horário ali primeiro */}
                         <button
@@ -2554,7 +2554,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <RepeatIcon size={17} />)}
                     </button>
 
-                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+                    <div className="w-px h-5 bg-white/10 dark:bg-dark-border shrink-0" />
 
                     {canScrollTabsLeft && (
                         <button
@@ -2591,7 +2591,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </button>
                     )}
 
-                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+                    <div className="w-px h-5 bg-white/10 dark:bg-dark-border shrink-0" />
 
                     <Button
                         variant="outline"
@@ -2617,7 +2617,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     >
                         {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <RepeatIcon size={17} />)}
                     </button>
-                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+                    <div className="w-px h-5 bg-white/10 dark:bg-dark-border shrink-0" />
                     <div data-vendor-tabs-scroll="true" className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full min-w-0">
                         {allTabs.map(tab => (
                             <button
@@ -2630,7 +2630,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             </button>
                         ))}
                     </div>
-                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+                    <div className="w-px h-5 bg-white/10 dark:bg-dark-border shrink-0" />
                     <button
                         onClick={() => setIsCategoryFiltersOpen(true)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white relative"

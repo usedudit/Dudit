@@ -37,20 +37,18 @@ export function DeliveryOtpCard({
 
   return (
     <div
-      className={`rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${
-        isConfirmed
-          ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-          : "border-brand-border bg-gradient-to-br from-white to-gray-50/80 dark:border-dark-border dark:from-dark-surface dark:to-dark-surface/80 shadow-xs"
-      } ${className}`}
+      className={`rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${isConfirmed
+        ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+        : "border-brand-border bg-gradient-to-br from-white to-gray-50/80 dark:border-dark-border dark:from-dark-surface dark:to-dark-surface/80 shadow-xs"
+        } ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-              isConfirmed
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                : "bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20"
-            }`}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isConfirmed
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+              : "bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20"
+              }`}
           >
             {isConfirmed ? <CheckCircleIcon size={20} /> : <ShieldIcon size={20} />}
           </div>
@@ -125,12 +123,12 @@ export function DeliveryOtpCard({
           <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
             {confirmedAt
               ? `O código de segurança foi validado pelo entregador em ${new Intl.DateTimeFormat(
-                  "pt-BR",
-                  {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  }
-                ).format(new Date(confirmedAt))}.`
+                "pt-BR",
+                {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                }
+              ).format(new Date(confirmedAt))}.`
               : "O código de segurança foi validado pelo entregador na conclusão da entrega."}
           </p>
         </div>

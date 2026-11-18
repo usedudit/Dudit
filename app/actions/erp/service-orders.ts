@@ -34,6 +34,7 @@ import { generateShortId, isUuid } from "@/lib/utils/short-id"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { maskPersonName } from "@/lib/utils/formatters"
+import { formatCurrency } from "@/lib/utils"
 
 export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 
@@ -1707,6 +1708,45 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
   if (error) {
     console.error("[recalcTotals] rpc error:", error)
   }
+
+  // Garante que a situação do pedido vinculado permaneça alinhada com o novo total
+  try {
+    const { data: so } = await admin
+      .from("service_orders")
+      .select("id, order_id, total_amount, paid_amount, payment_status")
+      .eq("id", serviceOrderId)
+      .single()
+
+    if (so?.order_id) {
+      const { data: order } = await admin
+        .from("orders")
+        .select("id, paid_amount, total_amount, situation")
+        .eq("id", so.order_id)
+        .single()
+
+      if (order) {
+        const paid = Number(order.paid_amount || 0)
+        const total = Number(order.total_amount || 0)
+        let nextSituation = order.situation
+        if (paid >= total - 0.005 && total > 0) {
+          nextSituation = "paid"
+        } else if (paid > 0.005) {
+          nextSituation = "partially_paid"
+        } else if (order.situation === "paid" || order.situation === "partially_paid") {
+          nextSituation = "pending"
+        }
+
+        if (nextSituation !== order.situation) {
+          await admin
+            .from("orders")
+            .update({ situation: nextSituation })
+            .eq("id", order.id)
+        }
+      }
+    }
+  } catch (syncErr) {
+    console.error("[recalcTotals] error syncing order situation:", syncErr)
+  }
 }
 
 export async function ensurePublicTokenAction(partnerId: string, serviceOrderId: string): Promise<string | null> {
@@ -1774,7 +1814,7 @@ export async function getServiceOrderByTokenAction(
 
     const admin = getAdminClient()
 
-    const { data: row, error } = await admin
+    let { data: row, error } = await admin
       .from("service_orders")
       .select(`
         id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
@@ -1788,7 +1828,52 @@ export async function getServiceOrderByTokenAction(
       .eq("public_token", cleanToken)
       .maybeSingle()
 
-    if (error || !row) {
+    if (!row) {
+      // 1. Tenta buscar por prefixo de versão mais recente (ex: token original sendo acessado após virar _v2)
+      const cleanBase = cleanToken.replace(/_v\d+$/i, "")
+      const { data: byPrefix } = await admin
+        .from("service_orders")
+        .select(`
+          id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+          total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
+          customer_snapshot, created_at, created_by, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
+          public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
+          stores!left (
+            id, name, logo_url, phone
+          )
+        `)
+        .ilike("public_token", `${cleanBase}_v%`)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (byPrefix) {
+        row = byPrefix
+      } else {
+        // 2. Tenta buscar por histórico no array metadata->previous_tokens
+        const { data: byHistory } = await admin
+          .from("service_orders")
+          .select(`
+            id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+            total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
+            customer_snapshot, created_at, created_by, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
+            public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
+            stores!left (
+              id, name, logo_url, phone
+            )
+          `)
+          .contains("metadata", { previous_tokens: [cleanToken] })
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (byHistory) {
+          row = byHistory
+        }
+      }
+    }
+
+    if (!row) {
       return { success: false, error: "Ordem de serviço não encontrada" }
     }
 
@@ -1990,6 +2075,99 @@ export async function getServiceOrderByTokenAction(
   }
 }
 
+function buildServiceOrderItemDiff(
+  oldServices: any[],
+  newServices: any[] | undefined,
+  oldProducts: any[],
+  newProducts: any[] | undefined,
+): string[] {
+  const lines: string[] = []
+
+  if (newServices !== undefined) {
+    const oldSvcMap = new Map<string, { name: string; price: number; qty: number }>()
+    for (const s of oldServices) {
+      const key = s.service_id ? `id:${s.service_id}` : `name:${(s.service_name || "").toLowerCase().trim()}`
+      oldSvcMap.set(key, {
+        name: s.service_name || "Serviço",
+        price: Number(s.service_price || 0),
+        qty: Number(s.quantity || 1),
+      })
+    }
+
+    const newSvcMap = new Map<string, { name: string; price: number; qty: number }>()
+    for (const s of newServices) {
+      const name = s.service_name || "Serviço avulso"
+      const key = s.service_id ? `id:${s.service_id}` : `name:${name.toLowerCase().trim()}`
+      const price = Number(s.service_price !== undefined ? s.service_price : 0)
+      const qty = Number(s.quantity || 1)
+      newSvcMap.set(key, { name, price, qty })
+
+      const oldS = oldSvcMap.get(key)
+      if (!oldS) {
+        lines.push(`Adicionou serviço: ${name} (${qty}x ${formatCurrency(price)})`)
+      } else {
+        if (oldS.qty !== qty) {
+          lines.push(`Alterou quantidade do serviço ${name}: ${oldS.qty} -> ${qty}`)
+        }
+        if (Math.abs(oldS.price - price) > 0.009) {
+          lines.push(`Alterou valor do serviço ${name}: ${formatCurrency(oldS.price)} -> ${formatCurrency(price)}`)
+        }
+      }
+    }
+
+    for (const [key, oldS] of oldSvcMap.entries()) {
+      if (!newSvcMap.has(key)) {
+        lines.push(`Removeu serviço: ${oldS.name} (${oldS.qty}x)`)
+      }
+    }
+  }
+
+  if (newProducts !== undefined) {
+    const oldProdMap = new Map<string, { name: string; price: number; qty: number }>()
+    for (const p of oldProducts) {
+      const key = p.product_id
+        ? (p.variant_id ? `v:${p.variant_id}` : `p:${p.product_id}`)
+        : `name:${(p.product_name || "").toLowerCase().trim()}`
+      oldProdMap.set(key, {
+        name: p.product_name || "Produto",
+        price: Number(p.unit_price || 0),
+        qty: Number(p.quantity || 1),
+      })
+    }
+
+    const newProdMap = new Map<string, { name: string; price: number; qty: number }>()
+    for (const p of newProducts) {
+      const name = p.product_name || "Produto avulso"
+      const key = p.product_id
+        ? (p.variant_id ? `v:${p.variant_id}` : `p:${p.product_id}`)
+        : `name:${name.toLowerCase().trim()}`
+      const price = Number(p.unit_price !== undefined ? p.unit_price : 0)
+      const qty = Number(p.quantity || 1)
+      newProdMap.set(key, { name, price, qty })
+
+      const oldP = oldProdMap.get(key)
+      if (!oldP) {
+        lines.push(`Adicionou produto: ${name} (${qty}x ${formatCurrency(price)})`)
+      } else {
+        if (oldP.qty !== qty) {
+          lines.push(`Alterou quantidade do produto ${name}: ${oldP.qty} -> ${qty}`)
+        }
+        if (Math.abs(oldP.price - price) > 0.009) {
+          lines.push(`Alterou valor do produto ${name}: ${formatCurrency(oldP.price)} -> ${formatCurrency(price)}`)
+        }
+      }
+    }
+
+    for (const [key, oldP] of oldProdMap.entries()) {
+      if (!newProdMap.has(key)) {
+        lines.push(`Removeu produto: ${oldP.name} (${oldP.qty}x)`)
+      }
+    }
+  }
+
+  return lines
+}
+
 export async function updateServiceOrderAction(
   partnerId: string,
   serviceOrderId: string,
@@ -2020,6 +2198,7 @@ export async function updateServiceOrderAction(
     specifications?: { name: string; value: string }[]
     services?: Array<{ service_id: string | null; service_name?: string; service_price?: number; quantity?: number }>
     products?: Array<{ product_id: string | null; variant_id?: string | null; product_name?: string; unit_price?: number; quantity?: number }>
+    generate_store_credit?: boolean
   },
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
@@ -2032,12 +2211,24 @@ export async function updateServiceOrderAction(
 
     const { data: current, error: getErr } = await admin
       .from("service_orders")
-      .select("id, store_id, title, status, payment_status, completed_at")
+      .select(`
+        id, store_id, title, description, diagnosis, status, payment_status,
+        paid_amount, total_amount, completed_at, order_number, public_token,
+        metadata, order_id, customer_id, discount_value, discount_type,
+        coupon_id, coupon_code, coupon_discount_amount, other_costs, specifications
+      `)
       .eq("id", serviceOrderId)
       .eq("partner_id", partnerId)
       .single()
 
     if (getErr || !current) throw new Error("Ordem de serviço não encontrada")
+
+    const [existingServicesRes, existingProductsRes] = await Promise.all([
+      admin.from("service_order_services").select("*").eq("service_order_id", serviceOrderId).order("sort_order"),
+      admin.from("service_order_products").select("*").eq("service_order_id", serviceOrderId).order("sort_order"),
+    ])
+    const existingServices = existingServicesRes.data || []
+    const existingProducts = existingProductsRes.data || []
 
     const policy = getServiceOrderEditPolicy(current.status as ServiceOrderStatus)
 
@@ -2056,23 +2247,10 @@ export async function updateServiceOrderAction(
     }
     if (!policy.canEditAll && (
       input.store_id !== undefined ||
-      input.title !== undefined ||
-      input.description !== undefined ||
-      input.diagnosis !== undefined ||
       input.customer_id !== undefined ||
-      input.discount_value !== undefined ||
-      input.discount_type !== undefined ||
-      input.coupon_id !== undefined ||
-      input.coupon_code !== undefined ||
-      input.coupon_discount_amount !== undefined ||
-      input.other_costs !== undefined ||
-      input.payment_status !== undefined ||
-      input.paid_amount !== undefined ||
-      input.payment_method !== undefined ||
-      input.payment_breakdown !== undefined ||
       input.created_at !== undefined
     )) {
-      throw new Error("Esta ordem de serviço não permite editar cliente, valores ou descrição neste status.")
+      throw new Error("Esta ordem de serviço não permite alterar cliente ou loja neste status.")
     }
     if (!policy.canEditItems && (input.services !== undefined || input.products !== undefined)) {
       throw new Error("Não é possível alterar os itens desta ordem de serviço neste status.")
@@ -2083,28 +2261,116 @@ export async function updateServiceOrderAction(
     if (!policy.canEditNotes && input.internal_notes !== undefined) {
       throw new Error("Não é possível alterar as observações desta ordem de serviço neste status.")
     }
+    if (!policy.canEditDiagnosis && input.diagnosis !== undefined) {
+      throw new Error("Não é possível alterar o diagnóstico desta ordem de serviço neste status.")
+    }
+    if (!policy.canEditFinancial && (
+      input.discount_value !== undefined ||
+      input.discount_type !== undefined ||
+      input.coupon_id !== undefined ||
+      input.coupon_code !== undefined ||
+      input.coupon_discount_amount !== undefined ||
+      input.other_costs !== undefined
+    )) {
+      throw new Error("Não é possível alterar valores ou descontos desta ordem de serviço neste status.")
+    }
 
-    const isPaid = current.payment_status === "paid" || current.payment_status === "partially_paid"
+    const itemDiffLines = buildServiceOrderItemDiff(
+      existingServices,
+      input.services,
+      existingProducts,
+      input.products,
+    )
+
+    const diagnosisChanged = input.diagnosis !== undefined && input.diagnosis.trim() !== (current.diagnosis || "").trim()
+    const specsChanged = input.specifications !== undefined && JSON.stringify(input.specifications) !== JSON.stringify(current.specifications || [])
+    const discountChanged =
+      (input.discount_value !== undefined && Number(input.discount_value) !== Number(current.discount_value || 0)) ||
+      (input.discount_type !== undefined && input.discount_type !== current.discount_type) ||
+      (input.coupon_id !== undefined && input.coupon_id !== current.coupon_id) ||
+      (input.other_costs !== undefined && Number(input.other_costs) !== Number(current.other_costs || 0)) ||
+      (input.coupon_discount_amount !== undefined && Number(input.coupon_discount_amount) !== Number(current.coupon_discount_amount || 0))
+
+    const scopeOrItemsChanged = itemDiffLines.length > 0 || diagnosisChanged || specsChanged || discountChanged
+
+    const wasApproved = current.status === "aprovada"
+    const explicitStatusChange = input.status !== undefined && input.status !== current.status
+    const shouldTriggerReapproval = wasApproved && scopeOrItemsChanged && !explicitStatusChange
 
     const updateData: any = {}
-    if (input.store_id !== undefined && !isPaid) {
+    if (input.store_id !== undefined) {
       if (input.store_id !== current.store_id) {
         await requireStoreAccess(input.store_id, partnerId)
       }
       updateData.store_id = input.store_id
     }
-    if (input.title !== undefined && !isPaid) updateData.title = sanitizeInput(input.title, 150)
-    if (input.description !== undefined && !isPaid) updateData.description = sanitizeNotes(input.description)
-    if (input.diagnosis !== undefined && !isPaid) updateData.diagnosis = sanitizeNotes(input.diagnosis)
+    if (input.title !== undefined) updateData.title = sanitizeInput(input.title, 150)
+    if (input.description !== undefined) updateData.description = sanitizeNotes(input.description)
+    if (input.diagnosis !== undefined) updateData.diagnosis = sanitizeNotes(input.diagnosis)
     if (input.internal_notes !== undefined) updateData.internal_notes = sanitizeNotes(input.internal_notes)
-    if (input.customer_id !== undefined && !isPaid) {
+    if (input.customer_id !== undefined) {
       const customerId = input.customer_id || null
       updateData.customer_id = customerId
       updateData.customer_snapshot = customerId ? await getCustomerSnapshot(admin, customerId, partnerId) : null
     }
     if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
-    if (input.assigned_user_id !== undefined && !isPaid) updateData.assigned_user_id = input.assigned_user_id
-    if (input.status !== undefined) {
+    if (input.assigned_user_id !== undefined) updateData.assigned_user_id = input.assigned_user_id
+
+    // Status handling
+    if (shouldTriggerReapproval) {
+      updateData.status = "aguardando_aprovacao"
+      updateData.completed_at = null
+
+      // Versioning
+      const currentVersion = Number((current.metadata as any)?.version || 1)
+      const nextVersion = currentVersion + 1
+
+      const baseToken = current.public_token || generateShortId()
+      const cleanBase = baseToken.replace(/_v\d+$/i, "")
+      const newToken = `${cleanBase}_v${nextVersion}`
+      updateData.public_token = newToken
+
+      const prevTokens = Array.isArray((current.metadata as any)?.previous_tokens)
+        ? [...(current.metadata as any).previous_tokens]
+        : []
+      if (current.public_token && !prevTokens.includes(current.public_token)) {
+        prevTokens.push(current.public_token)
+      }
+
+      // Generate new approval code
+      const crypto = await import("crypto")
+      const plainCode = crypto.randomInt(1000, 10000).toString()
+      const salt = crypto.randomBytes(16).toString("hex")
+      const hash = crypto.createHash("sha256").update(salt + plainCode).digest("hex")
+
+      updateData.approval_code_salt = salt
+      updateData.approval_code_hash = hash
+      updateData.failed_attempts = 0
+      updateData.lockout_until = null
+      updateData.lockout_count = 0
+
+      const approvalHistory = Array.isArray((current.metadata as any)?.approval_history)
+        ? [...(current.metadata as any).approval_history]
+        : []
+      if ((current.metadata as any)?.approved_at) {
+        approvalHistory.push({
+          version: currentVersion,
+          approved_at: (current.metadata as any).approved_at,
+          approver_name: (current.metadata as any).approver_name || "Cliente",
+        })
+      }
+
+      const nextMetadata = {
+        ...((current.metadata as any) || {}),
+        version: nextVersion,
+        plain_code: plainCode,
+        previous_tokens: prevTokens,
+        approval_history: approvalHistory,
+      }
+      delete nextMetadata.approved_at
+      delete nextMetadata.approver_name
+      updateData.metadata = nextMetadata
+    } else if (input.status !== undefined) {
       if (!isServiceOrderStatus(input.status)) {
         throw new Error("Status inválido para ordem de serviço.")
       }
@@ -2124,26 +2390,27 @@ export async function updateServiceOrderAction(
         }
       }
     }
+
     if (input.priority !== undefined) updateData.priority = input.priority
     if (input.estimated_hours !== undefined) updateData.estimated_hours = input.estimated_hours
     if (input.expected_completion_time !== undefined) updateData.expected_completion_time = input.expected_completion_time
-    if (input.discount_value !== undefined && !isPaid) updateData.discount_value = input.discount_value
-    if (input.discount_type !== undefined && !isPaid) updateData.discount_type = input.discount_type
-    if (input.coupon_id !== undefined && !isPaid) updateData.coupon_id = input.coupon_id
-    if (input.coupon_code !== undefined && !isPaid) updateData.coupon_code = input.coupon_code
-    if (input.coupon_discount_amount !== undefined && !isPaid) updateData.coupon_discount_amount = input.coupon_discount_amount
-    if (input.other_costs !== undefined && !isPaid) updateData.other_costs = input.other_costs
-    if (input.payment_status !== undefined && !isPaid) updateData.payment_status = input.payment_status
-    if (input.paid_amount !== undefined && !isPaid) updateData.paid_amount = input.paid_amount
-    if (input.payment_method !== undefined && !isPaid) updateData.payment_method = input.payment_method
-    if (input.payment_breakdown !== undefined && !isPaid) {
+    if (input.discount_value !== undefined) updateData.discount_value = input.discount_value
+    if (input.discount_type !== undefined) updateData.discount_type = input.discount_type
+    if (input.coupon_id !== undefined) updateData.coupon_id = input.coupon_id
+    if (input.coupon_code !== undefined) updateData.coupon_code = input.coupon_code
+    if (input.coupon_discount_amount !== undefined) updateData.coupon_discount_amount = input.coupon_discount_amount
+    if (input.other_costs !== undefined) updateData.other_costs = input.other_costs
+    if (input.payment_status !== undefined) updateData.payment_status = input.payment_status
+    if (input.paid_amount !== undefined) updateData.paid_amount = input.paid_amount
+    if (input.payment_method !== undefined) updateData.payment_method = input.payment_method
+    if (input.payment_breakdown !== undefined) {
       updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
     }
-    if (input.created_at !== undefined && !isPaid) updateData.created_at = input.created_at
+    if (input.created_at !== undefined) updateData.created_at = input.created_at
     if (input.specifications !== undefined) updateData.specifications = input.specifications && input.specifications.length > 0 ? input.specifications : null
 
-    // Sync services if provided and not locked
-    if (input.services !== undefined && !isPaid) {
+    // Sync services if provided
+    if (input.services !== undefined) {
       await admin.from("service_order_services").delete().eq("service_order_id", serviceOrderId)
       if (input.services.length > 0) {
         const serviceItems = input.services.map((s, idx) => {
@@ -2163,8 +2430,8 @@ export async function updateServiceOrderAction(
       }
     }
 
-    // Sync products if provided and not locked
-    if (input.products !== undefined && !isPaid) {
+    // Sync products if provided
+    if (input.products !== undefined) {
       await admin.from("service_order_products").delete().eq("service_order_id", serviceOrderId)
       if (input.products.length > 0) {
         const productItems = input.products.map((p, idx) => {
@@ -2196,21 +2463,7 @@ export async function updateServiceOrderAction(
 
     if (error) throw error
 
-    // Log audit event asynchronously
-    const changes = []
-    if (input.title && input.title !== current.title) changes.push(`Título: "${current.title}" -> "${input.title}"`)
-    if (input.status && input.status !== current.status) changes.push(`Status: "${current.status}" -> "${input.status}"`)
-    if (input.store_id && input.store_id !== current.store_id) changes.push(`Loja alterada`)
-
-    const updatedStoreId = data.store_id || current.store_id
-    void logAuditEvent({
-      partnerId, actorUserId: user.id,
-      entityType: "service_order", entityId: serviceOrderId,
-      actionType: "updated", source: "manual",
-      changeLines: changes.length > 0 ? changes : ["Dados da OS atualizados"],
-      metadata: { storeId: updatedStoreId, partnerId, userId: user.id, serviceOrderId },
-    }).catch(e => console.error("[updateServiceOrderAction] audit log error:", e))
-
+    // Recalculate totals
     const totalsChanged =
       input.services !== undefined ||
       input.products !== undefined ||
@@ -2222,6 +2475,98 @@ export async function updateServiceOrderAction(
     if (totalsChanged) {
       await recalcTotals(admin, serviceOrderId)
     }
+
+    // Build audit changes
+    const changes: string[] = []
+    if (input.title && input.title !== current.title) changes.push(`Título: "${current.title}" -> "${input.title}"`)
+    if (diagnosisChanged) changes.push(`Diagnóstico alterado`)
+    if (specsChanged) changes.push(`Especificações atualizadas`)
+    if (itemDiffLines.length > 0) changes.push(...itemDiffLines)
+    if (discountChanged) changes.push(`Valores/descontos atualizados`)
+    if (input.store_id && input.store_id !== current.store_id) changes.push(`Loja alterada`)
+
+    if (shouldTriggerReapproval) {
+      const nextVersion = Number(updateData.metadata?.version || 2)
+      changes.push(`OS revisada após aprovação prévia. Status retornado para Aguardando Aprovação (Versão ${nextVersion}). Novo código de aprovação gerado.`)
+    } else if (input.status && input.status !== current.status) {
+      changes.push(`Status: "${current.status}" -> "${input.status}"`)
+    }
+
+    // Handle excess payment & store credit
+    try {
+      const { data: updatedOS } = await admin
+        .from("service_orders")
+        .select("id, total_amount, paid_amount, payment_status, customer_id, order_number, order_id")
+        .eq("id", serviceOrderId)
+        .single()
+
+      const newTotal = Number(updatedOS?.total_amount || 0)
+      const paidAmount = Number(current.paid_amount || 0)
+      const excessAmount = Number(Math.max(0, paidAmount - newTotal).toFixed(2))
+
+      if (excessAmount > 0.009 && current.customer_id) {
+        const isFullyPaid = current.payment_status === "paid"
+        const shouldGenerateStoreCredit =
+          input.generate_store_credit === true ||
+          (isFullyPaid && input.generate_store_credit !== false)
+
+        if (shouldGenerateStoreCredit) {
+          await admin.from("store_credits").insert({
+            partner_id: partnerId,
+            customer_id: current.customer_id,
+            amount: excessAmount,
+            remaining_amount: excessAmount,
+            status: "ACTIVE",
+            created_by: user.id,
+            metadata: {
+              source: "service_order_reduction",
+              service_order_id: serviceOrderId,
+              order_number: current.order_number,
+              description: `Crédito em loja gerado pela redução de valor na OS #${current.order_number}`,
+            },
+          })
+
+          const { data: custRow } = await admin
+            .from("customers")
+            .select("store_credit")
+            .eq("id", current.customer_id)
+            .single()
+          const currentCustCredit = Number(custRow?.store_credit || 0)
+          await admin
+            .from("customers")
+            .update({ store_credit: Number((currentCustCredit + excessAmount).toFixed(2)) })
+            .eq("id", current.customer_id)
+
+          if (current.order_id) {
+            await admin
+              .from("orders")
+              .update({ paid_amount: newTotal, situation: "paid" })
+              .eq("id", current.order_id)
+          }
+          await admin
+            .from("service_orders")
+            .update({ paid_amount: newTotal, payment_status: "paid" })
+            .eq("id", serviceOrderId)
+
+          changes.push(`Gerou Crédito em Loja de ${formatCurrency(excessAmount)} para o cliente devido à redução de valor na OS`)
+        } else {
+          changes.push(`Redução de valor da OS com saldo excedente de ${formatCurrency(excessAmount)} a ser acertado na finalização`)
+        }
+      }
+    } catch (creditErr) {
+      console.error("[updateServiceOrderAction] store credit error:", creditErr)
+    }
+
+    const updatedStoreId = data.store_id || current.store_id
+    void logAuditEvent({
+      partnerId, actorUserId: user.id,
+      entityType: "service_order", entityId: serviceOrderId,
+      actionType: shouldTriggerReapproval ? "revised_for_approval" : "updated",
+      source: "manual",
+      changeLines: changes.length > 0 ? changes : ["Dados da OS atualizados"],
+      metadata: { storeId: updatedStoreId, partnerId, userId: user.id, serviceOrderId },
+    }).catch(e => console.error("[updateServiceOrderAction] audit log error:", e))
+
     revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {

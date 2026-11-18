@@ -25,7 +25,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
     }
 
     const canonicalToken = result.data.serviceOrder?.public_token
-    if (canonicalToken && canonicalToken !== token && isUuid(token)) {
+    if (canonicalToken && canonicalToken !== token) {
         permanentRedirect(`/os/${canonicalToken}`)
     }
 

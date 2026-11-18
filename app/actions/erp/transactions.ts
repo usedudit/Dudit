@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePermission } from "@/lib/permissions/access"
+import { requirePermission, checkPermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import type { ERPTransaction, FinancialTransactionCursor, FinancialTransactionsPageSuccess } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -1946,6 +1946,142 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
         }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao carregar detalhe do parcelado" }
+    }
+}
+
+export type OrderInstallmentItem = {
+    id: string
+    installmentGroupId: string
+    installmentNumber: number
+    totalInstallments: number
+    originalAmount: number
+    paidAmount: number
+    remainingAmount: number
+    dueDate: string | null
+    paymentDate: string | null
+    status: "paid" | "overdue" | "pending"
+    paymentMethodId: string | null
+    paymentType: string | null
+    accountId: string | null
+    description: string | null
+    storeId: string | null
+}
+
+export async function getOrderInstallmentsAction(input: {
+    partnerId: string
+    orderId?: string
+    orderNumber?: string
+}) {
+    try {
+        await requireUser()
+        const { allowed: hasFinancial } = await checkPermission(input.partnerId, "financial", "view")
+        const { allowed: hasOrders } = await checkPermission(input.partnerId, "orders", "view")
+        if (!hasFinancial && !hasOrders) {
+            throw new Error("Permissão insuficiente para visualizar parcelas do pedido.")
+        }
+
+        const supabase = createAdminClient()
+
+        // 1. Buscar grupos de parcelas do pedido
+        let groupsQuery = supabase
+            .from("installment_groups")
+            .select("id, description, total_amount, installments_count, store_id, account_id, payment_method_id, order_id")
+            .eq("partner_id", input.partnerId)
+
+        const sanitizedOrderId = input.orderId ? sanitizeUUID(input.orderId) : null
+        if (sanitizedOrderId) {
+            groupsQuery = groupsQuery.eq("order_id", sanitizedOrderId)
+        } else if (input.orderNumber) {
+            groupsQuery = groupsQuery.ilike("description", `%${input.orderNumber}%`)
+        } else {
+            return { success: true as const, data: [] }
+        }
+
+        const { data: groups, error: groupsErr } = await groupsQuery
+        if (groupsErr) throw groupsErr
+
+        const groupIds = (groups || []).map((g: any) => g.id).filter(Boolean)
+
+        // 2. Buscar transações das parcelas
+        let rowsQuery = supabase
+            .from("transactions")
+            .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number, total_installments, payment_method_id, payment_type, store_id, account_id, installment_group_id")
+            .eq("partner_id", input.partnerId)
+
+        if (groupIds.length > 0) {
+            rowsQuery = rowsQuery.in("installment_group_id", groupIds)
+        } else if (sanitizedOrderId) {
+            rowsQuery = rowsQuery.eq("order_id", sanitizedOrderId).not("installment_group_id", "is", null)
+        } else {
+            return { success: true as const, data: [] }
+        }
+
+        const { data: rows, error: rowsErr } = await rowsQuery.order("installment_number", { ascending: true })
+        if (rowsErr) throw rowsErr
+
+        if (!rows || rows.length === 0) {
+            return { success: true as const, data: [] }
+        }
+
+        // 3. Buscar pagamentos das parcelas
+        const transactionIds = rows.map((r: any) => r.id).filter(Boolean)
+        const { data: payments, error: paymentsErr } = await supabase
+            .from("transaction_payments")
+            .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
+            .eq("partner_id", input.partnerId)
+            .in("transaction_id", transactionIds)
+
+        if (paymentsErr) throw paymentsErr
+
+        const paymentByTxId = new Map<string, { base: number; cash: number }>()
+        for (const p of payments || []) {
+            const txId = String((p as any).transaction_id || "")
+            const pBase = Number((p as any).base_amount ?? (p as any).amount ?? 0)
+            const pCash = Number((p as any).amount || 0)
+            const cur = paymentByTxId.get(txId) || { base: 0, cash: 0 }
+            paymentByTxId.set(txId, {
+                base: cur.base + pBase,
+                cash: cur.cash + pCash,
+            })
+        }
+
+        const result: OrderInstallmentItem[] = rows.map((row: any) => {
+            const isPaidStatus = String(row.status || "").toLowerCase() === "paid"
+            const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
+            const agg = paymentByTxId.get(row.id) || { base: 0, cash: 0 }
+            const fallbackPaid = isPaidStatus && agg.base <= 0 ? original : 0
+            const paidPrincipal = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
+            const remaining = Math.max(0, Math.round((original - paidPrincipal) * 100) / 100)
+            const isFullyPaid = isPaidStatus || remaining <= 0.009
+
+            const dueYmd = row.due_date ? String(row.due_date).slice(0, 10) : ""
+            const isOverdue = !isFullyPaid && !!dueYmd && /^\d{4}-\d{2}-\d{2}$/.test(dueYmd) && diffCalendarDaysInSaoPaulo(dueYmd) < 0
+
+            const group = groups?.find((g: any) => g.id === row.installment_group_id)
+            const totalCount = Number(row.total_installments || group?.installments_count || rows.length)
+
+            return {
+                id: row.id,
+                installmentGroupId: row.installment_group_id,
+                installmentNumber: Number(row.installment_number || 1),
+                totalInstallments: totalCount,
+                originalAmount: original,
+                paidAmount: paidPrincipal,
+                remainingAmount: remaining,
+                dueDate: row.due_date,
+                paymentDate: row.payment_date,
+                status: (isFullyPaid ? "paid" : isOverdue ? "overdue" : "pending") as "paid" | "overdue" | "pending",
+                paymentMethodId: row.payment_method_id,
+                paymentType: row.payment_type,
+                accountId: row.account_id,
+                description: row.description,
+                storeId: row.store_id,
+            }
+        })
+
+        return { success: true as const, data: result }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao buscar parcelas do pedido", data: [] }
     }
 }
 

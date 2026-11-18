@@ -1419,7 +1419,7 @@ export default function TransactionsPage({
         openEntity("edit", tx.id)
     }, [loadedTransactions, notifyError, openEntity, closeEntity])
 
-      const handlePayInstallment = useCallback(
+    const handlePayInstallment = useCallback(
         (row: any, meta?: { ledgerDirection: ERPTransaction["ledgerDirection"]; isOrderOrigin: boolean }) => {
             if (!row) return
             if (row.status === "paid") {
@@ -1677,17 +1677,17 @@ export default function TransactionsPage({
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         <span className="font-bold text-sm text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[120px] md:max-w-[150px]" title={selectedInstallmentForPayment.description}>
                                                             {selectedInstallmentForPayment.description}
+                                                            {isRecurring && (
+                                                                <Badge variant="purple" icon={null}>
+                                                                    Recorrente
+                                                                </Badge>
+                                                            )}
+                                                            {isInstallment && (
+                                                                <Badge variant="gray" icon={null}>
+                                                                    Parcela {selectedInstallmentForPayment.installmentNumber}
+                                                                </Badge>
+                                                            )}
                                                         </span>
-                                                        {isRecurring && (
-                                                            <Badge variant="purple">
-                                                                Recorrente
-                                                            </Badge>
-                                                        )}
-                                                        {isInstallment && (
-                                                            <Badge variant="gray">
-                                                                Parcela {selectedInstallmentForPayment.installmentNumber}
-                                                            </Badge>
-                                                        )}
                                                     </div>
                                                     {selectedInstallmentForPayment.dueDate && (
                                                         <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">
@@ -1993,31 +1993,31 @@ export default function TransactionsPage({
                                     ]}
                                 />
 
-                                 {/* Conta bancária da quitação */}
-                                 <FormSection
-                                     hasSeparator
-                                     title="Conta bancária da quitação"
-                                     description={settleAccountLocked ? "Conta vinculada automaticamente ao meio de pagamento do pedido." : "Conta onde o saldo da quitação será aplicado."}
-                                 >
-                                     <div className="md:w-1/2">
-                                         <FormDropdown
-                                             label="Conta bancária *"
-                                             value={settleResolvedAccount || ""}
-                                             setValue={(val) => setSettleAccountId(val)}
-                                             options={settleAccountOptions}
-                                             placeholder="Selecione a conta bancária"
-                                             disabled={settleAccountLocked}
-                                             error={settleAccountLocked ? false : !settleResolvedAccount}
-                                         />
-                                         {settleAccountLocked && settleResolvedAccount && (
-                                             <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                 Conta vinculada automaticamente ao meio de pagamento.
-                                             </p>
-                                         )}
-                                     </div>
-                                 </FormSection>
+                                {/* Conta bancária da quitação */}
+                                <FormSection
+                                    hasSeparator
+                                    title="Conta bancária da quitação"
+                                    description={settleAccountLocked ? "Conta vinculada automaticamente ao meio de pagamento do pedido." : "Conta onde o saldo da quitação será aplicado."}
+                                >
+                                    <div className="md:w-1/2">
+                                        <FormDropdown
+                                            label="Conta bancária *"
+                                            value={settleResolvedAccount || ""}
+                                            setValue={(val) => setSettleAccountId(val)}
+                                            options={settleAccountOptions}
+                                            placeholder="Selecione a conta bancária"
+                                            disabled={settleAccountLocked}
+                                            error={settleAccountLocked ? false : !settleResolvedAccount}
+                                        />
+                                        {settleAccountLocked && settleResolvedAccount && (
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                Conta vinculada automaticamente ao meio de pagamento.
+                                            </p>
+                                        )}
+                                    </div>
+                                </FormSection>
 
-                                 {/* Table / List Container */}
+                                {/* Table / List Container */}
                                 <FormSection hasSeparator title="Parcelas pendentes">
                                     {pendingInstallments.length === 0 ? (
                                         <IconPlaceholder

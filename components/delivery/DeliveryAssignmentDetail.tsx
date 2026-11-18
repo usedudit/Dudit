@@ -854,9 +854,18 @@ export default function DeliveryAssignmentDetail({
                                                                         </Button>
                                                                     )
                                                                 ) : (
-                                                                    <div className="rounded-xl bg-brand-surface dark:bg-dark-hover p-3 text-center text-xs text-brand-muted dark:text-dark-muted">
-                                                                        O recebimento do pagamento poderá ser processado após a confirmação da entrega.
-                                                                    </div>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setSelectedPaymentOrder(buildOrderForModal(ordersList[0], assignment))
+                                                                            setShowPaymentModal(true)
+                                                                        }}
+                                                                        disabled={loading}
+                                                                        className="w-full text-xs text-brand-muted dark:text-dark-muted hover:text-brand-dark"
+                                                                    >
+                                                                        Ver Detalhes do Pagamento (Aguardando Entrega)
+                                                                    </Button>
                                                                 )}
                                                             </div>
                                                         )}
@@ -1251,9 +1260,18 @@ export default function DeliveryAssignmentDetail({
                                                             </Button>
                                                         )
                                                     ) : (
-                                                        <div className="rounded-xl bg-brand-surface dark:bg-dark-hover p-3 text-center text-xs text-brand-muted dark:text-dark-muted">
-                                                            O recebimento do pagamento poderá ser processado após a confirmação da entrega.
-                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setSelectedPaymentOrder(buildOrderForModal(order, assignment))
+                                                                setShowPaymentModal(true)
+                                                            }}
+                                                            disabled={loading}
+                                                            className="w-full text-xs text-brand-muted dark:text-dark-muted hover:text-brand-dark"
+                                                        >
+                                                            Ver Detalhes do Pagamento (Aguardando Entrega)
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
@@ -1369,6 +1387,11 @@ export default function DeliveryAssignmentDetail({
                 onClose={() => setShowPaymentModal(false)}
                 assignmentId={assignment.assignment_id || assignment.id}
                 order={selectedPaymentOrder}
+                canConfirm={Boolean(
+                    selectedPaymentOrder?.delivery_status === "delivered" ||
+                    assignment.status === "delivered" ||
+                    (ordersList.length === 1 && isSingleDelivered)
+                )}
                 onSuccess={() => {
                     setShowPaymentModal(false)
                     const paidOrderId = selectedPaymentOrder?.id || selectedPaymentOrder?.order_id

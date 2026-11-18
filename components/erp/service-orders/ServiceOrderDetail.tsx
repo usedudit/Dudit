@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -425,6 +425,9 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="hidden md:inline truncate">OS #{order.order_number}</span>
+                                            {Number(order.metadata?.version || 1) > 1 && (
+                                                <Badge variant="blue">v{order.metadata.version}</Badge>
+                                            )}
                                             {statusMeta && (
                                                 <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
                                             )}
@@ -791,7 +794,14 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                             <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center gap-3">
                                                                 <div className="min-w-0">
-                                                                    <span className="text-sm text-brand-inactive-text block">Código de Aprovação</span>
+                                                                    <span className="text-sm text-brand-inactive-text block flex items-center gap-1.5">
+                                                                        Código de Aprovação
+                                                                        {Number(order.metadata?.version || 1) > 1 && (
+                                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-light-primary text-brand-primary dark:bg-dark-accent dark:text-dark-primary">
+                                                                                v{order.metadata.version}
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
                                                                     <span className="text-lg font-bold text-brand-green tracking-wider">
                                                                         {order.metadata?.plain_code || "---"}
                                                                     </span>

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, FormSection, IconPlaceholder, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -375,15 +375,13 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                             </div>
                                         </div>
 
-                                        <div className="mt-8">
-                                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Resumo por forma de recebimento</h3>
+                                        <FormSection title="Resumo por forma de recebimento" hasSeparator>
                                             <div className="flex flex-col">
                                                 {(details.summaryByPaymentMethod || []).map((row) => {
                                                     const lowerLabel = row.label.toLowerCase()
                                                     let Icon = MoneyIcon
                                                     if (lowerLabel.includes("dinheiro")) Icon = MoneyIcon
-                                                    if (lowerLabel.includes("cartão") || lowerLabel.includes("cartao")) Icon = CreditCardIcon
+                                                    if (lowerLabel.includes("cartão") || lowerLabel.includes("cartao") || lowerLabel.includes("debito")) Icon = CreditCardIcon
                                                     if (lowerLabel.includes("pix")) Icon = QRCodeIcon
 
                                                     return (
@@ -456,7 +454,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </FormSection>
                                     </div>
 
                                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
