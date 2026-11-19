@@ -63,6 +63,12 @@ export async function getValidTinyClient(partnerId: string): Promise<TinyClient>
       partnerId,
       metadata: { provider: "tiny" },
     })
+    captureError(err, {
+      module: "integrations",
+      action: "getValidTinyClient",
+      partnerId,
+      metadata: { provider: "tiny" },
+    })
     throw new Error("Falha ao descriptografar token do Tiny ERP.")
   }
 
@@ -333,6 +339,12 @@ export async function syncTinyProductsToDudit(params: {
       partnerId,
       metadata: { provider: "tiny" },
     })
+    captureError(err, {
+      module: "integrations",
+      action: "syncTinyProductsToDudit",
+      partnerId,
+      metadata: { provider: "tiny" },
+    })
     return {
       success: false,
       totalProcessed,
@@ -543,18 +555,18 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
         },
         endereco_entrega: rawDeliveryAddress
           ? {
-              nome_destinatario: customerName,
-              tipo_pessoa: isPj ? ("J" as const) : ("F" as const),
-              cpf_cnpj: customerDocument,
-              endereco: clientStreet,
-              numero: clientNumber,
-              complemento: clientComplement,
-              bairro: clientNeighborhood,
-              cidade: clientCity,
-              uf: clientUf,
-              cep: clientCep,
-              fone: customerPhone,
-            }
+            nome_destinatario: customerName,
+            tipo_pessoa: isPj ? ("J" as const) : ("F" as const),
+            cpf_cnpj: customerDocument,
+            endereco: clientStreet,
+            numero: clientNumber,
+            complemento: clientComplement,
+            bairro: clientNeighborhood,
+            cidade: clientCity,
+            uf: clientUf,
+            cep: clientCep,
+            fone: customerPhone,
+          }
           : undefined,
         itens: items,
         total_pedido: Number(order.total_amount || 0),
@@ -787,8 +799,8 @@ export async function processTinyWebhook(
     const rawProducts = Array.isArray(root.produtos)
       ? root.produtos
       : root.produto
-      ? [root.produto]
-      : []
+        ? [root.produto]
+        : []
 
     for (const item of rawProducts) {
       const externalId = item.id ? String(item.id) : null
@@ -825,7 +837,7 @@ export async function processTinyWebhook(
         try {
           const { invalidateProductCache } = await import("@/lib/cache/invalidation")
           await invalidateProductCache(prod.id, partnerId, "update", { silent: true })
-        } catch {}
+        } catch { }
 
         affectedCount++
       }
@@ -849,10 +861,10 @@ export async function processTinyWebhook(
     const rawNotas = Array.isArray(root.notas)
       ? root.notas
       : root.nota_fiscal
-      ? [root.nota_fiscal]
-      : root.nota
-      ? [root.nota]
-      : []
+        ? [root.nota_fiscal]
+        : root.nota
+          ? [root.nota]
+          : []
 
     for (const nota of rawNotas) {
       const nfeNumber = String(nota.numero || "").trim()
@@ -1013,7 +1025,7 @@ export async function processTinyWebhook(
         try {
           const { revalidateOrders } = await import("@/lib/utils/revalidation")
           await revalidateOrders(partnerId)
-        } catch {}
+        } catch { }
 
         affectedCount++
       }
@@ -1036,8 +1048,8 @@ export async function processTinyWebhook(
     const rawOrders = Array.isArray(root.pedidos)
       ? root.pedidos
       : root.pedido
-      ? [root.pedido]
-      : []
+        ? [root.pedido]
+        : []
 
     for (const p of rawOrders) {
       const pedidoId = p.id ? String(p.id) : null
