@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { MapPinIcon, TrashIcon, CheckCircleIcon, EditIcon, HomeIcon, BriefcaseIcon, PlusIcon } from "@/lib/icons"
-import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, ActionsDropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
+import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, AlertModal, ActionsDropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
 import { Feedback, PageHeader, fade, View } from "./profile-shared"
 import { createAddressAction, updateAddressAction, deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useNotification } from "@/hooks/use-notification"
@@ -60,6 +60,8 @@ export const AddressView = ({
     const router = useRouter()
     const [editingId, setEditingId] = useState<string | null>(null) // null = not editing, "new" = creating
     const [form, setForm] = useState({ ...emptyForm })
+    const [addressToDelete, setAddressToDelete] = useState<any | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     const sortedAddresses = useMemo(() => {
         return [...addresses].sort((a, b) => {
@@ -172,27 +174,37 @@ export const AddressView = ({
         }
     }
 
-    const handleDelete = async (addrId: string) => {
-        setIsLoading(true)
+    const handleDelete = (addr: any) => {
+        setAddressToDelete(addr)
+    }
+
+    const confirmDelete = async () => {
+        if (!addressToDelete) return
+        setIsDeleting(true)
         clearMessages()
         try {
             const token = await getCSRF()
-            const result = await deleteAddressAction(addrId, "user", userId, token)
+            const result = await deleteAddressAction(addressToDelete.id, "user", userId, token)
             if (result.error) {
                 setError(result.error)
                 notifyError("Erro", result.error)
             } else {
-                setAddresses(addresses.filter((a: any) => a.id !== addrId))
+                setAddresses(addresses.filter((a: any) => a.id !== addressToDelete.id))
                 notifySuccess("Sucesso", "Endereço removido!")
-                if (editingId === addrId) setEditingId(null)
+                if (editingId === addressToDelete.id) setEditingId(null)
                 notifyAddressUpdated()
                 router.refresh()
             }
         } catch {
             setError("Erro ao excluir endereço.")
         } finally {
-            setIsLoading(false)
+            setIsDeleting(false)
+            setAddressToDelete(null)
         }
+    }
+
+    const cancelDelete = () => {
+        setAddressToDelete(null)
     }
 
     const handleSetDefault = async (addrId: string) => {
@@ -328,7 +340,7 @@ export const AddressView = ({
                                     )}
                                     <ActionsDropdown
                                         onEdit={() => startEdit(addr)}
-                                        onDelete={() => handleDelete(addr.id)}
+                                        onDelete={() => handleDelete(addr)}
                                     >
                                         {!addr.is_default && (
                                             <DropdownItem onClick={() => handleSetDefault(addr.id)}>
@@ -383,6 +395,19 @@ export const AddressView = ({
             >
                 {editingId !== null && renderForm()}
             </DefaultModal>
+
+            {/* Delete Confirmation Modal */}
+            <AlertModal
+                isOpen={!!addressToDelete}
+                onClose={cancelDelete}
+                title="Excluir endereço?"
+                description={`Tem certeza que deseja excluir o endereço "${addressToDelete?.street}, ${addressToDelete?.number} - ${addressToDelete?.neighborhood}, ${addressToDelete?.city} - ${addressToDelete?.state}"? Esta ação não pode ser desfeita.`}
+                confirmText="Sim, excluir"
+                cancelText="Cancelar"
+                variant="danger"
+                onConfirm={confirmDelete}
+                isLoading={isDeleting}
+            />
 
             {/* Tablet/Mobile Bottom Menu */}
             {addresses.length < 5 && (

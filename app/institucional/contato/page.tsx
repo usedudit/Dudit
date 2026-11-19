@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { MailIcon, PhoneIcon, ClockIcon } from "@/lib/icons"
 import { AlertModal, Button, EmailInput, FormDropdown, FormTextarea, InfoCard, Spinner } from "@/components/reusable"
+import { HeroBanner } from "@/components/marketplace/shared-components";
 import { GridLines, Navbar, Footer, CTA } from "@/components/InstitucionalShared"
 import { submitSupportTicketAction } from "@/app/actions/support"
 import type { SupportCategory } from "@/lib/services/discord-support.service"
@@ -97,17 +98,14 @@ export default function ContatoPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                {/* Hero Section */}
-                <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+                <HeroBanner href="/explorar" />
+
+                {/* Formulário de Contato */}
+                <section className="py-16 bg-white dark:bg-dark-surface">
                     <GridLines />
-                    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
-                        <div className="grid lg:grid-cols-2 gap-12 items-center">
-                            {/* Lado Esquerdo - Formulário */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 30 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6 }}
-                            >
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+                        <div className="grid lg:grid-cols-2 gap-12 items-start">
+                            <div>
                                 <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
                                     Fale com a gente
                                 </h1>
@@ -178,15 +176,9 @@ export default function ContatoPage() {
                                         variant="success"
                                     />
                                 )}
-                            </motion.div>
+                            </div>
 
-                            {/* Lado Direito - Imagem + Info */}
-                            <motion.div
-                                initial={{ opacity: 0, x: 50 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.8, delay: 0.2 }}
-                                className="relative h-[400px] lg:h-[500px] flex items-center justify-center"
-                            >
+                            <div className="relative h-[400px] lg:h-[500px] flex items-center justify-center hidden lg:block">
                                 <div className="relative z-10 w-full max-w-[460px]">
                                     <img
                                         src="https://img.dudit.com.br/static/mascots/FaleConosco.png"
@@ -196,7 +188,7 @@ export default function ContatoPage() {
                                 </div>
                                 <div className="absolute inset-0 bg-brand-gray/50 dark:bg-dark-border/30 rounded-[4rem] transform rotate-6 scale-90 -z-10" />
                                 <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10" />
-                            </motion.div>
+                            </div>
                         </div>
                     </div>
                 </section>

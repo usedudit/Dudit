@@ -12,36 +12,11 @@ import {
    ArrowRightIcon
 } from '@/lib/icons';
 import { GridLines, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
+import { HeroBanner } from "@/components/marketplace/shared-components";
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/reusable/Badge';
 
-const PricingHero = () => {
-   return (
-      <section className="relative bg-white dark:bg-dark-surface pt-32 pb-16 overflow-hidden flex flex-col justify-center text-center">
-         <GridLines />
-         <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
-            <motion.div
-               initial={{ opacity: 0, y: 30 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.6 }}
-            >
-               <Badge icon={<MoneyIcon />} variant="green">
-                  Nossos Planos
-               </Badge>
-
-               <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading leading-tight mb-6">
-                  Venda na sua cidade ou envie para todo o Brasil. Com 0% de comissão.
-               </h1>
-
-               <p className="text-brand-inactive-text text-lg max-w-2xl mx-auto">
-                  Uma vitrine e gestão simples para seu negócio, sem intermediários, taxas por pedido ou surpresas no fim do mês.
-               </p>
-            </motion.div>
-         </div>
-      </section>
-   )
-}
 
 const PricingCards = () => {
    const plans = [
@@ -522,7 +497,7 @@ export default function PricingPage() {
          />
          <Navbar onNavigate={onNavigate} />
          <main>
-            <PricingHero />
+            <HeroBanner href="/explorar" />
             <PricingCards />
             <ComparisonTable />
             <FAQ />

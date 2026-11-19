@@ -47,28 +47,6 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
                         <p className="text-gray-400 dark:text-dark-body text-sm leading-relaxed max-w-sm">
                             Compre de quem tá perto ou receba de qualquer lugar do Brasil. Uma vitrine simples para vender na sua cidade e enviar para todo o país com 0% de comissão.
                         </p>
-
-                        {/* Redes Sociais */}
-                        <div className="flex gap-4 mt-6">
-                            <a
-                                href="https://instagram.com/usedudit"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
-                                title="Siga a Dudit no Instagram"
-                            >
-                                <InstagramIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
-                            </a>
-                            <a
-                                href="https://twitter.com/usedudit"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
-                                title="Siga a Dudit no Twitter"
-                            >
-                                <TwitterIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
-                            </a>
-                        </div>
                     </div>
 
                     {/* Colunas de Links */}
@@ -112,18 +90,41 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
                     </div>
                 </div>
 
-                {/* Barra Inferior: Legal */}
+                {/* Barra Inferior: Legal + Redes Sociais */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
-                    <p className="text-gray-500 dark:text-dark-body text-xs text-center md:text-left">
-                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
-                    </p>
+                    <div className="text-center md:text-left flex flex-col md:flex-row items-center gap-2 md:gap-4">
+                        <p className="text-gray-500 dark:text-dark-body text-xs">
+                            © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-dark-body">
+                            <Link href="/institucional/termos" prefetch={false} className="hover:text-gray-300 transition-colors">Termos de uso</Link>
+                            <span>•</span>
+                            <Link href="/institucional/privacidade" prefetch={false} className="hover:text-gray-300 transition-colors">Privacidade</Link>
+                            <span>•</span>
+                            <Link href="/mapa-do-site" prefetch={false} className="hover:text-brand-green transition-colors">Mapa do Site</Link>
+                        </div>
+                    </div>
 
-                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-dark-body">
-                        <Link href="/institucional/termos" prefetch={false} className="hover:text-gray-300 transition-colors">Termos de uso</Link>
-                        <span>•</span>
-                        <Link href="/institucional/privacidade" prefetch={false} className="hover:text-gray-300 transition-colors">Privacidade</Link>
-                        <span>•</span>
-                        <Link href="/mapa-do-site" prefetch={false} className="hover:text-brand-green transition-colors">Mapa do Site</Link>
+                    {/* Redes Sociais - Lado Direito no Desktop */}
+                    <div className="flex gap-4">
+                        <a
+                            href="https://instagram.com/usedudit"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
+                            title="Siga a Dudit no Instagram"
+                        >
+                            <InstagramIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
+                        </a>
+                        <a
+                            href="https://twitter.com/usedudit"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all group"
+                            title="Siga a Dudit no Twitter"
+                        >
+                            <TwitterIcon className="w-4 h-4 text-gray-400 dark:text-dark-body group-hover:text-white" />
+                        </a>
                     </div>
                 </div>
 

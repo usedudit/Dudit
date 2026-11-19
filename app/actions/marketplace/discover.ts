@@ -461,7 +461,7 @@ const BASE_FIELDS = `id, short_id, store_id, partner_id, name, price, promotiona
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
-    id, is_showcase_active, marketplace_reputation
+    id, is_showcase_active
 ),
 stores!left(
     id, short_id, name, slug, description, logo_url, banner_url,
@@ -673,7 +673,7 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
             phone, rating, is_showcase_active, partner_id, marketplace_reputation,
             addresses!store_id!left(city, state, neighborhood, latitude, longitude),
             delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer),
-            partners!inner(id, category_id, marketplace_reputation, completed_orders_count, vendas_totais, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
         .in("partner_id", allIds)

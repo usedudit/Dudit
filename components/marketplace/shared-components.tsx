@@ -17,14 +17,9 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
-import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
+import { calculateDistance, formatDistanceLabel, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
 import Button from "../reusable/Button"
 import { FormSection } from "../reusable"
-
-const HOME_BANNERS = [
-    { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
-    { id: 2, src: 'https://img.dudit.com.br/static/banners/Banner-2.png', alt: 'Gerencie tudo' },
-];
 
 const HOME_CATEGORIES = [
     { name: 'Decoração', image: 'https://img.dudit.com.br/static/Placeholder.png' },

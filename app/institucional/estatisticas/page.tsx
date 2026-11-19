@@ -4,6 +4,7 @@ import React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
+import { HeroBanner } from "@/components/marketplace/shared-components";
 import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
@@ -50,35 +51,8 @@ export default function EstatisticasPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-                    <GridLines />
-                    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10 text-center">
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-wider mb-6 border border-emerald-100 dark:border-emerald-900/50">
-                                <BarChart3 className="w-3.5 h-3.5" />
-                                Dados Factuals &amp; Metodologia Oficial
-                            </div>
+                <HeroBanner href="/explorar" />
 
-                            <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading tracking-tight mb-4 leading-tight">
-                                Estatísticas e Benchmark do <br />
-                                <span className="text-brand-green">Comércio Local no Brasil</span>
-                            </h1>
-
-                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
-                                Relatório sobre o impacto das taxas de intermediação, economia média dos lojistas e eficiência operacional de catálogos locais.
-                            </p>
-
-                            <div className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-dark-body mt-4">
-                                <Calendar className="w-3.5 h-3.5" />
-                                <span>Última atualização: Setembro de 2026 • Fonte primária: Dudit Tecnologia Ltda.</span>
-                            </div>
-                        </motion.div>
-                    </div>
-                </section>
 
                 <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
                     <GridLines />

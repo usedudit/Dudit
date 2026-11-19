@@ -713,7 +713,6 @@ async function hydrateMarketplaceSearchHits(
             supabase.from("products").select(`
                 id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
-                sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -732,7 +731,6 @@ async function hydrateMarketplaceSearchHits(
         promises.push(
             supabase.from("services").select(`
                 id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
-                marketplace_score, views_count, bookings_last_30_days, favorites_count,
                 marketplace_score, views_count, bookings_last_30_days, favorites_count,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id),
@@ -1073,10 +1071,9 @@ async function searchMarketplaceByCity(
         .select(`
             id, short_id, partner_id, name, slug, description, logo_url, banner_url,
             rating, created_at, is_showcase_active, marketplace_reputation,
-            rating, created_at, is_showcase_active, marketplace_reputation,
             addresses!store_id!inner(city, state, neighborhood, latitude, longitude),
             partners!inner(
-                id, is_active, category_id, marketplace_reputation,
+                id, is_active, category_id,
                 category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name))
             )
         `)
@@ -1139,9 +1136,7 @@ async function searchMarketplaceByCity(
             let pq = supabase
                 .from("products")
                 .select(`
-                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
-                    sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
-                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                    id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                     sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
@@ -1154,7 +1149,6 @@ async function searchMarketplaceByCity(
                 .eq("status", "ativo")
                 .eq("show_in_marketplace", true)
                 .in("partner_id", partnerIds)
-                .order("marketplace_score", { ascending: false, nullsFirst: false })
                 .order("marketplace_score", { ascending: false, nullsFirst: false })
                 .order("created_at", { ascending: false })
                 .limit(type === 'produtos' || type === 'tudo' ? limitCount : 0)
@@ -1170,7 +1164,6 @@ async function searchMarketplaceByCity(
                 .select(`
                     id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_score, views_count, bookings_last_30_days, favorites_count,
-                    marketplace_score, views_count, bookings_last_30_days, favorites_count,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id),
                     stores!left(id, short_id, name, slug, logo_url, banner_url, marketplace_reputation, addresses!store_id!left(city, state, neighborhood, latitude, longitude), delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)),
@@ -1180,7 +1173,6 @@ async function searchMarketplaceByCity(
                 .is("deleted_at", null)
                 .eq("show_in_marketplace", true)
                 .in("partner_id", partnerIds)
-                .order("marketplace_score", { ascending: false, nullsFirst: false })
                 .order("marketplace_score", { ascending: false, nullsFirst: false })
                 .order("created_at", { ascending: false })
                 .limit(type === 'servicos' || type === 'tudo' ? limitCount : 0)

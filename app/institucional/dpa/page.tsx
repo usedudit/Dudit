@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { HeroBanner } from "@/components/marketplace/shared-components";
 import { GridLines, Navbar, Footer } from '@/components/InstitucionalShared';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
