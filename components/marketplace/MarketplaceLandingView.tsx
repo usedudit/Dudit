@@ -13,6 +13,8 @@ import {
 } from "@/lib/icons"
 import { COMMON_CITY_ACCENTS } from "@/components/marketplace/explorar-constants"
 import { HomeCategoryBar } from "./HomeCategoryBar"
+import { HorizontalCarousel, ItemCard } from "./shared-components"
+import type { HomeSection } from "@/app/actions/marketplace/discover"
 
 interface MarketplaceLandingViewProps {
     user?: any
@@ -27,6 +29,8 @@ interface MarketplaceLandingViewProps {
     locationError?: string | null
     onSelectCitySlug: (slug: string) => void
     citiesList: string[]
+    brasilTodoSection?: HomeSection | null
+    userCoords?: { lat: number; lng: number } | null
 }
 
 export function MarketplaceLandingView({
@@ -42,6 +46,8 @@ export function MarketplaceLandingView({
     locationError = null,
     onSelectCitySlug,
     citiesList = [],
+    brasilTodoSection = null,
+    userCoords = null,
 }: MarketplaceLandingViewProps) {
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState("")
@@ -273,6 +279,32 @@ export function MarketplaceLandingView({
                     <HomeCategoryBar selectedCitySlug={selectedCitySlug || "brasil"} />
                 </div>
             </div>
+
+            {/* ═══════════════════════════════════════════════════════════
+                DESTAQUES EM TODO O BRASIL (Quando há produtos nacionais)
+            ═══════════════════════════════════════════════════════════ */}
+            {brasilTodoSection && brasilTodoSection.items && brasilTodoSection.items.length > 0 && (
+                <div className="w-full bg-white dark:bg-dark-background py-6 border-b border-gray-100 dark:border-dark-border">
+                    <div className="container mx-auto px-4 max-w-[1000px]">
+                        <HorizontalCarousel
+                            key={brasilTodoSection.id}
+                            title={brasilTodoSection.title}
+                            subtitle={brasilTodoSection.subtitle}
+                            items={brasilTodoSection.items}
+                            onSeeAll={brasilTodoSection.seeMoreLink ? () => router.push(brasilTodoSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => (
+                                <ItemCard
+                                    product={item}
+                                    userCoords={userCoords}
+                                    locationContext={{ scope: "country" }}
+                                    className="w-full"
+                                />
+                            )}
+                            itemWidthClass="w-[150px] md:w-[230px]"
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* ═══════════════════════════════════════════════════════════
                 HERO 2 - VOCÊ VENDE? (Situação: "Quero ser encontrado")

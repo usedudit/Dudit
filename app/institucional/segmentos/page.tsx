@@ -194,3 +194,70 @@ const SegmentMockup = ({ type }: { type: string }) => {
   }
 };
 
+const SegmentsGrid = () => (
+  <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
+    <GridLines />
+    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+      <SectionHeader
+        subtitle="PARA TODOS OS TIPOS DE NEGÓCIOS"
+        title="Encontre o que precisa ou mostre o que você faz"
+      />
+      <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
+        De produtos locais a profissionais autônomos, tudo organizado e conectado de forma simples.
+      </p>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {segments.map((segment, idx) => (
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: idx * 0.1 }}
+          >
+            <Link href={segment.href} className="group block h-full">
+              <div className="bg-brand-gray dark:bg-dark-border/40 border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6 group-hover:border-brand-green/40 transition-colors">
+                <SegmentMockup type={segment.type} />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors">{segment.title}</h4>
+                </div>
+                <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
+              </div>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+export default function SegmentsPage() {
+  const router = useRouter();
+
+  const onNavigate = (page: string) => {
+    if (page === 'home') router.push('/institucional/inicio');
+    else if (page === 'segments') router.push('/institucional/segmentos');
+    else if (page === 'pricing') router.push('/institucional/planos');
+    else if (page === 'terms') router.push('/institucional/termos');
+    else if (page === 'privacidade') router.push('/institucional/privacidade');
+    else if (page === 'about') router.push('/institucional/sobre');
+    else if (page === 'start-selling') router.push('/auth/login?mode=partner');
+    else if (page === 'explore') router.push('/explorar');
+    else router.push('/');
+  };
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-dark-surface">
+      <Navbar onNavigate={onNavigate} />
+      <main>
+        <HeroBanner href="/explorar" />
+        <SegmentsGrid />
+        <CTA onNavigate={onNavigate} />
+      </main>
+      <Footer onNavigate={onNavigate} />
+    </div>
+  );
+};
+

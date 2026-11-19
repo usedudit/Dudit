@@ -125,7 +125,11 @@ export default function MarketplaceHome({
     const { success: notifySuccess, error: notifyError } = useNotification()
 
     const hasNoLocation = !selectedCityName
-    const hasNoProductsOrVitrines = Boolean(selectedCityName && sections.length === 0)
+    const isCountryScope = selectedCityName === "Brasil" || selectedCitySlug === "brasil"
+    const localSections = sections.filter(s => s.id !== "brasilTodo" && s.items && s.items.length > 0)
+    const hasNoProductsOrVitrines = isCountryScope
+        ? sections.length === 0
+        : localSections.length === 0
 
     const [activeTrend, setActiveTrend] = useState(TRENDS[0])
     const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false)
@@ -652,6 +656,8 @@ export default function MarketplaceHome({
 
     let content;
 
+    const brasilTodoSection = sections.find(s => s.id === "brasilTodo")
+
     if (hasNoLocation || hasNoProductsOrVitrines) {
         content = (
             <div className="w-full flex-grow flex flex-col pb-28 lg:pb-12">
@@ -668,6 +674,8 @@ export default function MarketplaceHome({
                     locationError={locationError}
                     onSelectCitySlug={handleSelectCitySlug}
                     citiesList={citiesList}
+                    brasilTodoSection={brasilTodoSection}
+                    userCoords={userCoords}
                 />
 
                 {renderAddressModal()}
@@ -678,7 +686,6 @@ export default function MarketplaceHome({
         const productSection = sections.find(s => s.id !== "services" && s.id !== "topVitrines" && s.id !== "brasilTodo")
         const serviceSection = sections.find(s => s.id === "services")
         const vitrineSection = sections.find(s => s.id === "topVitrines")
-        const brasilTodoSection = sections.find(s => s.id === "brasilTodo")
         const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection && s !== brasilTodoSection)
 
         const exploreHref = useMemo(() => {

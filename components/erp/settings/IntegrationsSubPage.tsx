@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, Tabs, TabsList, TabsTrigger, TabsContent, Spinner } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
@@ -48,6 +48,14 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { toast } from "@/hooks/use-notification"
 import { useStore } from "@/lib/store-context"
+import { ShoppingCart, TrendingUp, RotateCcw, Gift } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
+import { AddonMetricsModal } from "./AddonMetricsModal"
+import {
+    getPartnerAddonsAction,
+    togglePartnerAddonAction,
+} from "@/app/actions/erp/addons"
+import type { PartnerAddonStatus, AddonSlug } from "@/lib/services/addon.service"
 
 // ─── Integration Card (same style as IntegrationsPage.tsx) ───────────────────
 
@@ -137,6 +145,57 @@ export const IntegrationsSubPage = ({
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
     const [isLoadingMethods, setIsLoadingMethods] = useState(false)
     const [isSavingMethods, setIsSavingMethods] = useState<string | null>(null)
+
+    // Addons / Sales Accelerators state
+    const [addons, setAddons] = useState<PartnerAddonStatus[]>([])
+    const [loadingAddons, setLoadingAddons] = useState(false)
+    const [togglingSlug, setTogglingSlug] = useState<string | null>(null)
+    const [selectedAddonForModal, setSelectedAddonForModal] = useState<PartnerAddonStatus | null>(null)
+    const [isAddonModalOpen, setIsAddonModalOpen] = useState(false)
+
+    const fetchAddons = useCallback(async () => {
+        setLoadingAddons(true)
+        try {
+            const res = await getPartnerAddonsAction()
+            if (res.success && res.data) {
+                setAddons(res.data)
+            }
+        } catch (err) {
+            console.error("Erro ao carregar aplicativos:", err)
+        } finally {
+            setLoadingAddons(false)
+        }
+    }, [])
+
+    const handleToggleAddon = async (slug: AddonSlug, enabled: boolean) => {
+        setTogglingSlug(slug)
+        setAddons((prev) =>
+            prev.map((a) => (a.slug === slug ? { ...a, isEnabled: enabled } : a))
+        )
+
+        try {
+            const res = await togglePartnerAddonAction(slug, enabled)
+            if (res.success) {
+                toast.success(
+                    enabled
+                        ? "Aplicativo ativado com sucesso!"
+                        : "Aplicativo desativado."
+                )
+            } else {
+                toast.error(res.error || "Erro ao atualizar aplicativo.")
+                setAddons((prev) =>
+                    prev.map((a) => (a.slug === slug ? { ...a, isEnabled: !enabled } : a))
+                )
+            }
+        } catch {
+            toast.error("Erro inesperado ao salvar status.")
+            setAddons((prev) =>
+                prev.map((a) => (a.slug === slug ? { ...a, isEnabled: !enabled } : a))
+            )
+        } finally {
+            setTogglingSlug(null)
+        }
+    }
 
     // SuperFrete integration state
     const [sfStatus, setSfStatus] = useState<SuperFreteStatus | null>(null)
@@ -645,7 +704,8 @@ export const IntegrationsSubPage = ({
         fetchMpAcceptedMethods()
         fetchSfStatus()
         fetchTinyStatus()
-    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus, fetchTinyStatus])
+        fetchAddons()
+    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus, fetchTinyStatus, fetchAddons])
 
     const handleConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -1186,6 +1246,120 @@ export const IntegrationsSubPage = ({
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* ─── Aceleradores de Vendas & Retenção (Add-ons) ─── */}
+                        <div className="mt-10 pt-8 border-t border-brand-border dark:border-dark-border">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-md lg:text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                            Aceleradores de Vendas & Retenção
+                                        </h3>
+                                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-green/10 text-brand-green border border-brand-green/20">
+                                            Aplicativos
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                                        Robôs inteligentes e gatilhos automáticos para aumentar seu faturamento, resgatar vendas perdidas e fidelizar clientes.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {loadingAddons && addons.length === 0 ? (
+                                <div className="py-12 flex items-center justify-center">
+                                    <Spinner size={24} />
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                                    {addons.map((item) => {
+                                        const isToggling = togglingSlug === item.slug
+                                        return (
+                                            <div
+                                                key={item.slug}
+                                                className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all hover:border-brand-green/40 shadow-sm"
+                                            >
+                                                <div>
+                                                    <div className="flex gap-4 items-start">
+                                                        <div className="w-12 h-12 rounded-2xl bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                                                            {item.slug === "cart_abandonment" && <ShoppingCart className="w-6 h-6 text-brand-green" />}
+                                                            {item.slug === "order_bump" && <TrendingUp className="w-6 h-6 text-amber-500" />}
+                                                            {item.slug === "service_return" && <RotateCcw className="w-6 h-6 text-blue-500" />}
+                                                            {item.slug === "customer_birthday" && <Gift className="w-6 h-6 text-purple-500" />}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
+                                                                    {item.name}
+                                                                </span>
+                                                                {item.isIncludedInPlan ? (
+                                                                    <Badge variant="blue">Incluso no Escalar</Badge>
+                                                                ) : item.isEnabled ? (
+                                                                    <Badge variant="green">Ativo</Badge>
+                                                                ) : (
+                                                                    <Badge variant="gray">Inativo</Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-1 flex items-center gap-2">
+                                                                {item.isIncludedInPlan ? (
+                                                                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                                                        Incluso no seu plano
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs font-bold text-brand-green">
+                                                                        {formatCurrency(item.price)}/mês
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
+                                                        {item.shortDescription}
+                                                    </p>
+                                                </div>
+
+                                                <div className="mt-4">
+                                                    <hr className="my-4 border-brand-border dark:border-dark-border" />
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-1 sm:gap-2">
+                                                            <Button
+                                                                variant="link"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    setSelectedAddonForModal(item)
+                                                                    setIsAddonModalOpen(true)
+                                                                }}
+                                                                className="text-xs font-semibold"
+                                                            >
+                                                                Métricas & Teste
+                                                            </Button>
+                                                            <Button
+                                                                variant="link"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    setSelectedAddonForModal(item)
+                                                                    setIsAddonModalOpen(true)
+                                                                }}
+                                                                className="text-xs text-brand-inactive-text hover:text-brand-dark dark:text-dark-body dark:hover:text-dark-heading"
+                                                            >
+                                                                Saber mais
+                                                            </Button>
+                                                        </div>
+
+                                                        <Switch
+                                                            checked={item.isEnabled}
+                                                            onCheckedChange={(checked) => handleToggleAddon(item.slug, checked)}
+                                                            disabled={isToggling}
+                                                            className={isToggling ? "opacity-50 cursor-not-allowed" : ""}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2417,6 +2591,14 @@ export const IntegrationsSubPage = ({
                     confirmText="Desconectar"
                     variant="danger"
                     isDestructive
+                />
+
+                {/* Addon Metrics & Testing Modal */}
+                <AddonMetricsModal
+                    isOpen={isAddonModalOpen}
+                    onClose={() => setIsAddonModalOpen(false)}
+                    addon={selectedAddonForModal}
+                    onStatusChanged={fetchAddons}
                 />
 
                 {/* Mobile Bottom Action Bar */}

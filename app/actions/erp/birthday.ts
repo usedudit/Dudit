@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { createNotification, resolveCustomerUserId } from "@/lib/services/notification.service"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireAuthorizedCustomerRecord } from "@/lib/services/authorized-customer-access"
+import { checkIsAddonActive, recordAddonEvent } from "@/lib/services/addon.service"
 
 export async function getBirthdayCouponCodeAction(partnerId: string): Promise<string> {
   await requireUser()
@@ -54,6 +55,15 @@ export async function sendBirthdayNotificationAction(
   const customerAccess = await requireAuthorizedCustomerRecord(customerId, "edit")
   const canonicalPartnerId = customerAccess.partnerId
   const supabase = customerAccess.admin
+
+  // Validar se o aplicativo de aniversário está ativo para o parceiro
+  const isAddonActive = await checkIsAddonActive(canonicalPartnerId, "customer_birthday")
+  if (!isAddonActive) {
+    return {
+      success: false,
+      error: "O aplicativo de Aniversário com Cupom Automático não está ativo na sua loja.",
+    }
+  }
 
   // Fetch store name
   const { data: store } = await supabase
@@ -111,6 +121,19 @@ export async function sendBirthdayNotificationAction(
   if (!notification) {
     return { success: false, error: "Falha ao criar notificação no banco de dados." }
   }
+
+  // Registrar métrica do aplicativo
+  await recordAddonEvent({
+    partnerId: canonicalPartnerId,
+    addonSlug: "customer_birthday",
+    eventType: "sent",
+    entityType: "customer",
+    entityId: customerId,
+    metadata: {
+      couponCode,
+      customerName: customer.name,
+    },
+  })
 
   return { success: true, notified: created }
 }

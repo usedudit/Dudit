@@ -12,6 +12,7 @@ import {
   resolveMarketplaceCapabilities,
   resolveRecurringPlanSaleBlock,
 } from "@/lib/marketplace-capabilities"
+import { recordAddonEvent } from "@/lib/services/addon.service"
 
 export async function assertCanBuyFromStore(
   userId: string,
@@ -332,6 +333,19 @@ export async function addBumpProductToCartAction(input: {
 
   await supabase.from("cart_items").update({ selected: true }).eq("id", row.id)
   await revalidateCart(user.id)
+
+  // Registra clique/adição do Order Bump nas métricas
+  await recordAddonEvent({
+    partnerId: input.partnerId,
+    addonSlug: "order_bump",
+    eventType: "clicked",
+    entityType: "product",
+    entityId: input.productId,
+    metadata: {
+      productId: input.productId,
+      quantity: row.quantity,
+    },
+  })
 
   return { success: true, cartItemId: row.id as string, quantity: row.quantity }
 }

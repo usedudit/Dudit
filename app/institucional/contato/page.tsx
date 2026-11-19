@@ -98,8 +98,6 @@ export default function ContatoPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <HeroBanner href="/explorar" />
-
                 {/* Formulário de Contato */}
                 <section className="py-16 bg-white dark:bg-dark-surface">
                     <GridLines />

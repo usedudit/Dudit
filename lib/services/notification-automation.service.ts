@@ -14,6 +14,7 @@ import {
   resolveCustomerUserId,
   scheduleNotificationJob,
 } from "./notification.service"
+import { checkIsAddonActive, recordAddonEvent } from "@/lib/services/addon.service"
 
 function formatCurrency(value: number | null | undefined): string | undefined {
   if (value == null || Number.isNaN(Number(value))) return undefined
@@ -244,6 +245,16 @@ export async function runScheduledNotificationJob(job: {
     .maybeSingle()
 
   if (job.job_type === "service_return_reminder") {
+    // Verificar se o aplicativo de Retorno de Serviços está ativo para o parceiro
+    const isAddonActive = await checkIsAddonActive(appointment.partner_id as string, "service_return")
+    if (!isAddonActive) {
+      await admin
+        .from("notification_scheduled_jobs")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", job.id)
+      return
+    }
+
     const returnInterval = (job.payload?.returnInterval as string) || undefined
     const serviceNameFromPayload = (job.payload?.serviceName as string) || appointment.service_name
 
@@ -259,6 +270,20 @@ export async function runScheduledNotificationJob(job: {
         serviceName: serviceNameFromPayload,
         storeName: hqStore?.name || undefined,
         returnInterval,
+      },
+    })
+
+    // Registrar métrica do aplicativo
+    await recordAddonEvent({
+      partnerId: appointment.partner_id as string,
+      addonSlug: "service_return",
+      eventType: "sent",
+      entityType: "appointment",
+      entityId: appointment.id,
+      metadata: {
+        serviceName: serviceNameFromPayload,
+        returnInterval,
+        customerId: appointment.customer_id,
       },
     })
 

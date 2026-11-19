@@ -979,13 +979,13 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
     const planTheme = {
         escalar: {
-            border: "border-2 border-brand-dark/25 dark:border-brand-green/30 shadow-sm",
+            border: "border-brand-dark dark:border-brand-green shadow-sm",
             badgeVariant: "green" as const,
             badgeText: "Plano Completo",
-            badgeIcon: <ShieldIcon size={12} className="text-brand-green" />,
+            badgeIcon: undefined,
         },
         crescer: {
-            border: "border-2 border-brand-green/35 dark:border-brand-green/30 shadow-sm",
+            border: "border-brand-green/ dark:border-brand-green shadow-sm",
             badgeVariant: "green" as const,
             badgeText: "Mais popular",
             badgeIcon: undefined,
@@ -1160,7 +1160,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     </p>
                                 </div>
 
-                                <div className="pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
+                                <div className="pt-4 border-t border-brand-border dark:border-dark-border mt-auto">
                                     <div className="mb-4">
                                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                                             {getHardcodedPlan(displayPlanSlug).limits.slice(0, 4).map((limit, i) => (

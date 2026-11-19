@@ -3,6 +3,7 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { createNotification, buildIdempotencyKey } from "./notification.service"
 import { buildNotificationContent } from "@/lib/notifications/templates"
+import { checkIsAddonActive, recordAddonEvent } from "@/lib/services/addon.service"
 
 const ABANDONMENT_THRESHOLD_MINUTES = 4 * 60
 const NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -88,6 +89,13 @@ export async function sweepAbandonedCarts(
 
     const firstItem = items[0]
     const partnerId = firstItem.partner_id
+
+    // Só envia notificação de carrinho se o parceiro tiver o aplicativo ativo ou for Escalar
+    const isAddonActive = await checkIsAddonActive(partnerId, "cart_abandonment")
+    if (!isAddonActive) {
+      continue
+    }
+
     const storeId = firstItem.store_id ? String(firstItem.store_id) : null
     const storeName = await resolveStoreName(client, partnerId, firstItem.store_id)
 
@@ -138,6 +146,21 @@ export async function sweepAbandonedCarts(
         origin: "system",
       })
       result.notified++
+
+      // Registra métrica do aplicativo
+      await recordAddonEvent({
+        partnerId,
+        addonSlug: "cart_abandonment",
+        eventType: "sent",
+        entityType: "cart",
+        entityId: userId,
+        metadata: {
+          itemCount,
+          totalQuantity,
+          productNames,
+          customerName,
+        },
+      })
     } catch (err) {
       result.errors++
       console.error(

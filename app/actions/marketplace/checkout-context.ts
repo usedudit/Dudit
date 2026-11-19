@@ -23,6 +23,7 @@ import {
   resolveMarketplaceCapabilities,
   type MarketplaceCapabilities,
 } from "@/lib/marketplace-capabilities"
+import { checkIsAddonActive } from "@/lib/services/addon.service"
 
 export type MarketplaceCheckoutDepositConfig = {
   available: boolean
@@ -140,6 +141,8 @@ export async function getMarketplaceCheckoutContextAction(input: {
   }
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
+
+  const isOrderBumpActive = await checkIsAddonActive(resolved.partnerId, "order_bump")
 
   const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult, userCartProductsResult, marketplaceCapabilities] = await Promise.all([
     admin
@@ -462,6 +465,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     storefrontPaymentMethods,
     userAddresses: ((userAddressesResult as any)?.data || []) as Record<string, unknown>[],
     partnerBumpProducts: (() => {
+      if (!isOrderBumpActive) return []
       const cartProductIds = new Set(
         ((userCartProductsResult as any)?.data || [])
           .map((row: any) => row.product_id)

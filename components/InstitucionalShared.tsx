@@ -273,9 +273,9 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     </div>
 
                     {/* Conteúdo: texto + botão à esquerda, mascote à direita */}
-                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-10 px-6 py-8 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-10 px-10 py-10">
                         <div className="flex-1 w-full max-w-2xl text-left">
-                            <h2 className="text-2xl sm:text-3xl md:text-[34px] lg:text-[40px] font-black leading-tight text-white mb-3 sm:mb-4">
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black leading-tight text-white mb-3 sm:mb-4">
                                 Pronto para vender na sua cidade e em todo o Brasil?
                             </h2>
                             <p className="text-sm sm:text-base md:text-lg text-gray-300 leading-relaxed mb-6 sm:mb-8 max-w-xl">
@@ -283,7 +283,7 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                             </p>
 
                             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                                <Button asChild className="h-11 sm:h-12 px-6 sm:px-8 text-sm sm:text-base">
+                                <Button asChild className="h-11">
                                     <Link href="/auth/login?mode=partner" prefetch={false}>
                                         Começar Grátis
                                     </Link>
