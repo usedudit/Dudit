@@ -300,8 +300,7 @@ export default function MarketplaceHome({
         : null
 
     const locationContext = useMemo<LocationContext | null>(() => {
-        if (!selectedCitySlug) return null
-        if (selectedCityName === "Brasil" || selectedCitySlug === "brasil") return { scope: "country" }
+        if (!selectedCitySlug || selectedCityName === "Brasil" || selectedCitySlug === "brasil") return { scope: "country" }
         if (selectedCitySlug.startsWith("estado-")) {
             return { scope: "state", state: selectedCitySlug.replace("estado-", "").toUpperCase() }
         }

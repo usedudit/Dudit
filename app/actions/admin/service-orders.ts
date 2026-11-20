@@ -97,7 +97,7 @@ export async function getAdminServiceOrders(
 
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`order_number.ilike.%${s}%,title.ilike.%${s}%`)
+        query = query.or(`order_number.ilike.%${s}%,title.ilike.%${s}%,id.eq.${s},customer_snapshot.name.ilike.%${s}%,customer_snapshot.email.ilike.%${s}%,stores.name.ilike.%${s}%`)
     }
 
     if (filters?.statuses && filters.statuses.length > 0) {

@@ -1567,7 +1567,33 @@ export async function processReturnRequestAction(
                     changeLines: ["Pedido cancelado - solicitação de cancelamento aprovada."],
                     source: "erp",
                 })
+
+                // Sincroniza cancelamento do pedido no Tiny ERP se integrado
+                try {
+                    const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
+                    updateTinyOrderStatus({ orderId: request.order_id, situacao: "cancelado" }).catch((tinyErr) => {
+                        console.error("[processReturnRequest] Erro ao sincronizar cancelamento no Tiny:", tinyErr)
+                    })
+                } catch {}
             }
+        }
+
+        // Se a solicitação for de troca e foi aprovada, exporta o novo pedido de troca gerado para o Tiny ERP
+        if (isExchange && (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED")) {
+            try {
+                const { data: exchangeOrder } = await supabase
+                    .from("orders")
+                    .select("id")
+                    .eq("exchange_return_request_id", data.requestId)
+                    .maybeSingle()
+
+                if (exchangeOrder?.id) {
+                    const { exportDuditOrderToTiny } = await import("@/lib/services/integrations/tiny/tiny-integration")
+                    exportDuditOrderToTiny(exchangeOrder.id).catch((err) => {
+                        console.error("[processReturnRequest] Erro ao exportar pedido de troca no Tiny:", err)
+                    })
+                }
+            } catch {}
         }
         const requestedRefundAmount = data.refundAmount > 0
             ? data.refundAmount

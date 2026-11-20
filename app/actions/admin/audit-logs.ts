@@ -197,6 +197,8 @@ export async function getAuditLogs(
         actionType?: string
         targetType?: string
         search?: string
+        startDate?: string
+        endDate?: string
     }
 ): Promise<CursorPaginatedResult<AuditLogRow>> {
     await requireAdminScope("audit_access")
@@ -219,7 +221,14 @@ export async function getAuditLogs(
 
     if (filters?.search && filters.search.trim().length > 0) {
         const sanitized = sanitizeIlike(filters.search.trim())
-        query = query.or(`admin_email.ilike.%${sanitized}%,target_id.ilike.%${sanitized}%`)
+        query = query.or(`admin_email.ilike.%${sanitized}%,target_id.ilike.%${sanitized}%,target_name.ilike.%${sanitized}%,admin_name.ilike.%${sanitized}%`)
+    }
+
+    if (filters?.startDate) {
+        query = query.gte("created_at", filters.startDate)
+    }
+    if (filters?.endDate) {
+        query = query.lte("created_at", filters.endDate)
     }
 
     if (cursor) {

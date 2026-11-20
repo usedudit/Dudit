@@ -16,7 +16,7 @@ import { useFavorites } from "@/providers/favorites-provider"
 import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
-import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
+import { getLocationLabel, normalizeStateUf, type LocationContext } from "@/lib/utils/location-label"
 import { calculateDistance, formatDistanceLabel, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
 import Button from "../reusable/Button"
 import { FormSection } from "../reusable"
@@ -91,22 +91,28 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const category = vitrine.category || null
     const reviewsCount = vitrine.reviewsCount ?? 0
     const showRating = (vitrine.rating ?? 0) > 0
+    const isBroadScope = locationContext?.scope === "country" || locationContext?.scope === "state"
     const locationLabel = getLocationLabel(vitrine, locationContext, { full: preferCityLabel })
+        || (isBroadScope && (vitrine.city || partner?.city)
+            ? ((vitrine.state || partner?.state) ? `${vitrine.city || partner?.city}, ${normalizeStateUf(vitrine.state || partner?.state)}` : (vitrine.city || partner?.city))
+            : null)
 
     // Resolve distance (O(1) in-memory calculation)
     const storeLat = vitrine.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
     const storeLng = vitrine.longitude ?? vitrine.addresses?.[0]?.longitude ?? null
 
     let distanceKm: number | null = null
-    if (partner.distance_km != null && typeof partner.distance_km === "number") {
-        distanceKm = partner.distance_km
-    } else if (vitrine.distance_km != null && typeof vitrine.distance_km === "number") {
-        distanceKm = vitrine.distance_km
-    } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
-        distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+    if (!isBroadScope) {
+        if (partner.distance_km != null && typeof partner.distance_km === "number") {
+            distanceKm = partner.distance_km
+        } else if (vitrine.distance_km != null && typeof vitrine.distance_km === "number") {
+            distanceKm = vitrine.distance_km
+        } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
+            distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+        }
     }
 
-    const distanceLabel = preferCityLabel && locationLabel
+    const distanceLabel = (preferCityLabel && locationLabel) || isBroadScope
         ? null
         : (distanceKm != null ? formatDistanceLabel(distanceKm) : (vitrine.distance_km_formatted || null))
 
@@ -183,7 +189,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         {category && (
                             <span className="font-medium shrink-0">{category}</span>
                         )}
-                        {locationContext?.scope === "country" && locationLabel ? (
+                        {isBroadScope && locationLabel ? (
                             <>
                                 {category && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
                                 <span className="shrink-0">{locationLabel}</span>
@@ -433,6 +439,19 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const partnerUserId = (partner as any)?.user_id
     const itemType = (product as any).itemType === "plano" ? "plano" : ((product as any).itemType === "servico" ? "servico" : "produto")
 
+    const resolvedPartner = useMemo(() => {
+        const basePartner = Array.isArray(product.partners) ? product.partners[0] : (product.partners || (product as any).partner || null)
+        const city = basePartner?.city || (product as any).city || (product as any).store_city || (product as any).addresses?.[0]?.city || null
+        const state = basePartner?.state || (product as any).state || (product as any).store_state || (product as any).addresses?.[0]?.state || null
+        const neighborhood = basePartner?.neighborhood || (product as any).neighborhood || (product as any).store_neighborhood || (product as any).addresses?.[0]?.neighborhood || null
+        return {
+            ...basePartner,
+            city,
+            state,
+            neighborhood,
+        }
+    }, [product])
+
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage, "thumb") : null
     const partnerId = partner?.partner_id || partner?.partnerId || partner?.id || (product as any)?.partner_id || null
@@ -440,28 +459,42 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const sellerCategory = (product as any).category as string | null | undefined
     const sellerSubcategory = (product as any).subcategoryName as string | null | undefined
     const sellerLabel = sellerSubcategory || sellerCategory || null
-    const locationLabel = getLocationLabel(partner, locationContext, { full: preferCityLabel || locationOnly })
+
+    const effectiveLocationContext = locationContext || { scope: "country" as const }
+    const isBroadScope = effectiveLocationContext.scope === "country" || effectiveLocationContext.scope === "state"
+
+    const locationLabel = getLocationLabel(resolvedPartner, effectiveLocationContext, { full: preferCityLabel || locationOnly })
+        || (resolvedPartner.city
+            ? (resolvedPartner.state ? `${resolvedPartner.city}, ${normalizeStateUf(resolvedPartner.state)}` : resolvedPartner.city)
+            : null)
 
     // Resolve distance & delivery estimates
-    const storeLat = partner?.latitude ?? (product as any).latitude ?? (product as any).partners?.latitude ?? null
-    const storeLng = partner?.longitude ?? (product as any).longitude ?? (product as any).partners?.longitude ?? null
+    const storeLat = resolvedPartner?.latitude ?? (product as any).latitude ?? (product as any).partners?.latitude ?? null
+    const storeLng = resolvedPartner?.longitude ?? (product as any).longitude ?? (product as any).partners?.longitude ?? null
 
     let distanceKm: number | null = null
-    if (partner?.distance_km != null && typeof partner.distance_km === "number") {
-        distanceKm = partner.distance_km
-    } else if ((product as any).distance_km != null && typeof (product as any).distance_km === "number") {
-        distanceKm = (product as any).distance_km
-    } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
-        distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+    if (!isBroadScope) {
+        if (resolvedPartner?.distance_km != null && typeof resolvedPartner.distance_km === "number") {
+            distanceKm = resolvedPartner.distance_km
+        } else if ((product as any).distance_km != null && typeof (product as any).distance_km === "number") {
+            distanceKm = (product as any).distance_km
+        } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
+            distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+        }
     }
 
-    const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || (product as any).distance_km_formatted || distance || null)
-    const metaDistanceLabel = preferCityLabel ? (locationLabel || distanceLabel) : distanceLabel
+    const distanceLabel = !isBroadScope && distanceKm != null
+        ? formatDistanceLabel(distanceKm)
+        : (!isBroadScope ? (resolvedPartner?.distance_km_formatted || (product as any).distance_km_formatted || distance || null) : null)
+
+    const metaDistanceLabel = isBroadScope
+        ? locationLabel
+        : (preferCityLabel ? (locationLabel || distanceLabel) : distanceLabel)
 
     const rawDeliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
     const deliverySettings = Array.isArray(rawDeliverySettings) ? rawDeliverySettings[0] : rawDeliverySettings
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
-    const showDeliveryTime = itemType === "produto" && isDeliveryEnabled
+    const showDeliveryTime = !isBroadScope && itemType === "produto" && isDeliveryEnabled
 
     // Check if seller is outside the delivery radius
     const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
@@ -711,12 +744,25 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                             <span className="shrink-0">{metaDistanceLabel || locationLabel}</span>
                                         </div>
                                     ) : null
-                                ) : locationContext?.scope === "country" && locationLabel ? (
+                                ) : isBroadScope ? (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {metaDistanceLabel ? (
-                                            <span className="shrink-0">{metaDistanceLabel}</span>
-                                        ) : (
-                                            <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{locationLabel}</span>
+                                        {locationLabel && (
+                                            <span className="shrink-0">{locationLabel}</span>
+                                        )}
+                                        {itemType === "servico" && serviceDuration && (
+                                            <>
+                                                {locationLabel && <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />}
+                                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
+                                            </>
+                                        )}
+                                        {itemType === "produto" && deliveryFeeLabel && isFreeDelivery && (
+                                            <>
+                                                {locationLabel && <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />}
+                                                <span className="shrink-0 font-medium text-brand-green font-bold">{deliveryFeeLabel}</span>
+                                            </>
+                                        )}
+                                        {!locationLabel && !serviceDuration && (!deliveryFeeLabel || !isFreeDelivery) && (
+                                            <span>{sellerLabel || "Pronta entrega"}</span>
                                         )}
                                     </div>
                                 ) : itemType === "servico" ? (

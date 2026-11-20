@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useTransition, useMemo, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import PartnerListRow from "./PartnerListRow"
@@ -25,6 +25,12 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 type SortKey = "store" | "owner" | "risk" | "date" | "status"
 type SortDirection = "asc" | "desc"
@@ -50,13 +56,9 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
     const [enableERPTarget, setEnableERPTarget] = useState<EnforcementPartner | null>(null)
     const [suspendPartnerTarget, setSuspendPartnerTarget] = useState<EnforcementPartner | null>(null)
     const [unsuspendPartnerTarget, setUnsuspendPartnerTarget] = useState<EnforcementPartner | null>(null)
-    const [actionReason, setActionReason] = useState("")
 
     // Stats
     const [stats, setStats] = useState<AdminPartnerStats | undefined>(initialStats)
-
-    // Search state
-    const [search, setSearch] = useState("")
 
     // Sorting state
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
@@ -64,9 +66,47 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         direction: "desc",
     })
 
-    // Data State (initialized from SSR)
-    const [partners, setPartners] = useState<EnforcementPartner[]>(initialData?.data || [])
-    const [page, setPage] = useState(1)
+    // Filters
+    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
+
+    const isDefaultView = statusTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+
+    const entityPage = useEntityPage<any, any, any>({
+        entityType: "partners",
+        partnerId: "admin",
+        queryKey: ["admin-partners", statusTab, debouncedSearch, filters.datePeriod],
+        initialItems: initialData?.data || [],
+        initialNextCursor: initialData?.nextCursor || null,
+        initialHasMore: initialData?.hasMore || false,
+        skipInitialData: !isDefaultView,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getPartners(cursor, 100, search || undefined, statusTab === "all" ? undefined : statusTab)
+            return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            // getPartners doesn't have a detail function, we'll use the admin detail view
+            return null
+        },
+        listToDetail: (item) => ({ ...item, __partial: true }),
+        staleTime: 30_000,
+    })
+
+    const {
+        items: partners,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        entityState: epEntityState,
+        openEntity: epOpenEntity,
+        closeEntity: epCloseEntity,
+        search,
+        setSearch,
+        debouncedSearch,
+        afterMutation,
+    } = entityPage
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -77,20 +117,10 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         })
     }
 
-    const refreshPartners = useCallback(() => {
-        startTransition(async () => {
-            try {
-                const [res, statsRes] = await Promise.all([
-                    getPartners(null, 100),
-                    getAdminPartnerStats(),
-                ])
-                setPartners(res.data || [])
-                setStats(statsRes)
-            } catch (err) {
-                console.error("Failed to refresh admin partners:", err)
-            }
-        })
-    }, [])
+    const handleMutation = useCallback(() => {
+        afterMutation()
+        getAdminPartnerStats().then(setStats).catch(console.error)
+    }, [afterMutation])
 
     const handleConfirmSuspendStore = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!suspendStoreTarget) return
@@ -99,7 +129,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
             if (res.success) {
                 toast.success(`Loja suspensa com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setSuspendStoreTarget(null)
-                refreshPartners()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao suspender loja")
             }
@@ -120,7 +150,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
             if (res.success) {
                 toast.success("Loja reativada com sucesso!")
                 setUnsuspendStoreTarget(null)
-                refreshPartners()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao reativar loja")
             }
@@ -141,7 +171,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
             if (res.success) {
                 toast.success(`Acesso ao ERP desativado! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setDisableERPTarget(null)
-                refreshPartners()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao desativar ERP")
             }
@@ -162,7 +192,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
             if (res.success) {
                 toast.success("Acesso ao ERP restabelecido com sucesso!")
                 setEnableERPTarget(null)
-                refreshPartners()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao reativar ERP")
             }
@@ -183,7 +213,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
             if (res.success) {
                 toast.success(`Parceiro e lojas suspensos! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setSuspendPartnerTarget(null)
-                refreshPartners()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao suspender parceiro")
             }
@@ -204,7 +234,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
             if (res.success) {
                 toast.success("Parceiro e lojas reativados com sucesso!")
                 setUnsuspendPartnerTarget(null)
-                refreshPartners()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao reativar parceiro")
             }
@@ -218,33 +248,26 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         }
     }
 
-    // Instant in-memory filtering (0ms)
-    const filteredPartners = useMemo(() => {
-        const term = search.trim().toLowerCase()
+    // Reset to page 1 on filter/tab/search change
+    useEffect(() => {
+        setPage(1)
+    }, [statusTab, debouncedSearch, filters.datePeriod])
 
-        let result = partners.filter((p) => {
-            // Tab filter
-            const isSuspended = !!p.suspended_at || !p.is_active
-            const isHighRisk = (p.risk_score || 0) >= 50
-            if (statusTab === "active" && isSuspended) return false
-            if (statusTab === "suspended" && !isSuspended) return false
-            if (statusTab === "high_risk" && !isHighRisk) return false
+    // If viewing detail of a specific partner via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        return (
+            <AdminPartnerDetailView
+                storeId={entityState.entityId}
+                onBack={closeEntity}
+                onPartnerUpdated={handleMutation}
+            />
+        )
+    }
 
-            // Search filter
-            if (term) {
-                const name = String(p.store_name || "").toLowerCase()
-                const owner = String(p.owner_name || "").toLowerCase()
-                const id = String(p.id || "").toLowerCase()
+    // In-memory sorting (search and status are done server-side)
+    const sortedPartners = useMemo(() => {
+        let result = [...(partners || [])]
 
-                if (!name.includes(term) && !owner.includes(term) && !id.includes(term)) {
-                    return false
-                }
-            }
-
-            return true
-        })
-
-        // In-memory sorting
         if (sortConfig) {
             result = [...result].sort((a, b) => {
                 let aVal: any = ""
@@ -278,30 +301,16 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         }
 
         return result
-    }, [partners, statusTab, search, sortConfig])
+    }, [partners, sortConfig])
 
     // Pagination (Strict 8 items)
-    const totalPages = Math.ceil(filteredPartners.length / ITEMS_PER_PAGE) || 1
+    const totalPages = Math.ceil(sortedPartners.length / ITEMS_PER_PAGE) || 1
     const paginatedItems = useMemo(() => {
         const start = (page - 1) * ITEMS_PER_PAGE
-        return filteredPartners.slice(start, start + ITEMS_PER_PAGE)
-    }, [filteredPartners, page])
+        return sortedPartners.slice(start, start + ITEMS_PER_PAGE)
+    }, [sortedPartners, page])
 
-    // Reset to page 1 on filter/tab/search change
-    useEffect(() => {
-        setPage(1)
-    }, [statusTab, search])
-
-    // If viewing detail of a specific partner via URL (?view=id)
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        return (
-            <AdminPartnerDetailView
-                storeId={entityState.entityId}
-                onBack={closeEntity}
-                onPartnerUpdated={refreshPartners}
-            />
-        )
-    }
+    const [page, setPage] = useState(1)
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -345,6 +354,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                     search={search}
                     setSearch={setSearch}
                     tabCounts={stats}
+                    onOpenFilter={() => setIsFilterSheetOpen(true)}
                 />
 
                 {/* List Content */}
@@ -562,6 +572,21 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                     currentRiskScore={unsuspendPartnerTarget.risk_score}
                 />
             )}
+
+            {/* Filter Sheet */}
+            <FilterSheet
+                isOpen={isFilterSheetOpen}
+                onClose={() => setIsFilterSheetOpen(false)}
+                sections={[
+                    { id: "datePeriod", title: "Data de Cadastro", type: "date-period" },
+                ]}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => {
+                    setFilters({ datePeriod: { ...EMPTY_DATE_PERIOD } })
+                    setIsFilterSheetOpen(false)
+                }}
+            />
         </FadeIn>
     )
 }

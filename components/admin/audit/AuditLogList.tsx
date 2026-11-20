@@ -16,7 +16,13 @@ import AuditLogListRow, { ACTION_TYPE_LABELS, TARGET_TYPE_LABELS, getActionBadge
 import AuditLogPageControls, { type AuditFilterState, INITIAL_AUDIT_FILTERS } from "./AuditLogPageControls"
 import { AdminAuditDetailView } from "./AdminAuditDetailView"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { useEntityPage } from "@/hooks/use-entity-page"
 import { DatabaseIcon } from "@/lib/icons"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 interface AuditLogListProps {
     initialData: CursorPaginatedResult<AuditLogRow>
@@ -37,10 +43,10 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
     const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [stats, setStats] = useState<AuditLogStats | undefined>(initialStats)
 
-    // Search and Filters
-    const [search, setSearch] = useState("")
-    const [filters, setFilters] = useState<AuditFilterState>(INITIAL_AUDIT_FILTERS)
-    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
+    // Filters
+    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
 
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
@@ -48,10 +54,51 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         direction: "desc",
     })
 
-    // Data State
-    const [logs, setLogs] = useState<AuditLogRow[]>(initialData?.data || [])
-    const [page, setPage] = useState(1)
-    const [isPending, startTransition] = useTransition()
+    const isDefaultView = targetTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+
+    const entityPage = useEntityPage<any, any, any>({
+        entityType: "audit_logs",
+        partnerId: "admin",
+        queryKey: ["admin-audit-logs", targetTab, debouncedSearch, filters.datePeriod],
+        initialItems: initialData?.data || [],
+        initialNextCursor: initialData?.nextCursor || null,
+        initialHasMore: initialData?.hasMore || false,
+        skipInitialData: !isDefaultView,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getAuditLogs(cursor, 100, {
+                targetType: targetTab === "all" ? undefined : targetTab,
+                search: debouncedSearch || undefined,
+                startDate: filters.datePeriod.from || undefined,
+                endDate: filters.datePeriod.to || undefined,
+            })
+            return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((l: any) => String(l?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            return null
+        },
+        listToDetail: (item) => ({ ...item, __partial: true }),
+        staleTime: 30_000,
+    })
+
+    const {
+        items: logs,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        entityState: epEntityState,
+        openEntity: epOpenEntity,
+        closeEntity: epCloseEntity,
+        search,
+        setSearch,
+        debouncedSearch,
+        afterMutation,
+    } = entityPage
+
+    const handleMutation = useCallback(() => {
+        afterMutation()
+        getAuditLogStats().then(setStats).catch(console.error)
+    }, [afterMutation])
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -62,35 +109,52 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         })
     }
 
-    const refreshLogs = useCallback(() => {
-        startTransition(async () => {
-            try {
-                const [res, statsRes] = await Promise.all([
-                    getAuditLogs(null, 150),
-                    getAuditLogStats(),
-                ])
-                setLogs(res.data || [])
-                setStats(statsRes)
-            } catch (err) {
-                console.error("Failed to refresh audit logs:", err)
-            }
-        })
-    }, [])
+    // Reset page on filter changes
+    useMemo(() => {
+        setPage(1)
+    }, [targetTab, debouncedSearch, filters.datePeriod])
 
-    // Instant in-memory filtering (0ms)
+    // If viewing detail of a specific log (?view=[id])
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        const currentLog = logs.find((l) => l.id === entityState.entityId)
+        if (currentLog) {
+            return (
+                <AdminAuditDetailView
+                    log={currentLog}
+                    onBack={closeEntity}
+                />
+            )
+        }
+    }
+
+    const actionOptions = Array.from(new Set(logs.map((l) => ACTION_TYPE_LABELS[l.action_type] || l.action_type)))
+    const targetTypeOptions = Array.from(new Set(logs.map((l) => TARGET_TYPE_LABELS[l.target_type] || l.target_type)))
+
+    const filterSections: FilterSectionConfig[] = [
+        {
+            id: "action",
+            title: "Tipo de Ação",
+            type: "checkbox-list",
+            options: actionOptions.slice(0, 15),
+        },
+        {
+            id: "targetType",
+            title: "Tipo de Alvo",
+            type: "checkbox-list",
+            options: targetTypeOptions,
+        },
+        {
+            id: "datePeriod",
+            title: "Período",
+            type: "date-period",
+        },
+    ]
+
+    const hasActiveFilters = search !== "" || filters.action.length > 0 || filters.targetType.length > 0 || isDatePeriodFilterActive(filters.datePeriod)
+
+    // In-memory filtering for action and target type (not yet supported server-side)
     const filteredLogs = useMemo(() => {
-        const term = search.trim().toLowerCase()
-
         let result = logs.filter((log) => {
-            // Tab filter
-            if (targetTab !== "all") {
-                if (targetTab === "partner" && log.target_type !== "partner" && log.target_type !== "store") {
-                    return false
-                } else if (targetTab !== "partner" && log.target_type !== targetTab) {
-                    return false
-                }
-            }
-
             // Action Filter
             if (filters.action.length > 0) {
                 const actionLabel = ACTION_TYPE_LABELS[log.action_type] || log.action_type
@@ -103,29 +167,6 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
             if (filters.targetType.length > 0) {
                 const targetLabel = TARGET_TYPE_LABELS[log.target_type] || log.target_type
                 if (!filters.targetType.includes(targetLabel)) {
-                    return false
-                }
-            }
-
-            // Search Filter
-            if (term) {
-                const adminName = String(log.admin_name || "").toLowerCase()
-                const adminEmail = String(log.admin_email || "").toLowerCase()
-                const adminId = String(log.admin_user_id || "").toLowerCase()
-                const targetName = String(log.target_name || "").toLowerCase()
-                const targetId = String(log.target_id || "").toLowerCase()
-                const actionLabel = String(ACTION_TYPE_LABELS[log.action_type] || log.action_type).toLowerCase()
-                const reason = String(log.metadata?.reason || log.metadata?.action || "").toLowerCase()
-
-                if (
-                    !adminName.includes(term) &&
-                    !adminEmail.includes(term) &&
-                    !adminId.includes(term) &&
-                    !targetName.includes(term) &&
-                    !targetId.includes(term) &&
-                    !actionLabel.includes(term) &&
-                    !reason.includes(term)
-                ) {
                     return false
                 }
             }
@@ -163,7 +204,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         }
 
         return result
-    }, [logs, targetTab, search, filters, sortConfig])
+    }, [logs, filters, sortConfig])
 
     // Pagination (Strict 8 items)
     const totalPages = Math.max(1, Math.ceil(filteredLogs.length / ITEMS_PER_PAGE))
@@ -172,43 +213,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         return filteredLogs.slice(start, start + ITEMS_PER_PAGE)
     }, [filteredLogs, page])
 
-    // Reset page on filter changes
-    useMemo(() => {
-        setPage(1)
-    }, [targetTab, search, filters])
-
-    // If viewing detail of a specific log (?view=[id])
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentLog = logs.find((l) => l.id === entityState.entityId)
-        if (currentLog) {
-            return (
-                <AdminAuditDetailView
-                    log={currentLog}
-                    onBack={closeEntity}
-                />
-            )
-        }
-    }
-
-    const actionOptions = Array.from(new Set(logs.map((l) => ACTION_TYPE_LABELS[l.action_type] || l.action_type)))
-    const targetTypeOptions = Array.from(new Set(logs.map((l) => TARGET_TYPE_LABELS[l.target_type] || l.target_type)))
-
-    const filterSections: FilterSectionConfig[] = [
-        {
-            id: "action",
-            title: "Tipo de Ação",
-            type: "checkbox-list",
-            options: actionOptions.slice(0, 15),
-        },
-        {
-            id: "targetType",
-            title: "Tipo de Alvo",
-            type: "checkbox-list",
-            options: targetTypeOptions,
-        },
-    ]
-
-    const hasActiveFilters = search !== "" || filters.action.length > 0 || filters.targetType.length > 0
+    const [page, setPage] = useState(1)
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

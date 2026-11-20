@@ -49,6 +49,8 @@ export async function getAdminCommunityVideos(
     filters?: {
         status?: string
         search?: string
+        startDate?: string
+        endDate?: string
     }
 ): Promise<CursorPaginatedResult<any>> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -78,11 +80,18 @@ export async function getAdminCommunityVideos(
 
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
+        query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
     }
 
     if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
         query = query.eq("moderation_status", filters.status)
+    }
+
+    if (filters?.startDate) {
+        query = query.gte("created_at", filters.startDate)
+    }
+    if (filters?.endDate) {
+        query = query.lte("created_at", filters.endDate)
     }
 
     if (cursor) {

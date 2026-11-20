@@ -15,6 +15,7 @@ export interface AddonDefinition {
   shortDescription: string
   fullDescription: string
   price: number // Preço mensal em R$
+  imageSrc: string
   category: "vendas" | "retencao" | "fidelizacao"
   features: string[]
   metricsLabels: {
@@ -33,6 +34,7 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     fullDescription:
       "Quando um cliente adiciona produtos na sacola mas não conclui a compra em até 4 horas, o robô da Dudit envia uma notificação personalizada relembrando os itens e facilitando a finalização em 1 clique.",
     price: 14.9,
+    imageSrc: "https://img.dudit.com.br/static/mascots/SacolaVazia.png",
     category: "vendas",
     features: [
       "Detecção automática de sacolas paradas após 4 horas",
@@ -54,6 +56,7 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     fullDescription:
       "Exiba um produto complementar com 1 clique de adição no momento em que o cliente já está com a carteira na mão pronto para pagar na sua vitrine.",
     price: 9.9,
+    imageSrc: "https://img.dudit.com.br/static/mascots/Vitrine.png",
     category: "vendas",
     features: [
       "Oferta nativa e discreta no checkout da sua vitrine",
@@ -75,6 +78,7 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     fullDescription:
       "Defina o intervalo recomendado de retorno para cada serviço (ex: corte de cabelo a cada 30 dias, limpeza de pele a cada 45 dias, revisão veicular a cada 6 meses). O sistema avisa o cliente no momento exato de agendar de novo.",
     price: 14.9,
+    imageSrc: "https://img.dudit.com.br/static/mascots/Agendamentos.png",
     category: "retencao",
     features: [
       "Gatilho baseado no intervalo configurado em cada serviço",
@@ -96,6 +100,7 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     fullDescription:
       "Surpreenda seu cliente no dia mais especial do ano dele! O sistema identifica aniversariantes do dia e gera um cupom promocional para ele comemorar comprando de você.",
     price: 9.9,
+    imageSrc: "https://img.dudit.com.br/static/mascots/Cupons.png",
     category: "fidelizacao",
     features: [
       "Identificação automática pela data de nascimento cadastrada",
@@ -118,6 +123,7 @@ export interface PartnerAddonStatus {
   shortDescription: string
   fullDescription: string
   price: number
+  imageSrc: string
   category: "vendas" | "retencao" | "fidelizacao"
   features: string[]
   metricsLabels: {
@@ -285,6 +291,11 @@ export interface AddonMetrics {
   conversionCount: number
   conversionRate: number // em porcentagem, ex: 18.5
   revenueGenerated: number // em Reais
+  chartData: Array<{
+    name: string
+    total: number
+    recente: number
+  }>
   recentEvents: Array<{
     id: string
     eventType: string
@@ -309,6 +320,11 @@ export async function getAddonMetrics(
   let clickedCount = 0
   let conversionCount = 0
   let revenueGenerated = 0
+  let sentRecent30d = 0
+  let clickedRecent30d = 0
+  let conversionRecent30d = 0
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const recentEvents: AddonMetrics["recentEvents"] = []
 
   try {
@@ -322,12 +338,16 @@ export async function getAddonMetrics(
 
     if (!error && events && events.length > 0) {
       for (const ev of events) {
+        const isRecent = ev.created_at >= thirtyDaysAgo
         if (ev.event_type === "sent" || ev.event_type === "viewed") {
           sentCount++
+          if (isRecent) sentRecent30d++
         } else if (ev.event_type === "clicked") {
           clickedCount++
+          if (isRecent) clickedRecent30d++
         } else if (ev.event_type === "converted") {
           conversionCount++
+          if (isRecent) conversionRecent30d++
           const amount = Number(ev.metadata?.amount || 0)
           if (!isNaN(amount)) revenueGenerated += amount
         }
@@ -368,9 +388,26 @@ export async function getAddonMetrics(
     console.warn(`[addon.service] Aviso ao ler métricas do addon ${addonSlug}:`, err)
   }
 
-  const denominator = sentCount || clickedCount || 1
   const rawRate = sentCount > 0 ? (conversionCount / sentCount) * 100 : (clickedCount > 0 ? (conversionCount / clickedCount) * 100 : 0)
   const conversionRate = Math.min(100, Number(rawRate.toFixed(1)))
+
+  const chartData = [
+    {
+      name: "Disparos",
+      total: sentCount,
+      recente: sentRecent30d,
+    },
+    {
+      name: "Interações",
+      total: clickedCount,
+      recente: clickedRecent30d,
+    },
+    {
+      name: "Conversões",
+      total: conversionCount,
+      recente: conversionRecent30d,
+    },
+  ]
 
   return {
     slug: addonSlug,
@@ -379,58 +416,8 @@ export async function getAddonMetrics(
     conversionCount,
     conversionRate,
     revenueGenerated,
+    chartData,
     recentEvents,
-  }
-}
-
-/**
- * Dispara um evento de teste real para o lojista verificar e testar na hora.
- */
-export async function triggerAddonTestEvent(
-  partnerId: string,
-  addonSlug: AddonSlug,
-): Promise<{ success: boolean; message: string }> {
-  const meta: Record<string, unknown> = {
-    isTest: true,
-  }
-
-  if (addonSlug === "cart_abandonment") {
-    meta.customerName = "Cliente Teste"
-    meta.itemCount = 2
-    meta.productNames = "Produto Exemplo & Brinde"
-    meta.amount = 89.9
-  } else if (addonSlug === "order_bump") {
-    meta.productName = "Item Leve Junto (Demonstração)"
-    meta.amount = 19.9
-  } else if (addonSlug === "service_return") {
-    meta.serviceName = "Serviço com Intervalo de Retorno"
-    meta.returnInterval = "30 dias"
-  } else if (addonSlug === "customer_birthday") {
-    meta.customerName = "Aniversariante do Mês"
-    meta.couponCode = "ANIVER10"
-    meta.amount = 120.0
-  }
-
-  await recordAddonEvent({
-    partnerId,
-    addonSlug,
-    eventType: "sent",
-    metadata: meta,
-  })
-
-  // Também grava um evento de conversão de teste para demonstrar as métricas no gráfico
-  if (addonSlug === "cart_abandonment" || addonSlug === "order_bump") {
-    await recordAddonEvent({
-      partnerId,
-      addonSlug,
-      eventType: "converted",
-      metadata: meta,
-    })
-  }
-
-  return {
-    success: true,
-    message: `Disparo de teste do ${ADDON_REGISTRY[addonSlug].name} realizado com sucesso!`,
   }
 }
 

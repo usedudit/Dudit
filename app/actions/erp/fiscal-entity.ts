@@ -651,6 +651,24 @@ export async function getRevenueLimitStatusAction(input: { storeId: string }): P
   }
 }
 
+/**
+ * Libera a marca anual do aviso de limite (usada quando não houve envio de
+ * fato, para permitir nova tentativa em outro carregamento).
+ */
+async function releaseRevenueLimitClaim(
+  admin: ReturnType<typeof createAdminClient>,
+  entityId: string,
+) {
+  try {
+    await admin
+      .from("fiscal_entities")
+      .update({ revenue_limit_notified_year: null })
+      .eq("id", entityId)
+  } catch {
+    // Best effort: se falhar, o aviso fica suprimido até o próximo ano.
+  }
+}
+
 async function maybeNotifyRevenueLimit(params: {
   partnerId: string
   entityId: string
@@ -665,8 +683,8 @@ async function maybeNotifyRevenueLimit(params: {
   const exceeded = snapshot.status === "excedido"
   const atOrAboveLimit = snapshot.status === "limite" || snapshot.status === "tolerancia"
 
-  // Nível do alerta serve apenas para escolher título/mensagem. A chave de
-  // idempotência abaixo é anual, então o aviso não se repete a cada faixa.
+  // O nível serve apenas para escolher título/mensagem. A entidade fiscal é
+  // avisada uma única vez por ano, na primeira faixa que atingir.
   let level: 80 | 90 | 100 | 120 | "excedido" | null = null
   if (exceeded) level = profile === "mei" ? 120 : "excedido"
   else if (atOrAboveLimit) level = 100
@@ -678,12 +696,43 @@ async function maybeNotifyRevenueLimit(params: {
   const isExceeded = level === 120 || level === "excedido"
   const isAtLimit = level === 100
 
+  const admin = createAdminClient()
+  let claimHeld = false
+
   try {
+    // A marca do aviso fica na entidade fiscal, não na notificação: excluir a
+    // notificação (inclusive "Excluir todas") não pode liberar um novo envio no
+    // mesmo ano. O update condicional também resolve a corrida entre dois
+    // carregamentos simultâneos do painel.
+    const { data: claimed, error: claimError } = await admin
+      .from("fiscal_entities")
+      .update({ revenue_limit_notified_year: year })
+      .eq("id", entityId)
+      .or(`revenue_limit_notified_year.is.null,revenue_limit_notified_year.lt.${year}`)
+      .select("id")
+
+    // Migração ainda não aplicada: mantém o comportamento antigo (dedupe pela
+    // própria notificação) em vez de silenciar o aviso.
+    const claimUnavailable = claimError?.code === "42703"
+
+    if (claimError && !claimUnavailable) {
+      console.error("[FISCAL] Falha ao registrar aviso de limite", claimError.message)
+      return
+    }
+
+    if (!claimError) {
+      if (!claimed || claimed.length === 0) return // já avisado neste ano
+      claimHeld = true
+    }
+
     const userIds = await getPartnerTeamUserIds(
       partnerId,
       getNotificationRecipientRoles("revenue_limit_alert"),
     )
-    if (userIds.length === 0) return
+    if (userIds.length === 0) {
+      if (claimHeld) await releaseRevenueLimitClaim(admin, entityId)
+      return
+    }
 
     const limitLabel = formatCurrency(snapshot.limit)
     const revenueLabel = formatCurrency(snapshot.revenue)
@@ -717,13 +766,14 @@ async function maybeNotifyRevenueLimit(params: {
         percentage: snapshot.percentage,
         year,
       },
-      // Um alerta por entidade fiscal/ano/usuário. Antes a chave incluía o
-      // nível (80/90/100/120), o que permitia o mesmo aviso reaparecer para
-      // cada faixa. Agora é uma única notificação no ano.
+      // Um alerta por entidade fiscal/ano/usuário. A marca em
+      // `revenue_limit_notified_year` é quem garante o "uma vez por ano"; esta
+      // chave só evita duplicata em corrida no mesmo carregamento.
       idempotencyKey: `revenue_limit:${entityId}:${year}:${userId}`,
       origin: "system",
     }))
   } catch (err) {
     console.error("[FISCAL] Falha ao notificar limite de faturamento", err)
+    if (claimHeld) await releaseRevenueLimitClaim(admin, entityId)
   }
 }

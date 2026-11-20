@@ -33,7 +33,6 @@ import { StoreProvider } from "@/lib/store-context"
 import {
   isDatePeriodFilterActive,
   resolveDatePeriodBounds,
-  ymdInBounds,
   summarizeDatePeriodFilter,
 } from "@/lib/utils/filter-date-period"
 import {
@@ -117,8 +116,6 @@ export default function ServiceOrdersList({
   const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
   const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -130,12 +127,12 @@ export default function ServiceOrdersList({
   const [printOrderId, setPrintOrderId] = useState<string | null>(null)
   const itemsPerPage = 50
 
-  const isDefaultView = activeTab === "all" && !debouncedSearch
+  const isDefaultView = activeTab === "all" && !filters.expected_completion_date?.from && !filters.expected_completion_date?.to
 
   const entityPage = useEntityPage<any, any, any>({
     entityType: "service_orders",
     partnerId: "admin",
-    queryKey: ["admin-service-orders", activeTab, debouncedSearch],
+    queryKey: ["admin-service-orders", activeTab, debouncedSearch, filters.expected_completion_date],
     initialItems: rawOrders,
     initialNextCursor,
     initialHasMore,
@@ -144,6 +141,8 @@ export default function ServiceOrdersList({
       const res = await getAdminServiceOrders(cursor, 100, {
         statuses: TAB_STATUSES[activeTab] || [],
         search: debouncedSearch || undefined,
+        startDate: filters.expected_completion_date?.from || undefined,
+        endDate: filters.expected_completion_date?.to || undefined,
       })
       return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
     },
@@ -163,6 +162,9 @@ export default function ServiceOrdersList({
     currentEntity, isLoadingDetail,
     afterMutation, queryClient,
     getPrefetchProps,
+    search,
+    setSearch,
+    debouncedSearch,
   } = entityPage
 
   const activeOrder = useMemo(() => {
@@ -178,21 +180,10 @@ export default function ServiceOrdersList({
 
   const handleSearchChange = useCallback((val: string) => {
     setSearch(val)
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(timer)
-  }, [search])
+  }, [setSearch])
 
   const sortedOrders = useMemo(() => {
     let result = [...(effectiveOrders || [])]
-
-    // Status tab filter
-    const allowedStatuses = TAB_STATUSES[activeTab]
-    if (allowedStatuses && allowedStatuses.length > 0) {
-      result = result.filter(o => allowedStatuses.includes(o.status))
-    }
 
     // Filter Sheet: status
     if (filters.status && filters.status.length > 0) {
@@ -214,18 +205,6 @@ export default function ServiceOrdersList({
       const maxVal = parseFloat(filters.total.max)
       if (!isNaN(maxVal)) {
         result = result.filter(o => Number(o.total_amount || 0) <= maxVal)
-      }
-    }
-
-    // Filter Sheet: expected completion date
-    if (isDatePeriodFilterActive(filters.expected_completion_date)) {
-      const { startYmd, endYmd } = resolveDatePeriodBounds(filters.expected_completion_date)
-      if (startYmd !== null || endYmd !== null) {
-        result = result.filter(o => {
-          if (!o.expected_completion_date) return false
-          const d = o.expected_completion_date.slice(0, 10)
-          return ymdInBounds(d, startYmd, endYmd)
-        })
       }
     }
 
@@ -278,7 +257,7 @@ export default function ServiceOrdersList({
     }
 
     return result
-  }, [effectiveOrders, activeTab, filters, sortConfig])
+  }, [effectiveOrders, filters.status, filters.total, sortConfig])
 
   const totalPages = Math.ceil(sortedOrders.length / itemsPerPage)
   const paginatedOrders = useMemo(() => {

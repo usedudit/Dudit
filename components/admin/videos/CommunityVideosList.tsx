@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useTransition, useMemo } from "react"
+import React, { useState, useTransition, useMemo, useCallback } from "react"
 import {
     Button,
     Badge,
@@ -26,9 +26,18 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDate } from "@/lib/utils"
 import { useAdminActionModal } from "@/components/admin/AdminActionModal"
 import {
+    getAdminCommunityVideos,
     updateAdminCommunityVideo,
     type AdminVideoStats,
 } from "@/app/actions/admin/community-videos"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    resolveDatePeriodBounds,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 interface CommunityVideosListProps {
     initialData: any[]
@@ -41,14 +50,14 @@ const STATUS_MAP: Record<string, { label: string; variant: "green" | "orange" | 
     rejected: { label: "Rejeitado", variant: "red" },
 }
 
+const ITEMS_PER_PAGE = 10
+
 export default function CommunityVideosList({ initialData, initialStats }: CommunityVideosListProps) {
-    const [videos, setVideos] = useState(initialData)
-    const [stats, setStats] = useState(initialStats)
+    const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
+
     const [activeTab, setActiveTab] = useState("all")
-    const [viewMode, setViewMode] = useState<"list" | "grid">("list")
-    const [search, setSearch] = useState("")
+    const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
-    const itemsPerPage = 10
 
     // Detail / Video Player Modal
     const [playingVideo, setPlayingVideo] = useState<any | null>(null)
@@ -65,8 +74,58 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         description: "",
     })
 
-    const [isPending, startTransition] = useTransition()
-    const { modal: actionModal, runAction } = useAdminActionModal()
+    // Filters
+    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
+
+    const isDefaultView = activeTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+
+    const entityPage = useEntityPage<any, any, any>({
+        entityType: "community_videos",
+        partnerId: "admin",
+        queryKey: ["admin-community-videos", activeTab, debouncedSearch, filters.datePeriod],
+        initialItems: initialData,
+        initialNextCursor: null,
+        initialHasMore: false,
+        skipInitialData: !isDefaultView,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getAdminCommunityVideos(cursor, 100, {
+                status: activeTab === "all" ? undefined : activeTab,
+                search: debouncedSearch || undefined,
+                startDate: filters.datePeriod.from || undefined,
+                endDate: filters.datePeriod.to || undefined,
+            })
+            return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((v: any) => String(v?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            return null
+        },
+        listToDetail: (item) => ({ ...item, __partial: true }),
+        staleTime: 30_000,
+    })
+
+    const {
+        items: videos,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        entityState,
+        openEntity,
+        closeEntity,
+        search,
+        setSearch,
+        debouncedSearch,
+        afterMutation,
+    } = entityPage
+
+    const handleMutation = useCallback(() => {
+        afterMutation()
+    }, [afterMutation])
+
+    // Sync stats when data loads
+    const [stats, setStats] = useState(initialStats)
 
     const tabs = useMemo(() => [
         { id: "all", label: "Todos os Vídeos", count: stats?.total ?? videos.length },
@@ -75,31 +134,10 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         { id: "rejected", label: "Rejeitados", count: stats?.rejected ?? 0 },
     ], [stats, videos.length])
 
-    const filtered = useMemo(() => {
-        return videos.filter((v) => {
-            const status = v.moderation_status || "pending"
-            let matchesTab = true
-            if (activeTab !== "all") {
-                matchesTab = status === activeTab
-            }
-
-            const term = search.trim().toLowerCase()
-            const matchesSearch =
-                !term ||
-                v.title?.toLowerCase().includes(term) ||
-                v.description?.toLowerCase().includes(term) ||
-                v.store_name?.toLowerCase().includes(term) ||
-                v.stores?.name?.toLowerCase().includes(term)
-
-            return matchesTab && matchesSearch
-        })
-    }, [videos, activeTab, search])
-
-    const paginated = useMemo(() => {
-        return filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage)
-    }, [filtered, page])
-
-    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1
+    // Reset pagination when search/filter/tab changes
+    useMemo(() => {
+        setPage(1)
+    }, [debouncedSearch, activeTab, filters.datePeriod])
 
     const handleOpenEdit = (video: any) => {
         setEditingVideo(video)
@@ -142,18 +180,7 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                 }
 
                 toast({ title: "Sucesso", description: "Vídeo moderado com sucesso." })
-                setVideos((prev) =>
-                    prev.map((v) =>
-                        v.id === editingVideo.id
-                            ? {
-                                  ...v,
-                                  moderation_status: editForm.moderation_status,
-                                  title: editForm.title,
-                                  description: editForm.description,
-                              }
-                            : v
-                    )
-                )
+                handleMutation()
                 setEditingVideo(null)
                 return { success: true }
             },
@@ -239,7 +266,7 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
             </div>
 
             {/* Content Area */}
-            {filtered.length === 0 ? (
+            {videos.length === 0 ? (
                 <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex flex-col justify-center min-h-[360px]">
                     <IconPlaceholder
                         title="Nenhum vídeo encontrado"
@@ -278,7 +305,7 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                {paginated.map((video) => {
+                                {videos.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((video) => {
                                     const meta = STATUS_MAP[video.moderation_status?.toLowerCase()] || {
                                         label: video.moderation_status,
                                         variant: "gray" as const,
@@ -367,11 +394,11 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                         </table>
                     </div>
 
-                    {totalPages > 1 && (
+                    {Math.ceil(videos.length / ITEMS_PER_PAGE) > 1 && (
                         <div className="p-4 border-t border-brand-border dark:border-dark-border flex justify-end">
                             <Pagination
                                 currentPage={page}
-                                totalPages={totalPages}
+                                totalPages={Math.ceil(videos.length / ITEMS_PER_PAGE)}
                                 onPageChange={setPage}
                             />
                         </div>
@@ -381,7 +408,7 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                 /* ERP Grid Mode matching VideoGridCard */
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {paginated.map((video) => {
+                        {videos.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((video) => {
                             const meta = STATUS_MAP[video.moderation_status?.toLowerCase()] || {
                                 label: video.moderation_status,
                                 variant: "gray" as const,
@@ -446,11 +473,11 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                         })}
                     </div>
 
-                    {totalPages > 1 && (
+                    {Math.ceil(videos.length / ITEMS_PER_PAGE) > 1 && (
                         <div className="p-4 bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border flex justify-end">
                             <Pagination
                                 currentPage={page}
-                                totalPages={totalPages}
+                                totalPages={Math.ceil(videos.length / ITEMS_PER_PAGE)}
                                 onPageChange={setPage}
                             />
                         </div>

@@ -2,11 +2,12 @@
 
 import * as React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { CancelIcon, ChevronsUpDown, CheckCircleIcon, PlusIcon } from "@/lib/icons"
+import { CancelIcon, ChevronsUpDown, CheckCircleIcon, PlusIcon, InfoIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 import { createPortal } from "react-dom"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 export interface ComboboxOption {
     label: string
@@ -39,6 +40,10 @@ interface ComboboxProps {
     creatable?: boolean
     createLabel?: (search: string) => React.ReactNode
     dataField?: string
+    /** Tooltip text to show next to the label (info icon) */
+    labelTooltip?: string | React.ReactNode
+    /** Tooltip props for customization */
+    labelTooltipProps?: React.ComponentProps<typeof TooltipContent>
 }
 
 export function Combobox({
@@ -59,6 +64,8 @@ export function Combobox({
     creatable = false,
     createLabel,
     dataField,
+    labelTooltip,
+    labelTooltipProps,
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -320,6 +327,30 @@ export function Combobox({
                             {label}
                             {required && <span className="text-brand-red"> *</span>}
                         </label>
+                        {labelTooltip && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="p-0.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-body transition-colors rounded flex items-center justify-center"
+                                        aria-label="Mais informações"
+                                    >
+                                        <InfoIcon className="w-4 h-4" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="top"
+                                    align="start"
+                                    {...labelTooltipProps}
+                                >
+                                    {typeof labelTooltip === "string" ? (
+                                        <p className="text-xs">{labelTooltip}</p>
+                                    ) : (
+                                        labelTooltip
+                                    )}
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
                     </div>
                 )}
                 <button

@@ -10,7 +10,6 @@ import {
   PhoneIcon,
   CheckCircleIcon
 } from '@/lib/icons';
-import { HeroBanner } from "@/components/marketplace/shared-components";
 import { GridLines, SectionHeader, CTA, Navbar, Footer } from '@/components/InstitucionalShared';
 import { useRouter } from 'next/navigation';
 
@@ -194,6 +193,50 @@ const SegmentMockup = ({ type }: { type: string }) => {
   }
 };
 
+const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
+  <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+    <GridLines />
+    <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 relative z-10">
+      <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
+            Produtos, serviços e negócios de todos os tipos.
+          </h1>
+          <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
+            Na Dudit você encontra desde produtos até profissionais e empresas da sua cidade ou de todo o Brasil para resolver o seu dia a dia.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <Button onClick={() => onNavigate('explore')}>Explorar categorias</Button>
+            <Button variant="outline" onClick={() => onNavigate('start-selling')}>Divulgar meu negócio</Button>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="relative h-[400px] lg:h-[500px] flex items-center justify-center"
+        >
+          <div className="relative z-10 w-full max-w-[500px]">
+            <img
+              src="https://img.dudit.com.br/static/mascots/Segmentos.png"
+              alt="Mascote Segmentos Dudit"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="absolute inset-0 bg-brand-gray/50 dark:bg-dark-border/30 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
+          <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10"></div>
+        </motion.div>
+      </div>
+    </div>
+  </section>
+);
+
 const SegmentsGrid = () => (
   <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-brand-border">
     <GridLines />
@@ -252,7 +295,7 @@ export default function SegmentsPage() {
     <div className="min-h-screen bg-white dark:bg-dark-surface">
       <Navbar onNavigate={onNavigate} />
       <main>
-        <HeroBanner href="/explorar" />
+        <SegmentsHero onNavigate={onNavigate} />
         <SegmentsGrid />
         <CTA onNavigate={onNavigate} />
       </main>
@@ -260,4 +303,3 @@ export default function SegmentsPage() {
     </div>
   );
 };
-

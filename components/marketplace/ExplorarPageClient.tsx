@@ -231,10 +231,13 @@ export function ExplorarPageClient({
     const locationContext = useMemo<LocationContext | null>(() => {
         const currentCity = selectedCitySlug || pathCity || null
         if (!currentCity || currentCity === "brasil") {
-            return currentCity === "brasil" ? { scope: "country" } : null
+            return { scope: "country" }
         }
         if (currentCity.startsWith("estado-")) {
             return { scope: "state", state: currentCity.replace("estado-", "").toUpperCase() }
+        }
+        if (isStateRoute && currentCity) {
+            return { scope: "state", state: currentCity.replace(/^estado-/, "").toUpperCase() }
         }
         const state = currentCity.split("-").pop()?.toUpperCase() || null
         let city: string | null = null
@@ -248,7 +251,7 @@ export function ExplorarPageClient({
             city = COMMON_CITY_ACCENTS[cityKey] || parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ")
         }
         return { scope: "city", city, state }
-    }, [selectedCitySlug, pathCity, cidade, resolvedCityName])
+    }, [selectedCitySlug, pathCity, cidade, resolvedCityName, isStateRoute])
 
     const userCoords = useMemo(() => {
         return userProfile?.latitude && userProfile?.longitude

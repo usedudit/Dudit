@@ -195,69 +195,38 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                     </>
                 )}
 
-                <section className="mt-16 border-t border-brand-border pt-8 dark:border-dark-border">
-                    <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto relative z-10">
-                        <div className="bg-brand-dark dark:bg-[#061814] rounded-2xl md:rounded-3xl border border-[#0e3b2e] shadow-sm overflow-hidden relative">
+                <section className="py-10 px-4 bg-white dark:bg-dark-background relative">
+                    <div className="max-w-[1400px] mx-auto relative z-10">
+                        <div className="bg-brand-dark rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12 overflow-hidden">
                             {/* Background decorative faint rings */}
                             <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] sm:w-[800px] sm:h-[800px] lg:w-[1000px] lg:h-[1000px] border border-white rounded-full" />
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] sm:w-[600px] sm:h-[600px] lg:w-[750px] lg:h-[750px] border border-white rounded-full" />
                             </div>
 
-                            {/* Conteúdo: texto + botão à esquerda, mascote à direita */}
-                            <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-10 px-10 py-10">
-                                <div className="flex-1 w-full max-w-2xl text-left">
-                                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black leading-tight text-white mb-3 sm:mb-4">
-                                        Prefere um passo a passo da plataforma?
-                                    </h2>
-                                    <p className="text-sm sm:text-base md:text-lg text-gray-300 leading-relaxed mb-6 sm:mb-8 max-w-xl">
-                                        O blog traz estratégias e ideias. A Central de Ajuda mostra exatamente onde clicar para configurar produtos, financeiro, entregas e muito mais.
-                                    </p>
-
-                                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                                        <Button asChild className="h-11">
-                                            <Link href="/ajuda" prefetch={false}>Central de Ajuda</Link>
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div className="shrink-0 flex items-center justify-center w-[150px] sm:w-[190px] md:w-[220px] lg:w-[260px]">
-                                    <img
-                                        src="https://img.dudit.com.br/static/mascots/FaleConosco.png"
-                                        alt="Ajuda"
-                                        className="w-full h-auto object-contain select-none pointer-events-none"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                            const target = e.currentTarget
-                                            if (!target.src.includes("FaleConosco.png")) {
-                                                target.src = "https://img.dudit.com.br/static/mascots/FaleConosco.png"
-                                            }
-                                        }}
-                                    />
+                            {/* Texto + Botão */}
+                            <div className="flex-1 text-center md:text-left">
+                                <h2 className="text-2xl md:text-[32px] font-black text-white mb-3 leading-tight">
+                                    Prefere um passo a passo da plataforma?
+                                </h2>
+                                <p className="text-white/70 text-base md:text-lg leading-relaxed mb-6">
+                                    O blog traz estratégias e ideias. A Central de Ajuda mostra exatamente onde clicar para configurar produtos, financeiro, entregas e muito mais.
+                                </p>
+                                <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
+                                    <Button asChild className="h-11">
+                                        <Link href="/ajuda" prefetch={false}>Central de Ajuda</Link>
+                                    </Button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </section>
 
-                <section className="mt-16 border-t border-brand-border pt-8 dark:border-dark-border">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                Prefere um passo a passo da plataforma?
-                            </h2>
-                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-brand-inactive-text dark:text-dark-body">
-                                O blog traz estratégias e ideias. A Central de Ajuda mostra exatamente onde clicar para configurar produtos, financeiro, entregas e muito mais.
-                            </p>
-                        </div>
-                        <div className="flex flex-col gap-3 sm:flex-row">
-                            <Button asChild>
-                                <Link href="/ajuda" prefetch={false}>Central de Ajuda</Link>
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <Link href="/institucional/segmentos" prefetch={false}>Ver segmentos</Link>
-                            </Button>
+                            {/* Dino */}
+                            <div className="w-[160px] md:w-[220px] shrink-0 flex items-center justify-center">
+                                <img
+                                    src="https://img.dudit.com.br/static/mascots/Carousel2.png"
+                                    alt="Venda na Dudit"
+                                    className="w-full h-auto object-contain select-none"
+                                />
+                            </div>
                         </div>
                     </div>
                 </section>

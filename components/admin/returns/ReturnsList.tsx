@@ -10,29 +10,28 @@ import type { CursorPaginatedResult } from "@/lib/admin/types";
 import { getAdminReturnRequests, getAdminReturnRequestsStats, type AdminReturnStats } from "@/app/actions/admin/marketplace-ops";
 import { useMediaQuery } from "@/components/erp/hooks";
 import { useEntityState } from "@/hooks/use-entity-state";
+import { useEntityPage } from "@/hooks/use-entity-page";
 import { toast } from "@/hooks/use-notification";
 import ReturnListRow, { getReturnStatusMeta } from "@/components/erp/returns/ReturnListRow";
 import ReturnGridCard from "@/components/erp/returns/ReturnGridCard";
 import ReturnPageControls from "@/components/erp/returns/ReturnPageControls";
 import type { ReturnRequest } from "@/components/erp/returns/types";
 import { getReturnResolutionLabel } from "@/lib/returns/types";
-import { ReturnDetailView } from "@/components/erp/returns/ReturnDetailView";
 import AdminReturnDetailView from "./AdminReturnDetailView";
 import { PermissionProvider } from "@/lib/permission-context";
 import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions";
 import { StoreProvider } from "@/lib/store-context";
-import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard";
 import { TabCountBadge } from "@/components/reusable/TabCountBadge";
 import { cn } from "@/lib/utils";
+import {
+  EMPTY_DATE_PERIOD,
+  isDatePeriodFilterActive,
+  type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period";
 
 type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados";
 type SortKey = "id" | "order_number" | "store" | "customer" | "date" | "refund_type" | "status";
 type SortDirection = "asc" | "desc";
-
-interface ReturnsListProps {
-  initialData: CursorPaginatedResult<any>;
-  initialStats?: AdminReturnStats;
-}
 
 const ITEMS_PER_PAGE = 8;
 
@@ -55,6 +54,7 @@ interface FilterState {
   refundRange: { min: string; max: string };
   storeCreditRange: { min: string; max: string };
   hasEvidence: boolean;
+  datePeriod: DatePeriodFilterValue;
 }
 
 const INITIAL_FILTERS: FilterState = {
@@ -65,19 +65,23 @@ const INITIAL_FILTERS: FilterState = {
   refundRange: { min: "", max: "" },
   storeCreditRange: { min: "", max: "" },
   hasEvidence: false,
+  datePeriod: { ...EMPTY_DATE_PERIOD },
 };
 
-export default function ReturnsList({ initialData, initialStats }: ReturnsListProps) {
+const TAB_STATUSES: Record<ActiveTab, string[]> = {
+  Todos: [],
+  Pendentes: ["PENDING_REVIEW"],
+  Analise: ["UNDER_ANALYSIS", "ESCALATED"],
+  AguardandoCliente: ["WAITING_CUSTOMER"],
+  Aprovados: ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"],
+  Finalizados: ["RESOLVED", "REJECTED", "EXPIRED"],
+};
+
+export default function ReturnsList({ initialData, initialStats }: { initialData: CursorPaginatedResult<any>; initialStats?: AdminReturnStats }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
   const { state: entityState, open: openEntity, close: closeEntity } = useEntityState();
 
-  const [requests, setRequests] = useState<ReturnRequest[]>(
-    ((initialData?.data || []) as ReturnRequest[]),
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeTab, setActiveTab] = useState<ActiveTab>("Todos");
   const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list");
   const effectiveViewMode = isTablet ? "grid" : viewMode;
@@ -92,78 +96,128 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
   // Stats state
   const [stats, setStats] = useState<AdminReturnStats | null>(initialStats || null);
 
-  const refreshRequests = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [res, statsRes] = await Promise.all([
-        getAdminReturnRequests(null, 100),
-        getAdminReturnRequestsStats().catch(() => null),
-      ]);
-      setRequests((res.data || []) as ReturnRequest[]);
-      if (statsRes) setStats(statsRes);
-    } catch (err) {
-      console.error("Failed to refresh admin returns:", err);
-    } finally {
-      setIsLoading(false);
+  const isDefaultView = activeTab === "Todos" && !isDatePeriodFilterActive(filters.datePeriod);
+
+  const entityPage = useEntityPage<any, any, any>({
+    entityType: "returns",
+    partnerId: "admin",
+    queryKey: ["admin-returns", activeTab, debouncedSearch, filters.datePeriod],
+    initialItems: initialData?.data || [],
+    initialNextCursor: initialData?.nextCursor || null,
+    initialHasMore: initialData?.hasMore || false,
+    skipInitialData: !isDefaultView,
+    fetchPageFn: async ({ cursor }) => {
+      const statuses = TAB_STATUSES[activeTab] || [];
+      const res = await getAdminReturnRequests(cursor, 100, {
+        status: statuses.length === 1 ? statuses[0] : statuses.length > 1 ? statuses : undefined,
+        search: debouncedSearch || undefined,
+        startDate: filters.datePeriod.from || undefined,
+        endDate: filters.datePeriod.to || undefined,
+      });
+      return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore };
+    },
+    dedupeKey: useCallback((r: any) => String(r?.id || ""), []),
+    getDetailFn: async (id: string) => {
+      const res = await getAdminReturnRequests(null, 1, { search: id });
+      return res.data?.[0] || null;
+    },
+    listToDetail: (item) => ({ ...item, __partial: true }),
+    staleTime: 30_000,
+  });
+
+  const {
+    items: requests,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    entityState: epEntityState,
+    openEntity: epOpenEntity,
+    closeEntity: epCloseEntity,
+    search,
+    setSearch,
+    debouncedSearch,
+    afterMutation,
+  } = entityPage;
+
+  // Sync stats when data loads
+  useEffect(() => {
+    if (requests.length > 0 && !stats) {
+      getAdminReturnRequestsStats().then(setStats).catch(console.error);
     }
-  }, []);
+  }, [requests.length, stats]);
 
-  useEffect(() => {
-    void refreshRequests();
-  }, [refreshRequests]);
+  const handleMutation = useCallback(() => {
+    afterMutation();
+    getAdminReturnRequestsStats().then(setStats).catch(console.error);
+  }, [afterMutation]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const handleSearchChange = useCallback((val: string) => {
+    setSearch(val);
+  }, [setSearch]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeTab, filters]);
-
+  // Client-side filters that aren't yet supported server-side
   const filteredReturns = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
-    let result = requests.filter((item) => {
-      const matchesSearch =
-        !term ||
-        item.orderNumber.toLowerCase().includes(term) ||
-        item.customerName.toLowerCase().includes(term) ||
-        String(item.storeName || "").toLowerCase().includes(term) ||
-        `dvl-${item.id}`.toLowerCase().includes(term);
+    let result = [...(requests || [])];
 
-      let matchesTab = true;
-      if (activeTab === "Pendentes") matchesTab = item.status === "PENDING_REVIEW";
-      else if (activeTab === "Analise") matchesTab = ["UNDER_ANALYSIS", "ESCALATED"].includes(item.status);
-      else if (activeTab === "AguardandoCliente") matchesTab = item.status === "WAITING_CUSTOMER";
-      else if (activeTab === "Aprovados") matchesTab = ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(item.status);
-      else if (activeTab === "Finalizados") matchesTab = ["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status);
+    // Filter Sheet: status
+    if (filters.status && filters.status.length > 0) {
+      result = result.filter(item => {
+        const statusLabel = getReturnStatusMeta(item.status).label;
+        return filters.status.includes(statusLabel);
+      });
+    }
 
-      const statusLabel = getReturnStatusMeta(item.status).label;
-      const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel);
+    // Filter Sheet: resolution type
+    if (filters.resolutionType && filters.resolutionType.length > 0) {
+      result = result.filter(item => {
+        const resolutionLabel = getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "");
+        return filters.resolutionType.includes(resolutionLabel);
+      });
+    }
 
-      const resolutionLabel = getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "");
-      const resolutionMatch = filters.resolutionType.length === 0 || filters.resolutionType.includes(resolutionLabel);
+    // Filter Sheet: reason
+    if (filters.reason && filters.reason.length > 0) {
+      const itemReason = result[0]?.items[0]?.reason || "";
+      result = result.filter(item => filters.reason.includes(item.items[0]?.reason || ""));
+    }
 
-      const itemReason = item.items[0]?.reason || "";
-      const reasonMatch = filters.reason.length === 0 || filters.reason.includes(itemReason);
+    // Filter Sheet: condition
+    if (filters.condition && filters.condition.length > 0) {
+      result = result.filter(item => filters.condition.includes(item.items[0]?.condition || ""));
+    }
 
-      const itemCondition = item.items[0]?.condition || "";
-      const conditionMatch = filters.condition.length === 0 || filters.condition.includes(itemCondition);
+    // Filter Sheet: refund range
+    if (filters.refundRange?.min) {
+      const minVal = parseFloat(filters.refundRange.min);
+      if (!isNaN(minVal)) {
+        result = result.filter(item => Number(item.refundValue || 0) >= minVal);
+      }
+    }
+    if (filters.refundRange?.max) {
+      const maxVal = parseFloat(filters.refundRange.max);
+      if (!isNaN(maxVal)) {
+        result = result.filter(item => Number(item.refundValue || 0) <= maxVal);
+      }
+    }
 
-      const refundValue = Number(item.refundValue || 0);
-      const minRefund = filters.refundRange.min ? Number(filters.refundRange.min) : 0;
-      const maxRefund = filters.refundRange.max ? Number(filters.refundRange.max) : Number.POSITIVE_INFINITY;
-      const refundMatch = refundValue >= minRefund && refundValue <= maxRefund;
+    // Filter Sheet: store credit range
+    if (filters.storeCreditRange?.min) {
+      const minVal = parseFloat(filters.storeCreditRange.min);
+      if (!isNaN(minVal)) {
+        result = result.filter(item => Number(item.storeCreditValue || 0) >= minVal);
+      }
+    }
+    if (filters.storeCreditRange?.max) {
+      const maxVal = parseFloat(filters.storeCreditRange.max);
+      if (!isNaN(maxVal)) {
+        result = result.filter(item => Number(item.storeCreditValue || 0) <= maxVal);
+      }
+    }
 
-      const storeCreditValue = Number(item.storeCreditValue || 0);
-      const minCredit = filters.storeCreditRange.min ? Number(filters.storeCreditRange.min) : 0;
-      const maxCredit = filters.storeCreditRange.max ? Number(filters.storeCreditRange.max) : Number.POSITIVE_INFINITY;
-      const creditMatch = storeCreditValue >= minCredit && storeCreditValue <= maxCredit;
-
-      const evidenceMatch = !filters.hasEvidence || (item.items[0]?.evidence?.length > 0);
-
-      return matchesSearch && matchesTab && statusMatch && resolutionMatch && reasonMatch && conditionMatch && refundMatch && creditMatch && evidenceMatch;
-    });
+    // Filter Sheet: has evidence
+    if (filters.hasEvidence) {
+      result = result.filter(item => item.items[0]?.evidence?.length > 0);
+    }
 
     if (sortConfig) {
       result = [...result].sort((a, b) => {
@@ -206,7 +260,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
     }
 
     return result;
-  }, [requests, debouncedSearch, activeTab, sortConfig, filters]);
+  }, [requests, filters, sortConfig]);
 
   const filterSections = useMemo<FilterSectionConfig[]>(() => {
     const data = requests;
@@ -229,9 +283,14 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
     if (hasRefund) sections.push({ id: "refundRange", title: "Valor Reembolso", type: "range", rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" } });
     if (hasStoreCredit) sections.push({ id: "storeCreditRange", title: "Valor Vale-Compra", type: "range", rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" } });
     if (hasEvidence) sections.push({ id: "hasEvidence", title: "Tem Evidências", type: "switch", switchLabel: "Apenas com evidências" });
+    sections.push({ id: "datePeriod", title: "Data da Solicitação", type: "date-period" });
 
     return sections;
   }, [requests]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, activeTab, filters.datePeriod]);
 
   const totalPages = Math.max(1, Math.ceil(filteredReturns.length / ITEMS_PER_PAGE));
   const paginatedReturns = filteredReturns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -247,13 +306,14 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
     !!filters.refundRange.max ||
     !!filters.storeCreditRange.min ||
     !!filters.storeCreditRange.max ||
-    filters.hasEvidence;
+    filters.hasEvidence ||
+    isDatePeriodFilterActive(filters.datePeriod);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
     setFilters(INITIAL_FILTERS);
     setActiveTab("Todos");
-  }, []);
+  }, [setSearch]);
 
   // View Detail (read-only) - same pattern as ERP orders
   const handleViewDetail = useCallback((requestId: string) => {
@@ -373,7 +433,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
           {/* Page Controls */}
           <ReturnPageControls
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             onOpenFilter={() => setIsFilterSheetOpen(true)}
             viewMode={effectiveViewMode}
             onViewModeChange={setViewModeState}
@@ -383,7 +443,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
           {/* List/Grid Content */}
           <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
             <AnimatePresence mode="wait">
-              {isLoading && requests.length === 0 ? (
+              {isFetchingNextPage && requests.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center">
                   <ThreeDotsLoader />
                 </div>

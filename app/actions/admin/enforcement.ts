@@ -128,13 +128,31 @@ export async function getUsers(
         const cpfHash = digits.length === 11
             ? (await import("@/lib/crypto")).generateCpfLookupHash(digits)
             : null
-        query = query.or(`full_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%${cpfHash ? `,cpf_lookup_hash.eq.${cpfHash}` : ""}`)
+        // Search in user_profiles: name, phone, CPF
+        const orConditions = `full_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%${cpfHash ? `,cpf_lookup_hash.eq.${cpfHash}` : ""}`
+        query = query.or(orConditions)
+    }
+
+    // If search looks like an email, also search auth.users by email
+    let emailUserId: string | null = null
+    if (search && search.trim().includes("@")) {
+        try {
+            const { data: authUser } = await supabase.auth.admin.getUserByEmail(search.trim())
+            if (authUser?.user?.id) {
+                emailUserId = authUser.user.id
+            }
+        } catch {}
     }
 
     if (status === "active" || status === "Ativos") {
         query = query.is("banned_at", null)
     } else if (status === "banned" || status === "Banidos") {
         query = query.not("banned_at", "is", null)
+    }
+
+    // If we found a user by email, filter by that user_id
+    if (emailUserId) {
+        query = query.eq("user_id", emailUserId)
     }
 
     if (cursor) {
@@ -773,7 +791,7 @@ export async function getPartners(
 
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
-        storeQuery = storeQuery.ilike("name", `%${sanitized}%`)
+        storeQuery = storeQuery.or(`name.ilike.%${sanitized}%,id.eq.${sanitized},partner_id.eq.${sanitized}`)
     }
 
     if (status === "active") {

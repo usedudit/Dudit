@@ -3,6 +3,9 @@
 import { cn } from "@/lib/utils"
 import React, { forwardRef } from "react"
 
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { InfoIcon } from "@/lib/icons"
+
 interface FormInputProps {
   label?: string
   placeholder?: string
@@ -20,6 +23,10 @@ interface FormInputProps {
   readOnly?: boolean
   inputMode?: "search" | "text" | "none" | "tel" | "url" | "email" | "numeric" | "decimal"
   labelAddon?: React.ReactNode
+  /** Tooltip text to show next to the label (info icon) */
+  labelTooltip?: string | React.ReactNode
+  /** Tooltip props for customization */
+  labelTooltipProps?: React.ComponentProps<typeof TooltipContent>
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement | HTMLTextAreaElement>
   autoFocus?: boolean
   required?: boolean
@@ -83,6 +90,8 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInpu
       autoCapitalize,
       showCharacterCount = false,
       dataField,
+      labelTooltip,
+      labelTooltipProps,
     },
     ref
   ) => {
@@ -133,6 +142,30 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInpu
               {label}
               {required && <span className="text-brand-red"> *</span>}
             </label>
+            {labelTooltip && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="p-0.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-body transition-colors rounded flex items-center justify-center"
+                    aria-label="Mais informações"
+                  >
+                    <InfoIcon className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  {...labelTooltipProps}
+                >
+                  {typeof labelTooltip === "string" ? (
+                    <p className="text-xs">{labelTooltip}</p>
+                  ) : (
+                    labelTooltip
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            )}
             {labelAddon}
           </div>
         )}

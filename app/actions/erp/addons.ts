@@ -7,7 +7,6 @@ import {
   getAllPartnerAddons,
   getAddonMetrics,
   setPartnerAddonStatus,
-  triggerAddonTestEvent,
   PartnerAddonStatus,
   AddonMetrics,
 } from "@/lib/services/addon.service"
@@ -73,27 +72,5 @@ export async function getAddonMetricsAction(
   } catch (err: any) {
     console.error("[getAddonMetricsAction] Erro:", err)
     return { success: false, error: err.message || "Erro ao carregar métricas." }
-  }
-}
-
-export async function testPartnerAddonAction(
-  addonSlug: AddonSlug,
-): Promise<{
-  success: boolean
-  message?: string
-  error?: string
-}> {
-  try {
-    await requireUser()
-    const context = await getCurrentPartnerContext()
-    if (!context?.partnerId) {
-      return { success: false, error: "Parceiro ativo não encontrado." }
-    }
-
-    const res = await triggerAddonTestEvent(context.partnerId, addonSlug)
-    return res
-  } catch (err: any) {
-    console.error("[testPartnerAddonAction] Erro:", err)
-    return { success: false, error: err.message || "Erro ao disparar teste do aplicativo." }
   }
 }

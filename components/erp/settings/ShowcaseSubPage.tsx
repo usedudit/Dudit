@@ -19,10 +19,10 @@ import {
     SidebarCard,
     NumberInputWithCheckbox,
 } from "@/components/reusable"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { updateStoreAction } from "@/app/actions/erp/stores"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store, WhatsappIcon, TrashIcon, ClockIcon, MonitorIcon, ImageIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, WhatsappIcon, TrashIcon, ClockIcon, MonitorIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { usePermissions } from "@/lib/permission-context"
@@ -409,7 +409,264 @@ export const ShowcaseSubPage = ({
     return (
         <FadeIn className="h-full">
             <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col h-full w-full">
+                {isDesapego ? (
+                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col h-full w-full">
+                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
+
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
+                                    </div>
+
+                                    {/* Title row */}
+                                    <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="hidden md:inline truncate">Minha Vitrine</span>
+                                            </h1>
+
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                Personalize o status, banner, logo e endereço da sua vitrine
+                                            </div>
+                                        </div>
+
+                                        {/* Desktop action buttons */}
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <Button onClick={handleSubmit} disabled={isLoading} leftIcon={<SaveIcon size={18} />}>
+                                                {isLoading ? "Salvando..." : "Salvar"}
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Tabs Navigation - Only for desapego mode */}
+                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">Dados Gerais</TabsTrigger>
+                                            <TabsTrigger value="address">Endereço</TabsTrigger>
+                                        </TabsList>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Content Body */}
+                            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                                <TabsContent value="general" className="mt-0 focus-visible:outline-none">
+                                    <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-8">
+                                            {/* Status da Vitrine */}
+                                            <FormSection title="Status da Vitrine">
+                                                <div className="grid gap-3">
+                                                    <ListItem
+                                                        title="Vitrine Ativa"
+                                                        description="Seus anúncios estão visíveis e disponíveis"
+                                                        icon={<Store className="text-brand-green" />}
+                                                        onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
+                                                        right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
+                                                        className="py-4 px-6 gap-4 cursor-pointer"
+                                                    />
+                                                    <ListItem
+                                                        title="Vitrine Inativa"
+                                                        description="Seus anúncios ficam ocultos temporariamente"
+                                                        icon={<Store className="text-brand-inactive-text" />}
+                                                        onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
+                                                        right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
+                                                        className="py-4 px-6 gap-4 cursor-pointer"
+                                                    />
+                                                </div>
+                                            </FormSection>
+
+                                            {/* Banner da Vitrine */}
+                                            <FormSection hasSeparator title="Banner da Vitrine">
+                                                <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1400/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
+                                                    {bannerPreview ? (
+                                                        <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex flex-col items-center justify-center text-brand-inactive-text">
+                                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-40"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                                                            <span className="text-sm font-medium">Nenhum banner configurado</span>
+                                                        </div>
+                                                    )}
+
+                                                    {bannerUploading && (
+                                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                                                            <Spinner size={32} className="text-white" />
+                                                        </div>
+                                                    )}
+
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 z-10">
+                                                        <Button variant="filled" onClick={() => bannerInputRef.current?.click()} className="bg-white text-brand-dark hover:bg-gray-100 border-none">
+                                                            Trocar Banner
+                                                        </Button>
+                                                        {bannerPreview && !bannerPreview.includes('default/') && (
+                                                            <Button variant="outline" onClick={handleRemoveBanner} className="bg-white/10 text-white hover:bg-white/20 border-white/40">
+                                                                Remover
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1400x300px. Máximo 3MB.</p>
+                                                <input ref={bannerInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleBannerChange} />
+                                            </FormSection>
+                                        </div>
+
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
+                                            <SidebarCard hasSeparator hasTopStrip title="Logo / Imagem de Perfil">
+                                                <div className="flex items-center gap-4 dark:bg-dark-background/50">
+                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
+                                                        {imagePreview ? (
+                                                            <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
+                                                        ) : (
+                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                                                        )}
+                                                        {imageUploading && (
+                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                                <Spinner size={20} className="text-white" />
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo / Perfil</p>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
+                                                    </div>
+                                                    {imagePreview && (
+                                                        <Button
+                                                            variant="ghostred"
+                                                            size="icon"
+                                                            className="w-8 h-8"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                e.preventDefault()
+                                                                handleRemoveImage()
+                                                            }}
+                                                        >
+                                                            <TrashIcon size={14} />
+                                                        </Button>
+                                                    )}
+                                                    <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
+                                                </div>
+                                            </SidebarCard>
+                                        </div>
+                                    </div>
+                                </TabsContent>
+
+                                <TabsContent value="address" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                            <FormSection title="Endereço">
+                                                <div className="space-y-4">
+                                                    <CepInput
+                                                        value={address.zipCode}
+                                                        onChange={(val) => setAddress((p) => ({ ...p, zipCode: val }))}
+                                                        name="cep"
+                                                        onAddressFetched={(data) => {
+                                                            setAddress(prev => ({
+                                                                ...prev,
+                                                                street: data.street || prev.street,
+                                                                number: data.number || prev.number,
+                                                                neighborhood: data.neighborhood || prev.neighborhood,
+                                                                city: data.city || prev.city,
+                                                                state: data.state || prev.state,
+                                                                noNumber: data.number === "S/N",
+                                                                ibge: data.ibge || prev.ibge,
+                                                                latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                                                                longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
+                                                            }))
+                                                        }}
+                                                    />
+                                                    <Input
+                                                        label="Rua/Avenida"
+                                                        placeholder="Rua, Avenida, etc."
+                                                        value={address.street}
+                                                        onChange={e => setAddress({ ...address, street: e.target.value })}
+                                                    />
+
+                                                    <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
+                                                        <div>
+                                                            <NumberInputWithCheckbox
+                                                                label="Número"
+                                                                number={address.number}
+                                                                noNumber={address.noNumber}
+                                                                onNumberChange={val => setAddress({ ...address, number: val })}
+                                                                onNoNumberChange={checked => setAddress({ ...address, noNumber: checked, number: checked ? "S/N" : "" })}
+                                                                placeholder="123"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <Input
+                                                                label="Complemento"
+                                                                placeholder="Apto, Bloco, etc."
+                                                                value={address.complement}
+                                                                onChange={e => setAddress({ ...address, complement: e.target.value })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <Input
+                                                        label="Bairro"
+                                                        placeholder="Nome do bairro"
+                                                        value={address.neighborhood}
+                                                        onChange={e => setAddress({ ...address, neighborhood: e.target.value })}
+                                                    />
+
+                                                    <div className="grid grid-cols-2 gap-3 items-start">
+                                                        <div>
+                                                            <Input
+                                                                label="Cidade"
+                                                                placeholder="Nome da cidade"
+                                                                value={address.city}
+                                                                onChange={e => setAddress({ ...address, city: e.target.value })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <StateComboBox
+                                                                value={address.state}
+                                                                onChange={v => setAddress({ ...address, state: v })}
+                                                                className="w-full"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </FormSection>
+                                        </div>
+
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                            <SidebarCard hasTopStrip hasSeparator title="Localização">
+                                                <div className="flex flex-col">
+                                                    <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
+                                                        <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
+                                                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mb-0">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{store?.name || "Nome do Negócio"}</h4>
+                                                            <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
+                                                        </div>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
+                                                            {formattedAddress}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </SidebarCard>
+                                        </div>
+                                    </motion.div>
+                                </TabsContent>
+                            </div>
+                        </div>
+                    </Tabs>
+                ) : (
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
@@ -431,7 +688,7 @@ export const ShowcaseSubPage = ({
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            {isDesapego ? "Personalize o status, banner, logo e endereço da sua vitrine" : "Personalize a logo, banner, galeria e status de exibição da sua vitrine"}
+                                            Personalize a logo, banner, galeria e status de exibição da sua vitrine
                                         </div>
                                     </div>
 
@@ -442,592 +699,261 @@ export const ShowcaseSubPage = ({
                                         </Button>
                                     </div>
                                 </div>
-
-                                {/* Tabs Navigation */}
-                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general">Dados Gerais</TabsTrigger>
-                                        <TabsTrigger value="address">Endereço</TabsTrigger>
-                                    </TabsList>
-                                </div>
                             </div>
                         </div>
 
-                        {/* Content Body */}
+                        {/* Content Body - No Tabs */}
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            {isDesapego ? (
-                                <>
-                                    <TabsContent value="general" className="mt-0 focus-visible:outline-none">
-                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
-                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-8">
-                                                {/* Status da Vitrine */}
-                                                <FormSection title="Status da Vitrine">
-                                                    <div className="grid gap-3">
-                                                        <ListItem
-                                                            title="Vitrine Ativa"
-                                                            description="Seus anúncios estão visíveis e disponíveis"
-                                                            icon={<Store className="text-brand-green" />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
-                                                            right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                        <ListItem
-                                                            title="Vitrine Inativa"
-                                                            description="Seus anúncios ficam ocultos temporariamente"
-                                                            icon={<Store className="text-brand-inactive-text" />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
-                                                            right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                </FormSection>
-
-                                                {/* Banner da Vitrine */}
-                                                <FormSection hasSeparator title="Banner da Vitrine">
-                                                    <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1400/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
-                                                        {bannerPreview ? (
-                                                            <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex flex-col items-center justify-center text-brand-inactive-text">
-                                                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-40"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                                                                <span className="text-sm font-medium">Nenhum banner configurado</span>
-                                                            </div>
-                                                        )}
-
-                                                        {bannerUploading && (
-                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                                                                <Spinner size={32} className="text-white" />
-                                                            </div>
-                                                        )}
-
-                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 z-10">
-                                                            <Button variant="filled" onClick={() => bannerInputRef.current?.click()} className="bg-white text-brand-dark hover:bg-gray-100 border-none">
-                                                                Trocar Banner
-                                                            </Button>
-                                                            {bannerPreview && !bannerPreview.includes('default/') && (
-                                                                <Button variant="outline" onClick={handleRemoveBanner} className="bg-white/10 text-white hover:bg-white/20 border-white/40">
-                                                                    Remover
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1400x300px. Máximo 3MB.</p>
-                                                    <input ref={bannerInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleBannerChange} />
-                                                </FormSection>
-                                            </div>
-
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
-                                                <SidebarCard hasSeparator hasTopStrip title="Logo / Imagem de Perfil">
-                                                    <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                                                        <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
-                                                            {imagePreview ? (
-                                                                <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
-                                                            ) : (
-                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                                                            )}
-                                                            {imageUploading && (
-                                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                                                    <Spinner size={20} className="text-white" />
-                                                                </div>
-                                                            )}
-                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo / Perfil</p>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
-                                                        </div>
-                                                        {imagePreview && (
-                                                            <Button
-                                                                variant="ghostred"
-                                                                size="icon"
-                                                                className="w-8 h-8"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    e.preventDefault()
-                                                                    handleRemoveImage()
-                                                                }}
-                                                            >
-                                                                <TrashIcon size={14} />
-                                                            </Button>
-                                                        )}
-                                                        <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
-                                                    </div>
-                                                </SidebarCard>
-                                            </div>
-                                        </div>
-                                    </TabsContent>
-
-                                    <TabsContent value="address" className="mt-0 focus-visible:outline-none">
-                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                                <FormSection title="Endereço">
-                                                    <div className="space-y-4">
-                                                        <CepInput
-                                                            value={address.zipCode}
-                                                            onChange={(val) => setAddress((p) => ({ ...p, zipCode: val }))}
-                                                            name="cep"
-                                                            onAddressFetched={(data) => {
-                                                                setAddress(prev => ({
-                                                                    ...prev,
-                                                                    street: data.street || prev.street,
-                                                                    number: data.number || prev.number,
-                                                                    neighborhood: data.neighborhood || prev.neighborhood,
-                                                                    city: data.city || prev.city,
-                                                                    state: data.state || prev.state,
-                                                                    noNumber: data.number === "S/N",
-                                                                    ibge: data.ibge || prev.ibge,
-                                                                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
-                                                                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
-                                                                }))
-                                                            }}
-                                                        />
-                                                        <Input
-                                                            label="Rua/Avenida"
-                                                            placeholder="Rua, Avenida, etc."
-                                                            value={address.street}
-                                                            onChange={e => setAddress({ ...address, street: e.target.value })}
-                                                        />
-
-                                                        <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
-                                                            <div>
-                                                                <NumberInputWithCheckbox
-                                                                    label="Número"
-                                                                    number={address.number}
-                                                                    noNumber={address.noNumber}
-                                                                    onNumberChange={val => setAddress({ ...address, number: val })}
-                                                                    onNoNumberChange={checked => setAddress({ ...address, noNumber: checked, number: checked ? "S/N" : "" })}
-                                                                    placeholder="123"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <Input
-                                                                    label="Complemento"
-                                                                    placeholder="Apto, Bloco, etc."
-                                                                    value={address.complement}
-                                                                    onChange={e => setAddress({ ...address, complement: e.target.value })}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <Input
-                                                            label="Bairro"
-                                                            placeholder="Nome do bairro"
-                                                            value={address.neighborhood}
-                                                            onChange={e => setAddress({ ...address, neighborhood: e.target.value })}
-                                                        />
-
-                                                        <div className="grid grid-cols-2 gap-3 items-start">
-                                                            <div>
-                                                                <Input
-                                                                    label="Cidade"
-                                                                    placeholder="Nome da cidade"
-                                                                    value={address.city}
-                                                                    onChange={e => setAddress({ ...address, city: e.target.value })}
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <StateComboBox
-                                                                    value={address.state}
-                                                                    onChange={v => setAddress({ ...address, state: v })}
-                                                                    className="w-full"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </FormSection>
-                                            </div>
-
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                                <SidebarCard hasTopStrip hasSeparator title="Localização">
-                                                    <div className="flex flex-col">
-                                                        <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
-                                                            <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
-                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
-                                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mb-0">
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{store?.name || "Nome do Negócio"}</h4>
-                                                                <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
-                                                            </div>
-                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
-                                                                {formattedAddress}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </SidebarCard>
-                                            </div>
-                                        </motion.div>
-                                    </TabsContent>
-                                </>
-                            ) : (
-                                <>
-                                    <TabsContent value="general" className="mt-0 focus-visible:outline-none">
-                                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
-                                            {/* Main Content (Left Column) */}
-                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
-                                                {/* Status da Vitrine */}
-                                                <FormSection title="Status da Vitrine">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <ListItem
-                                                            title="Vitrine Ativa"
-                                                            description="Seu negócio está visível e apto a receber novos pedidos online."
-                                                            icon={<Store className="text-brand-green" />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
-                                                            right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                        <ListItem
-                                                            title="Vitrine Inativa"
-                                                            description="Sua vitrine continua visível, mas não poderá receber pedidos temporariamente."
-                                                            icon={<Store className="text-brand-inactive-text" />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
-                                                            right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                </FormSection>
-
-                                                {/* Pedidos fora do horário de funcionamento */}
-                                                <FormSection hasSeparator title="Pedidos fora do horário de funcionamento">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <ListItem
-                                                            title="Receber pedidos normalmente"
-                                                            description="Clientes podem fazer pedidos mesmo quando a loja estiver fora do horário de funcionamento."
-                                                            icon={<ClockIcon className="text-brand-green" size={20} />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: true })}
-                                                            right={
-                                                                <RadioButton
-                                                                    name="acceptOrdersWhenClosed"
-                                                                    value="allow"
-                                                                    checked={generalInfo.acceptOrdersWhenClosed}
-                                                                    onChange={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: true })}
-                                                                />
-                                                            }
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                        <ListItem
-                                                            title="Bloquear pedidos com loja fechada"
-                                                            description="A vitrine não permitirá a realização de novos pedidos enquanto a loja estiver fora do horário de funcionamento."
-                                                            icon={<ClockIcon className="text-brand-inactive-text" size={20} />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: false })}
-                                                            right={
-                                                                <RadioButton
-                                                                    name="acceptOrdersWhenClosed"
-                                                                    value="block"
-                                                                    checked={!generalInfo.acceptOrdersWhenClosed}
-                                                                    onChange={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: false })}
-                                                                />
-                                                            }
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                </FormSection>
-
-                                                {/* Fluxo operacional dos pedidos */}
-                                                <FormSection hasSeparator title="Fluxo operacional dos pedidos">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <ListItem
-                                                            title="Gerenciar tudo na Dudit"
-                                                            description="Os clientes finalizam a compra pelo checkout da Dudit e você gerencia os pedidos e pagamentos pelo painel."
-                                                            icon={<MonitorIcon className="text-brand-green" size={20} />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
-                                                            right={
-                                                                <RadioButton
-                                                                    name="orderFlow"
-                                                                    value="dudit"
-                                                                    checked={generalInfo.orderFlow === "dudit"}
-                                                                    onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
-                                                                />
-                                                            }
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                        <ListItem
-                                                            title="Receber apenas pelo WhatsApp"
-                                                            description="Ao finalizar o pedido, o cliente é redirecionado para o seu WhatsApp com a mensagem do pedido já estruturada."
-                                                            icon={<WhatsappIcon className="text-brand-green" size={20} />}
-                                                            onClick={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
-                                                            right={
-                                                                <RadioButton
-                                                                    name="orderFlow"
-                                                                    value="whatsapp"
-                                                                    checked={generalInfo.orderFlow === "whatsapp"}
-                                                                    onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
-                                                                />
-                                                            }
-                                                            className="py-4 px-6 gap-4 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                </FormSection>
-
-                                                {/* Banner da Vitrine */}
-                                                <FormSection hasSeparator title="Banner da Vitrine">
-                                                    <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1400/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
-                                                        {bannerPreview ? (
-                                                            <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex flex-col items-center justify-center text-brand-inactive-text">
-                                                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-40"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                                                                <span className="text-sm font-medium">Nenhum banner configurado</span>
-                                                            </div>
-                                                        )}
-
-                                                        {bannerUploading && (
-                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                                                                <Spinner size={32} className="text-white" />
-                                                            </div>
-                                                        )}
-
-                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 z-10">
-                                                            <Button variant="filled" onClick={() => bannerInputRef.current?.click()} className="bg-white text-brand-dark hover:bg-gray-100 border-none">
-                                                                Trocar Banner
-                                                            </Button>
-                                                            {bannerPreview && !bannerPreview.includes('default/') && (
-                                                                <Button variant="outline" onClick={handleRemoveBanner} className="bg-white/10 text-white hover:bg-white/20 border-white/40">
-                                                                    Remover
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1400x300px. Máximo 3MB.</p>
-                                                    <input ref={bannerInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleBannerChange} />
-                                                </FormSection>
-                                            </div>
-
-                                            {/* Sidebar (Right Column) */}
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
-                                                {/* Logo do Negócio */}
-                                                <SidebarCard hasSeparator hasTopStrip title="Logo do Negócio">
-                                                    <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                                                        <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
-                                                            {imagePreview ? (
-                                                                <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
-                                                            ) : (
-                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                                                            )}
-                                                            {imageUploading && (
-                                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                                                    <Spinner size={20} className="text-white" />
-                                                                </div>
-                                                            )}
-                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo</p>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
-                                                        </div>
-                                                        {imagePreview && (
-                                                            <Button
-                                                                variant="ghostred"
-                                                                size="icon"
-                                                                className="w-8 h-8"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    e.preventDefault()
-                                                                    handleRemoveImage()
-                                                                }}
-                                                            >
-                                                                <TrashIcon size={14} />
-                                                            </Button>
-                                                        )}
-                                                        <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
-                                                    </div>
-                                                </SidebarCard>
-                                            </div>
-                                        </div>
-                                    </TabsContent>
-
-                                    <TabsContent value="address" className="mt-0 focus-visible:outline-none">
-                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                                <FormSection title="Endereço">
-                                                    <div className="space-y-4">
-                                                        <CepInput
-                                                            value={address.zipCode}
-                                                            onChange={(val) => setAddress((p) => ({ ...p, zipCode: val }))}
-                                                            name="cep"
-                                                            onAddressFetched={(data) => {
-                                                                setAddress(prev => ({
-                                                                    ...prev,
-                                                                    street: data.street || prev.street,
-                                                                    number: data.number || prev.number,
-                                                                    neighborhood: data.neighborhood || prev.neighborhood,
-                                                                    city: data.city || prev.city,
-                                                                    state: data.state || prev.state,
-                                                                    noNumber: data.number === "S/N",
-                                                                    ibge: data.ibge || prev.ibge,
-                                                                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
-                                                                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
-                                                                }))
-                                                            }}
-                                                        />
-                                                        <Input
-                                                            label="Rua/Avenida"
-                                                            placeholder="Rua, Avenida, etc."
-                                                            value={address.street}
-                                                            onChange={e => setAddress({ ...address, street: e.target.value })}
-                                                        />
-
-                                                        <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
-                                                            <div>
-                                                                <NumberInputWithCheckbox
-                                                                    label="Número"
-                                                                    number={address.number}
-                                                                    noNumber={address.noNumber}
-                                                                    onNumberChange={val => setAddress({ ...address, number: val })}
-                                                                    onNoNumberChange={checked => setAddress({ ...address, noNumber: checked, number: checked ? "S/N" : "" })}
-                                                                    placeholder="123"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <Input
-                                                                    label="Complemento"
-                                                                    placeholder="Apto, Bloco, etc."
-                                                                    value={address.complement}
-                                                                    onChange={e => setAddress({ ...address, complement: e.target.value })}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <Input
-                                                            label="Bairro"
-                                                            placeholder="Nome do bairro"
-                                                            value={address.neighborhood}
-                                                            onChange={e => setAddress({ ...address, neighborhood: e.target.value })}
-                                                        />
-
-                                                        <div className="grid grid-cols-2 gap-3 items-start">
-                                                            <div>
-                                                                <Input
-                                                                    label="Cidade"
-                                                                    placeholder="Nome da cidade"
-                                                                    value={address.city}
-                                                                    onChange={e => setAddress({ ...address, city: e.target.value })}
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <StateComboBox
-                                                                    value={address.state}
-                                                                    onChange={v => setAddress({ ...address, state: v })}
-                                                                    className="w-full"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </FormSection>
-                                            </div>
-
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                                <SidebarCard hasTopStrip hasSeparator title="Localização">
-                                                    <div className="flex flex-col">
-                                                        <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
-                                                            <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
-                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
-                                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mb-0">
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{store?.name || "Nome do Negócio"}</h4>
-                                                                <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
-                                                            </div>
-                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
-                                                                {formattedAddress}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </SidebarCard>
-                                            </div>
-                                        </motion.div>
-                                    </TabsContent>
-
-                                    <TabsContent value="gallery" className="mt-0 focus-visible:outline-none">
-                                        <FormSection hasSeparator title="Galeria de Fotos">
-                                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-4">
-                                                Adicione fotos do seu estabelecimento, equipe ou produtos (Limite do plano: {limit} foto(s)).
-                                            </p>
-                                            <ProductImagesSection
-                                                images={generalInfo.gallery as string[]}
-                                                onImageUpload={handleGalleryImageUpload}
-                                                onRemoveImage={handleRemoveGalleryImage}
-                                                onSetPrimaryImage={handleSetPrimaryGalleryImage}
-                                                isEditing={true}
-                                                moderationStatus="approved"
+                            <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                {/* Main Content (Left Column) */}
+                                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
+                                    {/* Status da Vitrine */}
+                                    <FormSection title="Status da Vitrine">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <ListItem
+                                                title="Vitrine Ativa"
+                                                description="Seu negócio está visível e apto a receber novos pedidos online."
+                                                icon={<Store className="text-brand-green" />}
+                                                onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
+                                                right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
+                                                className="py-4 px-6 gap-4 cursor-pointer"
                                             />
-                                        </FormSection>
-                                    </TabsContent>
-                                </>
-                            )}
+                                            <ListItem
+                                                title="Vitrine Inativa"
+                                                description="Sua vitrine continua visível, mas não poderá receber pedidos temporariamente."
+                                                icon={<Store className="text-brand-inactive-text" />}
+                                                onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
+                                                right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
+                                                className="py-4 px-6 gap-4 cursor-pointer"
+                                            />
+                                        </div>
+                                    </FormSection>
+
+                                    {/* Pedidos fora do horário de funcionamento */}
+                                    <FormSection hasSeparator title="Pedidos fora do horário de funcionamento">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <ListItem
+                                                title="Receber pedidos normalmente"
+                                                description="Clientes podem fazer pedidos mesmo quando a loja estiver fora do horário de funcionamento."
+                                                icon={<ClockIcon className="text-brand-green" size={20} />}
+                                                onClick={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: true })}
+                                                right={
+                                                    <RadioButton
+                                                        name="acceptOrdersWhenClosed"
+                                                        value="allow"
+                                                        checked={generalInfo.acceptOrdersWhenClosed}
+                                                        onChange={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: true })}
+                                                    />
+                                                }
+                                                className="py-4 px-6 gap-4 cursor-pointer"
+                                            />
+                                            <ListItem
+                                                title="Bloquear pedidos com loja fechada"
+                                                description="A vitrine não permitirá a realização de novos pedidos enquanto a loja estiver fora do horário de funcionamento."
+                                                icon={<ClockIcon className="text-brand-inactive-text" size={20} />}
+                                                onClick={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: false })}
+                                                right={
+                                                    <RadioButton
+                                                        name="acceptOrdersWhenClosed"
+                                                        value="block"
+                                                        checked={!generalInfo.acceptOrdersWhenClosed}
+                                                        onChange={() => setGeneralInfo({ ...generalInfo, acceptOrdersWhenClosed: false })}
+                                                    />
+                                                }
+                                                className="py-4 px-6 gap-4 cursor-pointer"
+                                            />
+                                        </div>
+                                    </FormSection>
+
+                                    {/* Fluxo operacional dos pedidos */}
+                                    <FormSection hasSeparator title="Fluxo operacional dos pedidos">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <ListItem
+                                                title="Gerenciar tudo na Dudit"
+                                                description="Os clientes finalizam a compra pelo checkout da Dudit e você gerencia os pedidos e pagamentos pelo painel."
+                                                icon={<MonitorIcon className="text-brand-green" size={20} />}
+                                                onClick={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
+                                                right={
+                                                    <RadioButton
+                                                        name="orderFlow"
+                                                        value="dudit"
+                                                        checked={generalInfo.orderFlow === "dudit"}
+                                                        onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "dudit" })}
+                                                    />
+                                                }
+                                                className="py-4 px-6 gap-4 cursor-pointer"
+                                            />
+                                            <ListItem
+                                                title="Receber apenas pelo WhatsApp"
+                                                description="Ao finalizar o pedido, o cliente é redirecionado para o seu WhatsApp com a mensagem do pedido já estruturada."
+                                                icon={<WhatsappIcon className="text-brand-green" size={20} />}
+                                                onClick={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
+                                                right={
+                                                    <RadioButton
+                                                        name="orderFlow"
+                                                        value="whatsapp"
+                                                        checked={generalInfo.orderFlow === "whatsapp"}
+                                                        onChange={() => setGeneralInfo({ ...generalInfo, orderFlow: "whatsapp" })}
+                                                    />
+                                                }
+                                                className="py-4 px-6 gap-4 cursor-pointer"
+                                            />
+                                        </div>
+                                    </FormSection>
+
+                                    {/* Banner da Vitrine */}
+                                    <FormSection hasSeparator title="Banner da Vitrine">
+                                        <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1400/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
+                                            {bannerPreview ? (
+                                                <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center text-brand-inactive-text">
+                                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-40"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                                                    <span className="text-sm font-medium">Nenhum banner configurado</span>
+                                                </div>
+                                            )}
+
+                                            {bannerUploading && (
+                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                                                    <Spinner size={32} className="text-white" />
+                                                </div>
+                                            )}
+
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 z-10">
+                                                <Button variant="filled" onClick={() => bannerInputRef.current?.click()} className="bg-white text-brand-dark hover:bg-gray-100 border-none">
+                                                    Trocar Banner
+                                                </Button>
+                                                {bannerPreview && !bannerPreview.includes('default/') && (
+                                                    <Button variant="outline" onClick={handleRemoveBanner} className="bg-white/10 text-white hover:bg-white/20 border-white/40">
+                                                        Remover
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1400x300px. Máximo 3MB.</p>
+                                        <input ref={bannerInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleBannerChange} />
+                                    </FormSection>
+                                </div>
+
+                                {/* Sidebar (Right Column) */}
+                                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
+                                    {/* Logo do Negócio */}
+                                    <SidebarCard hasSeparator hasTopStrip title="Logo do Negócio">
+                                        <div className="flex items-center gap-4 dark:bg-dark-background/50">
+                                            <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
+                                                {imagePreview ? (
+                                                    <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
+                                                ) : (
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                                                )}
+                                                {imageUploading && (
+                                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                        <Spinner size={20} className="text-white" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo</p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
+                                            </div>
+                                            {imagePreview && (
+                                                <Button
+                                                    variant="ghostred"
+                                                    size="icon"
+                                                    className="w-8 h-8"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        e.preventDefault()
+                                                        handleRemoveImage()
+                                                    }}
+                                                >
+                                                    <TrashIcon size={14} />
+                                                </Button>
+                                            )}
+                                            <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
+                                        </div>
+                                    </SidebarCard>
+                                </div>
+                            </div>
+
+                            {/* Galeria de Fotos - shown directly without tabs in non-desapego mode */}
+                            <FormSection hasSeparator title="Galeria de Fotos">
+                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-4">
+                                    Adicione fotos do seu estabelecimento, equipe ou produtos (Limite do plano: {limit} foto(s)).
+                                </p>
+                                <ProductImagesSection
+                                    images={generalInfo.gallery as string[]}
+                                    onImageUpload={handleGalleryImageUpload}
+                                    onRemoveImage={handleRemoveGalleryImage}
+                                    onSetPrimaryImage={handleSetPrimaryGalleryImage}
+                                    isEditing={true}
+                                    moderationStatus="approved"
+                                />
+                            </FormSection>
                         </div>
                     </div>
-                </Tabs>
+                )}
+
+                {/* Mobile Bottom Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                    <Button
+                        onClick={handleSubmit}
+                        className="flex-1 h-12"
+                        disabled={isLoading}
+                        isLoading={isLoading}
+                        leftIcon={<SaveIcon size={18} />}
+                    >
+                        Salvar
+                    </Button>
+                </div>
+
+                <SavingStatusModal isOpen={isLoading} text="Salvando configurações da vitrine..." />
+
+                {
+                    showConfirmDialog && (
+                        <AlertModal
+                            isOpen={showConfirmDialog}
+                            onClose={cancelNavigation}
+                            onConfirm={confirmNavigation}
+                            title="Sair sem salvar?"
+                            description="Você tem alterações na vitrine que ainda não foram salvas."
+                            confirmText="Sair sem salvar"
+                            cancelText="Continuar editando"
+                            variant="warning"
+                        />
+                    )
+                }
+
+                <ImageCropperModal
+                    isOpen={cropModalOpen}
+                    onClose={() => setCropModalOpen(false)}
+                    imageFile={tempImageFile}
+                    onCropComplete={handleCropComplete}
+                />
+
+                <ImageCropperModal
+                    isOpen={bannerCropModalOpen}
+                    onClose={() => setBannerCropModalOpen(false)}
+                    imageFile={tempBannerFile}
+                    onCropComplete={handleBannerCropComplete}
+                    aspectRatio={1400 / 300}
+                />
+
+                <ImageCropperModal
+                    isOpen={galleryCropModalOpen}
+                    onClose={() => {
+                        setGalleryCropModalOpen(false)
+                        setTempGalleryImageFile(null)
+                    }}
+                    imageFile={tempGalleryImageFile}
+                    onCropComplete={handleGalleryCropComplete}
+                    aspectRatio={1}
+                />
             </div>
-
-            {/* Mobile Bottom Action Bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                <Button
-                    onClick={handleSubmit}
-                    className="flex-1 h-12"
-                    disabled={isLoading}
-                    isLoading={isLoading}
-                    leftIcon={<SaveIcon size={18} />}
-                >
-                    Salvar
-                </Button>
-            </div>
-
-            <SavingStatusModal isOpen={isLoading} text="Salvando configurações da vitrine..." />
-
-            {
-                showConfirmDialog && (
-                    <AlertModal
-                        isOpen={showConfirmDialog}
-                        onClose={cancelNavigation}
-                        onConfirm={confirmNavigation}
-                        title="Sair sem salvar?"
-                        description="Você tem alterações na vitrine que ainda não foram salvas."
-                        confirmText="Sair sem salvar"
-                        cancelText="Continuar editando"
-                        variant="warning"
-                    />
-                )
-            }
-
-            <ImageCropperModal
-                isOpen={cropModalOpen}
-                onClose={() => setCropModalOpen(false)}
-                imageFile={tempImageFile}
-                onCropComplete={handleCropComplete}
-            />
-
-            <ImageCropperModal
-                isOpen={bannerCropModalOpen}
-                onClose={() => setBannerCropModalOpen(false)}
-                imageFile={tempBannerFile}
-                onCropComplete={handleBannerCropComplete}
-                aspectRatio={1400 / 300}
-            />
-
-            <ImageCropperModal
-                isOpen={galleryCropModalOpen}
-                onClose={() => {
-                    setGalleryCropModalOpen(false)
-                    setTempGalleryImageFile(null)
-                }}
-                imageFile={tempGalleryImageFile}
-                onCropComplete={handleGalleryCropComplete}
-                aspectRatio={1}
-            />
-        </FadeIn >
+        </FadeIn>
     )
 }
 

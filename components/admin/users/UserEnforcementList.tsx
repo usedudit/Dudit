@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import UserEnforcementListRow from "./UserEnforcementListRow"
@@ -15,6 +15,12 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 type SortKey = "name" | "email" | "store" | "date" | "status"
 type SortDirection = "asc" | "desc"
@@ -36,13 +42,9 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
     // Modals
     const [banTarget, setBanTarget] = useState<EnforcementUser | null>(null)
     const [unbanTarget, setUnbanTarget] = useState<EnforcementUser | null>(null)
-    const [actionReason, setActionReason] = useState("")
 
     // Stats
     const [stats, setStats] = useState<AdminUserStats | undefined>(initialStats)
-
-    // Search state
-    const [search, setSearch] = useState("")
 
     // Sorting state
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
@@ -50,9 +52,46 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         direction: "desc",
     })
 
-    // Data State (initialized from SSR)
-    const [users, setUsers] = useState<EnforcementUser[]>(initialData?.data || [])
-    const [page, setPage] = useState(1)
+    // Filters
+    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
+
+    const isDefaultView = statusTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+
+    const entityPage = useEntityPage<any, any, any>({
+        entityType: "users",
+        partnerId: "admin",
+        queryKey: ["admin-users", statusTab, debouncedSearch, filters.datePeriod],
+        initialItems: initialData?.data || [],
+        initialNextCursor: initialData?.nextCursor || null,
+        initialHasMore: initialData?.hasMore || false,
+        skipInitialData: !isDefaultView,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getUsers(cursor, 100, debouncedSearch || undefined, statusTab === "all" ? undefined : statusTab)
+            return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((u: any) => String(u?.user_id || ""), []),
+        getDetailFn: async (id: string) => {
+            return null
+        },
+        listToDetail: (item) => ({ ...item, __partial: true }),
+        staleTime: 30_000,
+    })
+
+    const {
+        items: users,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        entityState: epEntityState,
+        openEntity: epOpenEntity,
+        closeEntity: epCloseEntity,
+        search,
+        setSearch,
+        debouncedSearch,
+        afterMutation,
+    } = entityPage
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -63,20 +102,10 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         })
     }
 
-    const refreshUsers = useCallback(() => {
-        startTransition(async () => {
-            try {
-                const [res, statsRes] = await Promise.all([
-                    getUsers(null, 100),
-                    getAdminUserStats(),
-                ])
-                setUsers(res.data || [])
-                setStats(statsRes)
-            } catch (err) {
-                console.error("Failed to refresh admin users:", err)
-            }
-        })
-    }, [])
+    const handleMutation = useCallback(() => {
+        afterMutation()
+        getAdminUserStats().then(setStats).catch(console.error)
+    }, [afterMutation])
 
     const handleConfirmBan = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!banTarget) return
@@ -85,7 +114,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
             if (res.success) {
                 toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setBanTarget(null)
-                refreshUsers()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao banir usuário")
             }
@@ -106,7 +135,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
             if (res.success) {
                 toast.success("Usuário desbanido com sucesso!")
                 setUnbanTarget(null)
-                refreshUsers()
+                handleMutation()
             } else {
                 toast.error(res.error || "Erro ao desbanir usuário")
             }
@@ -120,32 +149,26 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         }
     }
 
-    // Instant in-memory filtering (0ms)
-    const filteredUsers = useMemo(() => {
-        const term = search.trim().toLowerCase()
+    // Reset to page 1 on filter/tab/search change
+    useEffect(() => {
+        setPage(1)
+    }, [statusTab, debouncedSearch, filters.datePeriod])
 
-        let result = users.filter((u) => {
-            // Tab filter
-            const isBanned = !!u.banned_at
-            if (statusTab === "active" && isBanned) return false
-            if (statusTab === "banned" && !isBanned) return false
+    // If viewing detail of a specific user via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        return (
+            <AdminUserDetailView
+                userId={entityState.entityId}
+                onBack={closeEntity}
+                onUserUpdated={handleMutation}
+            />
+        )
+    }
 
-            // Search filter
-            if (term) {
-                const name = String(u.full_name || "").toLowerCase()
-                const email = String(u.email || "").toLowerCase()
-                const store = String(u.partner?.store_name || "").toLowerCase()
-                const id = String(u.user_id || "").toLowerCase()
+    // In-memory sorting (search and status are done server-side)
+    const sortedUsers = useMemo(() => {
+        let result = [...(users || [])]
 
-                if (!name.includes(term) && !email.includes(term) && !store.includes(term) && !id.includes(term)) {
-                    return false
-                }
-            }
-
-            return true
-        })
-
-        // In-memory sorting
         if (sortConfig) {
             result = [...result].sort((a, b) => {
                 let aVal: any = ""
@@ -179,30 +202,16 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         }
 
         return result
-    }, [users, statusTab, search, sortConfig])
+    }, [users, sortConfig])
 
     // Pagination (Strict 8 items)
-    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE))
+    const totalPages = Math.max(1, Math.ceil(sortedUsers.length / ITEMS_PER_PAGE))
     const paginatedItems = useMemo(() => {
         const start = (page - 1) * ITEMS_PER_PAGE
-        return filteredUsers.slice(start, start + ITEMS_PER_PAGE)
-    }, [filteredUsers, page])
+        return sortedUsers.slice(start, start + ITEMS_PER_PAGE)
+    }, [sortedUsers, page])
 
-    // Reset to page 1 on filter/tab/search change
-    useMemo(() => {
-        setPage(1)
-    }, [statusTab, search])
-
-    // If viewing detail of a specific user via URL (?view=id)
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        return (
-            <AdminUserDetailView
-                userId={entityState.entityId}
-                onBack={closeEntity}
-                onUserUpdated={refreshUsers}
-            />
-        )
-    }
+    const [page, setPage] = useState(1)
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -246,6 +255,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                     search={search}
                     setSearch={setSearch}
                     tabCounts={stats}
+                    onOpenFilter={() => setIsFilterSheetOpen(true)}
                 />
 
                 {/* List Content */}
@@ -402,6 +412,21 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                     currentRiskScore={unbanTarget.risk_score}
                 />
             )}
+
+            {/* Filter Sheet */}
+            <FilterSheet
+                isOpen={isFilterSheetOpen}
+                onClose={() => setIsFilterSheetOpen(false)}
+                sections={[
+                    { id: "datePeriod", title: "Data de Cadastro", type: "date-period" },
+                ]}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => {
+                    setFilters({ datePeriod: { ...EMPTY_DATE_PERIOD } })
+                    setIsFilterSheetOpen(false)
+                }}
+            />
         </FadeIn>
     )
 }

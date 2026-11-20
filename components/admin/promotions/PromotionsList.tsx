@@ -33,8 +33,6 @@ import {
 import { formatCurrency } from "@/lib/utils/formatters"
 import {
   EMPTY_DATE_PERIOD,
-  resolveDatePeriodBounds,
-  ymdInBounds,
   isDatePeriodFilterActive,
   type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
@@ -162,20 +160,13 @@ export default function PromotionsList({
   }, [])
 
   const [activeTab, setActiveTab] = useState<string>("all")
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(timer)
-  }, [search])
-
-  const isDefaultView = activeTab === "all" && !debouncedSearch
+  const isDefaultView = activeTab === "all" && !filters.datePeriod.from && !filters.datePeriod.to
 
   const entityPage = useEntityPage<any, any, any>({
     entityType: "campaigns",
     partnerId: "admin",
-    queryKey: ["admin-campaigns", activeTab, debouncedSearch],
+    queryKey: ["admin-campaigns", activeTab, debouncedSearch, filters.datePeriod],
     initialItems: initialData,
     initialNextCursor: null,
     initialHasMore: false,
@@ -184,6 +175,8 @@ export default function PromotionsList({
       const res = await getAdminCampaigns(cursor, 100, {
         isActive: activeTab === "active" ? "active" : activeTab === "inactive" ? "inactive" : undefined,
         search: debouncedSearch || undefined,
+        startDate: filters.datePeriod.from || undefined,
+        endDate: filters.datePeriod.to || undefined,
       })
       return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
     },
@@ -204,6 +197,9 @@ export default function PromotionsList({
     currentEntity,
     afterMutation,
     queryClient,
+    search,
+    setSearch,
+    debouncedSearch,
   } = entityPage
 
   const handleMutation = useCallback(() => {
@@ -268,28 +264,11 @@ export default function PromotionsList({
   const filteredCampaigns = useMemo(() => {
     let result = [...(campaigns || [])]
 
-    if (activeTab === "active") {
-      result = result.filter(c => c.is_active === true)
-    } else if (activeTab === "inactive") {
-      result = result.filter(c => c.is_active === false)
-    }
-
     if (filters.status && filters.status.length > 0) {
       result = result.filter(c => {
         const statusKey = c.is_active ? "active" : "inactive"
         return filters.status.includes(statusKey)
       })
-    }
-
-    if (isDatePeriodFilterActive(filters.datePeriod)) {
-      const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
-      if (startYmd !== null || endYmd !== null) {
-        result = result.filter(c => {
-          if (!c.starts_at) return false
-          const d = c.starts_at.slice(0, 10)
-          return ymdInBounds(d, startYmd, endYmd)
-        })
-      }
     }
 
     if (sortConfig) {
@@ -307,7 +286,7 @@ export default function PromotionsList({
     }
 
     return result
-  }, [campaigns, activeTab, filters, sortConfig])
+  }, [campaigns, filters.status, sortConfig])
 
   const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage)
   const paginatedCampaigns = useMemo(() => {

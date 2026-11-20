@@ -1,6 +1,8 @@
 "use client"
 
 import type React from "react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { InfoIcon } from "@/lib/icons"
 
 interface FormTextareaProps {
     label?: string
@@ -11,6 +13,10 @@ interface FormTextareaProps {
     name?: string
     disabled?: boolean
     labelAddon?: React.ReactNode
+    /** Tooltip text to show next to the label (info icon) */
+    labelTooltip?: string | React.ReactNode
+    /** Tooltip props for customization */
+    labelTooltipProps?: React.ComponentProps<typeof TooltipContent>
     required?: boolean
     maxLength?: number
     id?: string
@@ -40,6 +46,8 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
     errorMessage,
     showCharacterCount = false,
     dataField,
+    labelTooltip,
+    labelTooltipProps,
 }) => (
     <div className={`flex-1 w-full ${className || ""}`} {...(dataField ? { "data-field": dataField } : {})}>
         {(label || labelAddon) && (
@@ -49,6 +57,30 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
                         {label}
                         {required && <span className="text-brand-red"> *</span>}
                     </label>
+                )}
+                {labelTooltip && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                className="p-0.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-body transition-colors rounded flex items-center justify-center"
+                                aria-label="Mais informações"
+                            >
+                                <InfoIcon className="w-4 h-4" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            side="top"
+                            align="start"
+                            {...labelTooltipProps}
+                        >
+                            {typeof labelTooltip === "string" ? (
+                                <p className="text-xs">{labelTooltip}</p>
+                            ) : (
+                                labelTooltip
+                            )}
+                        </TooltipContent>
+                    </Tooltip>
                 )}
                 {labelAddon}
             </div>

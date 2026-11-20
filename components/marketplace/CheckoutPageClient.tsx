@@ -899,8 +899,6 @@ export function CheckoutPageClient() {
     const carrierResolving = carrierQuoteLoading || carrierOptions.length > 0
     const displayDeliveryError = carrierSectionVisible && carrierResolving ? null : deliveryError
     const activeCheckoutError = checkoutError
-        || displayDeliveryError
-        || paymentError
         || (!checkoutContext && contextError ? contextError : null)
     // Frete próprio voltou a cobrir o endereço (ou nunca saiu dele) → desfaz a
     // seleção de transportadora. Sem isso ela "grudava" após um momento de
@@ -2142,7 +2140,7 @@ export function CheckoutPageClient() {
     const hasUnavailableService = Object.values(serviceAvailability).some((s) => s.checked && !s.available)
     const disableCheckoutSubmit = isLoading || hasUnavailableService
         || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
-        || (productDeliveryQuoteActive && (deliveryQuoteLoading || !!deliveryError))
+        || (formData.deliveryType !== "pickup" && (deliveryQuoteLoading || !!deliveryError))
 
     const renderOrderBumpSection = () => {
         // Assinatura é um fluxo próprio: sem order bump ("aproveite e leve").
@@ -2853,23 +2851,19 @@ export function CheckoutPageClient() {
         // Sem o contexto não dá para saber se o pedido fecha pela Dudit ou pelo
         // WhatsApp: espera o carregamento em vez de decidir no escuro.
         if (contextLoading) return
-        // Preserva o erro já calculado (raio/deslocamento) antes de limpar o
-        // estado: o resumo precisa continuar exibindo o motivo do bloqueio.
-        const existingDeliveryError = deliveryError
-        setDeliveryError(null)
+
+        // Erro de entrega/deslocamento já calculado (ex.: serviço ou produto fora do raio
+        // de entrega): bloqueia antes de qualquer processamento ou cobrança.
+        if (deliveryError && !(carrierSectionVisible && selectedCarrierServiceId)) {
+            if (deliveryError.toLowerCase().includes("raio")) {
+                setShowOutsideRadiusModal(true)
+            }
+            return
+        }
+
         setPaymentError(null)
         setCheckoutError(null)
         setIsLoading(true)
-
-        // Erro de entrega/deslocamento já calculado (ex.: serviço fora do raio
-        // de atendimento): bloqueia antes de qualquer cobrança. Carrinhos com
-        // frete próprio de produto já caem no bloqueio mais abaixo (com o modal
-        // de raio), então aqui cobrimos os fluxos sem cotação de produto.
-        if (existingDeliveryError && !productDeliveryQuoteActive && !(carrierSectionVisible && selectedCarrierServiceId)) {
-            setDeliveryError(existingDeliveryError)
-            setIsLoading(false)
-            return
-        }
 
         if (checkoutContext?.deposit.available && !bypassDepositModalRef.current) {
             setShowDepositChoiceModal(true)
@@ -3413,14 +3407,16 @@ export function CheckoutPageClient() {
                 payment_method: formData.paymentMethod,
                 error_type: isSystemError ? "system" : "validation",
             })
-            setCheckoutError(msg)
 
             if (isSystemError) {
+                setCheckoutError(msg)
                 notifyError("Erro do Sistema", msg)
-            } else if (msg.toLowerCase().includes("endereço") || msg.toLowerCase().includes("entrega")) {
+            } else if (msg.toLowerCase().includes("endereço") || msg.toLowerCase().includes("entrega") || msg.toLowerCase().includes("raio")) {
                 setDeliveryError(msg)
+                notifyError("Entrega indisponível", msg)
             } else if (msg.toLowerCase().includes("pagamento") || msg.toLowerCase().includes("cartão") || msg.toLowerCase().includes("pix")) {
                 setPaymentError(msg)
+                notifyError("Pagamento", msg)
             } else {
                 notifyError("Erro", msg)
             }
@@ -3484,8 +3480,6 @@ export function CheckoutPageClient() {
                 message={activeCheckoutError}
                 onRetry={() => {
                     setCheckoutError(null)
-                    setDeliveryError(null)
-                    setPaymentError(null)
                     if (window.history.length > 1) {
                         router.back()
                         return
@@ -3815,8 +3809,8 @@ export function CheckoutPageClient() {
                                                         transition={{ duration: 0.2 }}
                                                         className="mb-4"
                                                     >
-                                                        {deliveryError ? (
-                                                            <InfoCard title="Endereço indisponível" message={deliveryError} color="red" />
+                                                        {displayDeliveryError ? (
+                                                            <InfoCard title="Endereço indisponível" message={displayDeliveryError} color="red" />
                                                         ) : (
                                                             <>
                                                                 {!formData.paymentMethod ? (

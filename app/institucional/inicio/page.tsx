@@ -25,7 +25,111 @@ import {
     Link2,
 } from 'lucide-react';
 import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
-import { HeroBanner } from "@/components/marketplace/shared-components";
+
+const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+    return (
+        <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
+            <GridLines />
+            <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4">
+                <div className="grid lg:grid-cols-2 gap-12 items-center">
+                    <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
+                            O que você precisa hoje pode estar na <span className="text-brand-green">Dudit.</span>
+                        </h1>
+                        <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
+                            Descubra produtos, serviços e negócios perto de você ou com envio para todo o Brasil. Compre, anuncie ou agende de um jeito simples.
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                            <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
+                            <Button variant="outline" onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.8, delay: 0.2 }}
+                        className="relative"
+                    >
+                        <div className="bg-white dark:bg-dark-surface rounded-xl overflow-hidden border border-gray-100 dark:border-dark-border shadow-xl">
+                            <div className="bg-gray-50 dark:bg-dark-border/30 p-3 border-b border-gray-100 dark:border-dark-border flex items-center gap-2">
+                                <div className="flex gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-red"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-green"></div>
+                                </div>
+                                <div className="bg-white dark:bg-dark-surface px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100 dark:border-dark-border">dudit.com.br</div>
+                            </div>
+                            <div className="p-6 space-y-3">
+                                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+                                        <ShoppingBag className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Descubra</div>
+                                        <div className="text-xs text-brand-inactive-text">Produtos, serviços e negócios perto de você</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/40 rounded-lg border border-green-100 dark:border-green-900/50">
+                                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-center justify-center">
+                                        <Store className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Anuncie</div>
+                                        <div className="text-xs text-brand-inactive-text">Seja descoberto por mais pessoas</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-950/40 rounded-lg border border-purple-100 dark:border-purple-900/50">
+                                    <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-lg flex items-center justify-center">
+                                        <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Organize</div>
+                                        <div className="text-xs text-brand-inactive-text">Gestão simples para o seu dia a dia</div>
+                                    </div>
+                                </div>
+                                <div className="pt-3 border-t border-gray-100 dark:border-dark-border flex items-center justify-between">
+                                    <div className="text-center">
+                                        <div className="text-xl font-bold text-brand-green">0%</div>
+                                        <div className="text-[10px] text-brand-inactive-text">comissão</div>
+                                    </div>
+                                    <div className="h-8 w-px bg-gray-100 dark:bg-dark-border/40"></div>
+                                    <div className="text-center">
+                                        <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">100%</div>
+                                        <div className="text-[10px] text-brand-inactive-text">do valor da venda é seu</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <motion.div
+                            className="absolute -right-4 md:-right-8 -bottom-6 w-44 bg-white dark:bg-dark-surface rounded-2xl p-4 border border-gray-100 dark:border-dark-border shadow-lg hidden md:block"
+                            animate={{ y: [0, -10, 0] }}
+                            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                        >
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="w-8 h-8 bg-brand-green/20 rounded-full flex items-center justify-center">
+                                    <TrendingUp className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                </div>
+                                <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Nova venda</div>
+                            </div>
+                            <div className="bg-brand-green/10 rounded-lg p-2 text-xs">
+                                <div className="flex justify-between font-bold text-brand-dark dark:text-dark-heading">
+                                    <span>Você recebe</span>
+                                    <span className="text-brand-green">R$ 150,00</span>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                </div>
+            </div>
+        </section>
+    );
+};
 
 const BentoFeaturesComoAjuda = () => {
     const cards = [
@@ -461,7 +565,7 @@ export default function HomePage() {
         <div className="min-h-screen bg-white dark:bg-dark-surface">
             <Navbar onNavigate={onNavigate} />
             <main>
-                <HeroBanner href="/explorar" />
+                <Hero onNavigate={onNavigate} />
                 <BentoFeaturesComoAjuda />
                 <ParaQuemCompra />
                 <ParaQuemVende />

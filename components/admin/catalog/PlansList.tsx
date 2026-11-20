@@ -7,6 +7,11 @@ import { useToast } from "@/hooks/use-toast"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useNotification } from "@/hooks/use-notification"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 // Reusable Components
 import {
@@ -95,6 +100,11 @@ const PLAN_FILTER_SECTIONS: FilterSectionConfig[] = [
       maxPlaceholder: "Preço máximo",
     },
   },
+  {
+    id: "datePeriod",
+    title: "Data de Criação",
+    type: "date-period",
+  },
 ]
 
 const PlanFilterChips = ({
@@ -182,12 +192,17 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
     const entityPage = useEntityPage<any, any, string>({
         entityType: "recurring_plans",
         partnerId: "admin",
-        queryKey: ["admin", "recurring_plans"],
+        queryKey: ["admin", "recurring_plans", debouncedSearch, filters.datePeriod],
         initialItems,
         initialNextCursor: null,
         initialHasMore: false,
+        skipInitialData: debouncedSearch.length > 0 || isDatePeriodFilterActive(filters.datePeriod),
         fetchPageFn: async () => {
-            const res = await listAdminCatalogPlans({ limit: 100 })
+            const res = await listAdminCatalogPlans({ 
+                limit: 100, 
+                search: debouncedSearch || undefined,
+                // TODO: Add date filters when server action supports them
+            })
             if (!res.success || !res.data) throw new Error((res as any).error || "Erro ao carregar planos.")
             return { items: res.data.items, nextCursor: null, hasMore: res.data.hasMore }
         },
@@ -219,6 +234,9 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
         currentEntity,
         afterMutation,
         queryClient,
+        search,
+        setSearch,
+        debouncedSearch,
     } = entityPage
 
     const handleMutation = useCallback(() => {
@@ -228,10 +246,12 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
 
     // Local states
     const [viewMode, setViewMode] = useState<"list" | "grid">(isTablet ? "grid" : "list")
-    const [searchQuery, setSearchQuery] = useState("")
     const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [filters, setFilters] = useState<PlanFilters>(EMPTY_PLAN_FILTERS)
+    const [filters, setFilters] = useState<PlanFilters & { datePeriod: DatePeriodFilterValue }>({
+        ...EMPTY_PLAN_FILTERS,
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
         key: "name",
         direction: "asc",
@@ -273,7 +293,7 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
     // Reset pagination when search/filter/tab changes
     useEffect(() => {
         setPage(1)
-    }, [searchQuery, activeTab, filters])
+    }, [debouncedSearch, activeTab, filters.datePeriod])
 
     // Selected plan for detail/edit
     const selectedPlan = useMemo(() => {
@@ -289,12 +309,16 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
             if (activeTab === "Inativo" && plan.status !== "inactive") return false
             if (activeTab === "Arquivado" && plan.status !== "archived") return false
 
-            if (searchQuery.trim()) {
-                const query = searchQuery.toLowerCase().trim()
-                const nameMatch = plan.name?.toLowerCase().includes(query)
-                const descMatch = plan.description?.toLowerCase().includes(query)
-                const sellerMatch = (plan.partner_name || plan.store_name || "").toLowerCase().includes(query)
-                if (!nameMatch && !descMatch && !sellerMatch) return false
+            // Date period filter (client-side for now, server-side when supported)
+            if (isDatePeriodFilterActive(filters.datePeriod)) {
+                const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
+                if (startYmd || endYmd) {
+                    const planDate = plan.created_at ? plan.created_at.slice(0, 10) : ""
+                    if (planDate) {
+                        if (startYmd && planDate < startYmd) return false
+                        if (endYmd && planDate > endYmd) return false
+                    }
+                }
             }
 
             if (filters.frequency.length > 0 && !filters.frequency.includes(plan.frequencyType)) {
@@ -316,7 +340,7 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
 
             return true
         })
-    }, [rawPlans, activeTab, searchQuery, filters])
+    }, [rawPlans, activeTab, filters])
 
     // Sort logic
     const sortedPlans = useMemo(() => {
@@ -559,8 +583,8 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
                             tabCounts={tabCounts}
                             viewMode={viewMode}
                             onViewModeChange={setViewMode}
-                            search={searchQuery}
-                            onSearchChange={setSearchQuery}
+                            search={search}
+                            onSearchChange={setSearch}
                             onAddPlan={handleAddPlan}
                             canManage={false}
                             onOpenFilter={() => setIsFilterOpen(true)}
@@ -568,7 +592,8 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
                                 filters.frequency.length > 0 ||
                                 filters.billing.length > 0 ||
                                 filters.price.min ||
-                                filters.price.max
+                                filters.price.max ||
+                                isDatePeriodFilterActive(filters.datePeriod)
                             )}
                             chips={
                                 <PlanFilterChips
@@ -576,7 +601,7 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
                                     onClear={(key) =>
                                         setFilters((prev) => ({
                                             ...prev,
-                                            [key]: key === "price" ? { min: "", max: "" } : [],
+                                            [key]: key === "price" ? { min: "", max: "" } : key === "datePeriod" ? { ...EMPTY_DATE_PERIOD } : [],
                                         }))
                                     }
                                 />

@@ -111,11 +111,8 @@ export function FiscalProfileSection({
           setValue={(v) => onTaxProfileChange(v as TaxProfile)}
           options={PROFILE_OPTIONS}
           dataField="taxProfile"
+          labelTooltip={meta.description}
         />
-
-        <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
-          {meta.description}
-        </p>
 
         {meta.requiresCnpj && !hasDocument && (
           <InfoCard
@@ -140,9 +137,6 @@ export function FiscalProfileSection({
             onChange={(e) => onChange({ cnaeSecondary: e.target.value })}
           />
         </div>
-        <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
-          Preenchidos automaticamente ao consultar o CNPJ na aba Geral.
-        </p>
 
         {meta.hasRevenueLimit && (
           <>
@@ -165,10 +159,8 @@ export function FiscalProfileSection({
                     label="Data de abertura do CNPJ"
                     value={value.openingDate}
                     onChange={(e) => onChange({ openingDate: e.target.value })}
+                    labelTooltip="Usada para calcular o limite proporcional no primeiro ano"
                   />
-                  <p className="mt-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
-                    Usada para calcular o limite proporcional no primeiro ano.
-                  </p>
                 </div>
               )}
             </div>

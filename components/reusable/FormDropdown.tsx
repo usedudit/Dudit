@@ -2,6 +2,8 @@
 
 import type React from "react"
 import Dropdown, { DropdownItem } from "./Dropdown"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { InfoIcon } from "@/lib/icons"
 
 interface FormDropdownProps {
   label?: string
@@ -17,6 +19,10 @@ interface FormDropdownProps {
   errorMessage?: string
   onFocus?: () => void
   dataField?: string
+  /** Tooltip text to show next to the label (info icon) */
+  labelTooltip?: string | React.ReactNode
+  /** Tooltip props for customization */
+  labelTooltipProps?: React.ComponentProps<typeof TooltipContent>
 }
 
 export const FormDropdown: React.FC<FormDropdownProps> = ({
@@ -33,9 +39,39 @@ export const FormDropdown: React.FC<FormDropdownProps> = ({
   errorMessage,
   onFocus,
   dataField,
+  labelTooltip,
+  labelTooltipProps,
 }) => (
   <div className="flex-1 w-full" {...(dataField ? { "data-field": dataField } : {})}>
-    {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>}
+    {label && (
+      <div className="flex items-center gap-2 mb-1.5">
+        <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>
+        {labelTooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="p-0.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-body transition-colors rounded flex items-center justify-center"
+                aria-label="Mais informações"
+              >
+                <InfoIcon className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              align="start"
+              {...labelTooltipProps}
+            >
+              {typeof labelTooltip === "string" ? (
+                <p className="text-xs">{labelTooltip}</p>
+              ) : (
+                labelTooltip
+              )}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    )}
     <Dropdown
       className={className}
       trigger={

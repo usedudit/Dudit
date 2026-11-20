@@ -44,10 +44,11 @@ export function getLocationLabel(
     if (!partner) return null
 
     if (options?.full) {
-        const city = String(partner.city || "").trim()
+        const rawCity = String(partner.city || "").trim()
         const state = normalizeStateUf(partner.state)
-        if (city && state) return `${city}, ${state}`
-        if (city) return city
+        const cleanCity = state ? rawCity.replace(new RegExp(`[,\\s-]+${state}$`, "i"), "").trim() || rawCity : rawCity
+        if (cleanCity && state) return `${cleanCity}, ${state}`
+        if (cleanCity) return cleanCity
         if (state) return state
         return null
     }
@@ -61,13 +62,16 @@ export function getLocationLabel(
 
     if (!sellerCity && !sellerState) return null
 
+    const rawCity = String(partner.city || "").trim()
+    const cleanCity = sellerState ? rawCity.replace(new RegExp(`[,\\s-]+${sellerState}$`, "i"), "").trim() || rawCity : rawCity
+
     if (context.scope === "country") {
-        return sellerCity && sellerState ? `${partner.city}, ${sellerState}` : (partner.city || partner.state || null)
+        return cleanCity && sellerState ? `${cleanCity}, ${sellerState}` : (cleanCity || partner.state || null)
     }
 
     if (context.scope === "state") {
-        if (sellerCity && ctxState && sellerState === ctxState) return partner.city || null
-        return sellerCity && sellerState ? `${partner.city}, ${sellerState}` : (partner.city || null)
+        if (cleanCity && ctxState && sellerState === ctxState) return cleanCity || null
+        return cleanCity && sellerState ? `${cleanCity}, ${sellerState}` : (cleanCity || null)
     }
 
     // scope === "city"
@@ -77,7 +81,7 @@ export function getLocationLabel(
         return null
     }
 
-    if (sellerCity && ctxState && sellerState === ctxState) return partner.city || null
+    if (cleanCity && ctxState && sellerState === ctxState) return cleanCity || null
 
-    return sellerCity && sellerState ? `${partner.city}, ${sellerState}` : (partner.city || null)
+    return cleanCity && sellerState ? `${cleanCity}, ${sellerState}` : (cleanCity || null)
 }

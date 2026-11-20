@@ -3130,18 +3130,18 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         }),
       );
     }
-
-    // Export order to Tiny ERP if configured (non-blocking)
-    try {
-      import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
-        exportDuditOrderToTiny(order.id).catch((err) => {
-          console.error("[createOrderAction] Tiny export failed:", err)
-        })
-      }).catch((tinyErr) => {
-        console.error("[createOrderAction] Error loading Tiny integration:", tinyErr)
-      })
-    } catch {}
   }
+
+  // Export order to Tiny ERP if configured (non-blocking)
+  try {
+    import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
+      exportDuditOrderToTiny(order.id).catch((err) => {
+        console.error("[createERPOrderAction] Tiny export failed:", err)
+      })
+    }).catch((tinyErr) => {
+      console.error("[createERPOrderAction] Error loading Tiny integration:", tinyErr)
+    })
+  } catch {}
 
   if (
     paymentState.situation === "paid" ||

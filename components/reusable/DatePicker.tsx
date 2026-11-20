@@ -12,7 +12,8 @@ import {
     CalendarIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
-    ChevronDownIcon
+    ChevronDownIcon,
+    InfoIcon
 } from "@/lib/icons"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import {
@@ -27,6 +28,7 @@ import {
     DrawerTitle,
     DrawerTrigger,
 } from "@/components/ui/drawer"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 // --- Local Calendar Component (Using Reusable Button and Brand Icons) ---
 
@@ -129,6 +131,10 @@ interface DatePickerProps {
     error?: boolean
     errorMessage?: string
     dataField?: string
+    /** Tooltip text to show next to the label (info icon) */
+    labelTooltip?: string | React.ReactNode
+    /** Tooltip props for customization */
+    labelTooltipProps?: React.ComponentProps<typeof TooltipContent>
 }
 
 export const DatePicker: React.FC<DatePickerProps> = ({
@@ -143,6 +149,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     error,
     errorMessage,
     dataField,
+    labelTooltip,
+    labelTooltipProps,
 }) => {
     const [open, setOpen] = React.useState(false)
     const isMobile = useIsMobile()
@@ -239,6 +247,30 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                         {label}
                         {required && <span className="text-brand-red"> *</span>}
                     </label>
+                    {labelTooltip && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="p-0.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-body transition-colors rounded flex items-center justify-center"
+                                    aria-label="Mais informações"
+                                >
+                                    <InfoIcon className="w-4 h-4" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                                side="top"
+                                align="start"
+                                {...labelTooltipProps}
+                            >
+                                {typeof labelTooltip === "string" ? (
+                                    <p className="text-xs">{labelTooltip}</p>
+                                ) : (
+                                    labelTooltip
+                                )}
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
                 </div>
             )}
 

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { HeroBanner } from "@/components/marketplace/shared-components";
 import { GridLines, Navbar, Footer } from '@/components/InstitucionalShared';
 import { useRouter } from 'next/navigation';
 
@@ -23,9 +22,7 @@ export default function TermsPage() {
         <div className="bg-white dark:bg-dark-surface min-h-screen">
             <Navbar onNavigate={onNavigate} />
 
-            <main>
-                <HeroBanner href="/explorar" />
-
+            <div className="pt-32 pb-24">
                 <section className="relative bg-white dark:bg-dark-surface pb-20 overflow-hidden">
                     <GridLines />
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
@@ -385,7 +382,7 @@ export default function TermsPage() {
                         </div>
                     </div>
                 </section>
-            </main>
+            </div>
 
             <Footer onNavigate={onNavigate} />
         </div>

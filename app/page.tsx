@@ -11,6 +11,7 @@ import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
+import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 
 export const metadata: Metadata = {
     title: "Dudit | Descubra. Anuncie. Organize.",
@@ -61,17 +62,19 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
         const isDefaultSP = citySlug === "sao-paulo-sp" && cityName === "Estado de São Paulo"
+        const isCountryScope = citySlug === "brasil" || cityName === "Brasil" || isDefaultSP
+        const isStateScope = citySlug.startsWith("estado-")
 
         const coords = userProfile?.latitude && userProfile?.longitude
             ? { lat: userProfile.latitude, lng: userProfile.longitude }
             : null
 
-        const scope = isDefaultSP ? "country" : "city"
+        const scope = isCountryScope ? "country" : (isStateScope ? "state" : "city")
 
-        // Country scope: override display values to "Brasil"
+        // Scope display values
         const ctxCity = scope === "country" ? "Brasil" : cityName
-        const ctxState = scope === "country" ? "BR" : state
-        const ctxStateOnly = scope === "country" ? false : isDefaultSP
+        const ctxState = scope === "country" ? "BR" : (isStateScope ? citySlug.replace("estado-", "").toUpperCase() : state)
+        const ctxStateOnly = isStateScope
 
         displayCityName = ctxCity
 
@@ -166,7 +169,14 @@ export default async function HomePage() {
     } else {
         const cookieStore = await cookies()
         const cookieCity = cookieStore.get("dudit_city")?.value
-        if (cookieCity && cookieCity !== "brasil" && !cookieCity.startsWith("estado-")) {
+        if (cookieCity === "brasil") {
+            citySlug = "brasil"
+            cityName = "Brasil"
+        } else if (cookieCity?.startsWith("estado-")) {
+            const uf = cookieCity.replace("estado-", "").toLowerCase()
+            citySlug = cookieCity
+            cityName = ESTADO_MAP[uf] || `Estado de ${uf.toUpperCase()}`
+        } else if (cookieCity) {
             const resolved = await resolveCityAndStateFromSlug(cookieCity)
             if (resolved) {
                 citySlug = cookieCity
@@ -197,13 +207,17 @@ export default async function HomePage() {
             full_name: null,
             latitude: null,
             longitude: null,
-            address: isDefaultStateSP ? "Estado de São Paulo" : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`,
+            address: isDefaultStateSP
+                ? "Estado de São Paulo"
+                : (citySlug === "brasil"
+                    ? "Brasil"
+                    : (citySlug.startsWith("estado-") ? cityName : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`)),
             city: cityName,
-            state: citySlug.split("-").pop()?.toUpperCase(),
+            state: citySlug === "brasil" ? "BR" : (citySlug.startsWith("estado-") ? citySlug.replace("estado-", "").toUpperCase() : citySlug.split("-").pop()?.toUpperCase()),
         } : null)
 
     // Country scope (no real location context): override header to show "Brasil"
-    if (isDefaultStateSP && userProfile) {
+    if ((isDefaultStateSP || citySlug === "brasil") && userProfile) {
         userProfile = { ...userProfile, address: "Brasil", city: "Brasil", state: "BR" }
     }
 

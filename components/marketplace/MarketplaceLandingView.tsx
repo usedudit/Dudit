@@ -8,13 +8,12 @@ import { Input } from "@/components/reusable/Input"
 import {
     MapPinIcon,
     ChevronRightIcon,
-    WhatsappIcon,
     GlobeIcon,
 } from "@/lib/icons"
 import { COMMON_CITY_ACCENTS } from "@/components/marketplace/explorar-constants"
-import { HomeCategoryBar } from "./HomeCategoryBar"
 import { HorizontalCarousel, ItemCard } from "./shared-components"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
+import { InfoCard } from "../reusable"
 
 interface MarketplaceLandingViewProps {
     user?: any
@@ -216,37 +215,13 @@ export function MarketplaceLandingView({
                             >
                                 {isLocationLoading ? "Localizando..." : "Usar localização atual"}
                             </Button>
-
-                            <Button
-                                variant="outline"
-                                onClick={() => onSelectCitySlug("brasil")}
-                                className="border-white/20 text-white hover:bg-white/10"
-                            >
-                                <GlobeIcon size={16} className="mr-1.5 text-brand-green" />
-                                Ver lojas do Brasil todo
-                            </Button>
-
-                            {user ? (
-                                <Button
-                                    variant="outline"
-                                    onClick={onOpenAddressModal}
-                                    className="border-white/20 text-white hover:bg-white/10"
-                                >
-                                    Adicionar Endereço
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="outline"
-                                    onClick={onOpenVisitorModal}
-                                    className="border-white/20 text-white hover:bg-white/10"
-                                >
-                                    Escolher Cidade
-                                </Button>
-                            )}
                         </div>
 
                         {locationError && (
-                            <p className="text-red-300 text-sm mt-3 font-semibold">{locationError}</p>
+                            <InfoCard
+                                message={locationError}
+                                color="red"
+                            />
                         )}
                     </div>
 
@@ -272,20 +247,11 @@ export function MarketplaceLandingView({
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                BARRA DE CATEGORIAS DO MARKETPLACE (Componente oficial Dudit)
-            ═══════════════════════════════════════════════════════════ */}
-            <div className="w-full bg-white dark:bg-dark-background border-b border-gray-100 dark:border-dark-border py-4">
-                <div className="container mx-auto px-4 max-w-[1000px]">
-                    <HomeCategoryBar selectedCitySlug={selectedCitySlug || "brasil"} />
-                </div>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════
                 DESTAQUES EM TODO O BRASIL (Quando há produtos nacionais)
             ═══════════════════════════════════════════════════════════ */}
             {brasilTodoSection && brasilTodoSection.items && brasilTodoSection.items.length > 0 && (
-                <div className="w-full bg-white dark:bg-dark-background py-6 border-b border-gray-100 dark:border-dark-border">
-                    <div className="container mx-auto px-4 max-w-[1000px]">
+                <div className="w-full bg-white dark:bg-dark-background py-6">
+                    <div className="container mx-auto px-4 max-w-[1400px]">
                         <HorizontalCarousel
                             key={brasilTodoSection.id}
                             title={brasilTodoSection.title}
@@ -420,8 +386,14 @@ export function MarketplaceLandingView({
                 HERO 5 - PRONTO PARA VENDER E CONVITE
             ═══════════════════════════════════════════════════════════ */}
             <section className="py-10 px-4 bg-white dark:bg-dark-background relative">
-                <div className="max-w-[1200px] mx-auto relative z-10">
-                    <div className="bg-brand-dark dark:bg-[#0a2e24] rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12 overflow-hidden">
+                <div className="max-w-[1400px] mx-auto relative z-10">
+                    <div className="bg-brand-dark rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12 overflow-hidden">
+                        {/* Background decorative faint rings */}
+                        <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] sm:w-[800px] sm:h-[800px] lg:w-[1000px] lg:h-[1000px] border border-white rounded-full" />
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] sm:w-[600px] sm:h-[600px] lg:w-[750px] lg:h-[750px] border border-white rounded-full" />
+                        </div>
+
                         {/* Texto + Botão */}
                         <div className="flex-1 text-center md:text-left">
                             <h2 className="text-2xl md:text-[32px] font-black text-white mb-3 leading-tight">
@@ -431,30 +403,11 @@ export function MarketplaceLandingView({
                                 Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda com 0% de comissão. Sem taxas por pedido ou surpresas no fim do mês.
                             </p>
                             <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
-                                <Button asChild className="h-11 px-8 text-sm">
+                                <Button asChild className="h-11">
                                     <Link href="/auth/login?mode=partner" prefetch={false}>
                                         Começar grátis
                                     </Link>
                                 </Button>
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="border-white/20 text-white hover:bg-white/10 h-11 px-6 text-sm"
-                                >
-                                    <Link href="/institucional/planos" prefetch={false}>
-                                        Ver planos
-                                    </Link>
-                                </Button>
-                                {isCityEmpty && effectiveCityName && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleInvite}
-                                        className="border-white/20 text-white hover:bg-white/10 h-11 px-6 text-sm"
-                                    >
-                                        <WhatsappIcon className="w-4 h-4 mr-2" />
-                                        Convidar pelo WhatsApp
-                                    </Button>
-                                )}
                             </div>
                         </div>
 

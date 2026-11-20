@@ -80,7 +80,7 @@ export async function getAdminCampaigns(
 
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
-        query = query.ilike("name", `%${s}%`)
+        query = query.or(`name.ilike.%${s}%,description.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
     }
 
     if (filters?.isActive === "active") {

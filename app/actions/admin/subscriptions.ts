@@ -21,6 +21,10 @@ import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { SubscriptionEntry, CursorPaginatedResult } from "@/lib/admin/types"
 
+function sanitizeIlike(input: string): string {
+    return input.replace(/[%_\\]/g, c => `\\${c}`)
+}
+
 export interface AdminSubscriptionStats {
     total: number
     connected: number
@@ -62,7 +66,12 @@ export async function getAdminSubscriptionStats(): Promise<AdminSubscriptionStat
 export async function getSubscriptions(
     cursor?: string | null,
     limit: number = 20,
-    statusFilter?: string
+    filters?: {
+        statusFilter?: string
+        search?: string
+        startDate?: string
+        endDate?: string
+    }
 ): Promise<CursorPaginatedResult<SubscriptionEntry>> {
     const admin = await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
@@ -78,10 +87,22 @@ export async function getSubscriptions(
             "id, user_id, is_active, suspended_at, erp_disabled, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), stores(name)"
         )
 
+    if (filters?.search && filters.search.trim().length > 0) {
+        const s = sanitizeIlike(filters.search.trim())
+        query = query.or(`id.eq.${s},stores.name.ilike.%${s}%`)
+    }
+
     // Connection status lives in partner_integrations, which cannot be used as
     // an anti-join here, so it is applied to the scanned page below.
-    if (statusFilter === "suspended") {
+    if (filters?.statusFilter === "suspended") {
         query = query.not("suspended_at", "is", null)
+    }
+
+    if (filters?.startDate) {
+        query = query.gte("created_at", filters.startDate)
+    }
+    if (filters?.endDate) {
+        query = query.lte("created_at", filters.endDate)
     }
 
     if (cursor) {
@@ -100,11 +121,11 @@ export async function getSubscriptions(
     const hasMore = (partners?.length || 0) > pageSize
     const scanned = (partners || []).slice(0, pageSize)
 
-    const wantsConnected = statusFilter === "connected" || statusFilter === "disconnected"
+    const wantsConnected = filters?.statusFilter === "connected" || filters?.statusFilter === "disconnected"
     const items = wantsConnected
         ? scanned.filter((p: any) => {
             const isConnected = !!mapToMpPartnerFields(p.partner_integrations).mp_user_id
-            return statusFilter === "connected" ? isConnected : !isConnected
+            return filters?.statusFilter === "connected" ? isConnected : !isConnected
         })
         : scanned
 

@@ -93,7 +93,7 @@ export async function getAdminMarketplaceOrders(
 
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%`)
+        query = query.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
     }
 
     if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
@@ -451,7 +451,7 @@ export async function getAdminReturnRequests(
 
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`customer_name_snapshot.ilike.%${s}%,order_number_snapshot.ilike.%${s}%`)
+        query = query.or(`customer_name_snapshot.ilike.%${s}%,order_number_snapshot.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%,customer_email_snapshot.ilike.%${s}%`)
     }
 
     if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {

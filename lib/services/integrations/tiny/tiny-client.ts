@@ -76,11 +76,23 @@ export interface TinyOrderDeliveryAddress {
 
 export interface TinyOrderItem {
   item: {
+    id_produto?: number | string
     codigo?: string
     descricao: string
     unidade?: string
     quantidade: number
     valor_unitario: number
+  }
+}
+
+export interface TinyOrderParcela {
+  parcela: {
+    dias?: number
+    data?: string
+    valor: number
+    forma_pagamento?: string
+    meio_pagamento?: string
+    obs?: string
   }
 }
 
@@ -90,10 +102,13 @@ export interface TinyOrderPayload {
     cliente: TinyOrderCustomer
     endereco_entrega?: TinyOrderDeliveryAddress
     itens: TinyOrderItem[]
+    condicao_pagamento?: string
     forma_pagamento?: string
     meio_pagamento?: string
+    parcelas?: TinyOrderParcela[]
     forma_envio?: string
     forma_frete?: string
+    nome_transportador?: string
     frete_por_conta?: "R" | "D" | "T" | "3" | "4" | "S"
     valor_frete?: number
     valor_desconto?: number
@@ -155,11 +170,40 @@ export class TinyClient {
       throw new Error("Resposta inválida do Tiny ERP.")
     }
 
-    if (retorno.status === "Erro" || retorno.status_processamento === 1) {
-      const errList = retorno.erros || []
-      const msg = Array.isArray(errList)
-        ? errList.map((e: any) => e.erro || e).join("; ")
-        : String(retorno.erros?.erro || "Erro na API do Tiny")
+    if (
+      retorno.status === "Erro" ||
+      retorno.status_processamento === 1 ||
+      retorno.status_processamento === "1" ||
+      retorno.status_processamento === 2 ||
+      retorno.status_processamento === "2"
+    ) {
+      let rawErrors: any[] = []
+      if (Array.isArray(retorno.erros)) {
+        rawErrors = retorno.erros
+      } else if (retorno.erros?.erro) {
+        rawErrors = Array.isArray(retorno.erros.erro) ? retorno.erros.erro : [retorno.erros.erro]
+      } else if (retorno.registros?.registro?.erros) {
+        const regErrors = retorno.registros.registro.erros
+        rawErrors = Array.isArray(regErrors) ? regErrors : [regErrors]
+      } else if (retorno.registro?.erros) {
+        const regErrors = retorno.registro.erros
+        rawErrors = Array.isArray(regErrors) ? regErrors : [regErrors]
+      } else if (Array.isArray(retorno.registros)) {
+        for (const reg of retorno.registros) {
+          if (reg?.erros) {
+            const inner = Array.isArray(reg.erros) ? reg.erros : [reg.erros]
+            rawErrors.push(...inner)
+          }
+        }
+      }
+
+      const msg = rawErrors.length > 0
+        ? rawErrors
+            .map((e: any) => e?.erro || e?.mensagem || (typeof e === "string" ? e : JSON.stringify(e)))
+            .filter(Boolean)
+            .join("; ")
+        : (retorno.mensagem || retorno.erro || "Erro na API do Tiny")
+
       throw new Error(`Tiny ERP: ${msg}`)
     }
 
@@ -236,14 +280,19 @@ export class TinyClient {
       pedido: JSON.stringify(payload),
     })
 
-    const registros = res.registros?.registro
-    if (!registros) {
+    const registro =
+      res.registro ||
+      res.registros?.registro ||
+      (Array.isArray(res.registros) ? res.registros[0] : null) ||
+      (Array.isArray(res.registros?.registro) ? res.registros.registro[0] : null)
+
+    if (!registro || (!registro.id && !registro.numero)) {
       throw new Error("Tiny não retornou informações do pedido gerado.")
     }
 
     return {
-      id: registros.id,
-      numero: registros.numero,
+      id: registro.id,
+      numero: registro.numero,
     }
   }
 

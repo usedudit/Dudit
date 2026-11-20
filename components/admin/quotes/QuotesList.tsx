@@ -49,8 +49,6 @@ import {
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
-    ymdInBounds,
-    msToBrazilYmd,
     isDatePeriodFilterActive,
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
@@ -159,7 +157,7 @@ export default function QuotesList({
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
-    const queryKey = useMemo(() => ["admin", "quotes"] as const, [])
+    const queryKey = useMemo(() => ["admin", "quotes", debouncedSearch, filters.issuePeriod, activeTab] as const, [debouncedSearch, filters.issuePeriod, activeTab])
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const { modal: actionModal, runAction } = useAdminActionModal()
@@ -172,8 +170,20 @@ export default function QuotesList({
         initialItems: rawQuotes,
         initialNextCursor,
         initialHasMore,
+        skipInitialData: debouncedSearch.length > 0 || isDatePeriodFilterActive(filters.issuePeriod),
         fetchPageFn: async ({ cursor }) => {
-            const res = await getAdminQuotes(cursor, 100)
+            let statuses: string[] | undefined
+            if (activeTab === "Enviados") statuses = ["sent", "pending_client", "viewed"]
+            else if (activeTab === "Aprovados") statuses = ["approved"]
+            else if (activeTab === "Rejeitados") statuses = ["rejected"]
+            else if (activeTab === "Expirados") statuses = ["expired"]
+
+            const res = await getAdminQuotes(cursor, 100, {
+                search: debouncedSearch,
+                startDate: filters.issuePeriod.from || undefined,
+                endDate: filters.issuePeriod.to || undefined,
+                statuses,
+            })
             return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((q: any) => String(q?.id || ""), []),
@@ -319,10 +329,6 @@ export default function QuotesList({
     const filteredQuotes: Quote[] = useMemo(() => {
         if (!currentQuotes) return []
 
-        const term = debouncedSearch.toLowerCase()
-        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.issuePeriod)
-        const dateBoundsActive = startYmd !== null || endYmd !== null
-
         const filtered = currentQuotes
             .map((q: any): Quote => {
                 const statusInfo = STATUS_MAP[q.status] || { label: q.status || "Pendente", color: "gray", icon: null }
@@ -372,26 +378,6 @@ export default function QuotesList({
                 }
             })
             .filter((q: Quote) => {
-                const itemMatch = Array.isArray(q.item_keywords) && q.item_keywords.some((k: string) =>
-                    typeof k === "string" && k.toLowerCase().includes(term)
-                )
-                const emailMatch = typeof q.customer_email === "string" && q.customer_email.toLowerCase().includes(term)
-                const notesMatch = typeof q.notes === "string" && q.notes.toLowerCase().includes(term)
-                const sellerMatch = typeof q.store_name === "string" && q.store_name.toLowerCase().includes(term)
-
-                const searchMatch = !term || (
-                    q.displayId.toLowerCase().includes(term) ||
-                    q.customer_name.toLowerCase().includes(term) ||
-                    (q.customer_id || "").toLowerCase().includes(term) ||
-                    sellerMatch ||
-                    itemMatch ||
-                    emailMatch ||
-                    notesMatch
-                )
-
-                return searchMatch
-            })
-            .filter((q: Quote) => {
                 let tabMatch = true
                 if (activeTab === "Enviados") tabMatch = q.status === "sent" || q.status === "pending_client" || q.status === "viewed"
                 else if (activeTab === "Aprovados") tabMatch = q.status === "approved"
@@ -399,10 +385,8 @@ export default function QuotesList({
                 else if (activeTab === "Expirados") tabMatch = q.status === "expired"
 
                 const statusFilterMatch = filters.status.length === 0 || filters.status.includes(q.statusLabel)
-                const issueYmd = msToBrazilYmd(q.created_at_time)
-                const matchesIssue = !dateBoundsActive || ymdInBounds(issueYmd, startYmd, endYmd)
 
-                return tabMatch && statusFilterMatch && matchesIssue
+                return tabMatch && statusFilterMatch
             })
 
         const result = [...filtered]
@@ -456,7 +440,7 @@ export default function QuotesList({
         }
 
         return result
-    }, [currentQuotes, debouncedSearch, activeTab, filters, sortConfig])
+    }, [currentQuotes, activeTab, filters.status, sortConfig])
 
     const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage) || 1
     const paginated = filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
