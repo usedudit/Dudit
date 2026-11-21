@@ -176,6 +176,35 @@ export async function createStockMovementAction(data: {
 
         await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
 
+        // Sincroniza estoque no Tiny ERP de forma não-bloqueante
+        import("@/lib/services/integrations/tiny/tiny-integration")
+          .then(async ({ syncDuditStockToTiny }) => {
+            let newStock = 0
+            if (data.variantId) {
+              const { data: vRow } = await supabase
+                .from("product_variants")
+                .select("stock_quantity")
+                .eq("id", data.variantId)
+                .maybeSingle()
+              newStock = Number(vRow?.stock_quantity || 0)
+            } else {
+              const { data: pRow } = await supabase
+                .from("products")
+                .select("stock_quantity")
+                .eq("id", data.productId)
+                .maybeSingle()
+              newStock = Number(pRow?.stock_quantity || 0)
+            }
+            await syncDuditStockToTiny({
+              partnerId,
+              productId: data.productId,
+              variantId: data.variantId || undefined,
+              newStock,
+              reason: `Movimentação ${data.type} na Dudit: ${data.reason}`,
+            })
+          })
+          .catch(() => {})
+
         return successResponse(movementRecord)
     } catch (err: any) {
         console.error("createStockMovementAction error:", err)
@@ -348,6 +377,39 @@ export async function createBatchStockMovementAction(data: {
         for (const item of data.items) {
             await invalidateProductCache(item.productId, partnerId, 'update', { silent: true })
         }
+
+        // Sincroniza estoque no Tiny ERP de forma não-bloqueante
+        import("@/lib/services/integrations/tiny/tiny-integration")
+            .then(async ({ syncDuditStockToTiny }) => {
+                for (const item of data.items) {
+                    try {
+                        let newStock = 0
+                        if (item.variantId) {
+                            const { data: vRow } = await supabase
+                                .from("product_variants")
+                                .select("stock_quantity")
+                                .eq("id", item.variantId)
+                                .maybeSingle()
+                            newStock = Number(vRow?.stock_quantity || 0)
+                        } else {
+                            const { data: pRow } = await supabase
+                                .from("products")
+                                .select("stock_quantity")
+                                .eq("id", item.productId)
+                                .maybeSingle()
+                            newStock = Number(pRow?.stock_quantity || 0)
+                        }
+                        await syncDuditStockToTiny({
+                            partnerId,
+                            productId: item.productId,
+                            variantId: item.variantId || undefined,
+                            newStock,
+                            reason: `Movimentação em lote ${data.type} na Dudit: ${data.reason}`,
+                        })
+                    } catch { }
+                }
+            })
+            .catch(() => { })
 
         return successResponse(movementRecord)
     } catch (err: any) {

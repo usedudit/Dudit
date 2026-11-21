@@ -27,18 +27,27 @@
   ambiente do app e fazer o deploy.
 
 .EXAMPLE
-  $env:CRONJOB_API_KEY = "sua-api-key"
+  # === COMO RODAR NO POWERSHELL (da raiz do projeto) ===
+  # 1. Defina a API key do cron-job.org e os secrets do ambiente (os mesmos do Railway/producao):
+  $env:CRONJOB_API_KEY = "sua-api-key-do-cron-job-org"
   $env:APP_URL = "https://dudit.com.br"
-  $env:CRON_SECRET = "..."
-  $env:INTERNAL_CRON_SECRET = "..."
-  $env:BACKUP_CRON_SECRET = "..."
-  .\scripts\setup-cron-job-org.ps1 -DryRun
-  .\scripts\setup-cron-job-org.ps1
+  $env:CRON_SECRET = "seu-CRON_SECRET"
+  $env:INTERNAL_CRON_SECRET = "seu-INTERNAL_CRON_SECRET"   # opcional se so criar jobs /api/cron/*
+  $env:BACKUP_CRON_SECRET = "seu-BACKUP_CRON_SECRET"       # opcional se so criar jobs /api/cron/*
+
+  # 2. (Opcional) Simular antes sem alterar nada no cron-job.org:
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup-cron-job-org.ps1 -DryRun
+
+  # 3. Criar os jobs novos (os que ja existem sao pulados automaticamente pelo titulo):
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup-cron-job-org.ps1
+
+  # (Opcional) Incluir tambem os jobs opcionais:
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup-cron-job-org.ps1 -IncludeOptional
 
 .EXAMPLE
-  # Depois de rotacionar os secrets no Railway e fazer deploy:
-  .\scripts\setup-cron-job-org.ps1 -UpdateSecret -DryRun
-  .\scripts\setup-cron-job-org.ps1 -UpdateSecret
+  # === DEPOIS DE TROCAR/ROTACIONAR SECRETS NO RAILWAY ===
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup-cron-job-org.ps1 -UpdateSecret -DryRun
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup-cron-job-org.ps1 -UpdateSecret
 #>
 param(
   [string]$AppUrl = $env:APP_URL,
@@ -175,6 +184,11 @@ $jobs = @(
      Path  = "/api/cron/expire-orders"
      Method = 0; Minutes = $every10; Hours = @(-1); SecretName = "CRON_SECRET"
      Note  = "Libera estoque/pedidos vencidos (so Mercado Pago)." }
+
+  @{ Title = "Dudit - Expirar banimentos e suspensoes"
+     Path  = "/api/cron/expire-enforcements"
+     Method = 0; Minutes = $every10; Hours = @(-1); SecretName = "CRON_SECRET"
+     Note  = "Desbane usuarios e reativa parceiros/lojas/ERP cuja data final de suspensao ja venceu." }
 
   @{ Title = "Dudit - Lembretes e notificacoes"
      Path  = "/api/cron/notification-reminders"

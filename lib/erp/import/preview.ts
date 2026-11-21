@@ -5,6 +5,7 @@ import type { ColumnMapping, PreviewSummary, ImportSession } from "./types"
 import { validateRows } from "./validators"
 import { resolveCategories } from "./category-resolver"
 import { resolveSuppliers } from "./supplier-resolver"
+import { consolidateProductRows } from "./product-grouper"
 
 function mapRow(
   row: string[],
@@ -34,7 +35,12 @@ export async function generatePreview(
 ): Promise<PreviewSummary> {
   const { rows, entityType, totalRows, partnerId } = session
 
-  const mappedRows = rows.map((row) => mapRow(row, mapping))
+  const rawMappedRows = rows.map((row) => mapRow(row, mapping))
+  const mappedRows =
+    entityType === "products"
+      ? consolidateProductRows(rawMappedRows).map((item) => item.row)
+      : rawMappedRows
+  const effectiveTotalRows = mappedRows.length
 
   let defaultMarginPercent: number | null = null
   if (entityType === "products" || entityType === "services") {
@@ -81,7 +87,7 @@ export async function generatePreview(
   }
 
   const duplicateRowIndices = await detectDuplicates(session, mappedRows)
-  const validRowsCount = Math.max(0, totalRows - errorRowIndices.size - duplicateRowIndices.size)
+  const validRowsCount = Math.max(0, effectiveTotalRows - errorRowIndices.size - duplicateRowIndices.size)
 
   const sampleRows = mappedRows.slice(0, 10).map((row) => {
     const sample: Record<string, string> = {}
@@ -94,7 +100,7 @@ export async function generatePreview(
   })
 
   return {
-    totalRows,
+    totalRows: effectiveTotalRows,
     validRows: validRowsCount,
     errorRows: errorRowIndices.size,
     warningRows: warningRowIndices.size,

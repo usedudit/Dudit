@@ -110,9 +110,9 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
     ? null
     : Math.max(0, Number(input.settings.maxDeliveryKm))
 
-  const effectiveMaxKm = maxDeliveryKmSetting != null
-    ? maxDeliveryKmSetting
-    : (includedKm > 0 ? includedKm : null)
+  // Only maxDeliveryKm defines the maximum delivery radius.
+  // includedKm is the distance covered by the base fee before extraKmPrice applies.
+  const effectiveMaxKm = maxDeliveryKmSetting
 
   const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
   if (isOutsideRadius && !input.allowOutsideRadius) {

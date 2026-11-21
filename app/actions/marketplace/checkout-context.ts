@@ -142,9 +142,24 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
 
-  const isOrderBumpActive = await checkIsAddonActive(resolved.partnerId, "order_bump")
+  const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
 
-  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult, userCartProductsResult, marketplaceCapabilities] = await Promise.all([
+  const [
+    isOrderBumpActive,
+    orderAcceptance,
+    { data: partnerRow },
+    { data: storeRowData },
+    plan,
+    deliveryConfig,
+    promosMap,
+    storefrontPaymentMethodsResult,
+    userAddressesResult,
+    bumpProductsResult,
+    userCartProductsResult,
+    marketplaceCapabilities,
+  ] = await Promise.all([
+    checkIsAddonActive(resolved.partnerId, "order_bump"),
+    canStoreAcceptOrders(admin, { storeId: targetStoreId || undefined, partnerId: resolved.partnerId }),
     admin
       .from("partners")
       .select(
@@ -194,7 +209,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     (() => {
       let q = admin
         .from("products")
-        .select("id, short_id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
+        .select("id, short_id, name, price, promotional_price, images, stock_available, stock_quantity, availability_value, availability_unit, unit, product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_available, stock_quantity, variant_options, image_url, is_active)")
         .eq("partner_id", resolved.partnerId)
         .eq("is_active", true)
         .neq("moderation_status", "rejected")
@@ -219,8 +234,6 @@ export async function getMarketplaceCheckoutContextAction(input: {
   // mp_* status fields are sourced from partner_integrations.
   if (partnerRow) Object.assign(partnerRow, withMpPartnerFields(partnerRow))
 
-  const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
-  const orderAcceptance = await canStoreAcceptOrders(admin, { storeId: targetStoreId || undefined, partnerId: resolved.partnerId })
   if (!orderAcceptance.allowed) {
     return { success: false, error: orderAcceptance.message || INACTIVE_SHOWCASE_ERROR }
   }

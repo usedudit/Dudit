@@ -14,6 +14,11 @@ import {
   readSpreadsheet,
   suggestMapping,
   detectEntity,
+  detectSpreadsheetSource,
+  consolidateProductRows,
+  normalizePackagingType,
+  normalizeProductType,
+  normalizeUnit,
   createImportSession,
   getImportSession,
   generatePreview,
@@ -24,7 +29,9 @@ import {
   generateFailedRowsReport,
   validateMappingCompatibility,
 } from "@/lib/erp/import"
+import { parseNumber } from "@/lib/erp/import/validators"
 import type { EntityType, ColumnMapping, ImportOptions, FailedRow } from "@/lib/erp/import/types"
+import type { DetectedSpreadsheetSource } from "@/lib/erp/import/product-grouper"
 import { requireActivePartnerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 
 export async function downloadImportTemplateAction(
@@ -86,6 +93,7 @@ export async function uploadPlanilhaAction(
   success: boolean
   sessionId?: string
   entityType?: EntityType
+  detectedSource?: DetectedSpreadsheetSource
   headers?: string[]
   totalRows?: number
   fileName?: string
@@ -159,15 +167,20 @@ export async function uploadPlanilhaAction(
       return { success: false, error: "Erro ao persistir sessão de importação. Verifique a conexão com Redis." }
     }
 
-    const previewProducts = readResult.rows.map((row, i) => {
-        const entity = rowToPreviewEntity(detectedEntity, row, mapping, i)
-        return { ...entity, _rowIndex: i }
-    })
+    const detectedSource = detectedEntity === "products" ? detectSpreadsheetSource(readResult.headers) : null
+    const previewProducts =
+      detectedEntity === "products"
+        ? buildConsolidatedProductPreviews(readResult.rows, mapping)
+        : readResult.rows.map((row, i) => {
+            const entity = rowToPreviewEntity(detectedEntity, row, mapping, i)
+            return { ...entity, _rowIndex: i }
+          })
 
     return {
       success: true,
       sessionId,
       entityType: detectedEntity,
+      detectedSource,
       headers: readResult.headers,
       totalRows: readResult.totalRows,
       fileName: readResult.fileName,
@@ -347,10 +360,13 @@ export async function applyMappingAction(
 
     const validation = validateMappingCompatibility(mapping, session.entityType, session.rows)
 
-    const previewProducts = session.rows.slice(0, 50).map((row, i) => {
-        const entity = rowToPreviewEntity(session.entityType, row, mapping, i)
-        return { ...entity, _rowIndex: i }
-    })
+    const previewProducts =
+      session.entityType === "products"
+        ? buildConsolidatedProductPreviews(session.rows, mapping)
+        : session.rows.slice(0, 50).map((row, i) => {
+            const entity = rowToPreviewEntity(session.entityType, row, mapping, i)
+            return { ...entity, _rowIndex: i }
+          })
 
     return { success: true, previewProducts, validation }
   } catch (err: any) {
@@ -386,6 +402,97 @@ export async function listImportsAction(
     console.error("[listImportsAction]", err)
     return { success: false, error: err.message }
   }
+}
+
+function buildConsolidatedProductPreviews(
+  rows: string[][],
+  mapping: ColumnMapping[],
+): Record<string, any>[] {
+  const mappedRows = rows.map((row) => {
+    const obj: Record<string, string> = {}
+    for (const col of mapping) {
+      if (col.field && col.headerIndex < row.length) {
+        const val = row[col.headerIndex]?.trim() ?? ""
+        if (val) {
+          obj[col.field] = obj[col.field] ? `${obj[col.field]}, ${val}` : val
+        }
+      }
+    }
+    return obj
+  })
+
+  const consolidated = consolidateProductRows(mappedRows)
+  const now = Date.now()
+  const nowIso = new Date().toISOString()
+
+  return consolidated.map((item, idx) => {
+    const row = item.row
+    const rawName = row["name"]?.trim()
+    let name = rawName || `Item ${idx + 1}`
+    if (name.length > 150) {
+      name = name.substring(0, 147) + "..."
+    }
+
+    const rawStatus = row["status"]?.toLowerCase()
+    const status =
+      rawStatus && ["inativo", "inactive", "0", "false", "desativado"].includes(rawStatus)
+        ? "inativo"
+        : "ativo"
+
+    const price = parseNumber(row["price"]) ?? 0
+    const cost_price = parseNumber(row["cost_price"])
+    const stock = Math.floor(parseNumber(row["stock_quantity"]) ?? 0)
+    const min_stock = row["min_stock"] ? Math.floor(parseNumber(row["min_stock"]) ?? 0) : null
+    const rawVis = row["show_in_marketplace"]?.toLowerCase()
+    const show_in_marketplace = !(
+      rawVis &&
+      ["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis)
+    )
+
+    const variants = item.variants
+    const hasVariants = variants.length > 0
+    const variantPrices = variants.map((v) => v.price_adjustment).filter((p) => p >= 0)
+    const variantTotalStock = variants.reduce((sum, v) => sum + v.stock_quantity, 0)
+
+    return {
+      id: `import-${now}-${idx}`,
+      _rowIndex: item.primaryRowIndex,
+      _rowIndexes: item.rowIndexes,
+      _isGroupedParent: item.isGroupedParent,
+      name,
+      sku: row["sku"]?.trim() || null,
+      price,
+      stock_quantity: hasVariants && variantTotalStock > 0 ? variantTotalStock : stock,
+      cost_price,
+      gtin: row["gtin"]?.trim() || null,
+      category: row["category"]?.trim() || null,
+      subcategory: row["subcategory"]?.trim() || null,
+      brand: row["brand"]?.trim() || null,
+      supplier: row["supplier"]?.trim() || null,
+      variant_type: row["variant_type"]?.trim() || (hasVariants ? variants[0].variant_type : null),
+      variants: hasVariants ? variants : [],
+      variant_min_price: hasVariants && variantPrices.length > 0 ? Math.min(...variantPrices) : undefined,
+      variant_max_price: hasVariants && variantPrices.length > 0 ? Math.max(...variantPrices) : undefined,
+      variant_total_stock: hasVariants ? variantTotalStock : undefined,
+      variant_total_reserved: hasVariants ? 0 : undefined,
+      unit: normalizeUnit(row["unit"]),
+      description: row["description"]?.trim() || null,
+      ncm: row["ncm"]?.trim() || null,
+      cest: row["cest"]?.trim() || null,
+      packaging_type: normalizePackagingType(row["packaging_type"]),
+      status,
+      show_in_marketplace,
+      is_active: status === "ativo",
+      condition: row["condition"]?.trim() || "Novo",
+      product_type: normalizeProductType(row["product_type"]),
+      min_stock,
+      show_price_in_store: true,
+      images: [],
+      created_at: nowIso,
+      partner_id: "",
+      rating: 0,
+    }
+  })
 }
 
 function rowToPreviewEntity(

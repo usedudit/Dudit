@@ -273,6 +273,42 @@ export class TinyClient {
   }
 
   /**
+   * Atualiza estoque de um produto ou variação no Tiny ERP
+   * tipo: 'B' = Balanço (substitui o saldo), 'E' = Entrada, 'S' = Saída
+   */
+  async updateProductStock(
+    idProduto: string | number,
+    quantidade: number,
+    options: {
+      tipo?: "B" | "E" | "S"
+      precoUnitario?: number
+      observacoes?: string
+      deposito?: string
+    } = {}
+  ): Promise<{ status: string; saldoEstoque?: number | string }> {
+    const estoqueObj: Record<string, any> = {
+      tipo: options.tipo || "B",
+      quantidade: Math.max(0, Number(quantidade || 0)),
+      observacoes: (options.observacoes || "Atualizado via Dudit").substring(0, 100),
+    }
+
+    if (options.precoUnitario !== undefined && options.precoUnitario !== null) {
+      estoqueObj.precoUnitario = Number(options.precoUnitario)
+    }
+
+    if (options.deposito) {
+      estoqueObj.deposito = options.deposito
+    }
+
+    const res = await this.request("produto.atualizar.estoque.php", {
+      idProduto: String(idProduto),
+      estoque: estoqueObj,
+    })
+
+    return res
+  }
+
+  /**
    * Cria um pedido de venda no Tiny ERP
    */
   async createOrder(payload: TinyOrderPayload): Promise<TinyOrderResponse> {

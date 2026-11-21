@@ -119,6 +119,7 @@ interface ProcessPaymentRequest {
   couponCode?: string | null
   deliveryFee?: number
   payDepositOnly?: boolean
+  useStoreCredit?: boolean
   checkoutPricing?: {
     subtotal: number
     couponDiscount: number
@@ -201,7 +202,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId, existingOrderId: rawExistingOrderId, deviceId } = body
+    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, useStoreCredit, storeId, existingOrderId: rawExistingOrderId, deviceId } = body
     const existingOrderId = typeof rawExistingOrderId === "string" && !rawExistingOrderId.startsWith("temp-") ? rawExistingOrderId : undefined
     const claimedPartnerId = body.partnerId
     const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
@@ -1049,8 +1050,54 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
     }
 
-    const chargeAmount = totalAmount
     if (!fullOrderTotal) fullOrderTotal = totalAmount
+
+    let appliedStoreCredit = 0
+    if (!existingOrder && useStoreCredit) {
+      const { data: customerCreditRow } = await adminClient
+        .from("customers")
+        .select("id, store_credit")
+        .eq("partner_id", partnerId)
+        .or(`marketplace_user_id.eq.${buyerId},email.eq.${user.email}`)
+        .maybeSingle()
+
+      const creditCustomerId = customerCreditRow?.id || null
+      let creditQuery = adminClient
+        .from("store_credits")
+        .select("remaining_amount")
+        .eq("partner_id", partnerId)
+        .eq("status", "ACTIVE")
+        .gt("remaining_amount", 0)
+
+      if (creditCustomerId) {
+        creditQuery = creditQuery.or(`customer_id.eq.${creditCustomerId},customer_user_id.eq.${buyerId}`)
+      } else {
+        creditQuery = creditQuery.eq("customer_user_id", buyerId)
+      }
+
+      const { data: creditRows } = await creditQuery
+      const creditsTotal = (creditRows || []).reduce(
+        (sum: number, c: any) => sum + Number(c.remaining_amount || 0),
+        0,
+      )
+      const availableCredit = Math.max(
+        0,
+        creditsTotal,
+        Number(customerCreditRow?.store_credit || 0),
+      )
+      appliedStoreCredit = Math.min(availableCredit, totalAmount)
+      if (appliedStoreCredit > 0) {
+        totalAmount = Math.max(0, roundMoney(totalAmount - appliedStoreCredit))
+        if (totalAmount <= 0.009) {
+          return NextResponse.json(
+            { error: "Seu crédito em loja cobre 100% do pedido. Finalize sem o Mercado Pago." },
+            { status: 400 },
+          )
+        }
+      }
+    }
+
+    const chargeAmount = totalAmount
 
     const { data: userProfile } = await supabase
       .from("user_profiles")
@@ -1381,7 +1428,9 @@ async function handler(request: NextRequest) {
     })
 
     const { resolveSituationFromPaid } = await import("@/lib/payments/order-financial-state")
-    const approvedPaidAmount = paymentStatus === "approved" ? chargeAmount : 0
+    const approvedPaidAmount = paymentStatus === "approved"
+      ? roundMoney(appliedStoreCredit + chargeAmount)
+      : 0
     const orderSituation =
       paymentStatus === "approved"
         ? resolveSituationFromPaid(approvedPaidAmount, fullOrderTotal)
@@ -1516,6 +1565,42 @@ async function handler(request: NextRequest) {
       orderError = updateError
     } else {
       // Criar novo pedido (fluxo original)
+      const newOrderPaymentMethodLabel = appliedStoreCredit > 0
+        ? `Vale-compra (R$ ${appliedStoreCredit.toFixed(2).replace(".", ",")}) + ${paymentMethodDisplayName}`
+        : paymentMethodDisplayName
+      const newOrderPaymentBreakdown: Record<string, unknown>[] = []
+      if (appliedStoreCredit > 0) {
+        newOrderPaymentBreakdown.push({
+          method: "store_credit",
+          amount: appliedStoreCredit,
+          effectiveAmount: appliedStoreCredit,
+          netAmount: appliedStoreCredit,
+        })
+      }
+      newOrderPaymentBreakdown.push({
+        method: paymentMethodDisplayName,
+        amount: chargeAmount,
+        effectiveAmount: chargeAmount,
+        amountReceived: isWalletPurchase ? 0 : (paymentStatus === "approved" ? chargeAmount : 0),
+        provider: "Mercado Pago",
+        adjustmentType: "none",
+        interestAmount: 0,
+        feeAmount: 0,
+        fixedFeeAmount: 0,
+        feeBearer: "merchant",
+        mpPaymentStatus: isWalletPurchase ? "pending" : paymentStatus,
+        mpPaymentStatusDetail: isWalletPurchase ? "pending_wallet_purchase" : (mpPaymentResponse?.status_detail ?? null),
+        checkoutPricing: checkoutPricing || {
+          subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+          couponDiscount: couponDiscountAmount,
+          paymentMethodDiscount: paymentMethodDiscountAmount,
+          paymentMethodInterest: 0,
+          paymentMethodFee: paymentMethodExtraAmount,
+          deliveryFee,
+          finalTotal: fullOrderTotal,
+        },
+      })
+
       const { data: insertedOrder, error: insertError } = await adminClient
         .from("orders")
         .insert({
@@ -1530,7 +1615,7 @@ async function handler(request: NextRequest) {
           notes: notes,
           total_amount: fullOrderTotal,
           situation: isWalletPurchase ? "pending" : orderSituation,
-          payment_method: paymentMethodDisplayName,
+          payment_method: newOrderPaymentMethodLabel,
           payment_provider: "Mercado Pago",
           mp_payment_id: mpPaymentId ? mpPaymentId.toString() : null,
           coupon_id: couponIdToSave,
@@ -1540,34 +1625,13 @@ async function handler(request: NextRequest) {
           manual_discount_amount: manualDiscountAmount,
           payment_method_discount_amount: paymentMethodDiscountAmount,
           payment_method_extra_amount: paymentMethodExtraAmount,
+          store_credit_amount: appliedStoreCredit,
           delivery_fee: deliveryFee,
           delivery_breakdown: deliveryBreakdown,
           distance_km: deliveryDistanceKm,
           delivery_payer: effectiveDeliveryPayer,
           seller_commission_amount: sellerCommissionAmount,
-          payment_breakdown: [{
-            method: paymentMethodDisplayName,
-            amount: chargeAmount,
-            effectiveAmount: chargeAmount,
-            amountReceived: isWalletPurchase ? 0 : (paymentStatus === "approved" ? chargeAmount : 0),
-            provider: "Mercado Pago",
-            adjustmentType: "none",
-            interestAmount: 0,
-            feeAmount: 0,
-            fixedFeeAmount: 0,
-            feeBearer: "merchant",
-            mpPaymentStatus: isWalletPurchase ? "pending" : paymentStatus,
-            mpPaymentStatusDetail: isWalletPurchase ? "pending_wallet_purchase" : (mpPaymentResponse?.status_detail ?? null),
-            checkoutPricing: checkoutPricing || {
-              subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
-              couponDiscount: couponDiscountAmount,
-              paymentMethodDiscount: paymentMethodDiscountAmount,
-              paymentMethodInterest: 0,
-              paymentMethodFee: paymentMethodExtraAmount,
-              deliveryFee,
-              finalTotal: fullOrderTotal,
-            },
-          }],
+          payment_breakdown: newOrderPaymentBreakdown,
           checkout_fulfillment: checkoutFulfillment,
           order_source: "Vitrine Online",
           promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
@@ -1634,6 +1698,15 @@ async function handler(request: NextRequest) {
         await adminClient.from("order_items").delete().eq("order_id", newOrder.id)
         await adminClient.from("orders").delete().eq("id", newOrder.id)
         return NextResponse.json({ error: reserveResult.error }, { status: 400 })
+      }
+
+      if (appliedStoreCredit > 0 && resolvedCustomerId) {
+        const { applyStoreCreditDeduction } = await import("@/app/actions/erp/orders")
+        await applyStoreCreditDeduction(adminClient, {
+          partnerId,
+          customerId: resolvedCustomerId,
+          amount: appliedStoreCredit,
+        })
       }
     }
 

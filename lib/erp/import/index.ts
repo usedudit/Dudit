@@ -3,6 +3,20 @@ export { suggestMapping, validateMappingCompatibility } from "./mapper"
 export { detectEntity } from "./entity-detector"
 export { generatePreview } from "./preview"
 export { executeImport } from "./batch-importer"
+export {
+  consolidateProductRows,
+  detectSpreadsheetSource,
+  parseProductVariants,
+  parseKeyValueVariantAttributes,
+  normalizePackagingType,
+  normalizeProductType,
+  normalizeUnit,
+} from "./product-grouper"
+export type {
+  ParsedVariant,
+  ConsolidatedProductRow,
+  DetectedSpreadsheetSource,
+} from "./product-grouper"
 export { createImportSession, getImportSession, deleteImportSession, updateImportSession } from "./session"
 export { getFieldsForEntity, getFieldByName, getRequiredFields } from "./field-registry"
 export { generateImportTemplate } from "./template-generator"

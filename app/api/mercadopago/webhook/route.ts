@@ -370,6 +370,18 @@ async function processWebhookWithRetry(
         if (mpRes.ok) {
           const preapprovalData = await mpRes.json()
 
+          // Check if this preapproval belongs to a Dudit Add-on subscription
+          const { syncAddonSubscriptionFromMp } = await import("@/lib/services/addon.service")
+          const handledAsAddon = await syncAddonSubscriptionFromMp({
+            mpPreapprovalId: paymentId?.toString(),
+            externalReference: preapprovalData?.external_reference,
+            mpStatus: preapprovalData?.status,
+          })
+          if (handledAsAddon) {
+            console.log(`[WEBHOOK] ✅ Add-on preapproval ${paymentId} synced (${preapprovalData?.status})`)
+            return
+          }
+
           await syncRecurringSubscriptionWithMp(
             supabase,
             {
@@ -418,6 +430,18 @@ async function processWebhookWithRetry(
           const authPayData = await mpRes.json()
           const preapprovalId = authPayData.preapproval_id
           if (preapprovalId) {
+            // Check if this authorized payment belongs to a Dudit Add-on subscription
+            const { syncAddonSubscriptionFromMp } = await import("@/lib/services/addon.service")
+            const handledAsAddon = await syncAddonSubscriptionFromMp({
+              mpPreapprovalId: preapprovalId.toString(),
+              externalReference: authPayData?.external_reference,
+              mpStatus: authPayData?.status,
+            })
+            if (handledAsAddon) {
+              console.log(`[WEBHOOK] ✅ Add-on authorized payment for ${preapprovalId} synced (${authPayData?.status})`)
+              return
+            }
+
             await syncRecurringSubscriptionWithMp(
               supabase,
               { mpPreapprovalId: preapprovalId.toString() },

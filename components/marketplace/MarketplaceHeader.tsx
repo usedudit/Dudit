@@ -824,8 +824,8 @@ const Header: React.FC<HeaderProps> = ({
 
         if (simpleTitle) {
             return (
-                <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-dark dark:bg-dark-surface border-b border-white/10">
-                    <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
+                <header className="lg:hidden fixed top-0 inset-x-0 w-full max-w-full z-50 bg-brand-dark dark:bg-dark-surface border-b border-white/10 overflow-hidden">
+                    <div className="w-full max-w-full px-4 py-3 flex items-center justify-between min-h-[50px]">
                         <button onClick={handleGoBack} className="shrink-0 text-white p-1 -ml-1">
                             <ChevronLeftIcon size={18} strokeWidth={2.5} />
                         </button>
@@ -843,8 +843,8 @@ const Header: React.FC<HeaderProps> = ({
         const isTransparentHeader = (isProductDetail || isVendorPage) && !isScrolled && !vendorCategoryTitle
 
         return (
-            <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isTransparentHeader ? "bg-transparent" : "bg-brand-dark dark:bg-dark-surface border-b border-white/10"}`}>
-                <div className="px-4 pt-2 pb-2">
+            <header className={`lg:hidden fixed top-0 inset-x-0 w-full max-w-full z-50 overflow-hidden transition-all duration-300 ${isTransparentHeader ? "bg-transparent" : "bg-brand-dark dark:bg-dark-surface border-b border-white/10"}`}>
+                <div className="w-full max-w-full px-4 pt-2 pb-2">
                     <div className="flex items-center gap-3 relative min-h-[36px]">
                         {/* Back Button */}
                         {(!isHome || isProductDetail) ? (
@@ -893,7 +893,7 @@ const Header: React.FC<HeaderProps> = ({
                         {/* Middle Section: Search or Product Name */}
                         <div className="flex-1 flex items-center justify-start min-w-0 transition-all duration-300">
                             {isProductDetail && vendorCategoryTitle ? (
-                                <div className="relative w-full h-[36px] overflow-visible">
+                                <div className="relative w-full h-[36px] overflow-hidden">
                                     <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${vendorCategorySearchOpen ? "opacity-0 -translate-x-6 pointer-events-none" : "opacity-100 translate-x-0"}`}>
                                         <h1 className="text-white font-bold text-[15px] truncate px-2">{vendorCategoryTitle}</h1>
                                     </div>
@@ -932,10 +932,10 @@ const Header: React.FC<HeaderProps> = ({
                                         setIsSearchInputFocused(true)
                                         void loadSuggestions()
                                     }}
-                                    className="bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200 cursor-text hover:border-brand-green/40 transition-colors"
+                                    className="bg-white h-[36px] rounded-full flex items-center px-3.5 w-full border border-gray-200 cursor-text hover:border-brand-green/40 transition-colors min-w-0"
                                 >
                                     <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
-                                    <span className="text-brand-dark text-[14px] placeholder-gray-400 font-normal">Buscar na Dudit</span>
+                                    <span className="text-brand-dark text-[14px] placeholder-gray-400 font-normal truncate">Buscar na Dudit</span>
                                 </button>
                             )}
                         </div>
@@ -987,10 +987,10 @@ const Header: React.FC<HeaderProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <IntentPrefetchLink href="/sacola" className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+                                    <IntentPrefetchLink href="/sacola" className="shrink-0 relative text-white p-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={18} strokeWidth={2} />
                                         {cartCount > 0 && (
-                                            <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
+                                            <span className="absolute -top-1 -right-1 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                                 {cartCount}
                                             </span>
                                         )}
@@ -1002,38 +1002,38 @@ const Header: React.FC<HeaderProps> = ({
 
                     {/* Delivery Info */}
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
-                        <div className="flex items-center justify-between mt-2.5 px-1">
+                        <div className="flex items-center justify-between mt-2.5 gap-2 min-w-0">
                             {user && userLocation ? (
                                 <IntentPrefetchLink
                                     href="/perfil?tab=enderecos"
                                     className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
                                 >
                                     <MapPinIcon size={14} className="shrink-0 text-white" />
-                                    <span className="text-[12px] font-normal truncate ml-0.5 text-white">
+                                    <span className="text-[12px] font-normal truncate text-white">
                                         Você está em {userLocation}
                                     </span>
-                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
+                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 text-white" />
                                 </IntentPrefetchLink>
                             ) : (
                                 <button
                                     type="button"
                                     onClick={() => setIsVisitorModalOpen(true)}
-                                    className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
+                                    className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1 text-left"
                                 >
                                     <MapPinIcon size={14} className="shrink-0 text-white" />
-                                    <span className="text-[12px] font-normal truncate ml-0.5 text-white">
+                                    <span className="text-[12px] font-normal truncate text-white">
                                         {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
                                     </span>
-                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
+                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 text-white" />
                                 </button>
                             )}
                             <button
                                 type="button"
                                 onClick={handleOpenAnnounceModal}
-                                className="shrink-0 text-brand-orange font-bold text-[12px] flex items-center gap-0.5 pl-3 cursor-pointer"
+                                className="shrink-0 text-brand-orange font-bold text-[12px] flex items-center gap-0.5 whitespace-nowrap cursor-pointer hover:opacity-80 transition-opacity"
                             >
                                 <PlusIcon size={14} />
-                                <span>Anunciar grátis</span>
+                                <span>Anunciar<span className="hidden min-[360px]:inline">&nbsp;grátis</span></span>
                             </button>
                         </div>
                     )}

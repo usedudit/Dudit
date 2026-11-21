@@ -303,13 +303,16 @@ export async function addBumpProductToCartAction(input: {
   productId: string
   partnerId: string
   storeId?: string
+  variantId?: string
+  quantity?: number
   csrf_token?: string
 }) {
+  const qty = Math.max(1, Math.round(Number(input.quantity || 1)))
   const addResult = await addToCartAction(
     input.productId,
-    1,
+    qty,
     input.csrf_token,
-    undefined,
+    input.variantId,
     input.storeId,
   )
   if (addResult.error) return { error: addResult.error }
@@ -317,17 +320,23 @@ export async function addBumpProductToCartAction(input: {
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
 
-  const { data: row } = await supabase
+  let query = supabase
     .from("cart_items")
-    .select("id, product_id, quantity")
+    .select("id, product_id, variant_id, quantity")
     .eq("user_id", user.id)
     .eq("partner_id", input.partnerId)
     .eq("item_type", "product")
     .eq("product_id", input.productId)
-    .is("variant_id", null)
     .order("updated_at", { ascending: false })
     .limit(1)
-    .maybeSingle()
+
+  if (input.variantId) {
+    query = query.eq("variant_id", input.variantId)
+  } else {
+    query = query.is("variant_id", null)
+  }
+
+  const { data: row } = await query.maybeSingle()
 
   if (!row?.id) return { error: "Item não encontrado na sacola." }
 
@@ -343,6 +352,7 @@ export async function addBumpProductToCartAction(input: {
     entityId: input.productId,
     metadata: {
       productId: input.productId,
+      variantId: input.variantId || null,
       quantity: row.quantity,
     },
   })

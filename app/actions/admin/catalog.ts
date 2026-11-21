@@ -250,6 +250,9 @@ export async function listAdminCatalogPlans(input?: {
     search?: string
     partnerId?: string
     limit?: number
+    cursor?: string | null
+    startDate?: string
+    endDate?: string
 }) {
     try {
         await adminReadGate()
@@ -263,7 +266,7 @@ export async function listAdminCatalogPlans(input?: {
             )
             .order("updated_at", { ascending: false })
             .order("id", { ascending: false })
-            .limit(limit)
+            .limit(limit + 1)
 
         const partnerId = sanitizeUUID(input?.partnerId || "")
         if (partnerId) query = query.eq("partner_id", partnerId)
@@ -273,10 +276,24 @@ export async function listAdminCatalogPlans(input?: {
             query = query.or(`name.ilike.%${search}%`)
         }
 
+        if (input?.cursor) {
+            query = query.lt("updated_at", input.cursor)
+        }
+
+        if (input?.startDate) {
+            query = query.gte("created_at", input.startDate)
+        }
+        if (input?.endDate) {
+            query = query.lte("created_at", input.endDate)
+        }
+
         const { data, error } = await query
         if (error) return errorResponse(error.message)
 
-        const rows = data || []
+        const allRows = data || []
+        const hasMore = allRows.length > limit
+        const rows = hasMore ? allRows.slice(0, limit) : allRows
+        const nextCursor = hasMore && rows.length > 0 ? rows[rows.length - 1].updated_at : null
         const partnerMap = await fetchPartnerNames(admin, rows.map((r: any) => r.partner_id))
         return successResponse({
             items: rows.map((r: any) => {
@@ -291,7 +308,8 @@ export async function listAdminCatalogPlans(input?: {
                     })),
                 }
             }),
-            hasMore: rows.length === limit,
+            hasMore,
+            nextCursor,
         })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao listar planos")

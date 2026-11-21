@@ -34,6 +34,7 @@ import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-
 import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-marketplace-checkout-payment"
 import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
 import { CheckoutErrorScreen } from "@/components/marketplace/checkout/CheckoutErrorScreen"
+import { OrderBumpProductModal, type OrderBumpProduct } from "@/components/marketplace/checkout/OrderBumpProductModal"
 import BottomSheet from "@/components/BottomSheet"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
@@ -305,21 +306,6 @@ export function CheckoutPageClient() {
     }, [user?.id, sessionData?.partnerId])
 
     useEffect(() => {
-        const fetchUserCredits = async () => {
-            setLoadingCredits(true)
-            const { getMySubscriptionCreditsAction } = await import("@/app/actions/marketplace/recurring-subscriptions")
-            const res = await getMySubscriptionCreditsAction()
-            setLoadingCredits(false)
-            if (res.success) {
-                setUserCredits(res.data || [])
-            }
-        }
-        if (user?.id) {
-            void fetchUserCredits()
-        }
-    }, [user?.id])
-
-    useEffect(() => {
         const stored = sessionStorage.getItem("checkout_session")
         if (stored) {
             try {
@@ -448,6 +434,25 @@ export function CheckoutPageClient() {
     const serviceLines = useMemo(() => {
         return checkoutContext?.lines?.filter(l => l.lineKind === "service_booking") || []
     }, [checkoutContext?.lines])
+
+    useEffect(() => {
+        if (!user?.id || serviceLines.length === 0) return
+        let cancelled = false
+        const fetchUserCredits = async () => {
+            setLoadingCredits(true)
+            const { getMySubscriptionCreditsAction } = await import("@/app/actions/marketplace/recurring-subscriptions")
+            const res = await getMySubscriptionCreditsAction()
+            if (cancelled) return
+            setLoadingCredits(false)
+            if (res.success) {
+                setUserCredits(res.data || [])
+            }
+        }
+        void fetchUserCredits()
+        return () => {
+            cancelled = true
+        }
+    }, [user?.id, serviceLines.length])
 
     const hasSubscriptionCreditsForCheckout = useMemo(() => {
         if (serviceLines.length === 0) return false
@@ -641,7 +646,13 @@ export function CheckoutPageClient() {
     // Envio nacional só entra quando a loja tem transportadora conectada e
     // algum item do pedido aceita "shipping" (requirements.showShippingOption).
     const carrierAllowed = shippingEnabled && Boolean(requirements?.showShippingOption)
-    const carrierSectionVisible = formData.deliveryType === "delivery" && carrierAllowed && (raioNoCoverage || ownDeliveryBlocked)
+    const localDeliveryAvailable = Boolean(
+        requirements?.showLocalDeliveryOption && deliveryPlanEnabled && deliveryEnabled,
+    )
+    const carrierSectionVisible =
+        formData.deliveryType === "delivery" &&
+        carrierAllowed &&
+        (!localDeliveryAvailable || raioNoCoverage || ownDeliveryBlocked)
 
     const destinationCep = useMemo(() => {
         if (formData.deliveryType !== "delivery") return ""
@@ -667,21 +678,25 @@ export function CheckoutPageClient() {
         setDeliveryBreakdown(null)
     }, [destinationCep])
 
-    // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
-    // este efeito esperava o erro "raio" - serializando frete próprio
-    // (geocoding) + SuperFrete + uma segunda rodada de totais em 10-15s.
-    // Agora as opções chegam junto com o "raio", tornando a seleção imediata.
-    // NOTE: the dedupe key lives in a ref (not state) so this effect never
-    // re-runs on its own updates - otherwise the cleanup below would cancel
-    // the in-flight request and discard its results.
+    const carrierItemsKey = useMemo(
+        () =>
+            products
+                .map((p: any) => `${p.product_id || p.id}:${Math.max(1, Number(p.quantity || 1))}`)
+                .sort()
+                .join(","),
+        [products],
+    )
+
+    // Quote carrier options ONLY when carrierSectionVisible is true (own delivery
+    // unavailable or outside radius). Avoids unnecessary SuperFrete API calls
+    // for local deliveries inside the seller's radius.
     useEffect(() => {
-        if (formData.deliveryType !== "delivery" || !carrierAllowed || !partnerId || !destinationCep || !mpAvailable) return
+        if (!carrierSectionVisible || !partnerId || !destinationCep || !mpAvailable || !carrierItemsKey) return
         const productItems = products.map((p: any) => ({
             productId: p.product_id || p.id,
             quantity: Math.max(1, Number(p.quantity || 1)),
         }))
-        const itemsDedupe = productItems.map((p: any) => `${p.productId}:${p.quantity}`).sort().join(",")
-        const dedupeKey = `${partnerId}:${destinationCep}:${itemsDedupe}`
+        const dedupeKey = `${partnerId}:${destinationCep}:${carrierItemsKey}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
         let completed = false
@@ -721,7 +736,8 @@ export function CheckoutPageClient() {
                 setCarrierQuoteLoading(false)
             }
         }
-    }, [destinationCep, partnerId, formData.deliveryType, mpAvailable, carrierAllowed, products])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [carrierSectionVisible, destinationCep, partnerId, mpAvailable, carrierItemsKey])
 
     const handleCarrierSelect = (opt: CarrierFreightOption) => {
         setSelectedCarrierServiceId(opt.serviceId)
@@ -772,6 +788,7 @@ export function CheckoutPageClient() {
     const [partnerProducts, setPartnerProducts] = useState<any[]>([])
     const [loadingBumps, setLoadingBumps] = useState(false)
     const [addingBumpId, setAddingBumpId] = useState<string | null>(null)
+    const [bumpModalProduct, setBumpModalProduct] = useState<OrderBumpProduct | null>(null)
 
     const bumpCandidates = useMemo(() => {
         const checkoutProductIds = new Set(
@@ -781,19 +798,50 @@ export function CheckoutPageClient() {
             ].filter(Boolean)
         )
         return partnerProducts.filter((p: any) => {
-            const isStock = (p.stock_available ?? p.stock_quantity ?? 0) > 0
+            const activeVariants = Array.isArray(p.product_variants)
+                ? p.product_variants.filter((v: any) => v && v.is_active !== false)
+                : []
+            const hasVariantStock = activeVariants.some(
+                (v: any) => Number(v.stock_available ?? v.stock_quantity ?? 0) > 0,
+            )
+            const isStock = activeVariants.length > 0
+                ? hasVariantStock
+                : (p.stock_available ?? p.stock_quantity ?? 0) > 0
             return isStock && !checkoutProductIds.has(p.id)
         })
     }, [partnerProducts, sessionData?.cartItems, sessionData?.products])
 
-    const handleAddBumpProduct = async (p: any) => {
+    const handleBumpClick = (p: any) => {
+        const activeVariants = Array.isArray(p.product_variants)
+            ? p.product_variants.filter((v: any) => v && v.is_active !== false)
+            : []
+        if (activeVariants.length > 0) {
+            setBumpModalProduct(p)
+            return
+        }
+        void handleAddBumpProduct(p)
+    }
+
+    const handleAddBumpProduct = async (
+        p: any,
+        variantSelection?: {
+            variantId: string
+            variantLabel: string
+            price: number
+            image: string
+            quantity: number
+        },
+    ) => {
         if (!sessionData || addingBumpId) return
         setAddingBumpId(p.id)
         try {
+            const qty = Math.max(1, Number(variantSelection?.quantity || 1))
             const result = await addBumpProductToCartAction({
                 productId: p.id,
                 partnerId,
                 storeId,
+                variantId: variantSelection?.variantId,
+                quantity: qty,
                 csrf_token: csrfToken || undefined,
             })
             if (result.error) {
@@ -802,19 +850,21 @@ export function CheckoutPageClient() {
             }
             const realCartItemId = result.cartItemId!
 
+            const resolvedPrice = variantSelection?.price ?? Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price)
             const newProductItem: ProductItem = {
                 id: p.id,
                 name: p.name,
-                price: Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price),
-                quantity: 1,
-                image: p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png",
+                price: resolvedPrice,
+                quantity: qty,
+                image: variantSelection?.image || p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png",
+                variant: variantSelection?.variantLabel || undefined,
                 availabilityValue: p.availability_value,
                 availabilityUnit: p.availability_unit
             }
 
             // Order bump nunca deve multiplicar/duplicar: se o produto já está no
             // pedido, apenas garante a presença, sem somar quantidade.
-            const alreadyInProducts = products.some((item) => item.id === p.id)
+            const alreadyInProducts = products.some((item) => item.id === p.id && item.variant === newProductItem.variant)
             const updatedProducts = alreadyInProducts ? products : [...products, newProductItem]
 
             const baseCartItems = sessionData.source === "cart"
@@ -826,14 +876,16 @@ export function CheckoutPageClient() {
                     quantity: item.quantity
                 }))
 
-            const alreadyInCart = baseCartItems.some((item) => item.productId === p.id && !item.variantId)
+            const alreadyInCart = baseCartItems.some(
+                (item) => item.productId === p.id && (item.variantId || undefined) === (variantSelection?.variantId || undefined),
+            )
             const updatedCartItems = alreadyInCart
                 ? baseCartItems
                 : [...baseCartItems, {
                     cartItemId: realCartItemId,
                     productId: p.id,
-                    variantId: undefined,
-                    quantity: 1
+                    variantId: variantSelection?.variantId || undefined,
+                    quantity: qty
                 }]
 
             const newSessionData: CheckoutSessionData = {
@@ -845,6 +897,7 @@ export function CheckoutPageClient() {
 
             setSessionData(newSessionData)
             sessionStorage.setItem("checkout_session", JSON.stringify(newSessionData))
+            setBumpModalProduct(null)
             setRefreshTrigger(prev => prev + 1)
             notifySuccess("Produto adicionado", `${p.name} foi adicionado ao seu pedido!`)
         } catch {
@@ -1729,6 +1782,7 @@ export function CheckoutPageClient() {
             // Checkout amounts (includes delivery fee calculation)
             if (activeCartItemIds.length && checkoutContext) {
                 const deliveryTypeForQuote = formData.deliveryType === "pickup" ? "pickup" : "delivery"
+                const effectiveCarrierServiceId = carrierSectionVisible ? (selectedCarrierServiceId || null) : null
                 const amountsCacheKey = JSON.stringify([
                     activeCartItemIds,
                     deliveryTypeForQuote,
@@ -1739,7 +1793,7 @@ export function CheckoutPageClient() {
                     payDepositOnly,
                     checkoutContext.deposit?.percent ?? 50,
                     depositAvailable,
-                    selectedCarrierServiceId || null,
+                    effectiveCarrierServiceId,
                     destinationCep || null,
                     checkoutContextKey,
                 ])
@@ -1750,7 +1804,10 @@ export function CheckoutPageClient() {
                     setDeliveryFee(Number(cachedAmounts.deliveryFee || 0))
                     setDeliveryDistanceKm(cachedAmounts.distanceKm != null ? Number(cachedAmounts.distanceKm) : null)
                     setDeliveryBreakdown((cachedAmounts.deliveryBreakdown as Record<string, any>) || null)
-                    if ((cachedAmounts.deliveryBreakdown as any)?.source !== "superfrete") setOwnDeliveryBlocked(false)
+                    if ((cachedAmounts.deliveryBreakdown as any)?.source !== "superfrete") {
+                        setOwnDeliveryBlocked(false)
+                        setSelectedCarrierServiceId(null)
+                    }
                     setCheckoutAmountsLoading(false)
                     setDeliveryQuoteLoading(false)
                     return
@@ -1767,7 +1824,7 @@ export function CheckoutPageClient() {
                         payDepositOnly,
                         depositPercent: checkoutContext.deposit?.percent ?? 50,
                         depositAvailable,
-                        carrierServiceId: selectedCarrierServiceId || undefined,
+                        carrierServiceId: effectiveCarrierServiceId || undefined,
                         destinationPostalCode: destinationCep || undefined,
                         cacheVariant: checkoutContextKey,
                     })
@@ -1779,7 +1836,10 @@ export function CheckoutPageClient() {
                         setDeliveryFee(Number(result.data.deliveryFee || 0))
                         setDeliveryDistanceKm(result.data.distanceKm != null ? Number(result.data.distanceKm) : null)
                         setDeliveryBreakdown((result.data.deliveryBreakdown as Record<string, any>) || null)
-                        if ((result.data.deliveryBreakdown as any)?.source !== "superfrete") setOwnDeliveryBlocked(false)
+                        if ((result.data.deliveryBreakdown as any)?.source !== "superfrete") {
+                            setOwnDeliveryBlocked(false)
+                            setSelectedCarrierServiceId(null)
+                        }
                     } else {
                         setCheckoutAmounts(null)
                         setDeliveryError(result.error)
@@ -1885,6 +1945,7 @@ export function CheckoutPageClient() {
         refreshTrigger,
         selectedAddressKey,
         selectedCarrierServiceId,
+        carrierSectionVisible,
         destinationCep,
     ])
 
@@ -1970,13 +2031,20 @@ export function CheckoutPageClient() {
     }, [paymentPreview, formData.installments])
 
 
-    const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
+    const baseCoversFullOrder = useMemo(() => {
+        return useStoreCredit && availableStoreCredit > 0 && checkoutChargeTotal > 0 && availableStoreCredit >= checkoutChargeTotal - 0.009
+    }, [useStoreCredit, availableStoreCredit, checkoutChargeTotal])
+
+    const checkoutTotalToCharge = (!baseCoversFullOrder && paymentOption === "traditional" && paymentPreview?.success)
         ? Number(paymentPreview.finalAmount || checkoutChargeTotal)
         : checkoutChargeTotal
 
     const appliedStoreCredit = useMemo(() => {
-        if (!useStoreCredit || availableStoreCredit <= 0) return 0
-        return Math.min(availableStoreCredit, checkoutTotalToCharge)
+        if (!useStoreCredit || availableStoreCredit <= 0 || checkoutTotalToCharge <= 0) return 0
+        return Math.min(
+            Math.round((availableStoreCredit + Number.EPSILON) * 100) / 100,
+            Math.round((checkoutTotalToCharge + Number.EPSILON) * 100) / 100,
+        )
     }, [useStoreCredit, availableStoreCredit, checkoutTotalToCharge])
 
     const remainingBalanceToCharge = useMemo(() => {
@@ -1984,8 +2052,8 @@ export function CheckoutPageClient() {
     }, [checkoutTotalToCharge, appliedStoreCredit])
 
     const isFullyCoveredByStoreCredit = useMemo(() => {
-        return useStoreCredit && availableStoreCredit > 0 && remainingBalanceToCharge <= 0.009
-    }, [useStoreCredit, availableStoreCredit, remainingBalanceToCharge])
+        return useStoreCredit && availableStoreCredit > 0 && checkoutTotalToCharge > 0 && remainingBalanceToCharge <= 0.009
+    }, [useStoreCredit, availableStoreCredit, checkoutTotalToCharge, remainingBalanceToCharge])
 
     const destinationCoords = useMemo(() => {
         if (!selectedAddress?.latitude || !selectedAddress?.longitude) return null
@@ -1993,19 +2061,20 @@ export function CheckoutPageClient() {
     }, [selectedAddress?.latitude, selectedAddress?.longitude])
 
     const checkoutPricingSnapshot = useMemo(() => {
-        const chargedBase = checkoutChargeTotal
-        const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
+        const useTraditionalAdjustments = !isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success
+        const methodDiscount = useTraditionalAdjustments
             ? Number(paymentPreview.paymentMethodDiscountAmount || 0)
             : 0
         const isCustomerFeeBearer = (paymentPreview?.feeBearer || "merchant") !== "merchant"
         const isCustomerInstallmentFeeBearer = (paymentPreview?.installmentFeeBearer || "merchant") !== "merchant"
-        const interestAmount = Number(paymentPreview?.interestAmount || 0)
-        const installmentCostAmount = Number(paymentPreview?.installmentCostAmount || 0)
+        const interestAmount = useTraditionalAdjustments ? Number(paymentPreview?.interestAmount || 0) : 0
+        const installmentCostAmount = useTraditionalAdjustments ? Number(paymentPreview?.installmentCostAmount || 0) : 0
         const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount)
-        const customerInterest = (isCustomerFeeBearer ? fixedInterestAmount : 0)
-            + (isCustomerInstallmentFeeBearer ? installmentCostAmount : 0)
-        const customerFee = isCustomerFeeBearer ? Number(paymentPreview?.feeAmount || 0) : 0
-        const customerFixedFee = isCustomerFeeBearer ? Number(paymentPreview?.fixedFeeAmount || 0) : 0
+        const customerInterest = useTraditionalAdjustments
+            ? ((isCustomerFeeBearer ? fixedInterestAmount : 0) + (isCustomerInstallmentFeeBearer ? installmentCostAmount : 0))
+            : 0
+        const customerFee = useTraditionalAdjustments && isCustomerFeeBearer ? Number(paymentPreview?.feeAmount || 0) : 0
+        const customerFixedFee = useTraditionalAdjustments && isCustomerFeeBearer ? Number(paymentPreview?.fixedFeeAmount || 0) : 0
 
         const snapshotSubtotal = checkoutAmounts
             ? (payDepositOnly && depositAvailable
@@ -2051,6 +2120,7 @@ export function CheckoutPageClient() {
         deliveryFee,
         checkoutChargeTotal,
         checkoutTotalToCharge,
+        isFullyCoveredByStoreCredit,
         payDepositOnly,
         depositAvailable,
         destinationCoords,
@@ -2139,8 +2209,50 @@ export function CheckoutPageClient() {
         && (Number(paymentPreview?.maxInstallments || selectedStorefrontMethod?.maxInstallments || 1) > 1)
     const hasUnavailableService = Object.values(serviceAvailability).some((s) => s.checked && !s.available)
     const disableCheckoutSubmit = isLoading || hasUnavailableService
-        || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
+        || (!isFullyCoveredByStoreCredit && paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
         || (formData.deliveryType !== "pickup" && (deliveryQuoteLoading || !!deliveryError))
+
+    const renderStoreCreditCard = () => {
+        if (availableStoreCredit <= 0) return null
+        return (
+            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-3 transition-all">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center shrink-0">
+                            <TagIcon size={18} className="text-brand-green" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                Crédito em Loja
+                            </div>
+                            <div className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Você possui <strong className="text-brand-green">{formatCurrency(availableStoreCredit)}</strong> disponível nesta loja.
+                            </div>
+                        </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                            type="checkbox"
+                            checked={useStoreCredit}
+                            onChange={(e) => setUseStoreCredit(e.target.checked)}
+                            className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-green"></div>
+                    </label>
+                </div>
+                {useStoreCredit && appliedStoreCredit > 0 && (
+                    <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40 text-xs text-brand-green font-medium flex items-center gap-1.5">
+                        <CheckCircleIcon size={14} className="shrink-0" />
+                        {isFullyCoveredByStoreCredit ? (
+                            <span>Seu crédito cobre 100% do valor do pedido. Nenhuma cobrança adicional será feita.</span>
+                        ) : (
+                            <span>Serão abatidos {formatCurrency(appliedStoreCredit)}. Saldo restante: {formatCurrency(remainingBalanceToCharge)}.</span>
+                        )}
+                    </div>
+                )}
+            </div>
+        )
+    }
 
     const renderOrderBumpSection = () => {
         // Assinatura é um fluxo próprio: sem order bump ("aproveite e leve").
@@ -2160,12 +2272,12 @@ export function CheckoutPageClient() {
                     }
                     title={bump.name}
                     description={formatCurrency(Number(bump.promotional_price && bump.promotional_price < bump.price ? bump.promotional_price : bump.price))}
-                    onClick={() => handleAddBumpProduct(bump)}
+                    onClick={() => handleBumpClick(bump)}
                     right={
                         isAdding ? (
                             <Spinner size={16} />
                         ) : (
-                            <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(bump) }}>
+                            <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleBumpClick(bump) }}>
                                 Adicionar
                             </Button>
                         )
@@ -2471,13 +2583,13 @@ export function CheckoutPageClient() {
                 {isPickup && Boolean(requirements?.hasProductLines) && preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                     <InfoCard color="orange" message={`Retirada ${getReadyDayLabel(preparationEstimate)} entre ${pickupStartLabel} e ${pickupEndLabel}`} />
                 )}
-                {paymentOption === "traditional" && paymentPreviewLoading && (
+                {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreviewLoading && (
                     <div className="flex items-center justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span>Calculando pagamento</span>
                         <Spinner size={16} />
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01 && (
+                {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-green">
                         <span className="flex items-center gap-2">
                             <span>Desconto do meio de pagamento</span>
@@ -2486,7 +2598,7 @@ export function CheckoutPageClient() {
                         <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && checkoutPricingSnapshot.paymentMethodInterest >= 0.01 && (
+                {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && checkoutPricingSnapshot.paymentMethodInterest >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Juros</span>
@@ -2495,7 +2607,7 @@ export function CheckoutPageClient() {
                         <span>+{formatCurrency(checkoutPricingSnapshot.paymentMethodInterest)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) >= 0.01 && (
+                {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Taxas</span>
@@ -2504,7 +2616,7 @@ export function CheckoutPageClient() {
                         <span>+{formatCurrency(paymentPreview.feeAmount)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01 && (
+                {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Custos do método</span>
@@ -2543,11 +2655,11 @@ export function CheckoutPageClient() {
                 >
                     {isLoading
                         ? "Direcionando..."
-                        : paymentPreviewLoading
+                        : (!isFullyCoveredByStoreCredit && paymentPreviewLoading)
                             ? "Calculando pagamento..."
                             : (!checkoutViaDudit || (isWhatsappFlow && paymentOption !== "mercadopago"))
-                                ? `Fazer pedido via WhatsApp - ${formatCurrency(checkoutTotalToCharge)}`
-                                : `Finalizar pedido - ${formatCurrency(checkoutTotalToCharge)}`
+                                ? `Fazer pedido via WhatsApp - ${formatCurrency(remainingBalanceToCharge)}`
+                                : `Finalizar pedido - ${formatCurrency(remainingBalanceToCharge)}`
                     }
                 </Button>
             )}
@@ -2796,7 +2908,10 @@ export function CheckoutPageClient() {
                     : "A combinar"
             msg += `- Taxa de Entrega: ${deliveryLabel}\n`
         }
-        msg += `- *Total do Pedido: ${formatCurrency(checkoutTotalToCharge)}*\n\n`
+        if (appliedStoreCredit > 0) {
+            msg += `- Crédito em Loja: -${formatCurrency(appliedStoreCredit)}\n`
+        }
+        msg += `- *Total do Pedido: ${formatCurrency(remainingBalanceToCharge)}*\n\n`
 
         if (formData.notes?.trim()) {
             msg += `*📝 OBSERVAÇÕES*\n`
@@ -2878,7 +2993,7 @@ export function CheckoutPageClient() {
             return
         }
 
-        if (isCashPayment && !isPickup) {
+        if (isCashPayment && !isPickup && !isFullyCoveredByStoreCredit) {
             if (wantsChange === null) {
                 setPaymentError("Por favor, informe se precisa de troco.")
                 setTempWantsChange(null)
@@ -3058,7 +3173,37 @@ export function CheckoutPageClient() {
                     sessionStorage.removeItem("checkout_session")
                     notifySuccess("Pedido realizado!", "Seu pedido foi pago integralmente com seu crédito na loja.")
                     setIsLoading(false)
-                    router.push("/minhas-compras")
+                    router.push("/pedidos")
+                    return
+                } else {
+                    const result = await createOrderAction({
+                        itemId: sessionData?.itemId || products[0]?.id || "",
+                        itemType: sessionData?.itemType || "product",
+                        quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
+                        totalAmount: checkoutTotalToCharge,
+                        deliveryType: formData.deliveryType,
+                        deliveryAddress: formData.deliveryAddress,
+                        paymentMethod: "Vale-compra",
+                        installments: 1,
+                        notes: formData.notes,
+                        partnerId: partnerId,
+                        csrf_token: token,
+                        couponCode: couponCode || null,
+                        wantsChange: false,
+                        payWithAmount: undefined,
+                        payDepositOnly,
+                        checkoutPricingSnapshot,
+                        useMercadoPago: false,
+                        useStoreCredit: true,
+                    })
+                    if ('error' in result && result.error) {
+                        if ((result as any).whatsappFallback && await redirectToSellerWhatsApp(fallbackReason(result))) return
+                        throw new Error(result.error)
+                    }
+                    sessionStorage.removeItem("checkout_session")
+                    notifySuccess("Pedido realizado!", "Seu pedido foi pago integralmente com seu crédito na loja.")
+                    setIsLoading(false)
+                    router.push("/pedidos")
                     return
                 }
             }
@@ -3210,7 +3355,7 @@ export function CheckoutPageClient() {
 
             if (paymentOption === "mercadopago") {
                 const tempOrderId = "temp-" + Date.now()
-                const amount = checkoutChargeTotal
+                const amount = remainingBalanceToCharge
                 const cartItemIds = sessionData?.source === "cart"
                     ? (sessionData.cartItems || []).map((item: any) => item.cartItemId).filter(Boolean)
                     : undefined
@@ -3231,6 +3376,8 @@ export function CheckoutPageClient() {
                         checkoutPricing: checkoutPricingSnapshot,
                         cartItemIds: cartItemIds,
                         storeId: storeId || checkoutContext?.store?.id || sessionData?.storeId || undefined,
+                        useStoreCredit: useStoreCredit && availableStoreCredit > 0,
+                        appliedStoreCredit,
                     },
                     sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                     mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || "",
@@ -3649,44 +3796,6 @@ export function CheckoutPageClient() {
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
-                                    {availableStoreCredit > 0 && (
-                                        <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-3 transition-all">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center shrink-0">
-                                                        <TagIcon size={18} className="text-brand-green" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                            Crédito em Loja
-                                                        </div>
-                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                            Você possui <strong className="text-brand-green">{formatCurrency(availableStoreCredit)}</strong> disponível nesta loja.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={useStoreCredit}
-                                                        onChange={(e) => setUseStoreCredit(e.target.checked)}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-green"></div>
-                                                </label>
-                                            </div>
-                                            {useStoreCredit && (
-                                                <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40 text-xs text-brand-green font-medium flex items-center gap-1.5">
-                                                    <CheckCircleIcon size={14} className="shrink-0" />
-                                                    {appliedStoreCredit >= checkoutTotalToCharge ? (
-                                                        <span>Seu crédito cobre 100% do valor do pedido. Nenhuma cobrança adicional será feita.</span>
-                                                    ) : (
-                                                        <span>Serão abatidos {formatCurrency(appliedStoreCredit)}. Selecione como pagar o saldo restante ({formatCurrency(remainingBalanceToCharge)}) abaixo.</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
                                     {hasSubscriptionCreditsForCheckout && (
                                         <ListItem
                                             icon={CrownIcon}
@@ -4053,9 +4162,10 @@ export function CheckoutPageClient() {
                             </FormSection>
                         </div>
 
-                        {/* Right Column (resumo + order bump) */}
+                        {/* Right Column (crédito em loja + resumo + order bump) */}
                         <div className="col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
                             {renderFreeDeliveryProgressCard()}
+                            {renderStoreCreditCard()}
                             <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
                                 <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
                                     Resumo do Pedido
@@ -4167,44 +4277,6 @@ export function CheckoutPageClient() {
                                     />
                                 )}
                                 {renderFreeDeliveryProgressCard()}
-                                {availableStoreCredit > 0 && (
-                                    <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center shrink-0">
-                                                    <TagIcon size={18} className="text-brand-green" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        Crédito em Loja
-                                                    </div>
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        Você possui <strong className="text-brand-green">{formatCurrency(availableStoreCredit)}</strong> disponível
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={useStoreCredit}
-                                                    onChange={(e) => setUseStoreCredit(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-green"></div>
-                                            </label>
-                                        </div>
-                                        {useStoreCredit && (
-                                            <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40 text-xs text-brand-green font-medium flex items-center gap-1.5">
-                                                <CheckCircleIcon size={14} className="shrink-0" />
-                                                {appliedStoreCredit >= checkoutTotalToCharge ? (
-                                                    <span>Seu crédito cobre 100% do pedido.</span>
-                                                ) : (
-                                                    <span>Abatido {formatCurrency(appliedStoreCredit)}. Pague o restante ({formatCurrency(remainingBalanceToCharge)}) abaixo.</span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
                                 {/* Order Bump (não aparece em carrinho de assinatura) */}
                                 {!requirements?.hasSubscriptionLines && bumpCandidates.length > 0 && (() => {
                                     const bump = bumpCandidates[0]
@@ -4222,12 +4294,12 @@ export function CheckoutPageClient() {
                                                 }
                                                 title={bump.name}
                                                 description={formatCurrency(Number(bump.promotional_price && bump.promotional_price < bump.price ? bump.promotional_price : bump.price))}
-                                                onClick={() => handleAddBumpProduct(bump)}
+                                                onClick={() => handleBumpClick(bump)}
                                                 right={
                                                     isAdding ? (
                                                         <Spinner size={16} />
                                                     ) : (
-                                                        <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(bump) }}>
+                                                        <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleBumpClick(bump) }}>
                                                             Adicionar
                                                         </Button>
                                                     )
@@ -4237,6 +4309,7 @@ export function CheckoutPageClient() {
                                         </FormSection>
                                     )
                                 })()}
+                                {renderStoreCreditCard()}
 
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
@@ -4558,33 +4631,46 @@ export function CheckoutPageClient() {
                                                 }
                                             </span>
                                         </div>
-                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01 && (
+                                        {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01 && (
                                             <div className="flex justify-between text-brand-green font-semibold">
                                                 <span>Desconto do pagamento</span>
                                                 <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && checkoutPricingSnapshot.paymentMethodInterest >= 0.01 && (
+                                        {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && checkoutPricingSnapshot.paymentMethodInterest >= 0.01 && (
                                             <div className="flex justify-between">
                                                 <span>Juros</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(checkoutPricingSnapshot.paymentMethodInterest)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) >= 0.01 && (
+                                        {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) >= 0.01 && (
                                             <div className="flex justify-between">
                                                 <span>Taxas</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01 && (
+                                        {!isFullyCoveredByStoreCredit && paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01 && (
                                             <div className="flex justify-between">
                                                 <span>Custos do método</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.fixedFeeAmount)}</span>
                                             </div>
                                         )}
-                                        <div className="flex justify-between text-base font-bold text-brand-dark dark:text-dark-heading pt-2 border-t border-brand-border/20">
-                                            <span>Total</span>
-                                            <span>{formatCurrency(checkoutTotalToCharge)}</span>
+                                        {appliedStoreCredit > 0 && (
+                                            <div className="flex justify-between text-brand-green font-semibold">
+                                                <span>Crédito em loja</span>
+                                                <span>-{formatCurrency(appliedStoreCredit)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col gap-1 pt-2 border-t border-brand-border/20">
+                                            <div className="flex justify-between text-base font-bold text-brand-dark dark:text-dark-heading">
+                                                <span>Total</span>
+                                                <span>{formatCurrency(remainingBalanceToCharge)}</span>
+                                            </div>
+                                            {appliedStoreCredit > 0 && (
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body text-right">
+                                                    (Total original: {formatCurrency(checkoutTotalToCharge)} · Crédito: -{formatCurrency(appliedStoreCredit)})
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </FormSection>
@@ -4619,7 +4705,7 @@ export function CheckoutPageClient() {
                                     <Button
                                         type="button"
                                         onClick={() => {
-                                            if (!paymentOption || (paymentOption === "traditional" && !formData.paymentMethod)) {
+                                            if (!isFullyCoveredByStoreCredit && (!paymentOption || (paymentOption === "traditional" && !formData.paymentMethod))) {
                                                 notifyError("Erro de Pagamento", "Por favor, selecione uma forma de pagamento.")
                                                 return
                                             }
@@ -4629,8 +4715,8 @@ export function CheckoutPageClient() {
                                         className="flex-1 h-12"
                                     >
                                         {(!checkoutViaDudit || (isWhatsappFlow && paymentOption !== "mercadopago"))
-                                            ? `Fazer pedido via WhatsApp • ${formatCurrency(checkoutTotalToCharge)}`
-                                            : `Finalizar • ${formatCurrency(checkoutTotalToCharge)}`
+                                            ? `Fazer pedido via WhatsApp • ${formatCurrency(remainingBalanceToCharge)}`
+                                            : `Finalizar • ${formatCurrency(remainingBalanceToCharge)}`
                                         }
                                     </Button>
                                 </div>
@@ -4719,34 +4805,47 @@ export function CheckoutPageClient() {
                     <div className="space-y-4">
                         <ListItem
                             icon={
-                                paymentOption === "mercadopago" ? <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" /> :
-                                    selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                        selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                selectedStorefrontMethod?.type === "store_credit" || selectedStorefrontMethod?.type === "vale-compra" || selectedStorefrontMethod?.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
-                                                    MoneyIcon
+                                isFullyCoveredByStoreCredit ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Crédito em loja" className="w-5 h-5 object-contain" /> :
+                                    paymentOption === "mercadopago" ? <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" /> :
+                                        selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                            selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                    selectedStorefrontMethod?.type === "store_credit" || selectedStorefrontMethod?.type === "vale-compra" || selectedStorefrontMethod?.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
+                                                        MoneyIcon
                             }
-                            title={paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                            title={isFullyCoveredByStoreCredit ? "Crédito em loja" : paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                             description={
-                                paymentOption === "mercadopago" ? (() => {
-                                    const mp = mpPaymentMethodsForCart
-                                    const enabled = []
-                                    if (mp?.pix === true) enabled.push("Pix")
-                                    if (mp?.credit_card === true) enabled.push("Cartão")
-                                    if (mp?.boleto === true && !payDepositOnly) enabled.push("Boleto")
-                                    if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
-                                    return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
-                                })() :
-                                    selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                        selectedStorefrontMethod?.type.includes("card") ? `${formData.installments}x no Cartão` :
-                                            wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                isFullyCoveredByStoreCredit ? "Pedido pago integralmente com seu crédito na loja" :
+                                    paymentOption === "mercadopago" ? (() => {
+                                        const mp = mpPaymentMethodsForCart
+                                        const enabled = []
+                                        if (mp?.pix === true) enabled.push("Pix")
+                                        if (mp?.credit_card === true) enabled.push("Cartão")
+                                        if (mp?.boleto === true && !payDepositOnly) enabled.push("Boleto")
+                                        if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
+                                        return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
+                                    })() :
+                                        selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                            selectedStorefrontMethod?.type.includes("card") ? `${formData.installments}x no Cartão` :
+                                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                    wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
                             }
                             className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                             right={
-                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(checkoutTotalToCharge)}</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(remainingBalanceToCharge)}</span>
                             }
                         />
+                        {appliedStoreCredit > 0 && !isFullyCoveredByStoreCredit && (
+                            <ListItem
+                                icon={<img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Crédito em loja" className="w-5 h-5 object-contain" />}
+                                title="Crédito em loja"
+                                description="Desconto aplicado no pedido"
+                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                right={
+                                    <span className="font-bold text-brand-green">-{formatCurrency(appliedStoreCredit)}</span>
+                                }
+                            />
+                        )}
                     </div>
 
                     {appliedCoupon && (
@@ -5519,6 +5618,23 @@ export function CheckoutPageClient() {
                     )}
                 </div>
             </DefaultModal>
+            <OrderBumpProductModal
+                isOpen={Boolean(bumpModalProduct)}
+                product={bumpModalProduct}
+                loading={Boolean(bumpModalProduct && addingBumpId === bumpModalProduct.id)}
+                onClose={() => {
+                    if (!addingBumpId) setBumpModalProduct(null)
+                }}
+                onConfirm={(selection) =>
+                    handleAddBumpProduct(selection.product, {
+                        variantId: selection.variantId,
+                        variantLabel: selection.variantLabel,
+                        price: selection.price,
+                        image: selection.image,
+                        quantity: selection.quantity,
+                    })
+                }
+            />
         </>
     )
 }

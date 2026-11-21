@@ -219,6 +219,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
 
     // Data from upload
     const [sessionId, setSessionId] = useState<string | null>(null)
+    const [detectedSource, setDetectedSource] = useState<string | null>(null)
     const [headers, setHeaders] = useState<string[]>([])
     const [totalRows, setTotalRows] = useState(0)
     const [fileName, setFileName] = useState("")
@@ -361,12 +362,14 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
             }
 
             setSessionId(result.sessionId)
+            setDetectedSource(result.detectedSource || null)
             setHeaders(Array.isArray(result.headers) ? result.headers : [])
             setTotalRows(typeof result.totalRows === "number" ? result.totalRows : 0)
             setFileName(result.fileName || file.name)
             setMapping(Array.isArray(result.suggestedMapping) ? result.suggestedMapping : [])
             setAvailableFields(Array.isArray(result.availableFields) ? result.availableFields : [])
             setParsedProducts(Array.isArray(result.previewProducts) ? result.previewProducts : [])
+            setExcludedRowIndexes([])
             setUploading(false)
             setStep("mapping")
         },
@@ -435,6 +438,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
         }
 
         setParsedProducts(Array.isArray(result.previewProducts) ? result.previewProducts : [])
+        setExcludedRowIndexes([])
         setPage(1)
         setSearch("")
         setSelection(new Set())
@@ -498,8 +502,13 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
         setParsedProducts((prevProducts) => {
             const indexesToRemove = prevProducts
                 .filter((p: any) => selection.has(p.id))
-                .map((p: any) => p._rowIndex)
-                .filter((index: number | undefined) => index !== undefined) as number[]
+                .flatMap((p: any) =>
+                    Array.isArray(p._rowIndexes) && p._rowIndexes.length > 0
+                        ? p._rowIndexes
+                        : p._rowIndex !== undefined
+                            ? [p._rowIndex]
+                            : [],
+                ) as number[]
             setExcludedRowIndexes((prev) => Array.from(new Set([...prev, ...indexesToRemove])))
             return prevProducts.filter((p: any) => !selection.has(p.id))
         })
@@ -606,8 +615,8 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                         {step === "upload"
                                             ? "Faça upload de uma planilha .xlsx, .xls ou .csv com produtos."
                                             : step === "mapping"
-                                                ? `${totalRows} produto(s) encontrados - ${mappedCount} de ${headers.length} colunas mapeadas`
-                                                : `${totalRows} produto(s) prontos para importar`}
+                                                ? `${totalRows} linha(s) encontradas - ${mappedCount} de ${headers.length} colunas mapeadas`
+                                                : `${parsedProducts.length} produto(s) prontos para importar`}
                                     </div>
                                 </div>
 
@@ -680,9 +689,9 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                         💡 Dicas para uma importação perfeita:
                                     </h3>
                                     <ul className="text-xs text-brand-inactive-text dark:text-dark-body space-y-1.5 list-disc list-inside">
-                                        <li><strong>Campos obrigatórios:</strong> Nome do Produto e Preço de Venda.</li>
-                                        <li><strong>Identificador único:</strong> O campo SKU é usado para evitar duplicidade ou atualizar produtos existentes.</li>
-                                        <li><strong>Planilha Modelo:</strong> Contém exemplos reais e listas suspensas (dropdown) no Excel para status, unidades e condições.</li>
+                                        <li><strong>Compatível com os principais ERPs e lojas:</strong> Tiny ERP, Bling, Shopify, WooCommerce, Nuvemshop e planilha modelo Dudit.</li>
+                                        <li><strong>Variações automáticas:</strong> Produtos com grade em múltiplas linhas (Código do Pai / Handle) são agrupados automaticamente em um único produto com suas variações.</li>
+                                        <li><strong>Campos obrigatórios:</strong> Nome do Produto e Preço de Venda. O SKU é usado para evitar duplicidade ou atualizar produtos existentes.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -690,6 +699,13 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
 
                         {step === "mapping" && (
                             <div className="flex flex-col gap-4">
+                                {detectedSource && (
+                                    <InfoCard
+                                        title={`Padrão detectado: ${detectedSource}`}
+                                        message="As colunas foram mapeadas automaticamente. Produtos com variações vinculadas pelo Código do Pai / Handle serão agrupados em um único produto na próxima etapa."
+                                        color="blue"
+                                    />
+                                )}
                                 {hasDuplicateMapping && (
                                     <InfoCard message="Existem campos do sistema atribuídos a mais de uma coluna da planilha. Por favor, desmarque as duplicadas para prosseguir." color="red" />
                                 )}
@@ -772,12 +788,20 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                         <label className="flex items-center gap-2 cursor-pointer text-brand-dark dark:text-dark-heading text-xs font-medium">
                                             <Checkbox
                                                 label="Cadastrar marcas novas automaticamente"
-                                                checked={autoCreateCategories}
-                                                onCheckedChange={(c) => setAutoCreateCategories(!!c)}
+                                                checked={autoCreateBrands}
+                                                onCheckedChange={(c) => setAutoCreateBrands(!!c)}
                                             />
                                         </label>
                                     </div>
                                 </FormSection>
+
+                                {totalRows > parsedProducts.length && (
+                                    <InfoCard
+                                        title="Variações agrupadas automaticamente"
+                                        message={`${totalRows} linhas da planilha foram consolidadas em ${parsedProducts.length} produto(s) (${parsedProducts.filter((p: any) => Array.isArray(p.variants) && p.variants.length > 0).length} com variações).`}
+                                        color="blue"
+                                    />
+                                )}
 
                                 <div className="flex-none flex items-center justify-between gap-4 flex-wrap">
                                     <div className="w-80">

@@ -215,6 +215,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                     exchangeItems: data.exchangeItems || [],
                     exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                     returnToInventory: Boolean(data.returnToInventory),
+                    skipRevalidate: true,
                 })
                 if (!response.success) throw new Error(response.error)
                 const requestId = response.data?.id
@@ -238,6 +239,8 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                         storeCreditAmount: (isApprovedStatus && data.resolutionType === "store_credit") ? Number(data.storeCreditValue || 0) : 0,
                         exchangeItems: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeItems || [] : [],
                         exchangeBalanceResolution: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeBalanceResolution || null : null,
+                        exchangeDeliveryType: (isApprovedStatus && data.resolutionType === "exchange") ? (data.exchangeDeliveryType || null) : null,
+                        exchangeDeliveryStatus: (isApprovedStatus && data.resolutionType === "exchange") ? (data.exchangeDeliveryStatus || null) : null,
                         notes: data.observations || "",
                         idempotencyKey: `erp-init-process:${requestId}`,
                         accountId: isApprovedStatus ? (data.accountId || null) : null,
@@ -272,6 +275,8 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                     storeCreditAmount: (isApprovedStatus && data.resolutionType === "store_credit") ? Number(data.storeCreditValue || 0) : 0,
                     exchangeItems: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeItems || [] : [],
                     exchangeBalanceResolution: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeBalanceResolution || null : null,
+                    exchangeDeliveryType: (isApprovedStatus && data.resolutionType === "exchange") ? (data.exchangeDeliveryType || null) : null,
+                    exchangeDeliveryStatus: (isApprovedStatus && data.resolutionType === "exchange") ? (data.exchangeDeliveryStatus || null) : null,
                     notes: data.observations || "",
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
                     accountId: isApprovedStatus ? (data.accountId || null) : null,

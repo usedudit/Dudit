@@ -170,4 +170,36 @@ describe("TinyClient", () => {
     expect(callArgs[1]?.body).toContain("url_rastreamento=https%3A%2F%2Frastreio.exemplo.com")
     expect(callArgs[1]?.body).toContain("id=998877")
   })
+
+  it("updateProductStock should send stock update to Tiny", async () => {
+    const client = createTinyClient(fakeToken)
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        retorno: {
+          status_processamento: 3,
+          status: "OK",
+          registros: {
+            registro: {
+              saldoEstoque: 42,
+            },
+          },
+        },
+      }),
+    } as any)
+
+    const res = await client.updateProductStock(12345, 42, {
+      tipo: "B",
+      observacoes: "Ajuste de teste",
+    })
+
+    expect(res.status).toBe("OK")
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const callArgs = fetchSpy.mock.calls[0]
+    expect(callArgs[0]).toContain("produto.atualizar.estoque.php")
+    expect(callArgs[1]?.body).toContain("idProduto=12345")
+    expect(callArgs[1]?.body).toContain(encodeURIComponent('"quantidade":42'))
+  })
 })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback } from "react"
+import { useState, useTransition, useMemo, useCallback, useEffect, useRef } from "react"
 import Link from "next/link"
 import {
     Button,
@@ -26,6 +26,8 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatDate } from "@/lib/utils"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
+import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds, DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
 type SortKey = "store" | "partner" | "gateway" | "status" | "date"
 type SortDirection = "asc" | "desc"
@@ -39,11 +41,9 @@ const ITEMS_PER_PAGE = 8
 
 export default function SubscriptionList({ initialData, initialStats }: SubscriptionListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    const [subscriptions, setSubscriptions] = useState<SubscriptionEntry[]>(initialData?.data || [])
     const [stats, setStats] = useState<AdminSubscriptionStats | undefined>(initialStats)
     const [statusTab, setStatusTab] = useState("all")
     const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
-    const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
@@ -54,6 +54,45 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
     const [disconnectTarget, setDisconnectTarget] = useState<SubscriptionEntry | null>(null)
     const [actionReason, setActionReason] = useState("")
     const [isPending, startTransition] = useTransition()
+
+    // Search state (debounced so the server is only queried after typing stops)
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+
+    // Date period filter
+    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
+
+    // Helper to compute derived fields from SubscriptionEntry
+    const enrichSubscription = useCallback((sub: SubscriptionEntry) => {
+        const isConnected = !!sub.mp_user_id
+        const isSuspended = !!sub.suspended_at
+        // The provider is not in the type, use a default
+        const mpProvider = sub.mp_user_id ? "Mercado Pago" : "—"
+        return { ...sub, is_connected: isConnected, is_suspended: isSuspended, mp_provider: mpProvider }
+    }, [])
+
+    // Server-side filters derived from the UI state
+    const buildServerFilters = useCallback((term: string) => {
+        const bounds = isDatePeriodFilterActive(filters.datePeriod)
+            ? resolveDatePeriodBounds(filters.datePeriod)
+            : { startYmd: null as string | null, endYmd: null as string | null }
+
+        return {
+            statusFilter: statusTab === "all" ? undefined : statusTab,
+            search: term.trim() || undefined,
+            startDate: bounds.startYmd || undefined,
+            endDate: bounds.endYmd || undefined,
+        }
+    }, [statusTab, filters])
+
+    // Data State (initialized from SSR)
+    const [subscriptions, setSubscriptions] = useState<SubscriptionEntry[]>(initialData?.data || [])
+    const [hasMore, setHasMore] = useState<boolean>(initialData?.hasMore || false)
+    const [nextCursor, setNextCursor] = useState<string | null>(initialData?.nextCursor || null)
+    const [isFetchingMore, setIsFetchingMore] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const isFirstFetchRef = useRef(true)
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -68,16 +107,72 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
         startTransition(async () => {
             try {
                 const [res, statsRes] = await Promise.all([
-                    getSubscriptions(null, 100),
+                    getSubscriptions(null, 50, buildServerFilters(debouncedSearch)),
                     getAdminSubscriptionStats(),
                 ])
                 setSubscriptions(res.data || [])
+                setNextCursor(res.nextCursor)
+                setHasMore(res.hasMore)
+                setPage(1)
                 setStats(statsRes)
             } catch (err) {
                 console.error("Failed to refresh subscriptions:", err)
             }
         })
-    }, [])
+    }, [buildServerFilters, debouncedSearch])
+
+    // Server-side search / filters: refetch the first page whenever they change
+    useEffect(() => {
+        const isDefaultView =
+            statusTab === "all" &&
+            debouncedSearch.trim().length === 0 &&
+            !isDatePeriodFilterActive(filters.datePeriod)
+
+        if (isFirstFetchRef.current) {
+            isFirstFetchRef.current = false
+            if (isDefaultView) return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+
+        getSubscriptions(null, 50, buildServerFilters(debouncedSearch))
+            .then((res) => {
+                if (cancelled) return
+                setSubscriptions(res.data || [])
+                setNextCursor(res.nextCursor)
+                setHasMore(res.hasMore)
+                setPage(1)
+            })
+            .catch((err) => {
+                if (!cancelled) console.error("Failed to load admin subscriptions:", err)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [statusTab, debouncedSearch, filters, buildServerFilters])
+
+    const loadMoreSubscriptions = useCallback(async () => {
+        if (!hasMore || !nextCursor || isFetchingMore) return
+        setIsFetchingMore(true)
+        try {
+            const res = await getSubscriptions(nextCursor, 50, buildServerFilters(debouncedSearch))
+            setSubscriptions((prev) => {
+                const existing = new Set(prev.map((s) => s.partner_id))
+                return [...prev, ...(res.data || []).filter((s: SubscriptionEntry) => !existing.has(s.partner_id))]
+            })
+            setNextCursor(res.nextCursor)
+            setHasMore(res.hasMore)
+        } catch (err) {
+            console.error("Failed to load more admin subscriptions:", err)
+        } finally {
+            setIsFetchingMore(false)
+        }
+    }, [hasMore, nextCursor, isFetchingMore, buildServerFilters, debouncedSearch])
 
     const handleConfirmDisconnect = () => {
         if (!disconnectTarget) return
@@ -98,91 +193,67 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
         })
     }
 
-    // Instant in-memory filtering (0ms)
-    const filteredItems = useMemo(() => {
-        const q = search.trim().toLowerCase()
+    // Enrich all subscriptions with computed fields
+    const enrichedSubscriptions = useMemo(() => subscriptions.map(enrichSubscription), [subscriptions, enrichSubscription])
 
-        let result = subscriptions.filter(item => {
-            // Determine status
-            const isConnected = !!item.mp_user_id
-            const isSuspended = !!item.suspended_at
-
-            if (statusTab === "connected" && (!isConnected || isSuspended)) return false
-            if (statusTab === "disconnected" && isConnected) return false
-            if (statusTab === "suspended" && !isSuspended) return false
-
-            // Search filter
-            if (q) {
-                const store = (item.store_name || "").toLowerCase()
-                const partner = (item.partner_id || "").toLowerCase()
-                const mp = (item.mp_user_id || "").toLowerCase()
-                if (!store.includes(q) && !partner.includes(q) && !mp.includes(q)) {
-                    return false
-                }
+    // In-memory sorting (applied on top of server-sorted data)
+    const sortedSubscriptions = useMemo(() => {
+        if (!sortConfig) return enrichedSubscriptions
+        return [...enrichedSubscriptions].sort((a, b) => {
+            let aVal: any = ""
+            let bVal: any = ""
+            switch (sortConfig.key) {
+                case "store":
+                    aVal = (a.store_name || "").toLowerCase()
+                    bVal = (b.store_name || "").toLowerCase()
+                    break
+                case "partner":
+                    aVal = (a.partner_id || "").toLowerCase()
+                    bVal = (b.partner_id || "").toLowerCase()
+                    break
+                case "gateway":
+                    aVal = (a.mp_provider || "").toLowerCase()
+                    bVal = (b.mp_provider || "").toLowerCase()
+                    break
+                case "status":
+                    aVal = a.is_suspended ? 2 : a.is_connected ? 0 : 1
+                    bVal = b.is_suspended ? 2 : b.is_connected ? 0 : 1
+                    break
+                case "date":
+                    aVal = new Date(a.created_at).getTime()
+                    bVal = new Date(b.created_at).getTime()
+                    break
             }
-
-            return true
+            if (aVal === bVal) return 0
+            const cmp = aVal < bVal ? -1 : 1
+            return sortConfig.direction === "asc" ? cmp : -cmp
         })
-
-        // In-memory sorting
-        if (sortConfig) {
-            result = [...result].sort((a, b) => {
-                let aVal: any = ""
-                let bVal: any = ""
-                switch (sortConfig.key) {
-                    case "store":
-                        aVal = (a.store_name || "").toLowerCase()
-                        bVal = (b.store_name || "").toLowerCase()
-                        break
-                    case "partner":
-                        aVal = (a.partner_id || "").toLowerCase()
-                        bVal = (b.partner_id || "").toLowerCase()
-                        break
-                    case "gateway":
-                        aVal = (a.mp_user_id || "").toLowerCase()
-                        bVal = (b.mp_user_id || "").toLowerCase()
-                        break
-                    case "status":
-                        aVal = a.suspended_at ? "suspended" : a.mp_user_id ? "connected" : "disconnected"
-                        bVal = b.suspended_at ? "suspended" : b.mp_user_id ? "connected" : "disconnected"
-                        break
-                    case "date":
-                        aVal = new Date(a.created_at || 0).getTime()
-                        bVal = new Date(b.created_at || 0).getTime()
-                        break
-                }
-                if (aVal === bVal) return 0
-                const cmp = aVal < bVal ? -1 : 1
-                return sortConfig.direction === "asc" ? cmp : -cmp
-            })
-        }
-
-        return result
-    }, [subscriptions, statusTab, search, sortConfig])
+    }, [enrichedSubscriptions, sortConfig])
 
     // Pagination (Strict 8 items)
-    const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE))
+    const totalPages = Math.max(1, Math.ceil(sortedSubscriptions.length / ITEMS_PER_PAGE))
     const paginatedItems = useMemo(() => {
         const start = (page - 1) * ITEMS_PER_PAGE
-        return filteredItems.slice(start, start + ITEMS_PER_PAGE)
-    }, [filteredItems, page])
+        return sortedSubscriptions.slice(start, start + ITEMS_PER_PAGE)
+    }, [sortedSubscriptions, page])
 
-    // Reset to page 1 on filter/tab/search change
-    useMemo(() => {
-        setPage(1)
-    }, [statusTab, search])
+    const getStatusBadgeVariant = (sub: ReturnType<typeof enrichSubscription>) => {
+        if (sub.is_suspended) return "red" as const
+        if (sub.is_connected) return "green" as const
+        return "red" as const
+    }
 
-    const getStatusMeta = (sub: SubscriptionEntry) => {
-        if (sub.suspended_at) return { label: "Suspenso", variant: "orange" as const }
-        if (sub.mp_user_id) return { label: "Conectado", variant: "green" as const }
-        return { label: "Desconectado", variant: "red" as const }
+    const getStatusLabel = (sub: ReturnType<typeof enrichSubscription>) => {
+        if (sub.is_suspended) return "Suspensa"
+        if (sub.is_connected) return "Conectada"
+        return "Desconectada"
     }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
                 .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
                 .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -198,7 +269,7 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                             Assinaturas & Gateways
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Monitore conexões de split e pagamento do Mercado Pago de cada vendedor parceiro.
+                            Gerencie conexões de gateways de pagamento dos parceiros.
                         </p>
                     </div>
 
@@ -234,15 +305,9 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                     imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                                     imageAlt="Nenhuma assinatura"
                                     title="Nenhuma assinatura encontrada"
-                                    subtitle={search || statusTab !== "all" ? "Tente ajustar seus filtros de busca." : "Nenhuma conexão registrada nesta categoria."}
-                                    itemButton={search || statusTab !== "all" ? {
-                                        text: "Limpar Filtros",
-                                        action: () => {
-                                            setSearch("")
-                                            setStatusTab("all")
-                                        },
-                                        variant: "outline",
-                                    } : undefined}
+                                    subtitle={statusTab !== "all" || debouncedSearch.trim().length > 0 || isDatePeriodFilterActive(filters.datePeriod)
+                                        ? "Tente ajustar seus filtros de busca."
+                                        : "Nenhuma assinatura registrada."}
                                 />
                             </FadeIn>
                         ) : (
@@ -250,213 +315,115 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                 {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((sub) => {
-                                        const statusMeta = getStatusMeta(sub)
+                                        const enriched = enrichSubscription(sub)
                                         return (
-                                            <div key={sub.partner_id} className="py-4 flex flex-col gap-2.5">
+                                            <div
+                                                key={sub.partner_id}
+                                                className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                            >
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <Link
-                                                        href={`/ddt-admin/partners?view=${sub.partner_id}`}
-                                                        className="flex flex-col gap-0.5 min-w-0"
-                                                    >
-                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading hover:text-brand-green truncate">
+                                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
                                                             {sub.store_name || "Loja"}
                                                         </span>
                                                         <span className="text-xs text-brand-inactive-text truncate">
-                                                            MP ID: {sub.mp_user_id || "Não conectado"}
+                                                            ID: {sub.partner_id.slice(0, 8)}
                                                         </span>
-                                                    </Link>
-                                                    <Badge variant={statusMeta.variant}>
-                                                        {statusMeta.label}
+                                                    </div>
+                                                    <Badge variant={getStatusBadgeVariant(enriched)}>
+                                                        {getStatusLabel(enriched)}
                                                     </Badge>
                                                 </div>
 
                                                 <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                    <span>{sub.created_at ? formatDate(sub.created_at) : "-"}</span>
-                                                    {!!sub.mp_user_id && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => setDisconnectTarget(sub)}
-                                                            className="text-xs text-red-600 border-red-200 py-1 h-auto"
-                                                        >
-                                                            Desconectar
-                                                        </Button>
-                                                    )}
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span className="truncate">Gateway: {enriched.mp_provider}</span>
+                                                    </div>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm shrink-0">
+                                                        {formatDate(sub.created_at)}
+                                                    </span>
                                                 </div>
                                             </div>
                                         )
                                     })}
                                 </div>
 
-                                {/* Desktop View: Grid */}
-                                {viewMode === "grid" ? (
-                                    <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {paginatedItems.map((sub) => {
-                                            const statusMeta = getStatusMeta(sub)
-                                            const isConnected = !!sub.mp_user_id
-                                            return (
-                                                <div
-                                                    key={sub.partner_id}
-                                                    className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer flex flex-col justify-between gap-4"
-                                                >
-                                                    <div className="flex justify-between items-start gap-2">
-                                                        <Link href={`/ddt-admin/partners?view=${sub.partner_id}`} className="flex items-center gap-3 min-w-0 group">
-                                                            <div className="w-10 h-10 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                                <StoreIcon className="w-5 h-5 text-brand-inactive-text group-hover:text-brand-green transition-colors" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading group-hover:text-brand-green truncate">
-                                                                    {sub.store_name || "Loja Parceira"}
-                                                                </h3>
-                                                                <p className="text-xs text-brand-inactive-text mt-0.5 truncate">
-                                                                    ID: {sub.partner_id.slice(0, 8)}...
-                                                                </p>
-                                                            </div>
-                                                        </Link>
-                                                        <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-                                                    </div>
-
-                                                    <div className="text-xs space-y-1.5 text-brand-inactive-text border-t border-b border-brand-border/50 dark:border-dark-border/50 py-3">
-                                                        <div className="flex justify-between">
-                                                            <span>Mercado Pago ID</span>
-                                                            <span className="font-mono truncate max-w-[130px]">{sub.mp_user_id || "-"}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>Conexão</span>
-                                                            <span>{sub.created_at ? formatDate(sub.created_at) : "-"}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-brand-inactive-text">Gateway</span>
-                                                        {isConnected ? (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outlinered"
-                                                                className="text-xs h-8 px-2.5"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    setDisconnectTarget(sub)
-                                                                }}
-                                                                disabled={isPending}
-                                                            >
-                                                                Desconectar
-                                                            </Button>
-                                                        ) : (
-                                                            <span className="text-xs text-brand-inactive-text">-</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                ) : (
-                                    /* Desktop View: Table */
-                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
-                                                        <th
-                                                            onClick={() => handleSort("store")}
-                                                            className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Loja / Parceiro {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("gateway")}
-                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Mercado Pago ID {sortConfig?.key === "gateway" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("status")}
-                                                            className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Status Split {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("date")}
-                                                            className="py-3 px-2 w-36 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Data de Conexão {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th className="py-3 px-2 w-36 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
-                                                            Ações
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginatedItems.map((sub) => {
-                                                        const isConnected = !!sub.mp_user_id
-                                                        const isSuspended = !!sub.suspended_at
-                                                        return (
-                                                            <tr
-                                                                key={sub.partner_id}
-                                                                className="bg-white dark:bg-dark-background hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors"
-                                                            >
-                                                                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
-                                                                    <Link
-                                                                        href={`/ddt-admin/partners?view=${sub.partner_id}`}
-                                                                        className="flex items-center gap-3 group cursor-pointer"
+                                {/* Desktop View: Table */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight rounded-l-lg">
+                                                        Loja / Parceiro
+                                                    </th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Gateway
+                                                    </th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Status
+                                                    </th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Conectado em
+                                                    </th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                        Criado em
+                                                    </th>
+                                                    <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-right pr-6 rounded-r-lg">
+                                                        Ações
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedItems.map((sub) => {
+                                                    const enriched = enrichSubscription(sub)
+                                                    return (
+                                                        <tr key={sub.partner_id} className="border-t border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 transition-colors">
+                                                            <td className="py-3 px-4">
+                                                                <div className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                    {sub.store_name || "Loja"}
+                                                                </div>
+                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                    ID: {sub.partner_id.slice(0, 8)}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 px-4">
+                                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-mono">
+                                                                    {enriched.mp_provider}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-3 px-4">
+                                                                <Badge variant={getStatusBadgeVariant(enriched)}>
+                                                                    {getStatusLabel(enriched)}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="py-3 px-4 text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                {sub.mp_connected_at ? formatDate(sub.mp_connected_at) : "—"}
+                                                            </td>
+                                                            <td className="py-3 px-4 text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                {formatDate(sub.created_at)}
+                                                            </td>
+                                                            <td className="py-3 px-4 text-right pr-6">
+                                                                {enriched.is_connected && !enriched.is_suspended && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setDisconnectTarget(sub)
+                                                                        }}
+                                                                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                                                                     >
-                                                                        <div className="w-9 h-9 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                                            <StoreIcon className="w-5 h-5 text-brand-inactive-text group-hover:text-brand-green transition-colors" />
-                                                                        </div>
-                                                                        <div className="flex flex-col min-w-0">
-                                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight group-hover:text-brand-green transition-colors truncate max-w-[220px]">
-                                                                                {sub.store_name || "Loja Parceira"}
-                                                                            </span>
-                                                                            <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                                                                                ID: {sub.partner_id.slice(0, 8)}...
-                                                                            </span>
-                                                                        </div>
-                                                                    </Link>
-                                                                </td>
-
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
-                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading font-mono">
-                                                                        {sub.mp_user_id || "Não conectado"}
-                                                                    </span>
-                                                                </td>
-
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                                                                    <div className="flex justify-center">
-                                                                        <Badge variant={isSuspended ? "orange" : isConnected ? "green" : "red"}>
-                                                                            {isSuspended ? "Suspenso" : isConnected ? "Conectado" : "Desconectado"}
-                                                                        </Badge>
-                                                                    </div>
-                                                                </td>
-
-                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                        {sub.created_at ? formatDate(sub.created_at) : "-"}
-                                                                    </span>
-                                                                </td>
-
-                                                                <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                                                                    {isConnected ? (
-                                                                        <Button
-                                                                            variant="outlinered"
-                                                                            size="sm"
-                                                                            onClick={() => setDisconnectTarget(sub)}
-                                                                            disabled={isPending}
-                                                                            className="text-xs h-8 px-2.5"
-                                                                        >
-                                                                            Desconectar
-                                                                        </Button>
-                                                                    ) : (
-                                                                        <span className="text-[13px] text-brand-inactive-text">-</span>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        )
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                                        Revogar
+                                                                    </Button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                )}
+                                </div>
 
                                 {/* Pagination */}
                                 {totalPages > 1 && (
@@ -469,23 +436,34 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                         />
                                     </div>
                                 )}
+
+                                {/* Load more from the server (cursor pagination) */}
+                                {hasMore && page === totalPages && (
+                                    <div className="pt-4 flex justify-center">
+                                        <Button
+                                            variant="outline"
+                                            onClick={loadMoreSubscriptions}
+                                            disabled={isFetchingMore}
+                                        >
+                                            {isFetchingMore ? "Carregando..." : "Carregar mais"}
+                                        </Button>
+                                    </div>
+                                )}
                             </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>
             </div>
 
-            {/* Modal: Desconectar Gateway */}
+            {/* Disconnect Modal */}
             <AlertModal
                 isOpen={!!disconnectTarget}
-                onClose={() => {
-                    setDisconnectTarget(null)
-                    setActionReason("")
-                }}
+                onClose={() => setDisconnectTarget(null)}
+                title="Revogar conexão do gateway"
+                description={`Tem certeza que deseja revogar a conexão do gateway para a loja "${disconnectTarget?.store_name}"? Esta ação desconectará o Mercado Pago e o parceiro precisará reconectar.`}
+                confirmText="Revogar"
+                cancelText="Cancelar"
                 onConfirm={handleConfirmDisconnect}
-                title="Revogar Conexão de Pagamento"
-                description={`Tem certeza que deseja revogar as credenciais do Mercado Pago da loja ${disconnectTarget?.store_name}? A loja não poderá mais receber pagamentos via split até reautorizar a conexão.`}
-                confirmText="Revogar Acesso"
                 variant="danger"
             />
         </FadeIn>

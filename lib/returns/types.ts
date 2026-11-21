@@ -94,6 +94,9 @@ export type ReturnRequestListItem = {
   refundPaymentMethod?: string
   refundType?: "full" | "partial" | "none" | "store_credit" | string | null
   exchangeOrderId?: string | null
+  exchangeOrderNumber?: string | null
+  exchangeOrderDeliveryStatus?: string | null
+  exchangeOrderDeliveryType?: string | null
   exchangeSubstatus?: string | null
   exchangeShortfallAmount?: number
   exchangeSurplusAmount?: number
@@ -102,6 +105,9 @@ export type ReturnRequestListItem = {
     variant_id?: string | null
     quantity: number
     unit_price: number
+    product_name?: string | null
+    sku?: string | null
+    image?: string | null
   }> | null
   exchangeBalanceResolution?: "store_credit" | "refund" | null
   items: Array<{

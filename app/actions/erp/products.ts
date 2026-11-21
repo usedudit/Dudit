@@ -1510,7 +1510,7 @@ export async function createProductVariantsBatchAction(data: {
         const existingVariants = existingVariantsRes.data
 
         // 2. Preparar dados para upsert
-        const variantsToInsert = data.variants.map(v => ({
+        const variantsToUpsert = data.variants.map(v => ({
             product_id: data.productId,
             variant_name: v.variantName,
             variant_type: v.variantType,
@@ -1520,12 +1520,25 @@ export async function createProductVariantsBatchAction(data: {
             stock_quantity: v.stockQuantity,
             variant_options: v.image ? { image: v.image } : null,
             is_active: v.isActive,
+            updated_at: new Date().toISOString(),
         }))
 
-        // 3. Fazer upsert em lote
+        // Se houver variantes antigas deste produto removidas na edição, apaga do banco
+        if (existingVariants && existingVariants.length > 0) {
+            const incomingSkus = new Set(data.variants.map(v => String(v.sku || "").trim().toLowerCase()).filter(Boolean))
+            const idsToDelete = existingVariants
+                .filter(ev => ev.sku && !incomingSkus.has(String(ev.sku).trim().toLowerCase()))
+                .map(ev => ev.id)
+
+            if (idsToDelete.length > 0) {
+                await supabase.from("product_variants").delete().in("id", idsToDelete)
+            }
+        }
+
+        // 3. Fazer upsert em lote com base no SKU (evita duplicate key value violates unique constraint "product_variants_sku_key")
         const { data: inserted, error } = await supabase
             .from("product_variants")
-            .insert(variantsToInsert)
+            .upsert(variantsToUpsert, { onConflict: 'sku' })
             .select()
 
         if (error) return errorResponse(error.message)

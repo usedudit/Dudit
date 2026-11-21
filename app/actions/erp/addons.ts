@@ -4,9 +4,14 @@ import { requireUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import {
   AddonSlug,
+  AddonSubscriptionStatus,
   getAllPartnerAddons,
   getAddonMetrics,
   setPartnerAddonStatus,
+  createAddonMpSubscription,
+  verifyAndSyncAddonCheckout,
+  cancelAddonMpSubscription,
+  isValidAddonSlug,
   PartnerAddonStatus,
   AddonMetrics,
 } from "@/lib/services/addon.service"
@@ -36,6 +41,7 @@ export async function togglePartnerAddonAction(
   isEnabled: boolean,
 ): Promise<{
   success: boolean
+  requiresPayment?: boolean
   error?: string
 }> {
   try {
@@ -50,6 +56,81 @@ export async function togglePartnerAddonAction(
   } catch (err: any) {
     console.error("[togglePartnerAddonAction] Erro:", err)
     return { success: false, error: err.message || "Erro ao alterar status do aplicativo." }
+  }
+}
+
+export async function subscribePartnerAddonAction(
+  addonSlug: AddonSlug,
+): Promise<{
+  success: boolean
+  initPoint?: string
+  mpPreapprovalId?: string
+  alreadyIncluded?: boolean
+  alreadyActive?: boolean
+  error?: string
+}> {
+  try {
+    const user = await requireUser()
+    const context = await getCurrentPartnerContext()
+    if (!context?.partnerId) {
+      return { success: false, error: "Parceiro ativo não encontrado." }
+    }
+
+    const payerEmail = user.email
+    if (!payerEmail) {
+      return { success: false, error: "E-mail de cobrança não encontrado na sua conta." }
+    }
+
+    return await createAddonMpSubscription(context.partnerId, addonSlug, payerEmail)
+  } catch (err: any) {
+    console.error("[subscribePartnerAddonAction] Erro:", err)
+    return { success: false, error: err.message || "Erro ao iniciar checkout do aplicativo." }
+  }
+}
+
+export async function syncPartnerAddonCheckoutAction(
+  addonSlug: string,
+): Promise<{
+  success: boolean
+  status?: AddonSubscriptionStatus
+  isEnabled?: boolean
+  error?: string
+}> {
+  try {
+    await requireUser()
+    const context = await getCurrentPartnerContext()
+    if (!context?.partnerId) {
+      return { success: false, error: "Parceiro ativo não encontrado." }
+    }
+
+    if (!isValidAddonSlug(addonSlug)) {
+      return { success: false, error: "Aplicativo inválido." }
+    }
+
+    return await verifyAndSyncAddonCheckout(context.partnerId, addonSlug)
+  } catch (err: any) {
+    console.error("[syncPartnerAddonCheckoutAction] Erro:", err)
+    return { success: false, error: err.message || "Erro ao verificar status do pagamento." }
+  }
+}
+
+export async function cancelPartnerAddonSubscriptionAction(
+  addonSlug: AddonSlug,
+): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    await requireUser()
+    const context = await getCurrentPartnerContext()
+    if (!context?.partnerId) {
+      return { success: false, error: "Parceiro ativo não encontrado." }
+    }
+
+    return await cancelAddonMpSubscription(context.partnerId, addonSlug)
+  } catch (err: any) {
+    console.error("[cancelPartnerAddonSubscriptionAction] Erro:", err)
+    return { success: false, error: err.message || "Erro ao cancelar assinatura do aplicativo." }
   }
 }
 

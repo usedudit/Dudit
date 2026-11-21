@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback, useEffect } from "react"
+import { useState, useTransition, useMemo, useCallback, useEffect, useRef } from "react"
 import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination, Checkbox, ActionsDropdown } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import OrderListRow from "./OrderListRow"
@@ -15,6 +15,7 @@ import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } from "@/lib/utils/filter-date-period"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
 import AdminOrderDetailClientWrapper from "./AdminOrderDetailClientWrapper"
 import { AdminOrderDetailView } from "./AdminOrderDetailView"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
@@ -66,8 +67,34 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     const [filters, setFilters] = useState<OrderFilterState>(INITIAL_FILTERS)
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
-    // Search state
-    const [search, setSearch] = useState("")
+    // Search state (debounced so the server is only queried after typing stops)
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+
+    // Server-side filters derived from the UI state
+    const buildServerFilters = useCallback((term: string) => {
+        const bounds = isDatePeriodFilterActive(filters.datePeriod)
+            ? resolveDatePeriodBounds(filters.datePeriod)
+            : { startYmd: null as string | null, endYmd: null as string | null }
+
+        const tabStatus =
+            activeTab === "pending" ? "Pendente"
+                : activeTab === "paid" ? "Pago"
+                    : activeTab === "shipped" ? "Enviado"
+                        : activeTab === "cancelled" ? "Cancelado"
+                            : null
+
+        const status = filters.status.length > 0 ? filters.status : tabStatus ? [tabStatus] : undefined
+
+        return {
+            status,
+            deliveryStatus: filters.deliveryStatus.length > 0 ? filters.deliveryStatus : undefined,
+            paymentMethod: filters.paymentMethod.length > 0 ? filters.paymentMethod : undefined,
+            channel: filters.channel.length > 0 ? filters.channel : undefined,
+            search: term.trim() || undefined,
+            startDate: bounds.startYmd || undefined,
+            endDate: bounds.endYmd || undefined,
+        }
+    }, [activeTab, filters])
 
     // Sorting state
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
@@ -82,7 +109,11 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     // Data State (initialized from SSR)
     const [orders, setOrders] = useState<any[]>(initialData?.data || [])
     const [isLoading, setIsLoading] = useState(false)
+    const [hasMore, setHasMore] = useState<boolean>(initialData?.hasMore || false)
+    const [nextCursor, setNextCursor] = useState<string | null>(initialData?.nextCursor || null)
+    const [isFetchingMore, setIsFetchingMore] = useState(false)
     const [page, setPage] = useState(1)
+    const isFirstFetchRef = useRef(true)
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -123,16 +154,76 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         startTransition(async () => {
             try {
                 const [res, statsRes] = await Promise.all([
-                    getAdminMarketplaceOrders(null, 100),
+                    getAdminMarketplaceOrders(null, 50, buildServerFilters(debouncedSearch)),
                     getAdminMarketplaceOrdersStats(),
                 ])
                 setOrders(res.data || [])
+                setNextCursor(res.nextCursor)
+                setHasMore(res.hasMore)
+                setPage(1)
                 setStats(statsRes)
             } catch (err) {
                 console.error("Failed to refresh admin orders:", err)
             }
         })
-    }, [])
+    }, [buildServerFilters, debouncedSearch])
+
+    // Server-side search / filters: refetch the first page whenever they change
+    useEffect(() => {
+        const isDefaultView =
+            activeTab === "all" &&
+            debouncedSearch.trim().length === 0 &&
+            filters.status.length === 0 &&
+            filters.deliveryStatus.length === 0 &&
+            filters.paymentMethod.length === 0 &&
+            filters.channel.length === 0 &&
+            !isDatePeriodFilterActive(filters.datePeriod)
+
+        if (isFirstFetchRef.current) {
+            isFirstFetchRef.current = false
+            if (isDefaultView) return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+
+        getAdminMarketplaceOrders(null, 50, buildServerFilters(debouncedSearch))
+            .then((res) => {
+                if (cancelled) return
+                setOrders(res.data || [])
+                setNextCursor(res.nextCursor)
+                setHasMore(res.hasMore)
+                setPage(1)
+            })
+            .catch((err) => {
+                if (!cancelled) console.error("Failed to load admin orders:", err)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [activeTab, debouncedSearch, filters, buildServerFilters])
+
+    const loadMoreOrders = useCallback(async () => {
+        if (!hasMore || !nextCursor || isFetchingMore) return
+        setIsFetchingMore(true)
+        try {
+            const res = await getAdminMarketplaceOrders(nextCursor, 50, buildServerFilters(debouncedSearch))
+            setOrders((prev) => {
+                const existing = new Set(prev.map((order) => order.id))
+                return [...prev, ...(res.data || []).filter((order: any) => !existing.has(order.id))]
+            })
+            setNextCursor(res.nextCursor)
+            setHasMore(res.hasMore)
+        } catch (err) {
+            console.error("Failed to load more admin orders:", err)
+        } finally {
+            setIsFetchingMore(false)
+        }
+    }, [hasMore, nextCursor, isFetchingMore, buildServerFilters, debouncedSearch])
 
     // Table columns matching ERP + seller column
     interface AdminColumn {
@@ -313,11 +404,6 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         const start = (page - 1) * ITEMS_PER_PAGE
         return filteredOrders.slice(start, start + ITEMS_PER_PAGE)
     }, [filteredOrders, page])
-
-    // Reset to page 1 on filter/tab/search change
-    useMemo(() => {
-        setPage(1)
-    }, [activeTab, search, filters])
 
     // If viewing detail of a specific order via URL (?view=id)
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
@@ -700,6 +786,19 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                             onPageChange={setPage}
                                             fixedUntil="lg"
                                         />
+                                    </div>
+                                )}
+
+                                {/* Load more from the server (cursor pagination) */}
+                                {hasMore && page === totalPages && (
+                                    <div className="pt-4 flex justify-center">
+                                        <Button
+                                            variant="outline"
+                                            onClick={loadMoreOrders}
+                                            disabled={isFetchingMore}
+                                        >
+                                            {isFetchingMore ? "Carregando..." : "Carregar mais"}
+                                        </Button>
                                     </div>
                                 )}
                             </FadeIn>

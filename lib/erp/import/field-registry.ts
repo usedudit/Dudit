@@ -11,7 +11,8 @@ const productFields: FieldDef[] = [
     synonyms: [
       "nome do produto", "nome produto", "produto nome", "produto", "nome",
       "item", "product name", "name", "produto/serviço", "titulo", "título",
-      "título do produto", "titulo do produto", "designação", "descrição", "descricao"
+      "título do produto", "titulo do produto", "product title", "title",
+      "designação", "descrição", "descricao"
     ]
   },
   {
@@ -23,10 +24,24 @@ const productFields: FieldDef[] = [
     description: "Código interno único para controle de estoque (deixe em branco se o produto tiver variações)",
     synonyms: [
       "sku", "sku / código", "sku / codigo", "sku/código", "sku/codigo",
-      "código sku", "codigo sku", "código interno", "codigo interno",
+      "código (sku)", "codigo (sku)", "código sku", "codigo sku",
+      "variant sku", "código interno", "codigo interno",
       "referencia", "ref", "código do produto", "codigo do produto",
       "cód interno", "cod interno", "code", "part number", "cod prod",
       "cód prod", "cod_item", "código item", "codigo item", "código", "codigo"
+    ]
+  },
+  {
+    name: "parent_sku",
+    label: "Código do Pai (Variação)",
+    type: "string",
+    example: "CAM-ALGODÃO",
+    description: "Código/SKU do produto pai (Tiny, Bling, WooCommerce) ou Handle/Identificador URL (Shopify, Nuvemshop) para agrupar variações automaticamente",
+    synonyms: [
+      "código do pai", "codigo do pai", "código pai", "codigo pai",
+      "cod pai", "cód pai", "sku pai", "sku do pai", "produto pai",
+      "referência pai", "referencia pai", "parent", "parent sku",
+      "parent_sku", "identificador url", "handle"
     ]
   },
   {
@@ -59,6 +74,7 @@ const productFields: FieldDef[] = [
       "preço de venda", "preco de venda", "preço venda", "preco venda",
       "valor de venda", "valor venda", "preço unitário", "preco unitario",
       "valor unitário", "valor unitario", "preço final", "preco final",
+      "variant price", "regular price",
       "preço", "preco", "valor", "price", "sale price", "pv"
     ]
   },
@@ -71,7 +87,7 @@ const productFields: FieldDef[] = [
     synonyms: [
       "preço de custo", "preco de custo", "preço custo", "preco custo",
       "custo unitário", "custo unitario", "valor de custo", "valor custo",
-      "preço de compra", "preco de compra", "cost", "cost price", "custo"
+      "preço de compra", "preco de compra", "cost per item", "cost", "cost price", "custo"
     ]
   },
   {
@@ -82,7 +98,7 @@ const productFields: FieldDef[] = [
     description: "Preço com desconto em vigor",
     synonyms: [
       "preço promocional", "preco promocional", "promotional price", "preço promo",
-      "preco promo", "promo price", "preço desconto", "valor promocional"
+      "preco promo", "promo price", "preço desconto", "valor promocional", "sale price"
     ]
   },
   {
@@ -93,6 +109,7 @@ const productFields: FieldDef[] = [
     description: "Quantidade disponível em estoque",
     synonyms: [
       "estoque atual", "saldo estoque", "quantidade estoque", "quantidade atual",
+      "variant inventory qty",
       "qtd", "quantidade", "estoque", "saldo", "stock", "quantity", "qtde", "qty", "quant"
     ]
   },
@@ -122,7 +139,7 @@ const productFields: FieldDef[] = [
     type: "string",
     example: "Dudit Wear",
     description: "Marca ou fabricante do produto",
-    synonyms: ["marca do produto", "marca produto", "marca", "brand", "fabricante", "marca/fabricante"]
+    synonyms: ["marca do produto", "marca produto", "marca", "brand", "vendor", "fabricante", "marca/fabricante"]
   },
   {
     name: "variant_type",
@@ -141,13 +158,45 @@ const productFields: FieldDef[] = [
     label: "Variações (Grade)",
     type: "string",
     example: "P (Estoque: 10, Preço: 49.90); M (Estoque: 20, Preço: 49.90); G (Estoque: 15, Preço: 54.90)",
-    description: "Lista de variações separadas por ponto e vírgula (;). Ex: P; M; G ou P (Estoque: 10, Preço: 49.90, SKU: CAM-P); M (Estoque: 20)",
+    description: "Lista de variações (ex: P; M; G ou Cor:Branca||Tamanho:P do Tiny/Bling)",
     synonyms: [
       "variações (grade)", "variacoes (grade)", "lista variacoes", "lista variações",
       "lista variantes", "itens grade", "grade produtos", "valores variacao",
       "valores variação", "variacoes produto", "variantes produto", "variacoes",
       "variações", "variantes", "grade", "opcoes", "opções"
     ]
+  },
+  {
+    name: "option1_name",
+    label: "Atributo 1 (Nome)",
+    type: "string",
+    example: "Cor",
+    description: "Nome do 1º atributo de variação (Shopify, Nuvemshop, WooCommerce)",
+    synonyms: ["option1 name", "nome da variação 1", "nome da variacao 1", "attribute 1 name", "atributo 1", "atributo 1 nome"]
+  },
+  {
+    name: "option1_value",
+    label: "Atributo 1 (Valor)",
+    type: "string",
+    example: "Branca",
+    description: "Valor do 1º atributo de variação (Shopify, Nuvemshop, WooCommerce)",
+    synonyms: ["option1 value", "valor da variação 1", "valor da variacao 1", "attribute 1 value(s)", "attribute 1 value", "atributo 1 valor"]
+  },
+  {
+    name: "option2_name",
+    label: "Atributo 2 (Nome)",
+    type: "string",
+    example: "Tamanho",
+    description: "Nome do 2º atributo de variação (Shopify, Nuvemshop, WooCommerce)",
+    synonyms: ["option2 name", "nome da variação 2", "nome da variacao 2", "attribute 2 name", "atributo 2", "atributo 2 nome"]
+  },
+  {
+    name: "option2_value",
+    label: "Atributo 2 (Valor)",
+    type: "string",
+    example: "P",
+    description: "Valor do 2º atributo de variação (Shopify, Nuvemshop, WooCommerce)",
+    synonyms: ["option2 value", "valor da variação 2", "valor da variacao 2", "attribute 2 value(s)", "attribute 2 value", "atributo 2 valor"]
   },
   {
     name: "status",
@@ -177,7 +226,7 @@ const productFields: FieldDef[] = [
       "descrição do produto", "descricao do produto", "descrição produto",
       "descricao produto", "descrição detalhada", "descricao detalhada",
       "descrição completa", "descricao completa", "sobre o produto",
-      "descrição complementar", "descricao complementar",
+      "descrição complementar", "descricao complementar", "body (html)", "short description",
       "descrição", "descricao", "description", "detalhes", "desc",
       "observações", "observacoes", "obs", "especificações", "especificacoes"
     ]
@@ -206,7 +255,7 @@ const productFields: FieldDef[] = [
     type: "string",
     example: "61091000",
     description: "Código NCM (8 dígitos)",
-    synonyms: ["classificação fiscal", "classificacao fiscal", "código ncm", "codigo ncm", "ncm/sh", "ncm sh", "ncm"]
+    synonyms: ["ncm (classificação fiscal)", "ncm (classificacao fiscal)", "classificação fiscal", "classificacao fiscal", "código ncm", "codigo ncm", "ncm/sh", "ncm sh", "ncm"]
   },
   {
     name: "cest",
@@ -217,13 +266,27 @@ const productFields: FieldDef[] = [
     synonyms: ["código cest", "codigo cest", "cest"]
   },
   {
+    name: "packaging_type",
+    label: "Formato da Embalagem",
+    type: "enum",
+    options: ["Pacote / Caixa", "Cilindro / Rolo", "Envelope"],
+    example: "Pacote / Caixa",
+    description: "Formato da embalagem para cálculo de frete (Pacote / Caixa, Cilindro / Rolo ou Envelope)",
+    synonyms: [
+      "formato embalagem", "formato da embalagem", "tipo de embalagem",
+      "tipo embalagem", "embalagem", "packaging type", "packaging_type",
+      "formato pacote", "formato do pacote"
+    ]
+  },
+  {
     name: "weight_gross",
     label: "Peso Bruto (g)",
     type: "number",
     example: "250",
-    description: "Peso total incluindo embalagem em gramas",
+    description: "Peso total incluindo embalagem",
     synonyms: [
-      "peso bruto (g)", "peso bruto g", "peso bruto (gramas)", "peso bruto gramas",
+      "peso bruto (g)", "peso bruto g", "peso bruto (kg)", "peso bruto kg",
+      "peso bruto (gramas)", "peso bruto gramas", "variant grams",
       "peso total (g)", "peso total g", "peso bruto", "gross weight", "peso total",
       "peso com embalagem", "peso embalagem"
     ]
@@ -233,9 +296,10 @@ const productFields: FieldDef[] = [
     label: "Peso Líquido (g)",
     type: "number",
     example: "200",
-    description: "Peso do produto em gramas",
+    description: "Peso do produto sem embalagem",
     synonyms: [
       "peso líquido (g)", "peso liquido (g)", "peso líquido g", "peso liquido g",
+      "peso líquido (kg)", "peso liquido (kg)", "peso líquido kg", "peso liquido kg",
       "peso líquido (gramas)", "peso liquido (gramas)", "peso líquido", "peso liquido",
       "peso liq (g)", "peso líq (g)", "peso liq", "peso líq", "peso l", "net weight",
       "peso sem embalagem", "peso produto", "peso real", "peso real (g)"
@@ -247,7 +311,7 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "20",
     description: "Largura do pacote em centímetros",
-    synonyms: ["largura (cm)", "largura cm", "cm largura", "largura", "width", "larg", "w"]
+    synonyms: ["largura (cm)", "largura cm", "largura embalagem", "largura da embalagem", "cm largura", "largura", "width", "larg", "w"]
   },
   {
     name: "height",
@@ -255,7 +319,7 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "5",
     description: "Altura do pacote em centímetros",
-    synonyms: ["altura (cm)", "altura cm", "cm altura", "altura", "height", "alt", "h"]
+    synonyms: ["altura (cm)", "altura cm", "altura embalagem", "altura da embalagem", "cm altura", "altura", "height", "alt", "h"]
   },
   {
     name: "length",
@@ -264,8 +328,9 @@ const productFields: FieldDef[] = [
     example: "25",
     description: "Comprimento ou profundidade em centímetros",
     synonyms: [
-      "comprimento (cm)", "comprimento cm", "cm comprimento", "profundidade (cm)",
-      "profundidade cm", "comprimento", "profundidade", "length", "comp", "compr", "prof", "l"
+      "comprimento (cm)", "comprimento cm", "comprimento embalagem", "comprimento da embalagem",
+      "cm comprimento", "profundidade (cm)", "profundidade cm", "comprimento",
+      "profundidade", "length", "comp", "compr", "prof", "l"
     ]
   },
 ]

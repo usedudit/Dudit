@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic"
 
 export default async function SubscriptionsPage() {
     const [initialData, initialStats] = await Promise.all([
-        getSubscriptions(null, 50),
+        getSubscriptions(null, 10),
         getAdminSubscriptionStats(),
     ])
 

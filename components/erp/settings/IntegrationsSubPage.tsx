@@ -53,6 +53,9 @@ import { AddonMetricsSheet } from "./AddonMetricsSheet"
 import {
     getPartnerAddonsAction,
     togglePartnerAddonAction,
+    subscribePartnerAddonAction,
+    syncPartnerAddonCheckoutAction,
+    cancelPartnerAddonSubscriptionAction,
 } from "@/app/actions/erp/addons"
 import type { PartnerAddonStatus, AddonSlug } from "@/lib/services/addon.service"
 
@@ -125,14 +128,18 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | "addonKnowMore" | null>(null)
+    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | "addonKnowMore" | "addonSubscribe" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
     const [sfKnowMoreStep, setSfKnowMoreStep] = useState(0)
     const [tinyKnowMoreStep, setTinyKnowMoreStep] = useState(0)
     const [addonKnowMoreStep, setAddonKnowMoreStep] = useState(0)
 
     // Main Tab state
-    const [integrationsTab, setIntegrationsTab] = useState<"integracoes" | "aplicativos">("integracoes")
+    const [integrationsTab, setIntegrationsTab] = useState<"integracoes" | "aplicativos">(() =>
+        searchParams.get("section") === "aplicativos" || Boolean(searchParams.get("addon_checkout"))
+            ? "aplicativos"
+            : "integracoes"
+    )
 
     // Tiny ERP integration state
     const [tinyStatus, setTinyStatus] = useState<TinyStatus | null>(null)
@@ -153,9 +160,13 @@ export const IntegrationsSubPage = ({
     const [addons, setAddons] = useState<PartnerAddonStatus[]>([])
     const [loadingAddons, setLoadingAddons] = useState(false)
     const [togglingSlug, setTogglingSlug] = useState<string | null>(null)
+    const [isSubscribingAddon, setIsSubscribingAddon] = useState(false)
+    const [isCancellingAddon, setIsCancellingAddon] = useState(false)
+    const [confirmAddonCancelItem, setConfirmAddonCancelItem] = useState<PartnerAddonStatus | null>(null)
     const [selectedAddonForModal, setSelectedAddonForModal] = useState<PartnerAddonStatus | null>(null)
     const [selectedAddonForSheet, setSelectedAddonForSheet] = useState<PartnerAddonStatus | null>(null)
     const [isMetricsSheetOpen, setIsMetricsSheetOpen] = useState(false)
+    const syncedAddonCheckoutRef = useRef<string | null>(null)
 
     const fetchAddons = useCallback(async () => {
         setLoadingAddons(true)
@@ -171,7 +182,36 @@ export const IntegrationsSubPage = ({
         }
     }, [])
 
-    const handleToggleAddon = async (slug: AddonSlug, enabled: boolean) => {
+    // Sync addon checkout status when returning from Mercado Pago
+    useEffect(() => {
+        const checkoutSlug = searchParams.get("addon_checkout")
+        if (!checkoutSlug || syncedAddonCheckoutRef.current === checkoutSlug) return
+        syncedAddonCheckoutRef.current = checkoutSlug
+        setIntegrationsTab("aplicativos")
+
+            ; (async () => {
+                try {
+                    const res = await syncPartnerAddonCheckoutAction(checkoutSlug)
+                    await fetchAddons()
+                    if (res.success && res.status === "active") {
+                        toast.success("Assinatura confirmada! Aplicativo ativado com sucesso.")
+                    } else if (res.success && res.status === "pending") {
+                        toast.info("Pagamento ainda em processamento no Mercado Pago. Assim que confirmado, o aplicativo será ativado automaticamente.")
+                    }
+                } catch {
+                    await fetchAddons()
+                }
+            })()
+    }, [searchParams, fetchAddons])
+
+    const handleToggleAddon = async (item: PartnerAddonStatus, enabled: boolean) => {
+        if (enabled && !item.hasAccess) {
+            setSelectedAddonForModal(item)
+            setActiveModal("addonSubscribe")
+            return
+        }
+
+        const slug = item.slug
         setTogglingSlug(slug)
         setAddons((prev) =>
             prev.map((a) => (a.slug === slug ? { ...a, isEnabled: enabled } : a))
@@ -186,10 +226,15 @@ export const IntegrationsSubPage = ({
                         : "Aplicativo desativado."
                 )
             } else {
-                toast.error(res.error || "Erro ao atualizar aplicativo.")
                 setAddons((prev) =>
                     prev.map((a) => (a.slug === slug ? { ...a, isEnabled: !enabled } : a))
                 )
+                if (res.requiresPayment) {
+                    setSelectedAddonForModal(item)
+                    setActiveModal("addonSubscribe")
+                } else {
+                    toast.error(res.error || "Erro ao atualizar aplicativo.")
+                }
             }
         } catch {
             toast.error("Erro inesperado ao salvar status.")
@@ -198,6 +243,50 @@ export const IntegrationsSubPage = ({
             )
         } finally {
             setTogglingSlug(null)
+        }
+    }
+
+    const handleSubscribeAddon = async (item: PartnerAddonStatus) => {
+        setIsSubscribingAddon(true)
+        try {
+            const res = await subscribePartnerAddonAction(item.slug)
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível iniciar o checkout no Mercado Pago.")
+                return
+            }
+            if (res.alreadyIncluded || res.alreadyActive) {
+                toast.success("Aplicativo ativado com sucesso!")
+                setActiveModal(null)
+                await fetchAddons()
+                return
+            }
+            if (res.initPoint) {
+                window.location.href = res.initPoint
+                return
+            }
+            toast.error("Link de pagamento não retornado pelo Mercado Pago.")
+        } catch {
+            toast.error("Erro inesperado ao iniciar pagamento.")
+        } finally {
+            setIsSubscribingAddon(false)
+        }
+    }
+
+    const handleCancelAddonSubscription = async (item: PartnerAddonStatus) => {
+        setIsCancellingAddon(true)
+        try {
+            const res = await cancelPartnerAddonSubscriptionAction(item.slug)
+            if (res.success) {
+                toast.success("Assinatura do aplicativo cancelada.")
+                setConfirmAddonCancelItem(null)
+                await fetchAddons()
+            } else {
+                toast.error(res.error || "Erro ao cancelar assinatura.")
+            }
+        } catch {
+            toast.error("Erro inesperado ao cancelar assinatura.")
+        } finally {
+            setIsCancellingAddon(false)
         }
     }
 
@@ -1207,7 +1296,7 @@ export const IntegrationsSubPage = ({
                                                 Conecte sua conta para gerar etiquetas de frete nacional com Correios, JadLog e mais.
                                             </p>
                                             {(sfStatus?.connected || superfreteConnected) && sfStatus?.webhookConfigured === false && (
-                                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">
+                                                <p className="text-xs text-brand-orange mt-2 font-medium">
                                                     Atualização automática de status desativada — abra "Configurar" para ativar.
                                                 </p>
                                             )}
@@ -1383,7 +1472,15 @@ export const IntegrationsSubPage = ({
                                                                     )}
                                                                 </div>
                                                                 <span className="text-xs text-brand-green font-medium block mt-1">
-                                                                    {formatCurrency(item.price)}/mês • Incluso no plano Escalar
+                                                                    {item.isIncludedInPlan
+                                                                        ? "Incluso no plano Escalar"
+                                                                        : item.subscriptionStatus === "active"
+                                                                            ? `Assinatura ativa • ${formatCurrency(item.price)}/mês`
+                                                                            : item.subscriptionStatus === "pending"
+                                                                                ? `Pagamento pendente • ${formatCurrency(item.price)}/mês`
+                                                                                : item.subscriptionStatus === "cancelled" && item.hasAccess && item.currentPeriodEnd
+                                                                                    ? `Ativo até ${new Date(item.currentPeriodEnd).toLocaleDateString("pt-BR")}`
+                                                                                    : `${formatCurrency(item.price)}/mês • Incluso no plano Escalar`}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -1415,10 +1512,18 @@ export const IntegrationsSubPage = ({
                                                                 >
                                                                     Métricas
                                                                 </Button>
+                                                                {!item.isIncludedInPlan && item.subscriptionStatus === "active" && (
+                                                                    <Button
+                                                                        variant="link"
+                                                                        onClick={() => setConfirmAddonCancelItem(item)}
+                                                                    >
+                                                                        Cancelar
+                                                                    </Button>
+                                                                )}
                                                             </div>
                                                             <Switch
                                                                 checked={item.isEnabled}
-                                                                onCheckedChange={(checked) => handleToggleAddon(item.slug, checked)}
+                                                                onCheckedChange={(checked) => handleToggleAddon(item, checked)}
                                                                 disabled={isToggling}
                                                                 className={isToggling ? "opacity-50 cursor-not-allowed" : ""}
                                                             />
@@ -1441,7 +1546,7 @@ export const IntegrationsSubPage = ({
                         maxWidth="lg"
                     >
                         <Tabs value={sfActiveTab} onValueChange={(v) => setSfActiveTab(v as "connect" | "settings")} className="w-full">
-                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b">
                                 <TabsTrigger value="connect">
                                     Conectar
                                 </TabsTrigger>
@@ -1454,7 +1559,7 @@ export const IntegrationsSubPage = ({
                             </TabsList>
 
                             <TabsContent value="connect" className="mt-0">
-                                <div className="space-y-4">
+                                <div className="space-y-4 mt-2">
                                     {(sfStatus?.email || sfStatus?.balance !== undefined) && (
                                         <ListItem
                                             className="px-4 py-3"
@@ -1468,37 +1573,31 @@ export const IntegrationsSubPage = ({
                                         />
                                     )}
                                     {(sfStatus?.connected || superfreteConnected) && sfStatus?.webhookConfigured === false && (
-                                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4 space-y-2">
-                                            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-                                                Atualização automática de status desativada
-                                            </p>
-                                            <p className="text-xs text-amber-700 dark:text-amber-400">
-                                                Sem o webhook, os status de postagem e entrega só mudam manualmente.
-                                                Ative para receber as atualizações da SuperFrete em tempo real.
-                                            </p>
-                                            <Button
-                                                className="w-full"
-                                                isLoading={sfIsFixingWebhook}
-                                                disabled={sfIsFixingWebhook}
-                                                onClick={handleSfSetupWebhook}
-                                            >
-                                                {sfIsFixingWebhook ? "Ativando..." : "Ativar agora"}
-                                            </Button>
-                                        </div>
+                                        <InfoCard
+                                            title="Atualização automática de status desativada"
+                                            message="Sem o webhook, os status de postagem e entrega só mudam manualmente."
+                                            bottomElement={
+                                                <Button
+                                                    variant="link"
+                                                    isLoading={sfIsFixingWebhook}
+                                                    disabled={sfIsFixingWebhook}
+                                                    onClick={handleSfSetupWebhook}
+                                                >
+                                                    {sfIsFixingWebhook ? "Ativando..." : "Ativar agora"}
+                                                </Button>}
+                                        />
                                     )}
+
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                        Conecte sua conta SuperFrete informando o token de API gerado em https://sandbox.superfrete.com/#/integrations
-                                    </p>
-                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4">
-                                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-2">
-                                            Como obter o token:
-                                        </p>
-                                        <ol className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-decimal list-inside">
+                                        Como obter o token:
+
+                                        <ol className="text-xs space-y-1 list-decimal list-inside">
                                             <li>Acesse sandbox.superfrete.com/#/integrations (teste) ou web.superfrete.com/#/integrations (produção)</li>
                                             <li>Clique em "Desenvolvedores" → "Integrar"</li>
                                             <li>Copie o token gerado e cole abaixo</li>
                                         </ol>
-                                    </div>
+                                    </p>
+
                                     <Input
                                         label="Token de API SuperFrete"
                                         placeholder="Cole seu token aqui..."
@@ -1535,24 +1634,21 @@ export const IntegrationsSubPage = ({
                             </TabsContent>
 
                             <TabsContent value="settings" className="mt-0">
-                                <div className="space-y-4">
+                                <div className="space-y-4 mt-2">
                                     {sfStatus?.connected && sfStatus?.webhookConfigured === false && (
-                                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4 space-y-2">
-                                            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-                                                Atualização automática de status desativada
-                                            </p>
-                                            <p className="text-xs text-amber-700 dark:text-amber-400">
-                                                Sem o webhook, os status de postagem e entrega só mudam manualmente.
-                                            </p>
-                                            <Button
-                                                className="w-full"
-                                                isLoading={sfIsFixingWebhook}
-                                                disabled={sfIsFixingWebhook}
-                                                onClick={handleSfSetupWebhook}
-                                            >
-                                                {sfIsFixingWebhook ? "Ativando..." : "Ativar agora"}
-                                            </Button>
-                                        </div>
+                                        <InfoCard
+                                            title="Atualização automática de status desativada"
+                                            message="Sem o webhook, os status de postagem e entrega só mudam manualmente."
+                                            bottomElement={
+                                                <Button
+                                                    variant="link"
+                                                    isLoading={sfIsFixingWebhook}
+                                                    disabled={sfIsFixingWebhook}
+                                                    onClick={handleSfSetupWebhook}
+                                                >
+                                                    {sfIsFixingWebhook ? "Ativando..." : "Ativar agora"}
+                                                </Button>}
+                                        />
                                     )}
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                         Configure as preferências padrão para geração de etiquetas.
@@ -2780,6 +2876,123 @@ export const IntegrationsSubPage = ({
                             </div>
                         </div>
                     </DefaultModal>
+
+                    {/* Addon Subscribe Modal (Mercado Pago Checkout) */}
+                    <DefaultModal
+                        isOpen={activeModal === "addonSubscribe" && selectedAddonForModal !== null}
+                        onClose={() => !isSubscribingAddon && setActiveModal(null)}
+                        title={selectedAddonForModal ? `Assinar ${selectedAddonForModal.name}` : "Assinar aplicativo"}
+                        maxWidth="md"
+                    >
+                        {selectedAddonForModal && (
+                            <div className="flex flex-col">
+                                <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-8 flex items-center justify-center gap-6 mb-6">
+                                    <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-3 flex items-center justify-center">
+                                        <img
+                                            src={selectedAddonForModal.imageSrc}
+                                            alt={selectedAddonForModal.name}
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col items-center gap-1">
+                                        <div className="w-10 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                                            <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                                        </div>
+                                    </div>
+                                    <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-3 flex items-center justify-center">
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                            alt="Mercado Pago"
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="px-2">
+                                    <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-3 leading-relaxed">
+                                        {selectedAddonForModal.shortDescription}
+                                    </p>
+
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 mb-4 flex items-center justify-between">
+                                        <div>
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">
+                                                Assinatura mensal
+                                            </span>
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Cobrança recorrente via Mercado Pago. Cancele quando quiser.
+                                            </span>
+                                        </div>
+                                        <span className="text-lg font-bold text-brand-green shrink-0 ml-3">
+                                            {formatCurrency(selectedAddonForModal.price)}/mês
+                                        </span>
+                                    </div>
+
+                                    <Button
+                                        variant="link"
+                                        onClick={() => {
+                                            setActiveModal(null)
+                                            openPlanUpgrade("escalar")
+                                        }}
+                                        className="flex items-center gap-2 mb-5 px-0 text-sm"
+                                    >
+                                        <InfoIcon size={14} />
+                                        Ou faça upgrade para o plano Escalar (todos os aplicativos inclusos)
+                                    </Button>
+
+                                    <div className="flex flex-col md:flex-row gap-3">
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-[46px]"
+                                            disabled={isSubscribingAddon}
+                                            onClick={() => setActiveModal(null)}
+                                        >
+                                            Cancelar
+                                        </Button>
+                                        {selectedAddonForModal.subscriptionStatus === "pending" && selectedAddonForModal.mpInitPoint ? (
+                                            <Button
+                                                className="flex-1 h-[46px]"
+                                                disabled={isSubscribingAddon}
+                                                onClick={() => {
+                                                    window.location.href = selectedAddonForModal.mpInitPoint!
+                                                }}
+                                            >
+                                                Continuar pagamento
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                className="flex-1 h-[46px]"
+                                                isLoading={isSubscribingAddon}
+                                                disabled={isSubscribingAddon}
+                                                onClick={() => handleSubscribeAddon(selectedAddonForModal)}
+                                            >
+                                                {isSubscribingAddon ? "Redirecionando..." : "Assinar no Mercado Pago"}
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </DefaultModal>
+
+                    {/* Confirm Cancel Addon Subscription */}
+                    <AlertModal
+                        isOpen={confirmAddonCancelItem !== null}
+                        onClose={() => !isCancellingAddon && setConfirmAddonCancelItem(null)}
+                        onConfirm={() => {
+                            if (confirmAddonCancelItem) {
+                                handleCancelAddonSubscription(confirmAddonCancelItem)
+                            }
+                        }}
+                        title="Cancelar assinatura do aplicativo"
+                        message={
+                            confirmAddonCancelItem
+                                ? `Tem certeza que deseja cancelar a assinatura mensal de ${confirmAddonCancelItem.name}? A cobrança recorrente no Mercado Pago será encerrada.`
+                                : ""
+                        }
+                        confirmText={isCancellingAddon ? "Cancelando..." : "Cancelar assinatura"}
+                        variant="danger"
+                        isDestructive
+                    />
 
                     {/* Addon Metrics Sheet */}
                     <AddonMetricsSheet

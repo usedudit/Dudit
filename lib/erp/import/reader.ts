@@ -174,6 +174,10 @@ function formatDateCell(value: Date): string {
   return hasTime ? `${date} ${pad(value.getHours())}:${pad(value.getMinutes())}` : date
 }
 
+function stripInvisibleChars(text: string): string {
+  return text.replace(/[\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+}
+
 function cellToString(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return ""
 
@@ -181,10 +185,10 @@ function cellToString(value: ExcelJS.CellValue): string {
 
   if (typeof value === "object") {
     if ("richText" in value && Array.isArray(value.richText)) {
-      return value.richText.map((part) => part.text ?? "").join("").trim()
+      return stripInvisibleChars(value.richText.map((part) => part.text ?? "").join("")).trim()
     }
     if ("text" in value && typeof value.text === "string") {
-      return value.text.trim()
+      return stripInvisibleChars(value.text).trim()
     }
     if ("result" in value) {
       return cellToString(value.result as ExcelJS.CellValue)
@@ -195,7 +199,7 @@ function cellToString(value: ExcelJS.CellValue): string {
 
   if (typeof value === "boolean") return value ? "Sim" : "Não"
 
-  const text = String(value).replace(/^\uFEFF/, "").trim()
+  const text = stripInvisibleChars(String(value)).trim()
   // The exporter writes "-" for empty values; treat it as blank on import.
   if (text === "-" || text === "—" || text === "–") return ""
   return text
@@ -293,7 +297,7 @@ function readWithSheetJS(buffer: ArrayBuffer): string[][] {
     for (const row of sheetRows) {
       const rowValues = (Array.isArray(row) ? row : []).map((c) => {
         if (c == null) return ""
-        const s = String(c).trim()
+        const s = stripInvisibleChars(String(c)).trim()
         if (s === "-" || s === "—" || s === "–") return ""
         return s
       })

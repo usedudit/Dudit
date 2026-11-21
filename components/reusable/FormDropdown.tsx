@@ -45,7 +45,7 @@ export const FormDropdown: React.FC<FormDropdownProps> = ({
   <div className="flex-1 w-full" {...(dataField ? { "data-field": dataField } : {})}>
     {label && (
       <div className="flex items-center gap-2 mb-1.5">
-        <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>
+        <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{label}</label>
         {labelTooltip && (
           <Tooltip>
             <TooltipTrigger asChild>

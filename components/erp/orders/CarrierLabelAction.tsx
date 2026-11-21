@@ -13,6 +13,7 @@ import {
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
 import { RecipientDocumentModal } from "@/components/erp/orders/RecipientDocumentModal"
+import { RecipientNameModal } from "@/components/erp/orders/RecipientNameModal"
 import { CancelIcon, PrinterIcon, ThreeDotsIcon, TruckIcon } from "@/lib/icons"
 
 interface CarrierLabelActionProps {
@@ -33,6 +34,8 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     const [cancelOpen, setCancelOpen] = useState(false)
     const [cancelReason, setCancelReason] = useState("")
     const [docModalOpen, setDocModalOpen] = useState(false)
+    const [nameModalOpen, setNameModalOpen] = useState(false)
+    const [incompleteRecipientName, setIncompleteRecipientName] = useState<string | undefined>(undefined)
     const [nfeModalOpen, setNfeModalOpen] = useState(false)
 
     // Uma única action rápida: gate + shipment numa cadeia de auth só e sem
@@ -93,6 +96,9 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                 await refresh()
             } else if (res.code === "missing_document") {
                 setDocModalOpen(true)
+            } else if (res.code === "incomplete_recipient_name") {
+                setIncompleteRecipientName(res.currentRecipientName)
+                setNameModalOpen(true)
             } else if (res.code === "missing_nfe") {
                 setNfeModalOpen(true)
             } else {
@@ -281,6 +287,14 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                 onClose={() => setDocModalOpen(false)}
                 partnerId={partnerId}
                 orderId={orderId}
+                onSaved={handleCreate}
+            />
+            <RecipientNameModal
+                isOpen={nameModalOpen}
+                onClose={() => setNameModalOpen(false)}
+                partnerId={partnerId}
+                orderId={orderId}
+                initialName={incompleteRecipientName}
                 onSaved={handleCreate}
             />
             <AlertModal

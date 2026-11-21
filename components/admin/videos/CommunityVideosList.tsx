@@ -20,6 +20,7 @@ import {
     SearchIcon,
     ListIcon,
     GridIcon,
+    FilterIcon,
 } from "@/lib/icons"
 import { Play } from "lucide-react"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -31,10 +32,10 @@ import {
     type AdminVideoStats,
 } from "@/app/actions/admin/community-videos"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
 import {
     EMPTY_DATE_PERIOD,
     isDatePeriodFilterActive,
-    resolveDatePeriodBounds,
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -59,22 +60,8 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
     const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
 
-    // Detail / Video Player Modal
-    const [playingVideo, setPlayingVideo] = useState<any | null>(null)
-
-    // Edit / Moderation State
-    const [editingVideo, setEditingVideo] = useState<any | null>(null)
-    const [editForm, setEditForm] = useState<{
-        moderation_status: "approved" | "pending" | "rejected"
-        title: string
-        description: string
-    }>({
-        moderation_status: "pending",
-        title: "",
-        description: "",
-    })
-
-    // Filters
+    // Local states - DECLARED BEFORE useEntityPage
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
     const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
@@ -89,6 +76,8 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         initialNextCursor: null,
         initialHasMore: false,
         skipInitialData: !isDefaultView,
+        search: debouncedSearch,
+        setSearch,
         fetchPageFn: async ({ cursor }) => {
             const res = await getAdminCommunityVideos(cursor, 100, {
                 status: activeTab === "all" ? undefined : activeTab,
@@ -114,9 +103,6 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         entityState,
         openEntity,
         closeEntity,
-        search,
-        setSearch,
-        debouncedSearch,
         afterMutation,
     } = entityPage
 
@@ -124,15 +110,30 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         afterMutation()
     }, [afterMutation])
 
-    // Sync stats when data loads
-    const [stats, setStats] = useState(initialStats)
+    // Detail / Video Player Modal
+    const [playingVideo, setPlayingVideo] = useState<any | null>(null)
+
+    // Edit / Moderation State
+    const [editingVideo, setEditingVideo] = useState<any | null>(null)
+    const [editForm, setEditForm] = useState<{
+        moderation_status: "approved" | "pending" | "rejected"
+        title: string
+        description: string
+    }>({
+        moderation_status: "pending",
+        title: "",
+        description: "",
+    })
+
+    const [isPending, startTransition] = useTransition()
+    const { modal: actionModal, runAction } = useAdminActionModal()
 
     const tabs = useMemo(() => [
-        { id: "all", label: "Todos os Vídeos", count: stats?.total ?? videos.length },
-        { id: "pending", label: "Pendentes", count: stats?.pending ?? 0 },
-        { id: "approved", label: "Aprovados", count: stats?.approved ?? 0 },
-        { id: "rejected", label: "Rejeitados", count: stats?.rejected ?? 0 },
-    ], [stats, videos.length])
+        { id: "all", label: "Todos os Vídeos", count: videos.length },
+        { id: "pending", label: "Pendentes", count: videos.filter(v => v.moderation_status === "pending").length },
+        { id: "approved", label: "Aprovados", count: videos.filter(v => v.moderation_status === "approved").length },
+        { id: "rejected", label: "Rejeitados", count: videos.filter(v => v.moderation_status === "rejected").length },
+    ], [videos])
 
     // Reset pagination when search/filter/tab changes
     useMemo(() => {

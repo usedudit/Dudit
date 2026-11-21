@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useTransition, useCallback } from "react"
+import React, { useState, useMemo, useCallback } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import {
@@ -17,6 +17,7 @@ import AuditLogPageControls, { type AuditFilterState, INITIAL_AUDIT_FILTERS } fr
 import { AdminAuditDetailView } from "./AdminAuditDetailView"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
 import { DatabaseIcon } from "@/lib/icons"
 import {
     EMPTY_DATE_PERIOD,
@@ -34,6 +35,13 @@ const ITEMS_PER_PAGE = 8
 type SortKey = "admin" | "action" | "target" | "date"
 type SortDirection = "asc" | "desc"
 
+type AuditFilters = AuditFilterState & { datePeriod: DatePeriodFilterValue }
+
+const INITIAL_FILTERS: AuditFilters = {
+    ...INITIAL_AUDIT_FILTERS,
+    datePeriod: { ...EMPTY_DATE_PERIOD },
+}
+
 export default function AuditLogList({ initialData, initialStats }: AuditLogListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -43,16 +51,20 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
     const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [stats, setStats] = useState<AuditLogStats | undefined>(initialStats)
 
-    // Filters
-    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
-        datePeriod: { ...EMPTY_DATE_PERIOD },
-    })
+    // Local search state - DECLARED BEFORE useEntityPage
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+
+    // Filters - DECLARED BEFORE useEntityPage
+    const [filters, setFilters] = useState<AuditFilters>(INITIAL_FILTERS)
 
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
         key: "date",
         direction: "desc",
     })
+
+    const [page, setPage] = useState(1)
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
     const isDefaultView = targetTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
 
@@ -64,6 +76,8 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         initialNextCursor: initialData?.nextCursor || null,
         initialHasMore: initialData?.hasMore || false,
         skipInitialData: !isDefaultView,
+        search: debouncedSearch,
+        setSearch,
         fetchPageFn: async ({ cursor }) => {
             const res = await getAuditLogs(cursor, 100, {
                 targetType: targetTab === "all" ? undefined : targetTab,
@@ -74,24 +88,13 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
             return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((l: any) => String(l?.id || ""), []),
-        getDetailFn: async (id: string) => {
-            return null
-        },
+        getDetailFn: async () => null,
         listToDetail: (item) => ({ ...item, __partial: true }),
         staleTime: 30_000,
     })
 
     const {
         items: logs,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-        entityState: epEntityState,
-        openEntity: epOpenEntity,
-        closeEntity: epCloseEntity,
-        search,
-        setSearch,
-        debouncedSearch,
         afterMutation,
     } = entityPage
 
@@ -109,14 +112,20 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         })
     }
 
-    // Reset page on filter changes
-    useMemo(() => {
+    const handleClearFilters = useCallback(() => {
+        setSearch("")
+        setFilters(INITIAL_FILTERS)
+        setTargetTab("all")
+        setPage(1)
+    }, [setSearch])
+
+    React.useEffect(() => {
         setPage(1)
     }, [targetTab, debouncedSearch, filters.datePeriod])
 
     // If viewing detail of a specific log (?view=[id])
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentLog = logs.find((l) => l.id === entityState.entityId)
+        const currentLog = logs.find((l: any) => l.id === entityState.entityId)
         if (currentLog) {
             return (
                 <AdminAuditDetailView
@@ -127,8 +136,8 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         }
     }
 
-    const actionOptions = Array.from(new Set(logs.map((l) => ACTION_TYPE_LABELS[l.action_type] || l.action_type)))
-    const targetTypeOptions = Array.from(new Set(logs.map((l) => TARGET_TYPE_LABELS[l.target_type] || l.target_type)))
+    const actionOptions = Array.from(new Set(logs.map((l: any) => ACTION_TYPE_LABELS[l.action_type] || l.action_type))) as string[]
+    const targetTypeOptions = Array.from(new Set(logs.map((l: any) => TARGET_TYPE_LABELS[l.target_type] || l.target_type))) as string[]
 
     const filterSections: FilterSectionConfig[] = [
         {
@@ -150,33 +159,28 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         },
     ]
 
-    const hasActiveFilters = search !== "" || filters.action.length > 0 || filters.targetType.length > 0 || isDatePeriodFilterActive(filters.datePeriod)
+    const hasActiveFilters =
+        search !== "" ||
+        filters.action.length > 0 ||
+        filters.targetType.length > 0 ||
+        isDatePeriodFilterActive(filters.datePeriod)
 
     // In-memory filtering for action and target type (not yet supported server-side)
     const filteredLogs = useMemo(() => {
-        let result = logs.filter((log) => {
-            // Action Filter
+        let result = logs.filter((log: any) => {
             if (filters.action.length > 0) {
                 const actionLabel = ACTION_TYPE_LABELS[log.action_type] || log.action_type
-                if (!filters.action.includes(actionLabel)) {
-                    return false
-                }
+                if (!filters.action.includes(actionLabel)) return false
             }
-
-            // Target Type Filter
             if (filters.targetType.length > 0) {
                 const targetLabel = TARGET_TYPE_LABELS[log.target_type] || log.target_type
-                if (!filters.targetType.includes(targetLabel)) {
-                    return false
-                }
+                if (!filters.targetType.includes(targetLabel)) return false
             }
-
             return true
         })
 
-        // In-memory sorting
         if (sortConfig) {
-            result = [...result].sort((a, b) => {
+            result = [...result].sort((a: any, b: any) => {
                 let aVal: any = ""
                 let bVal: any = ""
                 switch (sortConfig.key) {
@@ -204,7 +208,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         }
 
         return result
-    }, [logs, filters, sortConfig])
+    }, [logs, filters.action, filters.targetType, sortConfig])
 
     // Pagination (Strict 8 items)
     const totalPages = Math.max(1, Math.ceil(filteredLogs.length / ITEMS_PER_PAGE))
@@ -213,13 +217,11 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         return filteredLogs.slice(start, start + ITEMS_PER_PAGE)
     }, [filteredLogs, page])
 
-    const [page, setPage] = useState(1)
-
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
                 .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
                 .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -248,7 +250,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                     onSearchChange={setSearch}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
                     filters={filters}
-                    setFilters={setFilters}
+                    setFilters={setFilters as any}
                     hasActiveFilters={hasActiveFilters}
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
@@ -266,11 +268,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                                     subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhum evento registrado nesta categoria."}
                                     itemButton={hasActiveFilters ? {
                                         text: "Limpar Filtros",
-                                        action: () => {
-                                            setSearch("")
-                                            setFilters(INITIAL_AUDIT_FILTERS)
-                                            setTargetTab("all")
-                                        },
+                                        action: handleClearFilters,
                                         variant: "outline",
                                     } : undefined}
                                 />
@@ -279,7 +277,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                             <FadeIn key="list" className="w-full space-y-4">
                                 {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {paginatedItems.map((log) => (
+                                    {paginatedItems.map((log: any) => (
                                         <div
                                             key={log.id}
                                             className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
@@ -310,7 +308,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                                 {/* Desktop View */}
                                 {viewMode === "grid" ? (
                                     <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {paginatedItems.map((log) => (
+                                        {paginatedItems.map((log: any) => (
                                             <div
                                                 key={log.id}
                                                 onClick={() => openEntity("view", log.id)}
@@ -384,7 +382,7 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {paginatedItems.map((log) => (
+                                                    {paginatedItems.map((log: any) => (
                                                         <AuditLogListRow
                                                             key={log.id}
                                                             log={log}
@@ -420,9 +418,9 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
                 onClose={() => setIsFilterSheetOpen(false)}
                 sections={filterSections}
                 filters={filters}
-                setFilters={setFilters}
+                setFilters={setFilters as any}
                 onClear={() => {
-                    setFilters(INITIAL_AUDIT_FILTERS)
+                    setFilters(INITIAL_FILTERS)
                     setIsFilterSheetOpen(false)
                 }}
             />

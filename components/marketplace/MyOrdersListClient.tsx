@@ -108,7 +108,7 @@ function calculateDiscountedPrice(item: any, order: any) {
         (sum: number, i: any) => sum + Number(i.subtotal ?? Number(i.product_price || 0) * Number(i.quantity || 0)),
         0
     )
-    const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || 0))
+    const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || order.discount_amount || 0))
     const pmDiscount = Math.max(0, Number(order.payment_method_discount_amount || 0))
     const pmExtra = Math.max(0, Number(order.payment_method_extra_amount || 0))
     const subtotalVal = Number(order.subtotal_value || 0) > 0

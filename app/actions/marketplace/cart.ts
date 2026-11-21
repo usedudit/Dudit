@@ -1488,24 +1488,28 @@ export async function checkoutCartAction(
   // ── Resolve payment method first (before engine call) ──
   let bestMethod: any = methodResult.data
   const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
+  const isStoreCreditPayment = Boolean(useStoreCredit) && (chosenType === "store_credit" || paymentMethod === "Vale-compra")
+  const isSubscriptionCreditsPayment = paymentMethod === "Assinatura (Créditos)" || paymentMethod === "subscription_credits"
 
   const { validateMarketplaceCheckoutPayment } = await import(
     "@/lib/commerce/validate-marketplace-checkout-payment"
   )
-  const paymentValidation = validateMarketplaceCheckoutPayment({
-    requirements,
-    paymentOption: useMercadoPago ? "mercadopago" : "traditional",
-    paymentMethodType: useMercadoPago ? null : chosenType,
-    productDeliveryType: deliveryType,
-    useMercadoPago,
-  })
-  if (!paymentValidation.valid) return { error: paymentValidation.error }
+  if (!isStoreCreditPayment && !isSubscriptionCreditsPayment) {
+    const paymentValidation = validateMarketplaceCheckoutPayment({
+      requirements,
+      paymentOption: useMercadoPago ? "mercadopago" : "traditional",
+      paymentMethodType: useMercadoPago ? null : chosenType,
+      productDeliveryType: deliveryType,
+      useMercadoPago,
+    })
+    if (!paymentValidation.valid) return { error: paymentValidation.error }
+  }
 
-  if (!bestMethod && !useMercadoPago) {
+  if (!bestMethod && !useMercadoPago && !isStoreCreditPayment && !isSubscriptionCreditsPayment) {
     bestMethod = await pickBestPaymentMethod(adminClient as any, chosenType, partnerId, { preferDefault: true, storeId })
   }
 
-  if (!bestMethod && !useMercadoPago) {
+  if (!bestMethod && !useMercadoPago && !isStoreCreditPayment && !isSubscriptionCreditsPayment) {
     return { error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
   }
 
@@ -1767,6 +1771,10 @@ export async function checkoutCartAction(
   const remainingBalanceToPay = Math.max(0, Number((persistedTotal - appliedStoreCredit).toFixed(2)))
   const isFullyPaidWithStoreCredit = appliedStoreCredit > 0 && remainingBalanceToPay <= 0.009
 
+  if (isStoreCreditPayment && !isFullyPaidWithStoreCredit) {
+    return { error: "Seu crédito em loja não cobre o valor total do pedido. Selecione uma forma de pagamento para o saldo restante." }
+  }
+
   // Cash change is validated against the balance still due after store
   // credit, and it is stored as display data only.
   if (chosenType === "cash" && deliveryType === "delivery" && remainingBalanceToPay > 0.009) {
@@ -1862,6 +1870,7 @@ export async function checkoutCartAction(
       payment_breakdown: finalPaymentBreakdown,
       payment_provider: isFullyPaidWithStoreCredit ? null : (useMercadoPago ? "Mercado Pago" : null),
       situation: finalSituation,
+      ...(isFullyPaidWithStoreCredit ? { paid_at: new Date().toISOString() } : {}),
       notes: sanitizeNotes(notes),
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
@@ -1893,15 +1902,6 @@ export async function checkoutCartAction(
       metadata: { paymentProvider: useMercadoPago ? "mercadopago" : "other" },
     })
     return { error: "Não foi possível criar o pedido. Tente novamente." }
-  }
-
-  if (appliedStoreCredit > 0 && resolvedCustomerId) {
-    const { applyStoreCreditDeduction } = await import("@/app/actions/erp/orders")
-    await applyStoreCreditDeduction(adminClient, {
-      partnerId,
-      customerId: resolvedCustomerId,
-      amount: appliedStoreCredit,
-    })
   }
 
   // Set payment expiration - ONLY for Mercado Pago payments.
@@ -2009,12 +2009,33 @@ export async function checkoutCartAction(
     }
   }
 
+  if (appliedStoreCredit > 0 && resolvedCustomerId) {
+    const { applyStoreCreditDeduction } = await import("@/app/actions/erp/orders")
+    await applyStoreCreditDeduction(adminClient, {
+      partnerId,
+      customerId: resolvedCustomerId,
+      amount: appliedStoreCredit,
+    })
+  }
+
   // SECURITY FIX (MED-02): Scope cart deletion to current user
   await supabase.from("cart_items").delete().in("id", cartItemIds).eq("user_id", user.id)
 
   const hasServiceLines = resolvedLines.some((l) => l.itemType === "service_booking")
   if (!useMercadoPago && (String(order.situation).toLowerCase() === "paid" || hasServiceLines)) {
     await fulfillMarketplaceOrder(adminClient, order.id, { force: true })
+  }
+
+  // Para pedidos de checkout sem Mercado Pago (ex: pagamento na entrega/retirada ou crédito de loja),
+  // exporta para o Tiny ERP imediatamente de forma não-bloqueante e idempotente
+  if (!useMercadoPago && order?.id) {
+    import("@/lib/services/integrations/tiny/tiny-integration")
+      .then(({ exportDuditOrderToTiny }) => {
+        exportDuditOrderToTiny(order.id).catch((tinyErr) => {
+          console.error("[checkoutCartAction] Tiny export failed:", tinyErr)
+        })
+      })
+      .catch(() => {})
   }
 
   if (capabilities.hasCoupons && couponIdToSave) {

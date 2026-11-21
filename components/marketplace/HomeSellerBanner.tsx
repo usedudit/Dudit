@@ -5,7 +5,7 @@ import Button from "../reusable/Button"
 
 export function HomeSellerBanner() {
     return (
-        <section className="py-10 px-4 bg-white dark:bg-dark-background relative">
+        <section className="py-10 bg-white dark:bg-dark-background relative">
             <div className="max-w-[1400px] mx-auto relative z-10">
                 <div className="bg-brand-dark rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12 overflow-hidden">
                     {/* Background decorative faint rings */}

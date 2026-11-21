@@ -16,6 +16,15 @@ import {
 const DEFAULT_PRIMARY = QUOTE_PREVIEW_PRIMARY_COLOR;
 const DEFAULT_SECONDARY = QUOTE_PREVIEW_SECONDARY_COLOR;
 
+// A fatura de assinatura é sempre emitida pela Dudit (plataforma), nunca pela loja parceira
+const DUDIT_ISSUER = {
+    name: "Dudit",
+    email: "usedudit@gmail.com",
+    phone: "(18) 99622-9347",
+    address: "Rua José Canuto Barbosa 286 - Lado Sul, Lucélia/SP - 17781-240",
+    logoUrl: "https://img.dudit.com.br/static/Icon.png",
+} as const;
+
 interface InvoicePreviewProps {
     data: InvoiceData
     invoiceId?: string
@@ -46,23 +55,15 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
     const secondary = data.secondaryColor ?? DEFAULT_SECONDARY
     const shortId = shortInvoiceId(invoiceId)
 
-    const partnerAddressFormatted = useMemo(() => {
-        if (!data.partner.address) return ""
-        const lines = data.partner.address
-            .split("\n")
-            .filter((line: string) => line.trim() && !line.trim().startsWith("CEP:"))
-        return lines.slice(0, 2).join("\n")
-    }, [data.partner.address])
-
     const partnerHeader: SaleReceiptPartnerHeader = useMemo(
         () => ({
-            fantasyName: data.partner.name,
-            legalName: data.partner.name,
-            addressLine: data.partner.address || "",
-            taxIdLine: data.partner.document ? `CNPJ: ${data.partner.document}` : "",
-            phone: data.partner.phone ?? null,
+            fantasyName: DUDIT_ISSUER.name,
+            legalName: DUDIT_ISSUER.name,
+            addressLine: DUDIT_ISSUER.address,
+            taxIdLine: "",
+            phone: DUDIT_ISSUER.phone,
         }),
-        [data.partner]
+        []
     )
 
     const items = data.items || []
@@ -129,8 +130,8 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
             {pages.map((page, pageIndex) => (
                 <ReceiptA4Page key={pageIndex} printMode={printMode}>
                     <ReceiptStoreHeaderA4
-                        partnerName={data.partner.name}
-                        partnerAvatar={data.partner.image_url ?? undefined}
+                        partnerName={DUDIT_ISSUER.name}
+                        partnerAvatar={DUDIT_ISSUER.logoUrl}
                         primaryColor={primary}
                         secondaryColor={secondary}
                         title="Fatura"
@@ -164,8 +165,8 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
 
                                 <ReceiptA4StoreData
                                     partnerHeader={partnerHeader}
-                                    partnerName={data.partner.name}
-                                    partnerEmail={data.partner.email ?? undefined}
+                                    partnerName={DUDIT_ISSUER.name}
+                                    partnerEmail={DUDIT_ISSUER.email}
                                     customerName={data.customer?.name || undefined}
                                     customerEmail={data.customer?.email ?? null}
                                     customerPhone={data.customer?.phone ?? null}

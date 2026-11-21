@@ -589,7 +589,7 @@ export function AdminPartnerDetailView({
                                         {isStoreSuspended && (
                                             <InfoCard
                                                 title="Loja Suspensa Administrativamente"
-                                                message={`Motivo: ${store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}`}
+                                                message={`Motivo: ${store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}${store.suspended_until || partner?.suspended_until ? ` • Vigência até: ${formatDate(store.suspended_until || partner?.suspended_until)}` : " • Permanente"}`}
                                                 color="red"
                                                 bottomElement={
                                                     (store.suspended_case_id || partner?.suspended_case_id) && (

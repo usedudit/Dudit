@@ -51,6 +51,7 @@ interface PreferenceRequest {
   deliveryAddress?: string
   cartItemIds?: string[]
   payDepositOnly?: boolean
+  useStoreCredit?: boolean
   quoteOnly?: boolean
   checkoutPricing?: {
     subtotal?: number
@@ -596,7 +597,55 @@ async function handler(request: NextRequest) {
           totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
         }
       }
+    }
 
+    const totalAmountBeforeStoreCredit = totalAmount
+    let appliedStoreCredit = 0
+    if (!existingOrder && body.useStoreCredit) {
+      const { data: customerRow } = await adminClient
+        .from("customers")
+        .select("id, store_credit")
+        .eq("partner_id", partnerId)
+        .or(`marketplace_user_id.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle()
+
+      const customerId = customerRow?.id || null
+      let creditQuery = adminClient
+        .from("store_credits")
+        .select("remaining_amount")
+        .eq("partner_id", partnerId)
+        .eq("status", "ACTIVE")
+        .gt("remaining_amount", 0)
+
+      if (customerId) {
+        creditQuery = creditQuery.or(`customer_id.eq.${customerId},customer_user_id.eq.${user.id}`)
+      } else {
+        creditQuery = creditQuery.eq("customer_user_id", user.id)
+      }
+
+      const { data: creditRows } = await creditQuery
+      const creditsTotal = (creditRows || []).reduce(
+        (sum: number, c: any) => sum + Number(c.remaining_amount || 0),
+        0,
+      )
+      const availableCredit = Math.max(
+        0,
+        creditsTotal,
+        Number(customerRow?.store_credit || 0),
+      )
+      appliedStoreCredit = Math.min(availableCredit, totalAmount)
+      if (appliedStoreCredit > 0) {
+        totalAmount = Math.max(0, Math.round((totalAmount - appliedStoreCredit + Number.EPSILON) * 100) / 100)
+        if (totalAmount <= 0.009) {
+          return NextResponse.json(
+            { error: "Seu crédito em loja cobre 100% do pedido. Finalize sem o Mercado Pago." },
+            { status: 400 },
+          )
+        }
+      }
+    }
+
+    if (!existingOrder) {
       const prefSum = preferenceItems.reduce((acc: number, i: any) => acc + Number(i.unit_price || 0) * Number(i.quantity || 1), 0)
       if (totalAmount > 0 && Math.abs(prefSum - totalAmount) > 0.01) {
         preferenceItems.length = 0
@@ -617,6 +666,7 @@ async function handler(request: NextRequest) {
       const tolerance = 0.05
       const matches =
         Math.abs(snapshotFinalTotal - totalAmount) <= tolerance ||
+        Math.abs(snapshotFinalTotal - totalAmountBeforeStoreCredit) <= tolerance ||
         (existingOrder && Math.abs(snapshotFinalTotal - Number(existingOrder.total_amount || 0)) <= tolerance)
 
       if (!matches && snapshotFinalTotal > 0) {

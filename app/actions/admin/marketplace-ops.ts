@@ -49,10 +49,10 @@ export async function getAdminMarketplaceOrders(
     cursor?: string | null,
     limit: number = 20,
     filters?: {
-        status?: string
-        deliveryStatus?: string
-        paymentMethod?: string
-        channel?: string
+        status?: string | string[]
+        deliveryStatus?: string | string[]
+        paymentMethod?: string | string[]
+        channel?: string | string[]
         search?: string
         startDate?: string
         endDate?: string
@@ -91,36 +91,69 @@ export async function getAdminMarketplaceOrders(
             return_requests!order_id(id, status, desired_resolution, approved_resolution, refund_amount)
         `)
 
+    const toFilterArray = (value?: string | string[]) => {
+        if (Array.isArray(value)) return value.filter((v) => v && v !== "all" && v !== "Todos")
+        if (!value || value === "all" || value === "Todos") return []
+        return [value]
+    }
+
     if (filters?.search && filters.search.trim().length > 0) {
         const s = sanitizeIlike(filters.search.trim())
         query = query.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
     }
 
-    if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
-        if (filters.status === "Pendente" || filters.status === "pending") {
-            query = query.eq("situation", "pending")
-        } else if (filters.status === "Pago" || filters.status === "paid") {
-            query = query.eq("situation", "paid")
-        } else if (filters.status === "Cancelado" || filters.status === "cancelled") {
-            query = query.eq("situation", "cancelled")
-        } else if (filters.status === "Enviado" || filters.status === "sent") {
-            query = query.in("delivery_status", ["sent", "in_transit", "delivered"])
-        } else {
-            query = query.eq("situation", filters.status)
+    const statusValues = toFilterArray(filters?.status)
+    if (statusValues.length > 0) {
+        const situationMap: Record<string, string[]> = {
+            Pendente: ["pending"],
+            pending: ["pending"],
+            Pago: ["paid"],
+            paid: ["paid"],
+            Cancelado: ["cancelled"],
+            cancelled: ["cancelled"],
+            "Em análise": ["in_process"],
+            in_process: ["in_process"],
+            "Parcialmente Pago": ["partially_paid"],
+            partially_paid: ["partially_paid"],
+            Entregue: ["delivered"],
+        }
+
+        const situations = new Set<string>()
+        let includeShipped = false
+
+        for (const status of statusValues) {
+            if (status === "Enviado" || status === "sent") {
+                includeShipped = true
+                continue
+            }
+            const mapped = situationMap[status]
+            if (mapped) mapped.forEach((value) => situations.add(value))
+            else situations.add(status)
+        }
+
+        const orParts: string[] = []
+        if (situations.size > 0) orParts.push(`situation.in.(${Array.from(situations).join(",")})`)
+        if (includeShipped) orParts.push("delivery_status.in.(sent,in_transit,delivered)")
+
+        if (orParts.length === 1) {
+            if (situations.size > 0) query = query.in("situation", Array.from(situations))
+            else query = query.in("delivery_status", ["sent", "in_transit", "delivered"])
+        } else if (orParts.length > 1) {
+            query = query.or(orParts.join(","))
         }
     }
 
-    if (filters?.deliveryStatus && filters.deliveryStatus !== "all") {
-        query = query.eq("delivery_status", filters.deliveryStatus)
-    }
+    const deliveryStatuses = toFilterArray(filters?.deliveryStatus)
+    if (deliveryStatuses.length === 1) query = query.eq("delivery_status", deliveryStatuses[0])
+    else if (deliveryStatuses.length > 1) query = query.in("delivery_status", deliveryStatuses)
 
-    if (filters?.paymentMethod && filters.paymentMethod !== "all") {
-        query = query.eq("payment_method", filters.paymentMethod)
-    }
+    const paymentMethods = toFilterArray(filters?.paymentMethod)
+    if (paymentMethods.length === 1) query = query.eq("payment_method", paymentMethods[0])
+    else if (paymentMethods.length > 1) query = query.in("payment_method", paymentMethods)
 
-    if (filters?.channel && filters.channel !== "all") {
-        query = query.eq("order_source", filters.channel)
-    }
+    const channels = toFilterArray(filters?.channel)
+    if (channels.length === 1) query = query.eq("order_source", channels[0])
+    else if (channels.length > 1) query = query.in("order_source", channels)
 
     if (filters?.startDate) {
         query = query.gte("created_at", filters.startDate)
@@ -399,7 +432,7 @@ export async function getAdminReturnRequests(
     cursor?: string | null,
     limit: number = 20,
     filters?: {
-        status?: string
+        status?: string | string[]
         type?: string
         source?: string
         search?: string
@@ -454,7 +487,11 @@ export async function getAdminReturnRequests(
         query = query.or(`customer_name_snapshot.ilike.%${s}%,order_number_snapshot.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%,customer_email_snapshot.ilike.%${s}%`)
     }
 
-    if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
+    if (Array.isArray(filters?.status)) {
+        if (filters.status.length > 0) {
+            query = query.in("status", filters.status)
+        }
+    } else if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
         const rawStatus = filters.status.toUpperCase()
         if (filters.status === "pending" || filters.status === "Pendentes") {
             query = query.in("status", ["PENDING_REVIEW"])

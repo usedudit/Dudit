@@ -2,6 +2,12 @@ import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import {
+  getMpPlatformAccessToken,
+  getMpSubscriptionStatus,
+  cancelMpPreapproval,
+} from "@/lib/services/mercadopago/subscriptions"
+import { SecureLogger } from "@/lib/secure-logger"
 
 export type AddonSlug =
   | "cart_abandonment"
@@ -117,6 +123,14 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
   },
 }
 
+export type AddonSubscriptionStatus =
+  | "none"
+  | "pending"
+  | "active"
+  | "paused"
+  | "cancelled"
+  | "past_due"
+
 export interface PartnerAddonStatus {
   slug: AddonSlug
   name: string
@@ -134,47 +148,90 @@ export interface PartnerAddonStatus {
   }
   isEnabled: boolean
   isIncludedInPlan: boolean // se plano Escalar cobre nativamente
+  hasAccess: boolean // true se plano Escalar ou assinatura paga ativa/vigente
+  subscriptionStatus: AddonSubscriptionStatus
+  mpPreapprovalId?: string | null
+  mpInitPoint?: string | null
+  currentPeriodEnd?: string | null
+  cancelAtPeriodEnd?: boolean
   planSlug: string
   updatedAt?: string
 }
 
-/**
- * Verifica se um Add-on específico está ativo para o parceiro.
- * Se o plano do parceiro for "escalar", retorna ativo por padrão (a menos que desligado manualmente).
- */
-export async function checkIsAddonActive(
+interface StoredAddonRecord {
+  is_enabled?: boolean
+  subscription_status?: AddonSubscriptionStatus
+  mp_preapproval_id?: string | null
+  mp_init_point?: string | null
+  billing_email?: string | null
+  current_period_start?: string | null
+  current_period_end?: string | null
+  cancel_at_period_end?: boolean
+  cancelled_at?: string | null
+  settings?: Record<string, unknown>
+  updated_at?: string | null
+}
+
+const VALID_ADDON_SLUGS = new Set<string>([
+  "cart_abandonment",
+  "order_bump",
+  "service_return",
+  "customer_birthday",
+])
+
+export function isValidAddonSlug(slug: string): slug is AddonSlug {
+  return VALID_ADDON_SLUGS.has(slug)
+}
+
+function hasPaidAddonAccess(record: StoredAddonRecord | null): boolean {
+  if (!record) return false
+  const status = record.subscription_status || "none"
+  const nowMs = Date.now()
+  const periodEndMs = record.current_period_end ? new Date(record.current_period_end).getTime() : null
+
+  if (status === "active") {
+    // Se tiver data de fim de período, tolera até 3 dias de carência (grace period)
+    if (periodEndMs && Number.isFinite(periodEndMs)) {
+      const graceMs = 3 * 24 * 60 * 60 * 1000
+      return nowMs <= periodEndMs + graceMs
+    }
+    return true
+  }
+
+  // Assinatura cancelada mas ainda dentro do período já pago
+  if (status === "cancelled" && periodEndMs && Number.isFinite(periodEndMs)) {
+    return nowMs <= periodEndMs
+  }
+
+  return false
+}
+
+async function getPartnerAddonRecord(
   partnerId: string,
   addonSlug: AddonSlug,
-): Promise<boolean> {
+): Promise<StoredAddonRecord | null> {
+  const admin = getAdminClient()
+
+  // 1. Tentar ler da tabela partner_addons
   try {
-    const admin = getAdminClient()
+    const { data: row, error } = await admin
+      .from("partner_addons")
+      .select(
+        "is_enabled, subscription_status, mp_preapproval_id, mp_init_point, billing_email, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, settings, updated_at",
+      )
+      .eq("partner_id", partnerId)
+      .eq("addon_slug", addonSlug)
+      .maybeSingle()
 
-    // 1. Verificar plano do parceiro
-    let isEscalar = false
-    try {
-      const plan = await getPartnerPlan(partnerId)
-      isEscalar = plan?.slug === "escalar"
-    } catch {
-      // Ignora erro ao resolver plano
+    if (!error && row) {
+      return row as StoredAddonRecord
     }
+  } catch {
+    // Fallback para JSONB caso a tabela/colunas ainda estejam sendo migradas
+  }
 
-    // 2. Verificar na tabela partner_addons
-    try {
-      const { data: row, error } = await admin
-        .from("partner_addons")
-        .select("is_enabled")
-        .eq("partner_id", partnerId)
-        .eq("addon_slug", addonSlug)
-        .maybeSingle()
-
-      if (!error && row) {
-        return Boolean(row.is_enabled)
-      }
-    } catch {
-      // Tabela pode ainda estar sendo migrada; usa fallback
-    }
-
-    // 3. Fallback: verificar em partners.business_info->'addons'
+  // 2. Fallback: partners.business_info->'addons'
+  try {
     const { data: partner } = await admin
       .from("partners")
       .select("business_info")
@@ -183,10 +240,161 @@ export async function checkIsAddonActive(
 
     const addonsConfig = partner?.business_info?.addons
     if (addonsConfig && typeof addonsConfig === "object" && addonSlug in addonsConfig) {
-      return Boolean(addonsConfig[addonSlug]?.enabled)
+      const raw = addonsConfig[addonSlug] || {}
+      return {
+        is_enabled: typeof raw.enabled === "boolean" ? raw.enabled : undefined,
+        subscription_status: (raw.subscription_status as AddonSubscriptionStatus) || "none",
+        mp_preapproval_id: raw.mp_preapproval_id ?? null,
+        mp_init_point: raw.mp_init_point ?? null,
+        billing_email: raw.billing_email ?? null,
+        current_period_start: raw.current_period_start ?? null,
+        current_period_end: raw.current_period_end ?? null,
+        cancel_at_period_end: Boolean(raw.cancel_at_period_end),
+        cancelled_at: raw.cancelled_at ?? null,
+        updated_at: raw.updated_at ?? null,
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return null
+}
+
+async function persistPartnerAddonRecord(
+  partnerId: string,
+  addonSlug: AddonSlug,
+  patch: Partial<StoredAddonRecord>,
+): Promise<void> {
+  const admin = getAdminClient()
+  const now = new Date().toISOString()
+  const existing = await getPartnerAddonRecord(partnerId, addonSlug)
+
+  const merged: StoredAddonRecord = {
+    is_enabled: patch.is_enabled !== undefined ? patch.is_enabled : (existing?.is_enabled ?? false),
+    subscription_status:
+      patch.subscription_status !== undefined
+        ? patch.subscription_status
+        : (existing?.subscription_status ?? "none"),
+    mp_preapproval_id:
+      patch.mp_preapproval_id !== undefined
+        ? patch.mp_preapproval_id
+        : (existing?.mp_preapproval_id ?? null),
+    mp_init_point:
+      patch.mp_init_point !== undefined ? patch.mp_init_point : (existing?.mp_init_point ?? null),
+    billing_email:
+      patch.billing_email !== undefined ? patch.billing_email : (existing?.billing_email ?? null),
+    current_period_start:
+      patch.current_period_start !== undefined
+        ? patch.current_period_start
+        : (existing?.current_period_start ?? null),
+    current_period_end:
+      patch.current_period_end !== undefined
+        ? patch.current_period_end
+        : (existing?.current_period_end ?? null),
+    cancel_at_period_end:
+      patch.cancel_at_period_end !== undefined
+        ? patch.cancel_at_period_end
+        : (existing?.cancel_at_period_end ?? false),
+    cancelled_at:
+      patch.cancelled_at !== undefined ? patch.cancelled_at : (existing?.cancelled_at ?? null),
+    settings: patch.settings !== undefined ? patch.settings : (existing?.settings ?? {}),
+    updated_at: now,
+  }
+
+  // 1. Tentar salvar em partner_addons
+  try {
+    const { error } = await admin.from("partner_addons").upsert(
+      {
+        partner_id: partnerId,
+        addon_slug: addonSlug,
+        is_enabled: Boolean(merged.is_enabled),
+        subscription_status: merged.subscription_status || "none",
+        mp_preapproval_id: merged.mp_preapproval_id,
+        mp_init_point: merged.mp_init_point,
+        billing_email: merged.billing_email,
+        current_period_start: merged.current_period_start,
+        current_period_end: merged.current_period_end,
+        cancel_at_period_end: Boolean(merged.cancel_at_period_end),
+        cancelled_at: merged.cancelled_at,
+        settings: merged.settings || {},
+        updated_at: now,
+      },
+      { onConflict: "partner_id, addon_slug" },
+    )
+    if (error) {
+      console.warn("[addon.service] Aviso ao upsert na tabela partner_addons:", error.message)
+    }
+  } catch (dbErr) {
+    console.warn("[addon.service] Falha ao upsert na tabela partner_addons, usando fallback JSONB:", dbErr)
+  }
+
+  // 2. Sincronizar em partners.business_info->'addons'
+  const { data: partner } = await admin
+    .from("partners")
+    .select("business_info")
+    .eq("id", partnerId)
+    .maybeSingle()
+
+  const currentBusinessInfo = partner?.business_info || {}
+  const currentAddons = currentBusinessInfo.addons || {}
+
+  currentAddons[addonSlug] = {
+    ...(currentAddons[addonSlug] || {}),
+    enabled: Boolean(merged.is_enabled),
+    subscription_status: merged.subscription_status || "none",
+    mp_preapproval_id: merged.mp_preapproval_id,
+    mp_init_point: merged.mp_init_point,
+    billing_email: merged.billing_email,
+    current_period_start: merged.current_period_start,
+    current_period_end: merged.current_period_end,
+    cancel_at_period_end: Boolean(merged.cancel_at_period_end),
+    cancelled_at: merged.cancelled_at,
+    updated_at: now,
+    ...(patch.settings || {}),
+  }
+
+  await admin
+    .from("partners")
+    .update({
+      business_info: {
+        ...currentBusinessInfo,
+        addons: currentAddons,
+      },
+    })
+    .eq("id", partnerId)
+}
+
+/**
+ * Verifica se um Add-on específico está ativo para o parceiro.
+ * Exige plano "escalar" OU assinatura paga ativa do aplicativo.
+ */
+export async function checkIsAddonActive(
+  partnerId: string,
+  addonSlug: AddonSlug,
+): Promise<boolean> {
+  try {
+    let isEscalar = false
+    try {
+      const plan = await getPartnerPlan(partnerId)
+      isEscalar = plan?.slug === "escalar"
+    } catch {
+      // Ignora erro ao resolver plano
     }
 
-    // Se é Escalar e nunca foi explicitamente desativado, é ativo por padrão!
+    const record = await getPartnerAddonRecord(partnerId, addonSlug)
+    const hasAccess = isEscalar || hasPaidAddonAccess(record)
+
+    // Sem acesso (nem Escalar nem assinatura paga ativa) -> nunca executa
+    if (!hasAccess) {
+      return false
+    }
+
+    if (record && typeof record.is_enabled === "boolean") {
+      return record.is_enabled
+    }
+
+    // Se é Escalar e nunca foi explicitamente desativado, é ativo por padrão
     return isEscalar
   } catch (err) {
     console.error(`[addon.service] Erro ao verificar addon ${addonSlug}:`, err)
@@ -195,64 +403,349 @@ export async function checkIsAddonActive(
 }
 
 /**
- * Ativa ou desativa um Add-on para o parceiro (atualiza partner_addons e business_info).
+ * Ativa ou desativa um Add-on para o parceiro.
+ * Bloqueia ativação se o parceiro não estiver no plano Escalar e não possuir assinatura paga ativa.
  */
 export async function setPartnerAddonStatus(
   partnerId: string,
   addonSlug: AddonSlug,
   isEnabled: boolean,
   settings: Record<string, unknown> = {},
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; requiresPayment?: boolean; error?: string }> {
   try {
-    const admin = getAdminClient()
-    const now = new Date().toISOString()
+    if (isEnabled) {
+      let isEscalar = false
+      try {
+        const plan = await getPartnerPlan(partnerId)
+        isEscalar = plan?.slug === "escalar"
+      } catch {
+        // ignore
+      }
 
-    // 1. Tentar salvar em partner_addons
-    try {
-      await admin.from("partner_addons").upsert(
-        {
-          partner_id: partnerId,
-          addon_slug: addonSlug,
-          is_enabled: isEnabled,
-          settings,
-          updated_at: now,
-        },
-        { onConflict: "partner_id, addon_slug" },
-      )
-    } catch (dbErr) {
-      console.warn("[addon.service] Falha ao upsert na tabela partner_addons, usando fallback JSONB:", dbErr)
+      if (!isEscalar) {
+        const record = await getPartnerAddonRecord(partnerId, addonSlug)
+        if (!hasPaidAddonAccess(record)) {
+          return {
+            success: false,
+            requiresPayment: true,
+            error: "Para ativar este aplicativo, assine o adicional ou faça upgrade para o plano Escalar.",
+          }
+        }
+      }
     }
 
-    // 2. Sincronizar em partners.business_info->'addons'
-    const { data: partner } = await admin
-      .from("partners")
-      .select("business_info")
-      .eq("id", partnerId)
-      .maybeSingle()
-
-    const currentBusinessInfo = partner?.business_info || {}
-    const currentAddons = currentBusinessInfo.addons || {}
-
-    currentAddons[addonSlug] = {
-      enabled: isEnabled,
-      updated_at: now,
-      ...settings,
-    }
-
-    await admin
-      .from("partners")
-      .update({
-        business_info: {
-          ...currentBusinessInfo,
-          addons: currentAddons,
-        },
-      })
-      .eq("id", partnerId)
+    await persistPartnerAddonRecord(partnerId, addonSlug, {
+      is_enabled: isEnabled,
+      ...(Object.keys(settings).length > 0 ? { settings } : {}),
+    })
 
     return { success: true }
   } catch (err: any) {
     console.error(`[addon.service] Erro ao atualizar status do addon ${addonSlug}:`, err)
     return { success: false, error: err.message || "Erro ao salvar status do aplicativo" }
+  }
+}
+
+/**
+ * Cria uma assinatura mensal recorrente (Mercado Pago Preapproval) para um Add-on.
+ */
+export async function createAddonMpSubscription(
+  partnerId: string,
+  addonSlug: AddonSlug,
+  payerEmail: string,
+): Promise<{
+  success: boolean
+  initPoint?: string
+  mpPreapprovalId?: string
+  alreadyIncluded?: boolean
+  alreadyActive?: boolean
+  error?: string
+}> {
+  if (!isValidAddonSlug(addonSlug)) {
+    return { success: false, error: "Aplicativo inválido." }
+  }
+
+  const addon = ADDON_REGISTRY[addonSlug]
+
+  try {
+    // 1. Verificar se já está incluso no plano Escalar
+    try {
+      const plan = await getPartnerPlan(partnerId)
+      if (plan?.slug === "escalar") {
+        await persistPartnerAddonRecord(partnerId, addonSlug, { is_enabled: true })
+        return { success: true, alreadyIncluded: true }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Verificar se já tem assinatura ativa paga
+    const existing = await getPartnerAddonRecord(partnerId, addonSlug)
+    if (hasPaidAddonAccess(existing)) {
+      await persistPartnerAddonRecord(partnerId, addonSlug, { is_enabled: true })
+      return { success: true, alreadyActive: true }
+    }
+
+    // 3. Cancelar preapproval pendente anterior (se houver) para não acumular cobranças abandonadas
+    if (existing?.subscription_status === "pending" && existing.mp_preapproval_id) {
+      await cancelMpPreapproval(existing.mp_preapproval_id).catch(() => {})
+    }
+
+    // 4. Criar preapproval no Mercado Pago usando as credenciais da plataforma Dudit
+    const accessToken = await getMpPlatformAccessToken()
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br").replace(/\/$/, "")
+    const backUrl = `${appUrl}/erp/configuracoes?tab=integracoes&section=aplicativos&addon_checkout=${addonSlug}`
+
+    const mpPayload = {
+      reason: `Dudit Aplicativo: ${addon.name} - Assinatura mensal`,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: addon.price,
+        currency_id: "BRL",
+      },
+      payer_email: payerEmail,
+      back_url: backUrl,
+      external_reference: `addon:${partnerId}:${addonSlug}`,
+    }
+
+    const response = await fetch("https://api.mercadopago.com/preapproval", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(mpPayload),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      SecureLogger.error("[addon.service] MP preapproval creation failed", {
+        status: response.status,
+        partnerId,
+        addonSlug,
+        providerError: errorData?.error || errorData?.message || null,
+      })
+      return {
+        success: false,
+        error: "Não foi possível iniciar o checkout no Mercado Pago. Tente novamente.",
+      }
+    }
+
+    const mpData = (await response.json()) as {
+      id: string
+      status: string
+      init_point: string
+    }
+
+    if (!mpData?.id || !mpData?.init_point) {
+      return { success: false, error: "Resposta inválida do Mercado Pago ao criar assinatura." }
+    }
+
+    await persistPartnerAddonRecord(partnerId, addonSlug, {
+      is_enabled: false,
+      subscription_status: "pending",
+      mp_preapproval_id: mpData.id,
+      mp_init_point: mpData.init_point,
+      billing_email: payerEmail,
+      cancel_at_period_end: false,
+      cancelled_at: null,
+    })
+
+    return {
+      success: true,
+      initPoint: mpData.init_point,
+      mpPreapprovalId: mpData.id,
+    }
+  } catch (err: any) {
+    SecureLogger.error("[addon.service] createAddonMpSubscription error", {
+      partnerId,
+      addonSlug,
+      error: err?.message,
+    })
+    return { success: false, error: "Erro interno ao iniciar assinatura do aplicativo." }
+  }
+}
+
+/**
+ * Sincroniza o estado de uma assinatura de Add-on a partir de um evento do Mercado Pago
+ * (webhook `subscription_preapproval` / `subscription_authorized_payment` ou retorno de checkout).
+ * Retorna `true` se o recurso pertencia a um Add-on.
+ */
+export async function syncAddonSubscriptionFromMp(params: {
+  mpPreapprovalId?: string | null
+  externalReference?: string | null
+  mpStatus?: string | null
+}): Promise<boolean> {
+  const admin = getAdminClient()
+  const preapprovalId = params.mpPreapprovalId ? String(params.mpPreapprovalId) : null
+  const extRef = params.externalReference ? String(params.externalReference) : null
+
+  let partnerId: string | null = null
+  let addonSlug: AddonSlug | null = null
+
+  // 1. Parse de external_reference: "addon:<partnerId>:<addonSlug>"
+  if (extRef && extRef.startsWith("addon:")) {
+    const parts = extRef.split(":")
+    if (parts.length === 3 && isValidAddonSlug(parts[2])) {
+      partnerId = parts[1]
+      addonSlug = parts[2]
+    }
+  }
+
+  // 2. Fallback: procurar em partner_addons por mp_preapproval_id
+  if ((!partnerId || !addonSlug) && preapprovalId) {
+    try {
+      const { data: row } = await admin
+        .from("partner_addons")
+        .select("partner_id, addon_slug")
+        .eq("mp_preapproval_id", preapprovalId)
+        .maybeSingle()
+
+      if (row && isValidAddonSlug(row.addon_slug)) {
+        partnerId = row.partner_id
+        addonSlug = row.addon_slug
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!partnerId || !addonSlug) {
+    return false
+  }
+
+  const normalizedStatus = String(params.mpStatus || "").toLowerCase()
+  const now = new Date()
+  const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+  const existing = await getPartnerAddonRecord(partnerId, addonSlug)
+  const patch: Partial<StoredAddonRecord> = {
+    ...(preapprovalId ? { mp_preapproval_id: preapprovalId } : {}),
+  }
+
+  if (["authorized", "approved", "processed"].includes(normalizedStatus)) {
+    patch.subscription_status = "active"
+    patch.is_enabled = true
+    patch.mp_init_point = null
+    patch.cancel_at_period_end = false
+    patch.cancelled_at = null
+    patch.current_period_start = now.toISOString()
+    patch.current_period_end = nextMonth.toISOString()
+  } else if (normalizedStatus === "pending" || normalizedStatus === "waiting_for_gateway") {
+    if (existing?.subscription_status !== "active") {
+      patch.subscription_status = "pending"
+    }
+  } else if (normalizedStatus === "paused") {
+    patch.subscription_status = "paused"
+    patch.is_enabled = false
+  } else if (normalizedStatus === "cancelled") {
+    patch.subscription_status = "cancelled"
+    patch.cancel_at_period_end = true
+    patch.cancelled_at = now.toISOString()
+    patch.mp_init_point = null
+    const periodEndMs = existing?.current_period_end
+      ? new Date(existing.current_period_end).getTime()
+      : 0
+    if (!periodEndMs || periodEndMs <= now.getTime()) {
+      patch.is_enabled = false
+    }
+  } else if (["rejected", "refunded", "chargeback"].includes(normalizedStatus)) {
+    patch.subscription_status = "past_due"
+    patch.is_enabled = false
+  } else {
+    return true
+  }
+
+  await persistPartnerAddonRecord(partnerId, addonSlug, patch)
+  return true
+}
+
+/**
+ * Consulta diretamente a API do Mercado Pago para confirmar um checkout recém-concluído.
+ */
+export async function verifyAndSyncAddonCheckout(
+  partnerId: string,
+  addonSlug: AddonSlug,
+): Promise<{
+  success: boolean
+  status: AddonSubscriptionStatus
+  isEnabled: boolean
+}> {
+  const record = await getPartnerAddonRecord(partnerId, addonSlug)
+  if (!record?.mp_preapproval_id) {
+    return {
+      success: true,
+      status: record?.subscription_status || "none",
+      isEnabled: Boolean(record?.is_enabled),
+    }
+  }
+
+  try {
+    const mpData = await getMpSubscriptionStatus(record.mp_preapproval_id)
+    if (mpData?.status) {
+      await syncAddonSubscriptionFromMp({
+        mpPreapprovalId: record.mp_preapproval_id,
+        externalReference: `addon:${partnerId}:${addonSlug}`,
+        mpStatus: String(mpData.status),
+      })
+    }
+  } catch (err: any) {
+    console.warn("[addon.service] Falha ao consultar status no MP:", err?.message)
+  }
+
+  const updated = await getPartnerAddonRecord(partnerId, addonSlug)
+  return {
+    success: true,
+    status: updated?.subscription_status || "none",
+    isEnabled: Boolean(updated?.is_enabled),
+  }
+}
+
+/**
+ * Cancela a assinatura recorrente de um Add-on no Mercado Pago.
+ */
+export async function cancelAddonMpSubscription(
+  partnerId: string,
+  addonSlug: AddonSlug,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const record = await getPartnerAddonRecord(partnerId, addonSlug)
+    if (!record?.mp_preapproval_id) {
+      await persistPartnerAddonRecord(partnerId, addonSlug, {
+        subscription_status: "cancelled",
+        cancel_at_period_end: true,
+        cancelled_at: new Date().toISOString(),
+        is_enabled: false,
+        mp_init_point: null,
+      })
+      return { success: true }
+    }
+
+    const cancelRes = await cancelMpPreapproval(record.mp_preapproval_id)
+    if (!cancelRes.success) {
+      console.warn("[addon.service] Falha ao cancelar preapproval no MP:", cancelRes.error)
+    }
+
+    const now = new Date()
+    const periodEndMs = record.current_period_end
+      ? new Date(record.current_period_end).getTime()
+      : 0
+    const stillHasPaidTime =
+      record.subscription_status === "active" && periodEndMs > now.getTime()
+
+    await persistPartnerAddonRecord(partnerId, addonSlug, {
+      subscription_status: "cancelled",
+      cancel_at_period_end: true,
+      cancelled_at: now.toISOString(),
+      mp_init_point: null,
+      is_enabled: stillHasPaidTime ? Boolean(record.is_enabled) : false,
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    console.error(`[addon.service] Erro ao cancelar assinatura do addon ${addonSlug}:`, err)
+    return { success: false, error: err.message || "Erro ao cancelar assinatura do aplicativo." }
   }
 }
 
@@ -442,13 +935,26 @@ export async function getAllPartnerAddons(
 
   for (const slug of slugs) {
     const def = ADDON_REGISTRY[slug]
-    const isEnabled = await checkIsAddonActive(partnerId, slug)
+    const record = await getPartnerAddonRecord(partnerId, slug)
+    const hasAccess = isEscalar || hasPaidAddonAccess(record)
+    const isEnabled = hasAccess
+      ? record && typeof record.is_enabled === "boolean"
+        ? record.is_enabled
+        : isEscalar
+      : false
 
     results.push({
       ...def,
       isEnabled,
       isIncludedInPlan: isEscalar,
+      hasAccess,
+      subscriptionStatus: record?.subscription_status || "none",
+      mpPreapprovalId: record?.mp_preapproval_id ?? null,
+      mpInitPoint: record?.subscription_status === "pending" ? (record?.mp_init_point ?? null) : null,
+      currentPeriodEnd: record?.current_period_end ?? null,
+      cancelAtPeriodEnd: Boolean(record?.cancel_at_period_end),
       planSlug,
+      updatedAt: record?.updated_at ?? undefined,
     })
   }
 

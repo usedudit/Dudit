@@ -135,11 +135,22 @@ export async function syncTinyProductsToDudit(params: {
         const summary = item.produto
         if (!summary || !summary.id) continue
 
+        // Se o item na listagem for variação filha (tipoVariacao === "V"), ignora a criação
+        // como produto avulso, pois ele é importado como variação dentro do produto pai ("P")
+        if ((summary as any).tipoVariacao === "V") {
+          continue
+        }
+
         totalProcessed++
 
         try {
           // Busca detalhes completos do produto no Tiny
           const detail: TinyProductDetail = await client.getProduct(summary.id)
+
+          // Se o detalhe indicar que é uma variação filha de outro produto, ignora também
+          if ((detail as any).tipoVariacao === "V" || Number((detail as any).idProdutoPai || 0) > 0) {
+            continue
+          }
 
           const externalId = String(detail.id)
           const sku = detail.codigo?.trim() || `TINY-${externalId}`
@@ -322,7 +333,29 @@ export async function syncTinyProductsToDudit(params: {
               totalVariantStock += vStock
 
               const vPrice = Number(v.preco || price)
-              const priceAdj = vPrice - price
+              // No Dudit, product_variants.price_adjustment armazena o preço final de venda da variação
+              const variantFinalPrice = vPrice > 0 ? vPrice : price
+
+              // Se existir algum produto solto criado na tabela `products` com o external_id ou SKU dessa variação (criado anteriormente por engano),
+              // arquiva esse produto avulso duplicado para despoluir o catálogo
+              const vExternalId = v.id ? String(v.id) : null
+              if (vExternalId || vSku) {
+                let strayQuery = supabase
+                  .from("products")
+                  .update({ deleted_at: now, status: "inativo" })
+                  .eq("partner_id", partnerId)
+                  .neq("id", targetProductId)
+                  .is("deleted_at", null)
+
+                if (vExternalId && vSku) {
+                  strayQuery = strayQuery.or(`external_id.eq.${vExternalId},sku.eq.${vSku}`)
+                } else if (vExternalId) {
+                  strayQuery = strayQuery.eq("external_id", vExternalId)
+                } else if (vSku) {
+                  strayQuery = strayQuery.eq("sku", vSku)
+                }
+                await strayQuery
+              }
 
               let existingVar = null
               if (vSku) {
@@ -351,7 +384,7 @@ export async function syncTinyProductsToDudit(params: {
                     variant_type: gradeType,
                     variant_value: gradeName,
                     sku: vSku,
-                    price_adjustment: priceAdj,
+                    price_adjustment: variantFinalPrice,
                     stock_quantity: vStock,
                     variant_options: v.grade || {},
                     is_active: true,
@@ -367,7 +400,7 @@ export async function syncTinyProductsToDudit(params: {
                     variant_type: gradeType,
                     variant_value: gradeName,
                     sku: vSku,
-                    price_adjustment: priceAdj,
+                    price_adjustment: variantFinalPrice,
                     stock_quantity: vStock,
                     variant_options: v.grade || {},
                     is_active: true,
@@ -691,8 +724,10 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       payment_breakdown,
       store_credit_amount,
       discount_amount,
+      discount_value,
+      discount_type,
       manual_discount_amount,
-      coupon_discount_amount,
+      campaign_discount_amount,
       item_discount_amount,
       payment_method_discount_amount,
       exchange_return_request_id,
@@ -742,7 +777,8 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     .single()
 
   if (orderErr || !order) {
-    return { success: false, error: "Pedido não encontrado" }
+    console.error("[TINY] Erro ao buscar pedido para exportação:", orderErr)
+    return { success: false, error: orderErr?.message || "Pedido não encontrado" }
   }
 
   // Se já foi exportado com sucesso, não duplica
@@ -836,21 +872,40 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       ? order.order_shipments.find((s: any) => s.kind !== "return")
       : null
 
-    let formaEnvio = isPickup ? "Retirada" : undefined
-    let formaFrete: string | undefined = undefined
-    if (!isPickup) {
-      if (activeShipment?.carrier) {
-        formaEnvio = activeShipment.carrier
-      } else if (order.delivery_breakdown?.carrier) {
-        formaEnvio = order.delivery_breakdown.carrier
-      } else {
-        formaEnvio = "Entrega"
-      }
+    const breakdown = (order.delivery_breakdown as Record<string, any> | null) || null
 
-      if (activeShipment?.service_name) {
-        formaFrete = activeShipment.service_name
-      } else if (order.delivery_breakdown?.service_name) {
-        formaFrete = order.delivery_breakdown.service_name
+    // Nome da transportadora real (prioriza companyName do breakdown, ex: "Jadlog", "Correios")
+    let carrierName: string | undefined = undefined
+    let formaFrete: string | undefined = undefined
+    let formaEnvio: string | undefined = undefined
+
+    if (isPickup) {
+      formaEnvio = "X" // Sem frete / Retirada no Tiny API v2
+      carrierName = "Retirada na Loja"
+    } else {
+      carrierName =
+        breakdown?.companyName ||
+        activeShipment?.carrier ||
+        breakdown?.carrier ||
+        undefined
+
+      formaFrete =
+        activeShipment?.service_name ||
+        breakdown?.serviceName ||
+        breakdown?.service_name ||
+        undefined
+
+      const lowerCarrier = `${carrierName || ""} ${formaFrete || ""}`.toLowerCase()
+      if (lowerCarrier.includes("correios") || lowerCarrier.includes("sedex") || lowerCarrier.includes("pac") || lowerCarrier.includes("mini envios")) {
+        formaEnvio = "C" // Correios
+        if (!carrierName || carrierName.toLowerCase() === "superfrete") carrierName = "Correios"
+      } else if (lowerCarrier.includes("jadlog") || lowerCarrier.includes(".package") || lowerCarrier.includes(".com")) {
+        formaEnvio = "J" // Jadlog
+        if (!carrierName || carrierName.toLowerCase() === "superfrete") carrierName = "Jadlog"
+      } else if (carrierName || deliveryFee > 0) {
+        formaEnvio = "T" // Transportadora
+      } else {
+        formaEnvio = "X" // Sem frete
       }
     }
 
@@ -909,13 +964,23 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 
     const paymentInfo = buildTinyOrderPayments(order)
 
-    const totalDiscount = Math.max(
+    const itemsTotal = items.reduce(
+      (sum, it) => sum + Number(it.item.quantidade || 0) * Number(it.item.valor_unitario || 0),
+      0
+    )
+    const orderTotal = Number(order.total_amount || 0)
+
+    const explicitDiscount = Math.max(
       0,
-      Number(order.discount_amount || 0) +
-      Number(order.coupon_discount_amount || 0) +
+      Number(order.discount_amount || (order as any).coupon_discount_amount || 0) +
       Number(order.manual_discount_amount || 0) +
+      Number((order as any).campaign_discount_amount || 0) +
       Number(order.payment_method_discount_amount || 0)
     )
+
+    // Fallback: se o pedido tiver desconto via discount_value ou diferença entre (itens + frete) e total_pedido
+    const impliedDiscount = Math.max(0, Number((itemsTotal + deliveryFee - orderTotal).toFixed(2)))
+    const totalDiscount = explicitDiscount > 0.009 ? explicitDiscount : impliedDiscount
 
     const payload: TinyOrderPayload = {
       pedido: {
@@ -949,12 +1014,12 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
           }
           : undefined,
         itens: items,
-        total_pedido: Number(order.total_amount || 0),
-        valor_desconto: totalDiscount > 0 ? Number(totalDiscount.toFixed(2)) : undefined,
+        total_pedido: orderTotal,
+        valor_desconto: totalDiscount > 0.009 ? Number(totalDiscount.toFixed(2)) : undefined,
         valor_frete: deliveryFee > 0 ? deliveryFee : undefined,
         forma_envio: formaEnvio,
         forma_frete: formaFrete,
-        nome_transportador: formaEnvio,
+        nome_transportador: carrierName,
         frete_por_conta: fretePorConta,
         codigo_rastreamento: trackingCode,
         url_rastreamento: trackingUrl,
@@ -1055,10 +1120,9 @@ export async function updateTinyOrderStatus(params: {
     .single()
 
   if (orderErr || !order) {
-    return { success: false, error: "Pedido não encontrado" }
+    console.error("[TINY] Erro ao buscar pedido para atualizar situação:", orderErr)
+    return { success: false, error: orderErr?.message || "Pedido não encontrado" }
   }
-
-  // Se o pedido não foi exportado para o Tiny, não há o que atualizar lá
   if (order.external_provider !== TINY_PROVIDER || !order.external_order_id) {
     return { success: true }
   }
@@ -1115,7 +1179,8 @@ export async function syncOrderTrackingToTiny(params: {
     .single()
 
   if (orderErr || !order) {
-    return { success: false, error: "Pedido não encontrado" }
+    console.error("[TINY] Erro ao buscar pedido para sincronizar rastreamento:", orderErr)
+    return { success: false, error: orderErr?.message || "Pedido não encontrado" }
   }
 
   if (order.external_provider !== TINY_PROVIDER || !order.external_order_id) {
@@ -1158,6 +1223,101 @@ export async function syncOrderTrackingToTiny(params: {
       success: false,
       error: err?.message || "Erro ao atualizar rastreamento no Tiny ERP",
     }
+  }
+}
+
+/**
+ * Envia atualização de estoque de um produto ou variante da Dudit para o Tiny ERP
+ */
+export async function syncDuditStockToTiny(params: {
+  partnerId: string
+  productId?: string
+  variantId?: string
+  sku?: string
+  newStock: number
+  reason?: string
+}): Promise<{ success: boolean; error?: string }> {
+  const { partnerId, productId, variantId, sku, newStock, reason } = params
+  const supabase = createAdminClient()
+
+  const integration = await findTinyIntegration(supabase, partnerId)
+  if (!integration || integration.status !== "connected") {
+    return { success: false, error: "Tiny ERP não conectado para esta loja." }
+  }
+
+  const config = (integration.config as TinyIntegrationConfig) || {}
+  if (config.sync_stock === false) {
+    return { success: false, error: "Sincronização de estoque desativada nas configurações." }
+  }
+
+  try {
+    const client = await getValidTinyClient(partnerId)
+    let targetTinyId: string | number | null = null
+
+    // 1. Se tem variantId, tenta achar o produto no Tiny pelo SKU da variante
+    if (variantId) {
+      const { data: vRow } = await supabase
+        .from("product_variants")
+        .select("sku")
+        .eq("id", variantId)
+        .maybeSingle()
+
+      if (vRow?.sku) {
+        try {
+          const search = await client.searchProducts({ pesquisa: vRow.sku })
+          const found = (search.produtos || []).find((p: any) => p.produto.codigo === vRow.sku)
+          if (found?.produto?.id) {
+            targetTinyId = found.produto.id
+          }
+        } catch { }
+      }
+    }
+
+    // 2. Se tem productId e ainda não achou, tenta pelo external_id ou SKU do produto
+    if (!targetTinyId && productId) {
+      const { data: pRow } = await supabase
+        .from("products")
+        .select("external_id, sku")
+        .eq("id", productId)
+        .maybeSingle()
+
+      if (pRow?.external_id) {
+        targetTinyId = pRow.external_id
+      } else if (pRow?.sku) {
+        try {
+          const search = await client.searchProducts({ pesquisa: pRow.sku })
+          const found = (search.produtos || []).find((p: any) => p.produto.codigo === pRow.sku)
+          if (found?.produto?.id) {
+            targetTinyId = found.produto.id
+          }
+        } catch { }
+      }
+    }
+
+    // 3. Fallback por SKU direto
+    if (!targetTinyId && sku) {
+      try {
+        const search = await client.searchProducts({ pesquisa: sku })
+        const found = (search.produtos || []).find((p: any) => p.produto.codigo === sku)
+        if (found?.produto?.id) {
+          targetTinyId = found.produto.id
+        }
+      } catch { }
+    }
+
+    if (!targetTinyId) {
+      return { success: false, error: "Produto ou variação correspondente não encontrado no Tiny ERP." }
+    }
+
+    await client.updateProductStock(targetTinyId, newStock, {
+      tipo: "B",
+      observacoes: (reason || "Ajuste de estoque via Dudit").substring(0, 100),
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    console.warn(`[TINY] Erro ao sincronizar estoque para parceiro ${partnerId}:`, err?.message)
+    return { success: false, error: err?.message || "Erro ao atualizar estoque no Tiny ERP" }
   }
 }
 

@@ -6,6 +6,10 @@ import { isAllowedServerActionOrigin } from "@/lib/security/origin-validation"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { evaluateMaintenanceMode } from "@/lib/system/maintenance-guard"
 import { isBotSearch } from "@/lib/search/bot-detection"
+import {
+  clearExpiredUserBan,
+  clearExpiredPartnerEnforcement,
+} from "@/lib/services/enforcement-expiration.service"
 
 // ============================================================================
 // CONFIGURAÇÃO DE ROTAS
@@ -33,6 +37,7 @@ type SecureRuntimeStatus = {
   partner_status: {
     is_active: boolean | null
     erp_disabled: boolean | null
+    suspension_expired?: boolean | null
   } | null
 }
 
@@ -682,16 +687,8 @@ export async function middleware(request: NextRequest) {
           }
 
           if (needsBanCheck && runtimeStatus?.ban_expired === true) {
-            // Ban expirado e limpo, segue normal.
-            await supabase
-              .from("user_profiles")
-              .update({
-                banned_at: null,
-                banned_until: null,
-                banned_reason: null,
-                banned_by: null,
-              })
-              .eq("user_id", user.id)
+            // Ban expirado: limpa via service-role (evita bloqueio de RLS) e segue normal.
+            await clearExpiredUserBan(user.id)
           }
 
           // Process partner status/access check result
@@ -705,13 +702,21 @@ export async function middleware(request: NextRequest) {
           }
 
           const partnerStatus = runtimeStatus?.partner_status
-          if (needsPartnerCheck && partnerStatus) {
-            if (partnerStatus.is_active === false || partnerStatus.erp_disabled === true) {
-              console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
-              const selectErpUrl = new URL("/select-erp", request.url)
-              const responseRedirect = NextResponse.redirect(selectErpUrl)
-              responseRedirect.cookies.delete("active_partner_id")
-              return responseRedirect
+          if (needsPartnerCheck && partnerStatus && activePartnerId) {
+            if (
+              partnerStatus.is_active === false ||
+              partnerStatus.erp_disabled === true ||
+              partnerStatus.suspension_expired === true
+            ) {
+              // Verifica e limpa automaticamente suspensões / bloqueios de ERP expirados
+              const clearResult = await clearExpiredPartnerEnforcement(activePartnerId)
+              if (clearResult.stillBlocked) {
+                console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
+                const selectErpUrl = new URL("/select-erp", request.url)
+                const responseRedirect = NextResponse.redirect(selectErpUrl)
+                responseRedirect.cookies.delete("active_partner_id")
+                return responseRedirect
+              }
             }
           }
 

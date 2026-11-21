@@ -10,7 +10,8 @@
 import "server-only"
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { unstable_cache } from "next/cache"
+import { unstable_cache, revalidateTag } from "next/cache"
+import { isEnforcementExpired } from "@/lib/services/enforcement-expiration.service"
 
 export type BannedProfile = {
     user_id: string
@@ -43,7 +44,7 @@ export const getBannedUserProfile = cache(async (userId: string): Promise<Banned
         }
 
         // Banned with expiration AND expired → auto-clear
-        if (profile.banned_until && new Date(profile.banned_until) < new Date()) {
+        if (isEnforcementExpired(profile.banned_until)) {
             await supabase
                 .from("user_profiles")
                 .update({
@@ -54,6 +55,11 @@ export const getBannedUserProfile = cache(async (userId: string): Promise<Banned
                     banned_case_id: null,
                 })
                 .eq("user_id", userId)
+
+            try {
+                // @ts-ignore - Next.js revalidateTag signature
+                revalidateTag(`user-ban-${userId}`, "max")
+            } catch {}
 
             return null
         }

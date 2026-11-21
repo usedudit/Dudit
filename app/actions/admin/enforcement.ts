@@ -17,6 +17,13 @@ import { requireStepUp } from "@/lib/admin/step-up-auth"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import { MANAGEMENT_ROLES } from "@/lib/notifications/audience"
+import {
+    expireAllExpiredEnforcements,
+    clearExpiredUserBan,
+    clearExpiredPartnerEnforcement,
+    clearExpiredStoreSuspension,
+    clearExpiredEnforcementsForUserPartners,
+} from "@/lib/services/enforcement-expiration.service"
 
 // SECURITY FIX (MED-01): Sanitize wildcard chars in ILIKE queries
 function sanitizeIlike(input: string): string {
@@ -85,6 +92,7 @@ export async function getAdminUserStats(): Promise<AdminUserStats> {
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
+    await expireAllExpiredEnforcements(supabase)
 
     const [totalRes, bannedRes, partnersRes] = await Promise.all([
         supabase.from("user_profiles").select("user_id", { count: "exact", head: true }),
@@ -104,12 +112,15 @@ export async function getUsers(
     cursor?: string | null,
     limit: number = 20,
     search?: string,
-    status?: string
+    status?: string,
+    startDate?: string,
+    endDate?: string
 ): Promise<CursorPaginatedResult<EnforcementUser>> {
     await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
+    await expireAllExpiredEnforcements(supabase)
     const pageSize = Math.min(limit, 50)
 
     // Admin/moderator user_ids to exclude
@@ -149,6 +160,9 @@ export async function getUsers(
     } else if (status === "banned" || status === "Banidos") {
         query = query.not("banned_at", "is", null)
     }
+
+    if (startDate) query = query.gte("created_at", startDate)
+    if (endDate) query = query.lte("created_at", endDate)
 
     // If we found a user by email, filter by that user_id
     if (emailUserId) {
@@ -261,6 +275,10 @@ export async function getAdminUserDetail(userId: string): Promise<any | null> {
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
+    await Promise.all([
+        clearExpiredUserBan(userId, supabase),
+        clearExpiredEnforcementsForUserPartners(userId, supabase),
+    ])
 
     // 1. Profile
     const { data: profile } = await supabase
@@ -331,6 +349,7 @@ export async function getAdminPartnerStats(): Promise<AdminPartnerStats> {
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
+    await expireAllExpiredEnforcements(supabase)
 
     const [totalRes, activeRes, suspendedRes, highRiskRes] = await Promise.all([
         supabase.from("stores").select("id", { count: "exact", head: true }),
@@ -360,6 +379,7 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
         await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
         const supabase: any = getAdminClient()
+        await expireAllExpiredEnforcements(supabase)
 
         // 1. Try finding store by store ID first
         let store: any = null
@@ -776,18 +796,21 @@ export async function getPartners(
     cursor?: string | null,
     limit: number = 20,
     search?: string,
-    status?: string
+    status?: string,
+    startDate?: string,
+    endDate?: string
 ): Promise<CursorPaginatedResult<EnforcementPartner>> {
     const admin = await requireAdminScope("user_enforcement", "moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
+    await expireAllExpiredEnforcements(supabase)
     const pageSize = Math.min(limit, 50)
 
     // Main query: fetch stores with partner info
     let storeQuery = supabase
         .from("stores")
-        .select("id, name, is_active, suspended_at, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+        .select("id, name, is_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
 
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
@@ -801,6 +824,9 @@ export async function getPartners(
     } else if (status === "erp_disabled") {
         storeQuery = storeQuery.eq("is_active", false)
     }
+
+    if (startDate) storeQuery = storeQuery.gte("created_at", startDate)
+    if (endDate) storeQuery = storeQuery.lte("created_at", endDate)
 
     if (cursor) {
         storeQuery = storeQuery.lt("created_at", cursor)
@@ -846,7 +872,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: allStores } = await supabase
             .from("stores")
-            .select("id, name, is_active, suspended_at, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+            .select("id, name, is_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
             .in("partner_id", partnerIds)
         if (allStores) {
             for (const s of allStores) {
@@ -867,7 +893,7 @@ export async function getPartners(
             is_active: s.is_active,
             erp_disabled: partner ? !!partner.erp_disabled : false,
             suspended_at: s.suspended_at || partner?.suspended_at || null,
-            suspended_until: partner?.suspended_until || null,
+            suspended_until: s.suspended_until || partner?.suspended_until || null,
             suspended_reason: s.suspended_reason || partner?.suspended_reason || null,
             suspended_case_id: s.suspended_case_id || partner?.suspended_case_id || null,
             risk_score: s.risk_score || 0,
@@ -1032,6 +1058,7 @@ export async function banUser(
     }
 
     const supabase: any = getAdminClient()
+    await clearExpiredUserBan(targetUserId, supabase)
 
     // Anti-IDOR: re-fetch user
     const { data: user, error: fetchError } = await supabase
@@ -1248,6 +1275,7 @@ export async function suspendPartner(
     }
 
     const supabase = getAdminClient()
+    await clearExpiredPartnerEnforcement(partnerId, supabase)
 
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
@@ -1512,6 +1540,7 @@ export async function suspendStore(
     }
 
     const supabase: any = getAdminClient()
+    await clearExpiredStoreSuspension(storeId, supabase)
 
     const { data: store, error: fetchError } = await supabase
         .from("stores")
@@ -1757,6 +1786,7 @@ export async function disableTenantAccess(
     }
 
     const supabase: any = getAdminClient()
+    await clearExpiredPartnerEnforcement(partnerId, supabase)
 
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase

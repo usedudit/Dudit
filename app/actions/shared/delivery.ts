@@ -147,7 +147,7 @@ async function resolveDeliveryContext(
   const settings = mapSettingsRow(settingsRow)
   const effectiveMaxKm = (settings.maxDeliveryKm != null && settings.maxDeliveryKm > 0)
     ? settings.maxDeliveryKm
-    : (settings.includedKm > 0 ? settings.includedKm : null)
+    : null
   const shouldCalculateDistance = (
     effectiveMaxKm != null ||
     settings.extraKmPrice > 0 ||
@@ -155,54 +155,46 @@ async function resolveDeliveryContext(
   )
 
   let originCoords: { lat: number; lng: number } | null = null
-  if (shouldCalculateDistance) {
-    const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
-    if (storeAddr?.latitude != null && storeAddr?.longitude != null) {
-      originCoords = { lat: Number(storeAddr.latitude), lng: Number(storeAddr.longitude) }
-    }
+  const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
+  if (storeAddr?.latitude != null && storeAddr?.longitude != null) {
+    originCoords = { lat: Number(storeAddr.latitude), lng: Number(storeAddr.longitude) }
+  }
 
-    if (!originCoords && storeId) {
+  if (!originCoords && shouldCalculateDistance) {
+    if (storeId) {
       const { data: directAddr } = await supabase
         .from("addresses")
-        .select("latitude, longitude")
+        .select("id, street, number, neighborhood, city, state, zip_code, latitude, longitude")
         .eq("store_id", storeId)
-        .not("latitude", "is", null)
         .limit(1)
         .maybeSingle()
       if (directAddr?.latitude != null && directAddr?.longitude != null) {
         originCoords = { lat: Number(directAddr.latitude), lng: Number(directAddr.longitude) }
+      } else if (directAddr) {
+        const fullAddrString = `${directAddr.street || ""}, ${directAddr.number || ""} - ${directAddr.neighborhood || ""}, ${directAddr.city || ""} - ${directAddr.state || ""}, ${directAddr.zip_code || ""}`
+        const geocoded = await geocodeAddress(fullAddrString)
+        if (geocoded) {
+          originCoords = geocoded
+          void supabase.from("addresses").update({ latitude: geocoded.lat, longitude: geocoded.lng }).eq("id", directAddr.id)
+        }
       }
     }
 
     if (!originCoords) {
       const { data: partnerAddr } = await supabase
         .from("addresses")
-        .select("latitude, longitude")
+        .select("id, street, number, neighborhood, city, state, zip_code, latitude, longitude")
         .eq("partner_id", partnerId)
-        .not("latitude", "is", null)
         .limit(1)
         .maybeSingle()
       if (partnerAddr?.latitude != null && partnerAddr?.longitude != null) {
         originCoords = { lat: Number(partnerAddr.latitude), lng: Number(partnerAddr.longitude) }
-      }
-    }
-
-    if (!originCoords) {
-      let addrQuery = supabase
-        .from("addresses")
-        .select("id, street, number, neighborhood, city, state, zip_code")
-      if (storeId) {
-        addrQuery = addrQuery.eq("store_id", storeId)
-      } else {
-        addrQuery = addrQuery.eq("partner_id", partnerId)
-      }
-      const { data: textAddr } = await addrQuery.limit(1).maybeSingle()
-      if (textAddr) {
-        const fullAddrString = `${textAddr.street || ""}, ${textAddr.number || ""} - ${textAddr.neighborhood || ""}, ${textAddr.city || ""} - ${textAddr.state || ""}, ${textAddr.zip_code || ""}`
+      } else if (partnerAddr) {
+        const fullAddrString = `${partnerAddr.street || ""}, ${partnerAddr.number || ""} - ${partnerAddr.neighborhood || ""}, ${partnerAddr.city || ""} - ${partnerAddr.state || ""}, ${partnerAddr.zip_code || ""}`
         const geocoded = await geocodeAddress(fullAddrString)
         if (geocoded) {
           originCoords = geocoded
-          void supabase.from("addresses").update({ latitude: geocoded.lat, longitude: geocoded.lng }).eq("id", textAddr.id)
+          void supabase.from("addresses").update({ latitude: geocoded.lat, longitude: geocoded.lng }).eq("id", partnerAddr.id)
         }
       }
     }
@@ -479,10 +471,11 @@ export async function quoteDeliveryFeeAction(input: {
       const cepMatch = cleanAddr.match(/\b\d{5}-?\d{3}\b/)
       if (cepMatch) {
         const cleanCep = cepMatch[0].replace(/\D/g, "")
+        const formattedCep = cleanCep.length === 8 ? `${cleanCep.slice(0, 5)}-${cleanCep.slice(5)}` : cleanCep
         const { data: matchedDbAddr } = await supabase
           .from("addresses")
           .select("latitude, longitude")
-          .eq("zip_code", cleanCep)
+          .in("zip_code", cleanCep === formattedCep ? [cleanCep] : [cleanCep, formattedCep])
           .not("latitude", "is", null)
           .not("longitude", "is", null)
           .limit(1)
@@ -535,6 +528,12 @@ export async function quoteDeliveryFeeAction(input: {
     if (calculatedDistance == null || Number.isNaN(calculatedDistance)) {
       distanceKm = 0
     } else {
+      distanceKm = Number(calculatedDistance.toFixed(2))
+    }
+  } else if (originCoords && input.destinationCoords) {
+    // Fixed-fee delivery still benefits from real distance for estimated delivery time (zero extra calls)
+    const calculatedDistance = calculateDistance(originCoords, input.destinationCoords)
+    if (calculatedDistance != null && !Number.isNaN(calculatedDistance)) {
       distanceKm = Number(calculatedDistance.toFixed(2))
     }
   }

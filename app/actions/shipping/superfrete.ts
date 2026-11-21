@@ -1238,7 +1238,7 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
       .maybeSingle(),
     supabase
       .from("stores")
-      .select("name, cnpj, cpf")
+      .select("name, razao_social, nome_fantasia, cnpj, cpf")
       .eq("partner_id", partnerId)
       .order("is_headquarters", { ascending: false })
       .limit(1)
@@ -1246,7 +1246,7 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
     supabase
       .from("orders")
       .select(
-        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, partner_id, nfe_number, delivery_address, delivery_breakdown, stores(name), order_items(id, product_id, product_name, quantity, product_price, products(name, product_logistics(weight_gross, weight_net, width, height, length, packaging_type, preparation_days)), services(name))",
+        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, partner_id, nfe_number, delivery_address, delivery_breakdown, stores(name, razao_social, nome_fantasia), order_items(id, product_id, product_name, quantity, product_price, products(name, product_logistics(weight_gross, weight_net, width, height, length, packaging_type, preparation_days)), services(name))",
       )
       .eq("id", orderId)
       .eq("partner_id", partnerId)
@@ -1340,7 +1340,7 @@ async function resolveOriginAddress(
   if (order.store_id) {
     const { data } = await supabase
       .from("stores")
-      .select("cnpj, cpf")
+      .select("name, razao_social, nome_fantasia, cnpj, cpf")
       .eq("id", order.store_id)
       .maybeSingle()
     docRow = data || partner
@@ -1353,8 +1353,23 @@ async function resolveOriginAddress(
     document = (await resolvePlainCpf(docRow.cpf)) || undefined
   }
 
+  const nameCandidates = [
+    order.stores?.name,
+    order.stores?.razao_social,
+    order.stores?.nome_fantasia,
+    docRow?.name,
+    docRow?.razao_social,
+    docRow?.nome_fantasia,
+    partner?.name,
+    partner?.razao_social,
+    partner?.nome_fantasia,
+  ]
+    .map((value) => collapseSpaces(value))
+    .filter((value) => value.length > 0)
+
   return {
-    name: order.stores?.name || partner?.name || "Remetente",
+    name: nameCandidates[0] || "Remetente",
+    nameCandidates,
     address: row.street || "",
     number: row.number || undefined,
     complement: row.complement || undefined,
@@ -1376,7 +1391,7 @@ async function resolveDestinationAddress(
   for (const id of customerIds) {
     const { data } = await supabase
       .from("customers")
-      .select("name, email, phone, cpf, cnpj, person_type")
+      .select("name, razao_social, nome_fantasia, email, phone, cpf, cnpj, person_type, user_id, marketplace_user_id")
       .eq("id", id)
       .maybeSingle()
     if (data) {
@@ -1396,11 +1411,16 @@ async function resolveDestinationAddress(
     }
   }
   let profileFullName: string | undefined
-  if (customerIds.length > 0) {
+  const profileUserIds = Array.from(
+    new Set(
+      [...customerIds, customer?.user_id, customer?.marketplace_user_id].filter(Boolean),
+    ),
+  )
+  if (profileUserIds.length > 0) {
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("user_id, cpf, full_name")
-      .in("user_id", customerIds)
+      .in("user_id", profileUserIds)
       .limit(1)
       .maybeSingle()
     if (profile) {
@@ -1461,7 +1481,13 @@ async function resolveDestinationAddress(
     return null
   }
 
-  const nameCandidates = [customer?.name, order.customer_name, profileFullName]
+  const nameCandidates = [
+    customer?.name,
+    customer?.razao_social,
+    customer?.nome_fantasia,
+    order.customer_name,
+    profileFullName,
+  ]
     .map((value) => collapseSpaces(value))
     .filter((value) => value.length > 0)
 
@@ -1536,14 +1562,14 @@ type ResolvedCompleteName = { ok: true; name: string } | { ok: false; error: str
 
 // A API SuperFrete rejeita nomes com menos de 2 palavras
 // ("O nome do remetente/destinatário deve ser um nome completo").
-// Prefere o primeiro candidato completo; remetente de loja recebe o
-// prefixo oficial "Loja" quando o nome da loja é uma palavra só.
+// Prefere o primeiro candidato completo; quando há apenas uma palavra,
+// aplica o prefixo configurado (ex.: "Loja" para loja, "Cliente" para comprador).
 function resolveCompleteName(
   candidates: Array<unknown>,
   opts: { role: "remetente" | "destinatário"; prefixIfSingle?: string },
 ): ResolvedCompleteName {
   const names = candidates.map(collapseSpaces).filter(Boolean)
-  const full = names.find((name) => countWords(name) >= 2)
+  const full = names.find((name) => countWords(truncateField(name, 50)) >= 2)
   if (full) return { ok: true, name: truncateField(full, 50) }
   const single = names[0]
   if (single && opts.prefixIfSingle) {
@@ -1689,7 +1715,12 @@ export async function createOrderShippingLabelAction(payload: {
   priceMismatch: boolean
   checkoutPrice: number
   labelPrice: number | null
-} | { success: false; error: string; code?: "missing_document" | "missing_nfe" }> {
+} | {
+  success: false
+  error: string
+  code?: "missing_document" | "missing_nfe" | "incomplete_recipient_name"
+  currentRecipientName?: string
+}> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   const user = await requireUser()
   const ctx = await getCurrentPartnerContext()
@@ -1770,15 +1801,23 @@ export async function createOrderShippingLabelAction(payload: {
       }
     }
 
-    const senderName = resolveCompleteName([origin.name], {
+    const senderName = resolveCompleteName(origin.nameCandidates ?? [origin.name], {
       role: "remetente",
       prefixIfSingle: "Loja",
     })
     if (!senderName.ok) return { success: false, error: senderName.error }
     const recipientName = resolveCompleteName(destination.nameCandidates ?? [destination.name], {
       role: "destinatário",
+      prefixIfSingle: "Cliente",
     })
-    if (!recipientName.ok) return { success: false, error: recipientName.error }
+    if (!recipientName.ok) {
+      return {
+        success: false,
+        error: recipientName.error,
+        code: "incomplete_recipient_name",
+        currentRecipientName: destination.name !== "Destinatário" ? destination.name : undefined,
+      }
+    }
 
     const volumes = buildVolumes(config, order)
     const label = await client.createOrder({
@@ -2585,7 +2624,12 @@ export async function createReturnShippingLabelAction(payload: {
     paymentError?: string
     simulated?: boolean
   }
-  | { success: false; error: string }
+  | {
+    success: false
+    error: string
+    code?: "incomplete_sender_name"
+    currentSenderName?: string
+  }
 > {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   const user = await requireUser()
@@ -2626,8 +2670,16 @@ export async function createReturnShippingLabelAction(payload: {
 
     const senderName = resolveCompleteName(buyerAddress.nameCandidates ?? [buyerAddress.name], {
       role: "remetente",
+      prefixIfSingle: "Cliente",
     })
-    if (!senderName.ok) return { success: false, error: senderName.error }
+    if (!senderName.ok) {
+      return {
+        success: false,
+        error: senderName.error,
+        code: "incomplete_sender_name",
+        currentSenderName: buyerAddress.name !== "Destinatário" ? buyerAddress.name : undefined,
+      }
+    }
     const recipientName = resolveCompleteName(storeAddress.nameCandidates ?? [storeAddress.name], {
       role: "destinatário",
       prefixIfSingle: "Loja",
@@ -2857,4 +2909,66 @@ export async function saveOrderRecipientDocumentAction(payload: {
   }
 
   return { success: true, customerId }
+}
+
+export async function saveOrderRecipientNameAction(payload: {
+  partnerId: string
+  orderId: string
+  name: string
+}): Promise<{ success: true; name: string } | { success: false; error: string }> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(payload.partnerId, "orders", "edit", user)
+
+  const normalized = truncateField(collapseSpaces(payload.name), 150)
+  if (countWords(truncateField(normalized, 50)) < 2) {
+    return { success: false, error: "Informe nome e sobrenome (ao menos duas palavras)." }
+  }
+
+  const supabase = getAdminClient()
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, customer_id, buyer_id")
+    .eq("id", payload.orderId)
+    .eq("partner_id", payload.partnerId)
+    .maybeSingle()
+
+  if (!order) {
+    return { success: false, error: "Pedido não encontrado." }
+  }
+
+  const { error: orderErr } = await supabase
+    .from("orders")
+    .update({ customer_name: normalized })
+    .eq("id", payload.orderId)
+    .eq("partner_id", payload.partnerId)
+
+  if (orderErr) {
+    console.error("[SuperFrete] saveOrderRecipientName order update failed:", orderErr.message)
+    return { success: false, error: "Erro ao salvar o nome no pedido." }
+  }
+
+  const candidateIds = [order.buyer_id, order.customer_id].filter(Boolean)
+  for (const id of candidateIds) {
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle()
+    if (customer) {
+      const { error: customerErr } = await supabase
+        .from("customers")
+        .update({ name: normalized })
+        .eq("id", customer.id)
+      if (customerErr) {
+        console.error("[SuperFrete] saveOrderRecipientName customer update failed:", customerErr.message)
+      }
+      break
+    }
+  }
+
+  revalidateOrders(payload.partnerId)
+  return { success: true, name: normalized }
 }

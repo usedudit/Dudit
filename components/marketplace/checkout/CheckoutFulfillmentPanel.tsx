@@ -435,8 +435,8 @@ export function CheckoutFulfillmentPanel({
 
           {/* Entrega própria (frete do vendedor) */}
           {/* Não mostrar "Entrega pelo vendedor" quando há opções de transportadora,
-             pois isso indica que o endereço está fora do raio de entrega do vendedor */}
-          {!isPickup && canShowLocalDelivery && carrierOptions.length === 0 && !carrierQuoteLoading && (
+             ou quando houve erro de cobertura (ex.: endereço fora do raio) */}
+          {!isPickup && canShowLocalDelivery && carrierOptions.length === 0 && !carrierQuoteLoading && !ownDeliveryError && (
             <div className="space-y-4 mt-4">
               <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
                 Entrega pelo vendedor
@@ -452,11 +452,9 @@ export function CheckoutFulfillmentPanel({
                   icon={<TruckIcon className="w-6 h-6 text-brand-green" />}
                   title="Entrega própria"
                   description={
-                    ownDeliveryDistanceKm != null && ownDeliveryDistanceKm > 0
-                      ? estimateAverageDeliveryTime(ownDeliveryDistanceKm) || "Tempo estimado indisponível"
-                      : ownDeliveryBreakdown?.isEstimate
-                        ? "Tempo estimado indisponível"
-                        : "Tempo estimado indisponível"
+                    ownDeliveryDistanceKm != null && ownDeliveryDistanceKm >= 0 && !ownDeliveryBreakdown?.isEstimate
+                      ? estimateAverageDeliveryTime(Math.max(0.5, ownDeliveryDistanceKm)) || "Tempo estimado indisponível"
+                      : "Tempo estimado indisponível"
                   }
                   className="px-4 py-3"
                   right={
@@ -478,9 +476,6 @@ export function CheckoutFulfillmentPanel({
                     </div>
                   }
                 />
-              )}
-              {ownDeliveryError && !ownDeliveryQuoteLoading && (
-                <p className="text-xs text-brand-red">{ownDeliveryError}</p>
               )}
             </div>
           )}
@@ -534,9 +529,6 @@ export function CheckoutFulfillmentPanel({
                   }
                 />
               ))}
-              {carrierError && !carrierQuoteLoading && (
-                <p className="text-xs text-brand-red">{carrierError}</p>
-              )}
             </div>
           )}
         </div>

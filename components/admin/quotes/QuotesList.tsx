@@ -70,6 +70,7 @@ import {
 } from "@/lib/icons"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -157,6 +158,25 @@ export default function QuotesList({
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
+    // ── Local state (declared BEFORE useEntityPage reads it) ─────────────
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
+    const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
+    const [page, setPage] = useState(1)
+    const [modals, setModals] = useState({ filter: false, delete: false })
+    const [selection, setSelection] = useState({ ids: new Set<string>() })
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [quoteToDelete, setQuoteToDelete] = useState<any>(null)
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+    const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
+    const [confirmations, setConfirmations] = useState({ bulkDelete: false })
+    const [printQuoteId, setPrintQuoteId] = useState<string | null>(null)
+    const [showShareModal, setShowShareModal] = useState(false)
+    const [quoteToShare, setQuoteToShare] = useState<Quote | null>(null)
+    const itemsPerPage = 8
+
     const queryKey = useMemo(() => ["admin", "quotes", debouncedSearch, filters.issuePeriod, activeTab] as const, [debouncedSearch, filters.issuePeriod, activeTab])
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -210,9 +230,6 @@ export default function QuotesList({
         currentEntity,
         isLoadingDetail,
         getPrefetchProps,
-        search,
-        setSearch,
-        debouncedSearch,
         afterMutation,
     } = entityPage
 
@@ -281,25 +298,7 @@ export default function QuotesList({
         return activeQuote?.stores || (activeQuote?.store_name ? { id: activeQuote.store_id, name: activeQuote.store_name, partner_id: activePartnerId } : null)
     }, [activeQuote, activePartnerId])
 
-    const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
-    const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
-    const effectiveViewMode = isTablet ? "grid" : viewMode
-    const [page, setPage] = useState(1)
-    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
-
-    const [modals, setModals] = useState({ filter: false, delete: false })
-    const [selection, setSelection] = useState({ ids: new Set<string>() })
-    const [isDeleting, setIsDeleting] = useState(false)
-    const [quoteToDelete, setQuoteToDelete] = useState<any>(null)
-    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
-    const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
-    const [confirmations, setConfirmations] = useState({ bulkDelete: false })
-    const [printQuoteId, setPrintQuoteId] = useState<string | null>(null)
-    const [showShareModal, setShowShareModal] = useState(false)
-    const [quoteToShare, setQuoteToShare] = useState<Quote | null>(null)
-
     const isLoading = isQueryLoading
-    const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })

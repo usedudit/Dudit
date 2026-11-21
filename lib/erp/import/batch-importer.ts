@@ -8,6 +8,18 @@ import { enrichAddressData } from "@/lib/services/location.service"
 import { parseNumber, parseDate, parseTime } from "./validators"
 import { canUseFeature, checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import type { ColumnMapping, FailedRow, ImportOptions, ImportResult, ImportSession } from "./types"
+import {
+  consolidateProductRows,
+  parseProductVariants,
+  normalizePackagingType,
+  normalizeProductType,
+  normalizeUnit,
+  type ParsedVariant,
+  type ConsolidatedProductRow,
+} from "./product-grouper"
+
+export { parseProductVariants }
+export type { ParsedVariant }
 
 const BATCH_SIZE = 250
 
@@ -344,12 +356,12 @@ export async function executeImport(
   }
 
   // Execute in batches
-  for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
-    const batch = mappedRows.slice(i, i + BATCH_SIZE)
-    const rawBatch = rawRowsObjects.slice(i, i + BATCH_SIZE)
-    const startIndex = i
-
-    if (entityType === "products") {
+  if (entityType === "products") {
+    // Consolidate parent-child rows (Tiny ERP, Bling, Shopify, WooCommerce, Nuvemshop)
+    // BEFORE batching so a parent and its variants are never split across batch boundaries.
+    const consolidatedProducts = consolidateProductRows(mappedRows, rawRowsObjects)
+    for (let i = 0; i < consolidatedProducts.length; i += BATCH_SIZE) {
+      const batch = consolidatedProducts.slice(i, i + BATCH_SIZE)
       const result = await importProductBatch(
         // The action already authenticated/authorized the import. Use the
         // service-role client for the multi-table write so team members whose
@@ -359,8 +371,6 @@ export async function executeImport(
         partnerId,
         storeId,
         batch,
-        rawBatch,
-        startIndex,
         supplierCache,
         categoryCache,
         brandCache,
@@ -376,7 +386,17 @@ export async function executeImport(
       warningRows += result.warnings
       failedRows.push(...result.failedRows)
       if (result.errorMessage) errorMessages.push(result.errorMessage)
-    } else if (entityType === "customers") {
+      if (remainingItemsSlots !== null) {
+        remainingItemsSlots = Math.max(0, remainingItemsSlots - result.created)
+      }
+    }
+  } else {
+  for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
+    const batch = mappedRows.slice(i, i + BATCH_SIZE)
+    const rawBatch = rawRowsObjects.slice(i, i + BATCH_SIZE)
+    const startIndex = i
+
+    if (entityType === "customers") {
       const result = await importCustomerBatch(
         admin,
         partnerId,
@@ -441,6 +461,7 @@ export async function executeImport(
       if (result.errorMessage) errorMessages.push(result.errorMessage)
     }
   }
+  }
 
   const durationMs = Date.now() - startTime
 
@@ -459,242 +480,6 @@ export async function executeImport(
 }
 
 /* ========================================================================= */
-/* PRODUCT VARIANTS PARSER & HELPERS                                         */
-/* ========================================================================= */
-
-export interface ParsedVariant {
-  variant_name: string
-  variant_type: string
-  variant_value: string
-  sku: string
-  price_adjustment: number
-  stock_quantity: number
-  is_active: boolean
-  variant_options: any
-}
-
-function formatForVariantSku(text: string): string {
-  if (!text) return ""
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .toUpperCase()
-    .substring(0, 10)
-}
-
-export function parseProductVariants(
-  rawVariants: string | null | undefined,
-  rawVariantType: string | null | undefined,
-  productBase: {
-    sku: string
-    price: number
-    stock_quantity: number
-  },
-): ParsedVariant[] {
-  if (!rawVariants || !rawVariants.trim()) return []
-
-  const trimmedRaw = rawVariants.trim()
-
-  // 1. Split items: primary delimiter is semicolon (;)
-  let items: string[] = []
-  if (trimmedRaw.includes(";")) {
-    items = trimmedRaw.split(";").map((s) => s.trim()).filter(Boolean)
-  } else if (trimmedRaw.includes("\n")) {
-    items = trimmedRaw.split("\n").map((s) => s.trim()).filter(Boolean)
-  } else if (!trimmedRaw.includes("(") && trimmedRaw.includes(",")) {
-    items = trimmedRaw.split(",").map((s) => s.trim()).filter(Boolean)
-  } else {
-    // If parentheses are used with commas, e.g. "P (10), M (20)"
-    items = trimmedRaw.split(/,(?![^(]*\))/).map((s) => s.trim()).filter(Boolean)
-  }
-
-  if (items.length === 0) return []
-
-  // Limit maximum 50 variants per product
-  if (items.length > 50) {
-    items = items.slice(0, 50)
-  }
-
-  let defaultType = rawVariantType?.trim() || ""
-
-  // If no variant type provided, attempt smart inference from items
-  if (!defaultType) {
-    const allValues = items.map((it) => it.split(/[\(\[\:\;\|]/)[0].trim())
-    const hasCombo = allValues.some((v) => v.includes("/"))
-    if (hasCombo) {
-      defaultType = "Opção 1 / Opção 2"
-    } else {
-      const sizePattern = /^(PP|P|M|G|GG|XG|XGG|G1|G2|G3|G4|3[4-9]|4[0-9]|5[0-2]|XXS|XS|S|M|L|XL|XXL|XXXL)$/i
-      const colorPattern = /^(azul|preto|preta|branco|branca|vermelho|vermelha|verde|amarelo|amarela|rosa|cinza|bege|marrom|roxo|roxa|laranja|dourado|dourada|prata|off-white|nude|vinho|bordo|coral|turquesa|lilas|grafite|estampado|estampada)$/i
-
-      const allSizes = allValues.every((v) => sizePattern.test(v))
-      const allColors = allValues.every((v) => colorPattern.test(v))
-
-      if (allSizes) {
-        defaultType = "Tamanho"
-      } else if (allColors) {
-        defaultType = "Cor"
-      } else {
-        defaultType = "Variação"
-      }
-    }
-  }
-
-  if (defaultType.length > 50) {
-    defaultType = defaultType.substring(0, 50)
-  }
-
-  const parsedVariants: ParsedVariant[] = []
-  const usedSkus = new Set<string>()
-
-  for (let idx = 0; idx < items.length; idx++) {
-    const rawItem = items[idx]
-    if (!rawItem) continue
-
-    let variantName = ""
-    let stock = 0
-    let price = productBase.price
-    let customSku: string | null = null
-
-    // Check if parentheses or brackets format: e.g. "P (Estoque: 10, Preço: 49.90, SKU: CAM-P)" or "M [15]"
-    if (rawItem.includes("(") || rawItem.includes("[")) {
-      const parenMatch = rawItem.match(/^([^\(\[]+)(?:[\(\[](.*)[\)\]])?$/)
-      if (parenMatch) {
-        variantName = parenMatch[1].trim()
-        const insideParen = parenMatch[2]?.trim()
-
-        if (insideParen) {
-          const parts = insideParen.split(/[,;]/).map((p) => p.trim()).filter(Boolean)
-          let hasNamedKey = false
-
-          for (const part of parts) {
-            const lowerPart = part.toLowerCase()
-            if (
-              lowerPart.startsWith("est") ||
-              lowerPart.startsWith("qtd") ||
-              lowerPart.startsWith("quant") ||
-              lowerPart.startsWith("stock") ||
-              lowerPart.startsWith("saldo") ||
-              lowerPart.startsWith("qty")
-            ) {
-              const val = parseNumber(part.split(":")[1] || part.replace(/^[a-zA-Z\s]+/g, ""))
-              if (val !== null && val >= 0) stock = Math.floor(val)
-              hasNamedKey = true
-            } else if (
-              lowerPart.startsWith("pre") ||
-              lowerPart.startsWith("val") ||
-              lowerPart.startsWith("price") ||
-              lowerPart.startsWith("pv")
-            ) {
-              const val = parseNumber(part.split(":")[1] || part.replace(/^[a-zA-Z\s]+/g, ""))
-              if (val !== null && val >= 0) price = val
-              hasNamedKey = true
-            } else if (
-              lowerPart.startsWith("sku") ||
-              lowerPart.startsWith("cód") ||
-              lowerPart.startsWith("cod") ||
-              lowerPart.startsWith("ref")
-            ) {
-              const val = part.split(":")[1]?.trim()
-              if (val) customSku = val
-              hasNamedKey = true
-            }
-          }
-
-          // Positional values if no named key-values
-          if (!hasNamedKey) {
-            if (parts.length === 1) {
-              const num = parseNumber(parts[0])
-              if (num !== null && num >= 0) stock = Math.floor(num)
-            } else if (parts.length >= 2) {
-              const n1 = parseNumber(parts[0])
-              const n2 = parseNumber(parts[1])
-              if (n1 !== null && n1 >= 0) stock = Math.floor(n1)
-              if (n2 !== null && n2 >= 0) price = n2
-              if (parts[2]) customSku = parts[2]
-            }
-          }
-        }
-      }
-    } else if (rawItem.includes("|")) {
-      // Pipe format: "P | 10 | 49.90 | CAM-P"
-      const parts = rawItem.split("|").map((p) => p.trim())
-      variantName = parts[0]
-      if (parts[1]) {
-        const n = parseNumber(parts[1])
-        if (n !== null && n >= 0) stock = Math.floor(n)
-      }
-      if (parts[2]) {
-        const p = parseNumber(parts[2])
-        if (p !== null && p >= 0) price = p
-      }
-      if (parts[3]) customSku = parts[3]
-    } else if (rawItem.includes(":")) {
-      // Colon format: "P: 10" or "P: 10: 49.90"
-      const parts = rawItem.split(":").map((p) => p.trim())
-      variantName = parts[0]
-      if (parts[1]) {
-        const n = parseNumber(parts[1])
-        if (n !== null && n >= 0) stock = Math.floor(n)
-      }
-      if (parts[2]) {
-        const p = parseNumber(parts[2])
-        if (p !== null && p >= 0) price = p
-      }
-      if (parts[3]) customSku = parts[3]
-    } else {
-      variantName = rawItem.trim()
-    }
-
-    if (!variantName) continue
-
-    if (variantName.length > 50) {
-      variantName = variantName.substring(0, 50)
-    }
-
-    // Generate or validate SKU
-    let variantSku = customSku ? customSku.trim() : ""
-    if (!variantSku) {
-      const baseSku = productBase.sku || "PRD"
-      const suffix = variantName
-        .split("/")
-        .map((p) => formatForVariantSku(p.trim()))
-        .filter(Boolean)
-        .join("-")
-
-      variantSku = `${baseSku}-${suffix || idx + 1}`
-    }
-
-    if (variantSku.length > 100) {
-      variantSku = variantSku.substring(0, 100)
-    }
-
-    // Ensure unique SKU within batch
-    let uniqueVariantSku = variantSku
-    let counter = 1
-    while (usedSkus.has(uniqueVariantSku.toLowerCase())) {
-      uniqueVariantSku = `${variantSku}-${counter}`
-      counter++
-    }
-    usedSkus.add(uniqueVariantSku.toLowerCase())
-
-    parsedVariants.push({
-      variant_name: variantName,
-      variant_type: defaultType,
-      variant_value: variantName,
-      sku: uniqueVariantSku,
-      price_adjustment: price,
-      stock_quantity: stock,
-      is_active: true,
-      variant_options: null,
-    })
-  }
-
-  return parsedVariants
-}
-
-/* ========================================================================= */
 /* PRODUCTS BATCH IMPORT                                                     */
 /* ========================================================================= */
 
@@ -702,9 +487,7 @@ async function importProductBatch(
   supabase: any,
   partnerId: string,
   storeId: string,
-  batch: Record<string, string>[],
-  rawBatch: Record<string, string>[],
-  startIndex: number,
+  batch: ConsolidatedProductRow[],
   supplierCache: Map<string, string>,
   categoryCache: Map<string, string>,
   brandCache: Map<string, string>,
@@ -730,7 +513,7 @@ async function importProductBatch(
   let errorMessage: string | undefined = undefined
   let newlyInsertedCount = 0
 
-  const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
+  const skus = batch.map((item) => item.row["sku"]?.trim()).filter(Boolean) as string[]
   const existingProductMap = new Map<string, any>()
 
   if (skus.length > 0) {
@@ -745,18 +528,17 @@ async function importProductBatch(
     }
   }
 
-  // A product with variants often has no parent SKU. In that case the
-  // variant SKUs are the only stable identifiers available in an exported
-  // sheet. Resolve them before creating products so re-importing an export
-  // updates the existing product instead of creating a duplicate parent and
-  // then failing on the product_variants.sku unique constraint.
-  const variantSkusByRow = batch.map((row) => {
-    const rawVariants = row["variants"]?.trim()
+  // Resolve existing products by variant SKU for products with variants
+  const variantSkusByRow = batch.map((item) => {
+    if (item.isGroupedParent) {
+      return item.variants.map((variant) => variant.sku.trim()).filter(Boolean)
+    }
+    const rawVariants = item.row["variants"]?.trim()
     if (!rawVariants) return []
-    const parsed = parseProductVariants(rawVariants, row["variant_type"]?.trim(), {
-      sku: row["sku"]?.trim() || generateSKUBase(row["name"]?.trim() || "Produto"),
-      price: parseNumber(row["price"]) ?? 0,
-      stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
+    const parsed = parseProductVariants(rawVariants, item.row["variant_type"]?.trim(), {
+      sku: item.row["sku"]?.trim() || generateSKUBase(item.row["name"]?.trim() || "Produto"),
+      price: parseNumber(item.row["price"]) ?? 0,
+      stock_quantity: parseNumber(item.row["stock_quantity"]) ?? 0,
     })
     return parsed.map((variant) => variant.sku.trim()).filter(Boolean)
   })
@@ -799,9 +581,10 @@ async function importProductBatch(
   const toUpdate: { id: string; data: any; fiscal: any; logistics: any; variants?: ParsedVariant[] }[] = []
 
   for (let i = 0; i < batch.length; i++) {
-    const row = batch[i]
-    const rawRow = rawBatch[i]
-    const rowNum = startIndex + i + 1
+    const item = batch[i]
+    const row = item.row
+    const rawRow = item.rawRow || {}
+    const rowNum = item.primaryRowIndex + 1
 
     let name = row["name"]?.trim() || ""
     if (!name) {
@@ -837,21 +620,29 @@ async function importProductBatch(
       continue
     }
 
-    // Parse product variants if specified
-    const variantsRaw = row["variants"]?.trim()
-    const variantTypeRaw = row["variant_type"]?.trim()
+    // Use consolidated multi-row variants when present; otherwise parse inline variants string
     let parsedVariants: ParsedVariant[] = []
     let hasVariants = false
 
-    if (variantsRaw) {
-      const baseSkuForVariants = row["sku"]?.trim() || generateSKUBase(name)
-      parsedVariants = parseProductVariants(variantsRaw, variantTypeRaw, {
-        sku: baseSkuForVariants,
-        price,
-        stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
-      })
-      if (parsedVariants.length > 0) {
-        hasVariants = true
+    if (item.isGroupedParent && item.variants.length > 0) {
+      parsedVariants = item.variants.map((v) => ({
+        ...v,
+        price_adjustment: v.price_adjustment > 0 ? v.price_adjustment : price!,
+      }))
+      hasVariants = true
+    } else {
+      const variantsRaw = row["variants"]?.trim()
+      const variantTypeRaw = row["variant_type"]?.trim()
+      if (variantsRaw) {
+        const baseSkuForVariants = row["sku"]?.trim() || generateSKUBase(name)
+        parsedVariants = parseProductVariants(variantsRaw, variantTypeRaw, {
+          sku: baseSkuForVariants,
+          price,
+          stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
+        })
+        if (parsedVariants.length > 0) {
+          hasVariants = true
+        }
       }
     }
 
@@ -886,12 +677,12 @@ async function importProductBatch(
       sku: sku || null,
       description: row["description"] || null,
       price,
-      stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
+      stock_quantity: Math.floor(parseNumber(row["stock_quantity"]) ?? 0),
       cost_price: parseNumber(row["cost_price"]),
-      min_stock: parseNumber(row["min_stock"]),
-      unit: row["unit"] || "UN",
+      min_stock: row["min_stock"] ? Math.floor(parseNumber(row["min_stock"]) ?? 0) : null,
+      unit: normalizeUnit(row["unit"]),
       gtin: row["gtin"] || null,
-      product_type: row["product_type"] || "Físico",
+      product_type: normalizeProductType(row["product_type"]),
       condition: row["condition"] || "Novo",
       promotional_price: parseNumber(row["promotional_price"]),
       status,
@@ -951,7 +742,7 @@ async function importProductBatch(
       width: parseNumber(row["width"]) ?? 0,
       height: parseNumber(row["height"]) ?? 0,
       length: parseNumber(row["length"]) ?? 0,
-      packaging_type: row["packaging_type"] || "Pacote/Caixa",
+      packaging_type: normalizePackagingType(row["packaging_type"]),
       preparation_days: parseNumber(row["preparation_days"]) ?? 0,
     }
 

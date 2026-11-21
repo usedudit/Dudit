@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic"
 
 export default async function PartnersPage() {
     const [initialData, initialStats] = await Promise.all([
-        getPartners(null, 50),
+        getPartners(null, 10),
         getAdminPartnerStats(),
     ])
 

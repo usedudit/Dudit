@@ -547,7 +547,7 @@ export function buildSaleReceiptFromOrder(
   },
 ): SaleReceiptData {
   const manualDiscount = Math.max(0, Number(order.discount_value || 0));
-  const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || 0));
+  const couponDiscount = Math.max(0, Number(order.coupon_discount_amount || order.discount_amount || 0));
   const methodDiscount = Math.max(
     0,
     Number(order.payment_method_discount_amount || 0),

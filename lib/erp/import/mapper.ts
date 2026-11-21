@@ -238,6 +238,20 @@ export function suggestMapping(
             confidence = 0.2
             exactness = 0
           }
+          // Tiny ERP / Bling / WooCommerce "Tipo do produto" / "Type" uses structure codes (S, V, K, simple, variable, variation)
+          // rather than Dudit's product nature (Físico, Digital, Serviço). Avoid falsely mapping it to product_type.
+          if (field.name === "product_type") {
+            const erpStructureCodes = new Set([
+              "s", "v", "k", "f", "m", "p",
+              "simple", "variable", "variation", "grouped", "external",
+              "simples", "com variacoes", "variacao", "kit",
+            ])
+            const allAreStructureCodes = sampleValues.every((val) => erpStructureCodes.has(normalize(val)))
+            if (allAreStructureCodes) {
+              confidence = 0.2
+              exactness = 0
+            }
+          }
         }
 
         if (confidence > maxConfidence || (confidence === maxConfidence && exactness > maxExactness)) {
@@ -378,7 +392,7 @@ export function validateMappingCompatibility(
       const fieldDef = fields.find((f) => f.name === m.field)
       const warning = checkTypeMismatch(fieldDef, m.sampleValues)
       if (warning) {
-        warnings.push(`Coluna "${m.header}" $\\rightarrow$ ${fieldDef?.label}: ${warning}`)
+        warnings.push(`Coluna "${m.header}" → ${fieldDef?.label}: ${warning}`)
       }
     }
   }

@@ -319,7 +319,7 @@ export default async function RootLayout({
                     <title>Conta Suspensa</title>
                     <meta name="robots" content="noindex, nofollow" />
                 </head>
-                <body className="font-sans">
+                <body className="font-sans overflow-x-clip">
                     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
                         <PostHogProvider>
                             <SupabaseProvider initialUser={user} initialSessionData={null}>
@@ -349,7 +349,7 @@ export default async function RootLayout({
                 />
             </head>
 
-            <body className="font-sans">
+            <body className="font-sans overflow-x-clip">
                 <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
                     <PostHogProvider>
                         <SupabaseProvider initialUser={user} initialSessionData={null}>

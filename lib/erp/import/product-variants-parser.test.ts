@@ -163,18 +163,19 @@ describe("Product Variants Import Parser", () => {
     expect(variants).toHaveLength(50)
   })
 
-  it("field-registry does not include removed fields in productFields", () => {
+  it("field-registry includes packaging_type, parent_sku and does not include removed fields", () => {
     const fields = getFieldsForEntity("products")
     const names = fields.map((f) => f.name)
 
     expect(names).not.toContain("supplier")
     expect(names).not.toContain("origin")
-    expect(names).not.toContain("packaging_type")
     expect(names).not.toContain("preparation_days")
     expect(names).not.toContain("tags")
     expect(names).not.toContain("category")
     expect(names).not.toContain("subcategory")
 
+    expect(names).toContain("packaging_type")
+    expect(names).toContain("parent_sku")
     expect(names).toContain("variant_type")
     expect(names).toContain("variants")
     expect(names).toContain("gtin")
@@ -350,5 +351,185 @@ describe("Date Parser for Database Import", () => {
     expect(parseDate("data invalida")).toBeNull()
   })
 })
+
+import {
+  consolidateProductRows,
+  detectSpreadsheetSource,
+  normalizePackagingType,
+  normalizeProductType,
+  normalizeUnit,
+  parseKeyValueVariantAttributes,
+} from "./product-grouper"
+import { readSpreadsheet } from "./reader"
+
+describe("Multi-ERP Product Import (Tiny ERP, Bling, Shopify, WooCommerce)", () => {
+  const TINY_CSV = [
+    "ID,Código (SKU),Descrição,Unidade,NCM (Classificação fiscal),Origem,Preço,Valor IPI fixo,Observações,Situação,Estoque,Preço de custo,Cód do fornecedor,Fornecedor,Localização,Estoque máximo,Estoque mínimo,Peso líquido (Kg),Peso bruto (Kg),GTIN/EAN,GTIN/EAN tributável,Descrição complementar,CEST,Código de Enquadramento IPI,Formato embalagem,Largura embalagem,Altura Embalagem,Comprimento embalagem,Diâmetro embalagem,Tipo do produto,URL imagem 1,URL imagem 2,URL imagem 3,URL imagem 4,URL imagem 5,URL imagem 6,Categoria,Código do pai,Variações,Marca,Garantia,Sob encomenda,Preço promocional",
+    ",JOG-IA,Jogo Imagem & Ação Júnior,Un,9503.00.80,0.0,79.99,0.0,,Ativo,10.0,45.35,1020.0,Augusto Brinquedos,Prateleira A,,10.0,0.209,0.348,,,\"Jogo infantil\",,,Pacote / Caixa,12.0,12.0,12.0,12.0,K,,,,,,,Brinquedos > Jogos,,,\u200eGrow,,Sim,66.99",
+    ",CAM-ALGODÃO,Camiseta masculina - Algodão,Un,6109.10.00,0.0,129.9,,,Ativo,200.0,0.0,F-1234,Insider Store,Corredor A,,5.0,0.0,0.0,,,\"Camiseta 100% algodão\",01.003.00,4.0,Pacote / Caixa,15.0,10.0,40.0,10.0,V,,,,,,,Vestuários > Camisetas,,,Insider Store,,Não,",
+    ",CMB-P,Camiseta masculina Branca - Algodão - P,Un,6109.10.01,0.0,129.9,,,Ativo,,,F-1234,Insider Store,Corredor A,,,,,,,\"Camiseta 100% algodão\",01.003.01,4.0,Pacote / Caixa,15.0,10.0,40.0,10.0,S,,,,,,,Vestuários > Camisetas,CAM-ALGODÃO,Cor:Branca||Tamanho:P,Insider Store,,Não,",
+    ",CMB-M,Camiseta masculina Branca - Algodão - M,Un,6109.10.02,0.0,129.9,,,Ativo,100.0,0.0,F-1234,Insider Store,Corredor A,0.0,12.0,0.0,0.0,,,\"Camiseta 100% algodão\",01.003.02,4.0,Pacote / Caixa,15.0,10.0,40.0,10.0,S,,,,,,,Vestuários > Camisetas,CAM-ALGODÃO,Cor:Branca||Tamanho:M,Insider Store,,Não,",
+    ",CMB-G,Camiseta masculina Branca - Algodão - G,Un,6109.10.03,0.0,129.9,,,Ativo,100.0,0.0,F-1234,Insider Store,Corredor A,0.0,12.0,0.0,0.0,,,\"Camiseta 100% algodão\",01.003.03,4.0,Pacote / Caixa,15.0,10.0,40.0,10.0,S,,,,,,,Vestuários > Camisetas,CAM-ALGODÃO,Cor:Branca||Tamanho:G,Insider Store,3.0,Não,",
+    ",CMP-P,Camiseta masculina Preta - Algodão - P,Un,6109.10.04,0.0,129.9,,,Ativo,,,F-1234,Insider Store,Corredor A,,,,,,,\"Camiseta 100% algodão\",01.003.04,4.0,Pacote / Caixa,15.0,10.0,40.0,10.0,S,,,,,,,Vestuários > Camisetas,CAM-ALGODÃO,Cor:Preta||Tamanho:P,Insider Store,,Não,",
+    ",CMP-M,Camiseta masculina Preta - Algodão - M,Un,6109.10.05,0.0,129.9,,,Ativo,,,F-1234,Insider Store,Corredor A,,,,,,,\"Camiseta 100% algodão\",01.003.05,4.0,Pacote / Caixa,15.0,10.0,40.0,10.0,S,,,,,,,Vestuários > Camisetas,CAM-ALGODÃO,Cor:Preta||Tamanho:M,Insider Store,,Não,",
+  ].join("\r\n")
+
+  it("reads, auto-maps, detects Tiny ERP, and consolidates 7 rows into 2 products (1 with 5 variants)", async () => {
+    const buffer = new TextEncoder().encode(TINY_CSV).buffer
+    const readResult = await readSpreadsheet(buffer, "produtos-tiny.csv")
+
+    expect(readResult.totalRows).toBe(7)
+    expect(detectSpreadsheetSource(readResult.headers)).toBe("Tiny ERP")
+
+    // Invisible LRM char in "‎Grow" should be stripped
+    const brandColIdx = readResult.headers.indexOf("Marca")
+    expect(readResult.rows[0][brandColIdx]).toBe("Grow")
+
+    const mappings = suggestMapping(readResult.headers, "products", readResult.rows)
+    const mappedByHeader = new Map(mappings.map((m) => [m.header, m.field]))
+
+    expect(mappedByHeader.get("Código (SKU)")).toBe("sku")
+    expect(mappedByHeader.get("Descrição")).toBe("name")
+    expect(mappedByHeader.get("Descrição complementar")).toBe("description")
+    expect(mappedByHeader.get("Formato embalagem")).toBe("packaging_type")
+    expect(mappedByHeader.get("Código do pai")).toBe("parent_sku")
+    expect(mappedByHeader.get("Variações")).toBe("variants")
+    expect(mappedByHeader.get("Peso líquido (Kg)")).toBe("weight_net")
+    expect(mappedByHeader.get("Peso bruto (Kg)")).toBe("weight_gross")
+    // Tiny's "Tipo do produto" (K, V, S) must NOT falsely map to Dudit's product_type (Físico/Digital/Serviço)
+    expect(mappedByHeader.get("Tipo do produto")).toBeNull()
+
+    const mappedRows = readResult.rows.map((row) => {
+      const obj: Record<string, string> = {}
+      for (const col of mappings) {
+        if (col.field && col.headerIndex < row.length) {
+          const val = row[col.headerIndex]?.trim()
+          if (val) obj[col.field] = val
+        }
+      }
+      return obj
+    })
+
+    const consolidated = consolidateProductRows(mappedRows)
+    expect(consolidated).toHaveLength(2)
+
+    // Product 1: Jogo Imagem & Ação Júnior (no variants)
+    expect(consolidated[0].row.sku).toBe("JOG-IA")
+    expect(consolidated[0].row.name).toBe("Jogo Imagem & Ação Júnior")
+    expect(consolidated[0].variants).toHaveLength(0)
+    expect(consolidated[0].rowIndexes).toEqual([0])
+    expect(normalizePackagingType(consolidated[0].row.packaging_type)).toBe("package")
+
+    // Product 2: Camiseta masculina - Algodão (5 variants consolidated from rows 2..6)
+    expect(consolidated[1].row.sku).toBe("CAM-ALGODÃO")
+    expect(consolidated[1].row.name).toBe("Camiseta masculina - Algodão")
+    expect(consolidated[1].isGroupedParent).toBe(true)
+    expect(consolidated[1].rowIndexes).toEqual([1, 2, 3, 4, 5, 6])
+    expect(consolidated[1].variants).toHaveLength(5)
+    expect(consolidated[1].row.stock_quantity).toBe("200")
+    expect(consolidated[1].variants[0]).toMatchObject({
+      variant_type: "Cor / Tamanho",
+      variant_name: "Branca / P",
+      variant_value: "Branca / P",
+      sku: "CMB-P",
+      price_adjustment: 129.9,
+      stock_quantity: 0,
+      is_active: true,
+    })
+    expect(consolidated[1].variants[1]).toMatchObject({
+      variant_name: "Branca / M",
+      sku: "CMB-M",
+      stock_quantity: 100,
+    })
+    expect(consolidated[1].variants[4]).toMatchObject({
+      variant_name: "Preta / M",
+      sku: "CMP-M",
+      stock_quantity: 0,
+    })
+  })
+
+  it("consolidates Shopify / Nuvemshop Handle-grouped rows with Option1/Option2", () => {
+    const shopifyRows: Record<string, string>[] = [
+      {
+        parent_sku: "camiseta-basica",
+        name: "Camiseta Básica",
+        option1_name: "Cor",
+        option1_value: "Branca",
+        option2_name: "Tamanho",
+        option2_value: "P",
+        sku: "CAM-BR-P",
+        price: "89.90",
+        stock_quantity: "12",
+      },
+      {
+        parent_sku: "camiseta-basica",
+        option1_value: "Branca",
+        option2_value: "M",
+        sku: "CAM-BR-M",
+        price: "89.90",
+        stock_quantity: "8",
+      },
+      {
+        parent_sku: "camiseta-basica",
+        option1_value: "Preta",
+        option2_value: "G",
+        sku: "CAM-PR-G",
+        price: "94.90",
+        stock_quantity: "5",
+      },
+    ]
+
+    const consolidated = consolidateProductRows(shopifyRows)
+    expect(consolidated).toHaveLength(1)
+    expect(consolidated[0].row.name).toBe("Camiseta Básica")
+    expect(consolidated[0].row.stock_quantity).toBe("25")
+    expect(consolidated[0].variants).toHaveLength(3)
+    expect(consolidated[0].variants[0]).toMatchObject({
+      variant_type: "Cor / Tamanho",
+      variant_name: "Branca / P",
+      sku: "CAM-BR-P",
+      stock_quantity: 12,
+      price_adjustment: 89.9,
+    })
+    expect(consolidated[0].variants[2]).toMatchObject({
+      variant_type: "Cor / Tamanho",
+      variant_name: "Preta / G",
+      sku: "CAM-PR-G",
+      stock_quantity: 5,
+      price_adjustment: 94.9,
+    })
+  })
+
+  it("parses Bling and Tiny key-value variant attributes and normalizes packaging/product types/units", () => {
+    expect(parseKeyValueVariantAttributes("Cor:Branca||Tamanho:P")).toEqual({
+      variantType: "Cor / Tamanho",
+      variantName: "Branca / P",
+      attributes: { Cor: "Branca", Tamanho: "P" },
+    })
+    expect(parseKeyValueVariantAttributes("Cor:Azul;Tamanho:42")).toEqual({
+      variantType: "Cor / Tamanho",
+      variantName: "Azul / 42",
+      attributes: { Cor: "Azul", Tamanho: "42" },
+    })
+    // Dudit's inline "Name: Stock" must NOT be mistaken for key-value attributes
+    expect(parseKeyValueVariantAttributes("P: 10")).toBeNull()
+    expect(parseKeyValueVariantAttributes("P: 10: 39.90")).toBeNull()
+
+    expect(normalizePackagingType("Pacote / Caixa")).toBe("package")
+    expect(normalizePackagingType("Cilindro / Rolo")).toBe("cilinder")
+    expect(normalizePackagingType("2")).toBe("cilinder")
+    expect(normalizePackagingType("Envelope")).toBe("envelope")
+    expect(normalizePackagingType("3")).toBe("envelope")
+
+    expect(normalizeProductType("V")).toBe("Físico")
+    expect(normalizeProductType("S")).toBe("Físico")
+    expect(normalizeProductType("Digital")).toBe("Digital")
+    expect(normalizeProductType("Serviço")).toBe("Serviço")
+
+    expect(normalizeUnit("Un")).toBe("UN")
+    expect(normalizeUnit("pç")).toBe("PC")
+  })
+})
+
 
 

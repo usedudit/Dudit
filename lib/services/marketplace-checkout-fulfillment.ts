@@ -1459,6 +1459,17 @@ export async function fulfillMarketplaceOrder(
       await onMarketplaceOrderPaid(supabase, orderId)
     }
 
+    // Exporta pedido de checkout para o Tiny ERP (idempotente e não-bloqueante)
+    if (paymentConfirmed) {
+      import("@/lib/services/integrations/tiny/tiny-integration")
+        .then(({ exportDuditOrderToTiny }) => {
+          exportDuditOrderToTiny(orderId).catch((tinyErr) => {
+            console.error("[fulfillMarketplaceOrder] Tiny export failed:", tinyErr)
+          })
+        })
+        .catch(() => {})
+    }
+
     return { success: true, result }
   } catch (e: unknown) {
     const message = describeFulfillmentError(e)

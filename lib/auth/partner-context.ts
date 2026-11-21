@@ -165,12 +165,17 @@ export async function getActiveStoreId(): Promise<string | null> {
 
 import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
 import { normalizePermissions, mergePermissionsWithRole } from "@/lib/permissions/rbac-normalize"
+import {
+    clearExpiredEnforcementsForUserPartners,
+    isEnforcementExpired,
+} from "@/lib/services/enforcement-expiration.service"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
 
 const fetchUserAccessStatic = (userId: string) => unstable_cache(
     async (): Promise<PartnerAccessRecord[]> => {
         const admin = createAdminClient()
+        await clearExpiredEnforcementsForUserPartners(userId, admin, new Date(), { skipRevalidate: true })
         const template = await getPermissionTemplate()
 
         const [ownedPartnersRes, invitedRowsRes] = await Promise.all([
@@ -354,6 +359,7 @@ export const getUserPartnerCount = cache(async (): Promise<number> => {
 const getCachedUserStoreAccess = (userId: string) => unstable_cache(
     async () => {
         const admin = createAdminClient()
+        await clearExpiredEnforcementsForUserPartners(userId, admin, new Date(), { skipRevalidate: true })
         const template = await getPermissionTemplate()
 
         // Get all partner_ids the user has access to (owned + invited)
@@ -736,6 +742,7 @@ export interface SuspendedStoreRecord {
 const fetchUserSuspendedAccessStatic = (userId: string) => unstable_cache(
     async (): Promise<SuspendedStoreRecord[]> => {
         const admin = createAdminClient()
+        await clearExpiredEnforcementsForUserPartners(userId, admin, new Date(), { skipRevalidate: true })
 
         // 1. Get all partner ids the user owns or belongs to
         const [ownedPartnersRes, invitedRowsRes] = await Promise.all([
@@ -869,5 +876,9 @@ export const getUserSuspendedAccess = cache(async (userId?: string): Promise<Sus
     if (!user) return []
 
     const records = await fetchUserSuspendedAccessStatic(user.id)()
+    if (records.some((r) => isEnforcementExpired(r.suspendedUntil))) {
+        await clearExpiredEnforcementsForUserPartners(user.id)
+        return records.filter((r) => !isEnforcementExpired(r.suspendedUntil))
+    }
     return records
 })

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic"
 
 export default async function AdminReturnsPage() {
     const [initialData, initialStats] = await Promise.all([
-        getAdminReturnRequests(null, 50),
+        getAdminReturnRequests(null, 10),
         getAdminReturnRequestsStats(),
     ])
 

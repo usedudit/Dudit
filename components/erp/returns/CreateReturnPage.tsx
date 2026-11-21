@@ -31,7 +31,7 @@ import {
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon, StoreIcon, ReturnIcon, ThreeDotsIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, XIcon, PrinterIcon, TruckIcon, StoreIcon, ReturnIcon, ThreeDotsIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction, saveReturnEvidenceAction } from "@/app/actions/erp/returns"
 import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
@@ -44,7 +44,7 @@ import { ReturnHistoryTab } from "./ReturnHistoryTab"
 import { getReturnStatusMeta } from "./ReturnListRow"
 import { usePickerBucket, useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
 import { ProductSearchResultItem } from "@/components/erp/shared/ProductSearchResultItem"
-import { getDeliveryStatusIcon, getPaymentStatusMeta } from "@/lib/orders/status"
+import { getDeliveryStatusIcon, getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
 import { getOrderDeliveryBadgeMeta } from "@/lib/orders/delivery-badge"
 import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId } from "@/lib/finance-utils"
 import { usePermissions } from "@/lib/permission-context"
@@ -61,6 +61,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import ReturnPrintModal from "./ReturnPrintModal"
+import { RecipientNameModal } from "@/components/erp/orders/RecipientNameModal"
 
 const mapPaymentMethodToPt = (method: string): string => {
     const m = String(method || "").toLowerCase().trim();
@@ -328,7 +329,8 @@ export default function CreateReturnPage({
     const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
     const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: { name: string }; callback?: () => void } | null>(null)
     const [exchangeBalanceResolution, setExchangeBalanceResolution] = useState<"store_credit" | "refund">("store_credit")
-    const [exchangeStatus, setExchangeStatus] = useState("pending")
+    const [exchangeDeliveryType, setExchangeDeliveryType] = useState<"delivery" | "pickup">("delivery")
+    const [exchangeDeliveryStatus, setExchangeDeliveryStatus] = useState<"not_sent" | "preparing" | "sent" | "pickup_available" | "delivered">("not_sent")
     const [pendingSaveData, setPendingSaveData] = useState<(Partial<ReturnRequest> & Record<string, any>) | null>(null)
     const [isInventoryRestoreModalOpen, setIsInventoryRestoreModalOpen] = useState(false)
     const [inventoryRestoreQuantities, setInventoryRestoreQuantities] = useState<Record<string, number>>({})
@@ -353,6 +355,8 @@ export default function CreateReturnPage({
     const [isUploading, setIsUploading] = useState(false)
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
+    const [isSenderNameModalOpen, setIsSenderNameModalOpen] = useState(false)
+    const [incompleteSenderName, setIncompleteSenderName] = useState<string | undefined>(undefined)
     const [financeAccountId, setFinanceAccountId] = useState<string>("")
     const [financeAccounts, setFinanceAccounts] = useState<{ id: string; name: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[]>([])
 
@@ -456,37 +460,66 @@ export default function CreateReturnPage({
         }
     }, [mode, returnRequest?.id, partnerId, adminContext])
 
+    // Sync default exchange delivery type when selecting an order in create mode
+    useEffect(() => {
+        if (mode === "create" && selectedOrder?.delivery_type) {
+            const dt = String(selectedOrder.delivery_type).toLowerCase()
+            setExchangeDeliveryType(dt === "pickup" ? "pickup" : "delivery")
+        }
+    }, [mode, selectedOrder?.delivery_type])
+
+    const exchangeDeliveryStatusOptions = useMemo(() => {
+        if (exchangeDeliveryType === "pickup") {
+            return [
+                { value: "not_sent", label: "Não preparado" },
+                { value: "preparing", label: "Em preparação" },
+                { value: "pickup_available", label: "Pronto para retirada" },
+                { value: "delivered", label: "Retirado" },
+            ]
+        }
+        return [
+            { value: "not_sent", label: "Não enviado" },
+            { value: "preparing", label: "Em preparação" },
+            { value: "sent", label: "Enviado" },
+            { value: "delivered", label: "Entregue" },
+        ]
+    }, [exchangeDeliveryType])
+
     // Load existing return data for edit/view modes
     useEffect(() => {
-        if ((mode === "edit" || mode === "view") && returnRequest) {
+        const sourceRequest = (rawReturnRequestData && returnRequest && rawReturnRequestData.id === returnRequest.id)
+            ? { ...returnRequest, ...rawReturnRequestData }
+            : returnRequest
+
+        if ((mode === "edit" || mode === "view") && sourceRequest) {
             // Setup order info mock
             setSelectedOrder({
-                id: returnRequest.orderId,
-                displayId: returnRequest.orderNumber,
-                order_number: returnRequest.orderNumber,
-                customer_name: returnRequest.customerName,
+                id: sourceRequest.orderId,
+                displayId: sourceRequest.orderNumber,
+                order_number: sourceRequest.orderNumber,
+                customer_name: sourceRequest.customerName,
                 customer: {
-                    name: returnRequest.customerName,
-                    email: returnRequest.customerEmail || "",
-                    phone: returnRequest.customerPhone || "",
-                    addresses: returnRequest.customerAddress ? [{ street: returnRequest.customerAddress }] : []
+                    name: sourceRequest.customerName,
+                    email: sourceRequest.customerEmail || "",
+                    phone: sourceRequest.customerPhone || "",
+                    addresses: sourceRequest.customerAddress ? [{ street: sourceRequest.customerAddress }] : []
                 },
-                delivery_address: returnRequest.customerAddress,
-                orderDate: returnRequest.createdAt,
-                status: returnRequest.orderStatus || "paid",
-                deliveryStatus: returnRequest.deliveryStatus || "delivered",
-                delivery_status: returnRequest.deliveryStatus || "delivered",
-                delivery_type: returnRequest.deliveryType || "delivery",
-                situation: returnRequest.orderStatus || "paid",
-                totalAmount: returnRequest.orderTotal || returnRequest.orderPaidAmount || 0,
-                payment_provider: returnRequest.paymentProvider,
-                paymentProvider: returnRequest.paymentProvider,
-                mp_payment_id: returnRequest.mpPaymentId,
-                mpPaymentId: returnRequest.mpPaymentId,
+                delivery_address: sourceRequest.customerAddress,
+                orderDate: sourceRequest.createdAt,
+                status: sourceRequest.orderStatus || "paid",
+                deliveryStatus: sourceRequest.deliveryStatus || "delivered",
+                delivery_status: sourceRequest.deliveryStatus || "delivered",
+                delivery_type: sourceRequest.deliveryType || "delivery",
+                situation: sourceRequest.orderStatus || "paid",
+                totalAmount: sourceRequest.orderTotal || sourceRequest.orderPaidAmount || 0,
+                payment_provider: sourceRequest.paymentProvider,
+                paymentProvider: sourceRequest.paymentProvider,
+                mp_payment_id: sourceRequest.mpPaymentId,
+                mpPaymentId: sourceRequest.mpPaymentId,
             })
 
             // Setup items checklist - use orderedQuantity for max if available
-            const items = returnRequest.items.map(item => ({
+            const items = (sourceRequest.items || []).map((item: any) => ({
                 id: item.id,
                 orderItemId: item.orderItemId || item.id,
                 productId: item.productId || "",
@@ -504,7 +537,7 @@ export default function CreateReturnPage({
             setReturnItems(items)
 
             const itemsTotal = calculateReturnNetTotal(
-                items.map(item => ({
+                items.map((item: any) => ({
                     netItemValue: item.netItemValue,
                     price: item.price,
                     quantity: item.quantity,
@@ -513,30 +546,41 @@ export default function CreateReturnPage({
             )
 
             // Setup exchange items from snapshot
-            if (returnRequest.exchangeItemsSnapshot && returnRequest.exchangeItemsSnapshot.length > 0) {
-                // Proactively load product bucket to enrich exchange item names
-                productBucket.loadBucket()
+            if (sourceRequest.exchangeItemsSnapshot && sourceRequest.exchangeItemsSnapshot.length > 0) {
+                const needsProductEnrichment = sourceRequest.exchangeItemsSnapshot.some((ei: any) => !ei.product_name)
+                if (needsProductEnrichment && productBucket.bucket.length === 0) {
+                    productBucket.loadBucket()
+                }
 
-                const snapItems: ReplacementItemState[] = returnRequest.exchangeItemsSnapshot.map((ei: any) => ({
+                const snapItems: ReplacementItemState[] = sourceRequest.exchangeItemsSnapshot.map((ei: any) => ({
                     product: {
                         id: ei.product_id,
                         name: ei.product_name || "",
                         sku: ei.sku || "",
                         gtin: null,
-                        price: ei.unit_price || 0,
+                        price: Number(ei.unit_price || 0),
                         stock: 0,
                         allow_sell_without_stock: false,
-                        image: null,
+                        image: ei.image || null,
                         has_variants: false,
                     },
-                    quantity: ei.quantity || 1,
+                    quantity: Number(ei.quantity || 1),
                 }))
-                // Try to enrich with product names from the bucket
+                // Enrich missing metadata from product bucket while preserving snapshot unit_price
                 if (productBucket.bucket.length > 0) {
                     const enriched = snapItems.map((si) => {
                         const found = productBucket.bucket.find((p) => p.id === si.product.id)
                         if (found) {
-                            return { ...si, product: { ...found } }
+                            return {
+                                ...si,
+                                product: {
+                                    ...found,
+                                    price: si.product.price > 0 ? si.product.price : found.price,
+                                    name: si.product.name || found.name,
+                                    sku: si.product.sku || found.sku,
+                                    image: si.product.image || found.image,
+                                },
+                            }
                         }
                         return si
                     })
@@ -544,27 +588,40 @@ export default function CreateReturnPage({
                 } else {
                     setReplacementItems(snapItems)
                 }
+            } else {
+                setReplacementItems([])
             }
 
             // Setup details
-            setReturnDate(new Date(returnRequest.returnDate || returnRequest.createdAt))
-            setReturnStatus(returnRequest.status)
-            setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
+            setReturnDate(new Date(sourceRequest.returnDate || sourceRequest.createdAt))
+            setReturnStatus(sourceRequest.status)
+            setResolutionType((sourceRequest.approvedResolution || sourceRequest.desiredResolution || "refund") as any)
 
-            const isCancellation = returnRequest.requestType === "cancellation" || (returnRequest as any).request_type === "cancellation"
-            const loadedRefundValue = returnRequest.refundValue || (rawReturnRequestData?.return_refunds && rawReturnRequestData.return_refunds[0]?.amount ? Number(rawReturnRequestData.return_refunds[0].amount) : 0) || (returnRequest.desiredResolution === "refund" || returnRequest.approvedResolution === "refund" ? itemsTotal : 0)
-            const isFullRefund = isCancellation || returnRequest.refundType === "full" || (loadedRefundValue > 0 && returnRequest.orderPaidAmount && Math.abs(loadedRefundValue - returnRequest.orderPaidAmount) < 0.01)
+            const isCancellation = sourceRequest.requestType === "cancellation" || (sourceRequest as any).request_type === "cancellation"
+            const loadedRefundValue = sourceRequest.refundValue || (rawReturnRequestData?.return_refunds && rawReturnRequestData.return_refunds[0]?.amount ? Number(rawReturnRequestData.return_refunds[0].amount) : 0) || (sourceRequest.desiredResolution === "refund" || sourceRequest.approvedResolution === "refund" ? itemsTotal : 0)
+            const isFullRefund = isCancellation || sourceRequest.refundType === "full" || (loadedRefundValue > 0 && sourceRequest.orderPaidAmount && Math.abs(loadedRefundValue - sourceRequest.orderPaidAmount) < 0.01)
 
-            setRefundType(isCancellation ? "full" : (returnRequest.refundType || (isFullRefund ? "full" : (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))))
-            setRefundValue(isCancellation ? (returnRequest.orderPaidAmount || loadedRefundValue) : loadedRefundValue)
-            setRefundPaymentMethod(normalizeRefundMethod(returnRequest.refundPaymentMethod))
-            setCreditValue(returnRequest.storeCreditValue || (returnRequest.desiredResolution === "store_credit" ? itemsTotal : 0))
-            setExchangeStatus(returnRequest.exchangeSubstatus || "pending")
-            setExchangeBalanceResolution(returnRequest.exchangeBalanceResolution || "store_credit")
-            setReplacementProduct((returnRequest as any).replacementProduct || "")
-            setObservations(returnRequest.sellerNotes || "")
+            setRefundType(isCancellation ? "full" : (sourceRequest.refundType || (isFullRefund ? "full" : (sourceRequest.desiredResolution === "store_credit" ? "store_credit" : sourceRequest.desiredResolution === "refund" ? "partial" : "none"))))
+            setRefundValue(isCancellation ? (sourceRequest.orderPaidAmount || loadedRefundValue) : loadedRefundValue)
+            setRefundPaymentMethod(normalizeRefundMethod(sourceRequest.refundPaymentMethod))
+            setCreditValue(sourceRequest.storeCreditValue || (sourceRequest.desiredResolution === "store_credit" ? itemsTotal : 0))
+            const resolvedExDeliveryType = String(sourceRequest.exchangeOrderDeliveryType || sourceRequest.deliveryType || "delivery").toLowerCase()
+            setExchangeDeliveryType(resolvedExDeliveryType === "pickup" ? "pickup" : "delivery")
+            const rawExDeliveryStatus = String(sourceRequest.exchangeOrderDeliveryStatus || "").toLowerCase()
+            if (["not_sent", "preparing", "sent", "pickup_available", "delivered"].includes(rawExDeliveryStatus)) {
+                setExchangeDeliveryStatus(rawExDeliveryStatus as any)
+            } else {
+                const sub = String(sourceRequest.exchangeSubstatus || "").toLowerCase()
+                if (sub === "entregue" || sub === "concluido" || sub === "completed") setExchangeDeliveryStatus("delivered")
+                else if (sub === "enviado" || sub === "sent") setExchangeDeliveryStatus("sent")
+                else if (sub === "separando" || sub === "reserved") setExchangeDeliveryStatus("preparing")
+                else setExchangeDeliveryStatus("not_sent")
+            }
+            setExchangeBalanceResolution(sourceRequest.exchangeBalanceResolution || "store_credit")
+            setReplacementProduct((sourceRequest as any).replacementProduct || "")
+            setObservations(sourceRequest.sellerNotes || "")
         }
-    }, [mode, returnRequest, productBucket.bucket])
+    }, [mode, returnRequest, rawReturnRequestData, productBucket.bucket])
 
     // Load reverse logistics label state (SuperFrete) for this return
     useEffect(() => {
@@ -638,7 +695,14 @@ export default function CreateReturnPage({
                 service: selectedReturnService != null ? (selectedReturnService as SuperFreteServiceId) : undefined,
                 freightPayer: returnFreightPayer,
             })
-            if (!res.success) throw new Error(res.error)
+            if (!res.success) {
+                if (res.code === "incomplete_sender_name" && returnRequest.orderId) {
+                    setIncompleteSenderName(res.currentSenderName)
+                    setIsSenderNameModalOpen(true)
+                    return
+                }
+                throw new Error(res.error)
+            }
             const state = await getReturnShippingStateAction({ returnRequestId: returnRequest.id })
             if (state.success) {
                 setReturnShipping(state.shipment)
@@ -1124,7 +1188,8 @@ export default function CreateReturnPage({
                 accountId: financeAccountId || null,
                 storeCreditValue: creditValue,
                 replacementProduct,
-                exchangeStatus,
+                exchangeDeliveryType,
+                exchangeDeliveryStatus,
                 exchangeItems: replacementItems.map(item => ({
                     product_id: item.product.id,
                     variant_id: null,
@@ -1132,6 +1197,7 @@ export default function CreateReturnPage({
                     unit_price: Number(item.product.price || 0),
                     product_name: item.product.name || "",
                     sku: item.product.sku || "",
+                    image: item.product.image || null,
                 })),
                 exchangeBalanceResolution: (resolutionType === "exchange" && exchangeSurplus > 0) ? exchangeBalanceResolution : null,
                 returnDate: returnDate.toISOString(),
@@ -1802,6 +1868,62 @@ export default function CreateReturnPage({
                                                     )}
                                                 </FormSection>
                                             )}
+                                            {/* Replacement Products (View Only for Exchange) */}
+                                            {isViewOnly && resolutionType === "exchange" && replacementItems.length > 0 && (
+                                                <FormSection
+                                                    hasSeparator
+                                                    title={
+                                                        rawReturnRequestData?.exchangeOrderNumber
+                                                            ? `Produtos Substitutos (Pedido ${rawReturnRequestData.exchangeOrderNumber})`
+                                                            : "Produtos Substitutos"
+                                                    }
+                                                >
+                                                    <div className="flex flex-col gap-6">
+                                                        {replacementItems.map((item, idx) => {
+                                                            const unitPrice = Number(item.product.price || 0)
+                                                            const lineTotal = unitPrice * Number(item.quantity || 1)
+                                                            const imgUrl = item.product.image ? getR2ImageUrl(item.product.image, "thumb") : ""
+                                                            return (
+                                                                <div key={`${item.product.id}-${idx}`} className="flex items-start gap-4">
+                                                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                        <img
+                                                                            src={imgUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                            className="w-full h-full object-cover rounded-full"
+                                                                            alt={item.product.name || "Produto substituto"}
+                                                                            onError={(e: any) => {
+                                                                                e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex justify-between items-start mb-1 gap-3">
+                                                                            <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                {item.product.name || "Produto substituto"}
+                                                                            </h4>
+                                                                            <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                                                {formatCurrency(lineTotal)}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">
+                                                                            SKU: {item.product.sku || "Sem SKU"}
+                                                                        </div>
+                                                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                            <span>
+                                                                                Quantidade: <strong className="text-brand-dark dark:text-dark-heading">{item.quantity}</strong> un.
+                                                                            </span>
+                                                                            <span>•</span>
+                                                                            <span>
+                                                                                Preço unitário: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(unitPrice)}</strong>
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </FormSection>
+                                            )}
+
                                             {/* Refund/Exchange status details */}
                                             {(returnRequest || selectedOrder) && (
                                                 <FormSection hasSeparator title="Resolução da devolução">
@@ -1882,27 +2004,30 @@ export default function CreateReturnPage({
 
                                                             {resolutionType === "exchange" && (
                                                                 <>
-                                                                    {replacementItems.length > 0 && (
+                                                                    {rawReturnRequestData?.exchangeOrderNumber && (
                                                                         <PaymentRow
-                                                                            label="Produtos substitutos"
-                                                                            value={
-                                                                                <div className="flex flex-col gap-1 items-end font-normal text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                                    {replacementItems.map((item, idx) => (
-                                                                                        <span key={idx}>
-                                                                                            <strong className="text-brand-dark dark:text-dark-heading font-medium">{item.product.name}</strong> ({item.quantity}x {formatCurrency(item.product.price || 0)})
-                                                                                        </span>
-                                                                                    ))}
-                                                                                </div>
-                                                                            }
+                                                                            label="Pedido de troca"
+                                                                            value={rawReturnRequestData.exchangeOrderNumber}
                                                                         />
                                                                     )}
                                                                     <PaymentRow
-                                                                        label="Status da troca"
-                                                                        value={
-                                                                            exchangeStatus === "pending" ? "Pendente" :
-                                                                                exchangeStatus === "reserved" ? "Reservado" :
-                                                                                    exchangeStatus === "sent" ? "Enviado" : "Concluído"
-                                                                        }
+                                                                        label="Tipo de entrega"
+                                                                        value={getFulfillmentModeLabel(
+                                                                            rawReturnRequestData?.exchangeOrderDeliveryType || exchangeDeliveryType
+                                                                        )}
+                                                                    />
+                                                                    <PaymentRow
+                                                                        label="Status da entrega"
+                                                                        value={(() => {
+                                                                            const effectiveType = rawReturnRequestData?.exchangeOrderDeliveryType || exchangeDeliveryType
+                                                                            const effectiveStatus = rawReturnRequestData?.exchangeOrderDeliveryStatus || exchangeDeliveryStatus
+                                                                            const meta = getDeliveryStatusMeta(effectiveStatus)
+                                                                            return (
+                                                                                <Badge variant={meta.variant}>
+                                                                                    {getDeliveryStatusLabelForType(effectiveStatus, effectiveType)}
+                                                                                </Badge>
+                                                                            )
+                                                                        })()}
                                                                     />
                                                                     <PaymentRow label="Total dos substitutos" value={formatCurrency(replacementTotal)} />
                                                                     <PaymentRow label="Crédito disponível" value={formatCurrency(calculatedRefundValue)} />
@@ -2045,16 +2170,30 @@ export default function CreateReturnPage({
                                                             {resolutionType === "exchange" && (
                                                                 <>
                                                                     <FormDropdown
-                                                                        label="Status da troca"
+                                                                        label="Tipo de entrega"
                                                                         disabled={isViewOnly}
-                                                                        value={exchangeStatus}
-                                                                        setValue={setExchangeStatus}
+                                                                        value={exchangeDeliveryType}
+                                                                        setValue={(val) => {
+                                                                            const nextType = val === "pickup" ? "pickup" : "delivery"
+                                                                            setExchangeDeliveryType(nextType)
+                                                                            if (nextType === "pickup" && exchangeDeliveryStatus === "sent") {
+                                                                                setExchangeDeliveryStatus("pickup_available")
+                                                                            } else if (nextType === "delivery" && exchangeDeliveryStatus === "pickup_available") {
+                                                                                setExchangeDeliveryStatus("sent")
+                                                                            }
+                                                                        }}
                                                                         options={[
-                                                                            { value: "pending", label: "Pendente" },
-                                                                            { value: "reserved", label: "Reservado" },
-                                                                            { value: "sent", label: "Enviado" },
-                                                                            { value: "completed", label: "Concluído" }
+                                                                            { value: "delivery", label: "Entrega" },
+                                                                            { value: "pickup", label: "Retirada na loja" },
                                                                         ]}
+                                                                    />
+
+                                                                    <FormDropdown
+                                                                        label="Status da entrega"
+                                                                        disabled={isViewOnly}
+                                                                        value={exchangeDeliveryStatus}
+                                                                        setValue={(val) => setExchangeDeliveryStatus(val as any)}
+                                                                        options={exchangeDeliveryStatusOptions}
                                                                     />
 
                                                                     <div ref={replacementSearchRef} className="relative md:col-span-2">
@@ -2802,6 +2941,18 @@ export default function CreateReturnPage({
                     onClose={() => setIsPrintModalOpen(false)}
                     returnId={returnRequest.id}
                     partnerId={partnerId}
+                />
+            )}
+
+            {returnRequest?.orderId && (
+                <RecipientNameModal
+                    isOpen={isSenderNameModalOpen}
+                    onClose={() => setIsSenderNameModalOpen(false)}
+                    partnerId={partnerId}
+                    orderId={returnRequest.orderId}
+                    initialName={incompleteSenderName}
+                    role="remetente"
+                    onSaved={handleGenerateReturnLabel}
                 />
             )}
         </FadeIn >

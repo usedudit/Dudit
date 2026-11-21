@@ -1281,21 +1281,6 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode, onSaveOverride }:
                 <div className="lg:hidden flex flex-col h-full w-full overflow-hidden">
                     {/* Top Header & Tabs for Mobile/Tablet */}
                     <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border px-4 pt-3 pb-0">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                                <div className="min-w-0">
-                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 truncate">
-                                        <span className="truncate">{pageTitle}</span>
-                                        {mode === "edit" && (
-                                            <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
-                                        )}
-                                    </h1>
-                                </div>
-                            </div>
-                        </div>
                         <div>
                             <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 overflow-x-auto custom-scrollbar">
                                 <TabsTrigger value="Dados Gerais">

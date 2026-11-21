@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import UserEnforcementListRow from "./UserEnforcementListRow"
@@ -8,7 +8,7 @@ import UserEnforcementPageControls from "./UserEnforcementPageControls"
 import AdminUserDetailView from "./AdminUserDetailView"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { UserIcon, StoreIcon, ExportFileIcon } from "@/lib/icons"
+import { UserIcon, StoreIcon, ExportFileIcon, FilterIcon } from "@/lib/icons"
 import type { EnforcementUser, CursorPaginatedResult } from "@/lib/admin/types"
 import { getUsers, banUser, unbanUser, getAdminUserStats, type AdminUserStats } from "@/app/actions/admin/enforcement"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -16,6 +16,8 @@ import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import {
     EMPTY_DATE_PERIOD,
     isDatePeriodFilterActive,
@@ -52,7 +54,10 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         direction: "desc",
     })
 
-    // Filters
+    // Local search state - DECLARED BEFORE useEntityPage
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+
+    // Filters - DECLARED BEFORE useEntityPage
     const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
@@ -67,8 +72,17 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         initialNextCursor: initialData?.nextCursor || null,
         initialHasMore: initialData?.hasMore || false,
         skipInitialData: !isDefaultView,
+        search: debouncedSearch,
+        setSearch,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getUsers(cursor, 100, debouncedSearch || undefined, statusTab === "all" ? undefined : statusTab)
+            const res = await getUsers(
+                cursor,
+                100,
+                debouncedSearch || undefined,
+                statusTab === "all" ? undefined : statusTab,
+                filters.datePeriod.from || undefined,
+                filters.datePeriod.to || undefined,
+            )
             return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((u: any) => String(u?.user_id || ""), []),
@@ -87,11 +101,11 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         entityState: epEntityState,
         openEntity: epOpenEntity,
         closeEntity: epCloseEntity,
-        search,
-        setSearch,
-        debouncedSearch,
         afterMutation,
     } = entityPage
+
+    // Filter Sheet state
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -149,21 +163,11 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         }
     }
 
-    // Reset to page 1 on filter/tab/search change
+    // Pagination - DECLARED BEFORE useEffect
+    const [page, setPage] = useState(1)
     useEffect(() => {
         setPage(1)
     }, [statusTab, debouncedSearch, filters.datePeriod])
-
-    // If viewing detail of a specific user via URL (?view=id)
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        return (
-            <AdminUserDetailView
-                userId={entityState.entityId}
-                onBack={closeEntity}
-                onUserUpdated={handleMutation}
-            />
-        )
-    }
 
     // In-memory sorting (search and status are done server-side)
     const sortedUsers = useMemo(() => {
@@ -211,7 +215,16 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         return sortedUsers.slice(start, start + ITEMS_PER_PAGE)
     }, [sortedUsers, page])
 
-    const [page, setPage] = useState(1)
+    // If viewing detail of a specific user via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        return (
+            <AdminUserDetailView
+                userId={entityState.entityId}
+                onBack={closeEntity}
+                onUserUpdated={handleMutation}
+            />
+        )
+    }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

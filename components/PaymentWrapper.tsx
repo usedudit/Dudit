@@ -61,6 +61,8 @@ interface PixPaymentWrapperProps {
         couponDiscount?: number
         deliveryFee?: number
         storeId?: string | null
+        useStoreCredit?: boolean
+        appliedStoreCredit?: number
         checkoutPricing?: {
             subtotal: number
             couponDiscount: number
@@ -395,6 +397,7 @@ export function PaymentWrapper({
                         cartItemIds: orderDetails.cartItemIds,
                         payDepositOnly,
                         storeId: orderDetails.storeId || undefined,
+                        useStoreCredit: Boolean(orderDetails.useStoreCredit),
                         checkoutPricing: orderDetails.checkoutPricing,
                         existingOrderId: resolvedExistingOrderId,
                     },
@@ -571,6 +574,7 @@ export function PaymentWrapper({
                     deliveryFee: orderDetails.deliveryFee,
                     payDepositOnly,
                     storeId: orderDetails.storeId || undefined,
+                    useStoreCredit: Boolean(orderDetails.useStoreCredit),
                     checkoutPricing: orderDetails.checkoutPricing,
                     existingOrderId: resolvedExistingOrderId,
                 },

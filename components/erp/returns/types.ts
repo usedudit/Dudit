@@ -35,6 +35,9 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
   items: any[]
   returnEvents?: ReturnEvent[]
   exchangeOrderId?: string | null
+  exchangeOrderNumber?: string | null
+  exchangeOrderDeliveryStatus?: string | null
+  exchangeOrderDeliveryType?: string | null
   exchangeSubstatus?: string | null
   exchangeShortfallAmount?: number
   exchangeSurplusAmount?: number
@@ -43,6 +46,9 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
     variant_id?: string | null
     quantity: number
     unit_price: number
+    product_name?: string | null
+    sku?: string | null
+    image?: string | null
   }> | null
   exchangeBalanceResolution?: "store_credit" | "refund" | null
   /** Nome da loja/vendedor (usado apenas no painel admin). */

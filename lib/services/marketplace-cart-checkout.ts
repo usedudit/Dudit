@@ -85,12 +85,12 @@ export async function priceMarketplaceCartCheckout(
     .eq("user_id", params.userId)
     .limit(1)
     .maybeSingle()
-  const storeCaps = cartMeta?.partner_id
-    ? await resolveStoreFulfillmentCapabilities(cartMeta.partner_id, cartMeta.store_id || null)
-    : undefined
-  const marketplaceCapabilities = cartMeta?.partner_id
-    ? await resolveMarketplaceCapabilities(cartMeta.partner_id, { storeId: cartMeta.store_id || null })
-    : null
+  const [storeCaps, marketplaceCapabilities] = cartMeta?.partner_id
+    ? await Promise.all([
+        resolveStoreFulfillmentCapabilities(cartMeta.partner_id, cartMeta.store_id || null),
+        resolveMarketplaceCapabilities(cartMeta.partner_id, { storeId: cartMeta.store_id || null }),
+      ])
+    : [undefined, null]
   const couponsEnabled = marketplaceCapabilities?.couponsEnabled ?? true
 
   const resolved = await resolveCheckoutCartLines(
@@ -102,6 +102,9 @@ export async function priceMarketplaceCartCheckout(
   if (!resolved.success) return { success: false, error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+
+  // Start fetching promotions in parallel with delivery & coupon work (independent of shipping)
+  const promotionsPromise = cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
 
   // Autoritativo: bloqueia escolha incompatível com os modos efetivos dos itens.
   const selectionIssue = deliverySelectionIssue(resolvedLines, params.deliveryType)
@@ -297,31 +300,14 @@ export async function priceMarketplaceCartCheckout(
     : ((!hasOnlyServiceLines && hasDeliveryLines) || carrierApplied)
 
   if (freeShippingApplies && isFreeShippingCoupon) {
-    if (hasOnlySubscriptionLines && !subscriptionShippingNeedsQuote) {
-      // Frete fixo do plano - não precisa (nem pode) re-cotar o frete próprio.
-      deliveryFee = 0
-      if (deliveryBreakdown) {
-        deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
-      }
-    } else if (carrierApplied) {
-      // Frete do carrier já resolvido - não re-cotar o frete próprio só pra zerar.
-      deliveryFee = 0
-      if (deliveryBreakdown) {
-        deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
-      }
-    } else {
-      const quote = await quoteDeliveryFeeAction({
-        partnerId,
-        storeId: targetStoreId,
-        destinationAddress: params.deliveryAddress,
-        destinationCoords: params.destinationCoords,
-        freeDeliveryCoupon: true,
-        orderSubtotal: subtotal,
-      })
-      if (quote.success) {
-        deliveryFee = Number(quote.fee || 0)
-        deliveryBreakdown = quote.breakdown
-      }
+    // Delivery fee was already quoted above — zero it out without a redundant second quote call.
+    const previousFee = deliveryFee
+    deliveryFee = 0
+    deliveryBreakdown = {
+      ...(deliveryBreakdown || {}),
+      ...(previousFee > 0 ? { originalFee: previousFee, deliverySubsidy: previousFee } : {}),
+      freeShippingApplied: true,
+      freeDeliveryReason: "coupon",
     }
   }
 
@@ -380,7 +366,7 @@ export async function priceMarketplaceCartCheckout(
     }
   }
 
-  const promotionsData = await cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
+  const promotionsData = await promotionsPromise
 
   const pricingResult = calculateOrderPricing({
     items: pricingItems,

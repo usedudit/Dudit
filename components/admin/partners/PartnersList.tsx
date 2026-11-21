@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import PartnerListRow from "./PartnerListRow"
@@ -8,7 +8,7 @@ import PartnersPageControls from "./PartnersPageControls"
 import AdminPartnerDetailView from "./AdminPartnerDetailView"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { StoreIcon, ExportFileIcon } from "@/lib/icons"
+import { StoreIcon, ExportFileIcon, FilterIcon } from "@/lib/icons"
 import type { EnforcementPartner, CursorPaginatedResult } from "@/lib/admin/types"
 import {
     getPartners,
@@ -26,6 +26,8 @@ import { formatDate } from "@/lib/utils"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import {
     EMPTY_DATE_PERIOD,
     isDatePeriodFilterActive,
@@ -66,7 +68,10 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         direction: "desc",
     })
 
-    // Filters
+    // Local search state - DECLARED BEFORE useEntityPage
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+
+    // Filters - DECLARED BEFORE useEntityPage
     const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
@@ -81,13 +86,21 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         initialNextCursor: initialData?.nextCursor || null,
         initialHasMore: initialData?.hasMore || false,
         skipInitialData: !isDefaultView,
+        search: debouncedSearch,
+        setSearch,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getPartners(cursor, 100, search || undefined, statusTab === "all" ? undefined : statusTab)
+            const res = await getPartners(
+                cursor,
+                100,
+                debouncedSearch || undefined,
+                statusTab === "all" ? undefined : statusTab,
+                filters.datePeriod.from || undefined,
+                filters.datePeriod.to || undefined,
+            )
             return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
         getDetailFn: async (id: string) => {
-            // getPartners doesn't have a detail function, we'll use the admin detail view
             return null
         },
         listToDetail: (item) => ({ ...item, __partial: true }),
@@ -102,11 +115,11 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         entityState: epEntityState,
         openEntity: epOpenEntity,
         closeEntity: epCloseEntity,
-        search,
-        setSearch,
-        debouncedSearch,
         afterMutation,
     } = entityPage
+
+    // Filter Sheet state
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
     const handleSort = (key: SortKey) => {
         setSortConfig((prev) => {
@@ -248,21 +261,11 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         }
     }
 
-    // Reset to page 1 on filter/tab/search change
+    // Pagination - DECLARED BEFORE useEffect
+    const [page, setPage] = useState(1)
     useEffect(() => {
         setPage(1)
     }, [statusTab, debouncedSearch, filters.datePeriod])
-
-    // If viewing detail of a specific partner via URL (?view=id)
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        return (
-            <AdminPartnerDetailView
-                storeId={entityState.entityId}
-                onBack={closeEntity}
-                onPartnerUpdated={handleMutation}
-            />
-        )
-    }
 
     // In-memory sorting (search and status are done server-side)
     const sortedPartners = useMemo(() => {
@@ -310,7 +313,16 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         return sortedPartners.slice(start, start + ITEMS_PER_PAGE)
     }, [sortedPartners, page])
 
-    const [page, setPage] = useState(1)
+    // If viewing detail of a specific partner via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        return (
+            <AdminPartnerDetailView
+                storeId={entityState.entityId}
+                onBack={closeEntity}
+                onPartnerUpdated={handleMutation}
+            />
+        )
+    }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

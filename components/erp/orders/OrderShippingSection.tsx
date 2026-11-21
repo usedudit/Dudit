@@ -26,6 +26,7 @@ import {
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
 import { RecipientDocumentModal } from "@/components/erp/orders/RecipientDocumentModal"
+import { RecipientNameModal } from "@/components/erp/orders/RecipientNameModal"
 
 const SHIPPING_STATUS_META: Record<string, { label: string; variant: "green" | "red" | "orange" | "blue" | "gray" }> = {
     pending: { label: "Aguardando pagamento", variant: "orange" },
@@ -55,6 +56,8 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const [cancelOpen, setCancelOpen] = useState(false)
     const [cancelling, setCancelling] = useState(false)
     const [docModalOpen, setDocModalOpen] = useState(false)
+    const [nameModalOpen, setNameModalOpen] = useState(false)
+    const [incompleteRecipientName, setIncompleteRecipientName] = useState<string | undefined>(undefined)
     const [nfeModalOpen, setNfeModalOpen] = useState(false)
     const [quoteOptions, setQuoteOptions] = useState<any[]>([])
     const [quotesLoading, setQuotesLoading] = useState(false)
@@ -200,6 +203,9 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 await refresh()
             } else if (res.code === "missing_document") {
                 setDocModalOpen(true)
+            } else if (res.code === "incomplete_recipient_name") {
+                setIncompleteRecipientName(res.currentRecipientName || order?.customer_name || undefined)
+                setNameModalOpen(true)
             } else if (res.code === "missing_nfe") {
                 setNfeModalOpen(true)
             } else {
@@ -466,6 +472,15 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 partnerId={partnerId}
                 orderId={orderId}
                 recipientName={order?.customer_name || undefined}
+                onSaved={handleCreate}
+            />
+
+            <RecipientNameModal
+                isOpen={nameModalOpen}
+                onClose={() => setNameModalOpen(false)}
+                partnerId={partnerId}
+                orderId={orderId}
+                initialName={incompleteRecipientName}
                 onSaved={handleCreate}
             />
         </FormSection>

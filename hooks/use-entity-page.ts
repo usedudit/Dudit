@@ -52,6 +52,15 @@ export interface UseEntityPageOptions<
     staleTime?: number
     /** Priority tier for cache freshness. Default: 'normal'. Overridden by explicit staleTime if provided. */
     priority?: DataPriority
+
+    /**
+     * Optional controlled search value. Pass the *debounced* value here so the
+     * query key / fetch function only change after typing stops. When omitted,
+     * the hook manages its own (undebounced) search state.
+     */
+    search?: string
+    /** Setter paired with `search` when using controlled search. */
+    setSearch?: (value: string) => void
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -154,8 +163,10 @@ export function useEntityPage<
 
     // ── Search (built-in debounce) ───────────────────────────────────────
 
-    const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const [internalSearch, setInternalSearch] = useState("")
+    const search = options.search ?? internalSearch
+    const setSearch = options.setSearch ?? setInternalSearch
+    const [debouncedSearch, setDebouncedSearch] = useState(search)
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search), 300)

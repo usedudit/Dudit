@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { requireUser } from "@/lib/auth/authorization"
 import { getAllUserStoreAccess, getUserSuspendedAccess, type StoreAccessRecord } from "@/lib/auth/partner-context"
+import { clearExpiredEnforcementsForUserPartners } from "@/lib/services/enforcement-expiration.service"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { selectErpAction } from "./actions"
@@ -26,6 +27,10 @@ function roleIdToPartnerRole(roleId: RoleId | string | null | undefined): Partne
 
 export default async function SelectErpPage() {
     const user = await requireUser()
+
+    // Garante que suspensões de parceiro/loja/ERP já vencidas sejam liberadas
+    // antes de ler as listas cacheadas de acessos ativos e suspensos.
+    await clearExpiredEnforcementsForUserPartners(user.id)
 
     const [storeAccess, suspendedAccess] = await Promise.all([
         getAllUserStoreAccess(),

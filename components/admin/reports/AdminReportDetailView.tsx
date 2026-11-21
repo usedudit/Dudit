@@ -28,6 +28,7 @@ import {
     DropdownItem,
     SidebarCard,
     ThreeDotsLoader,
+    FormTextarea,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDateTime } from "@/lib/utils"
@@ -602,14 +603,15 @@ export function AdminReportDetailView({
                 }
             >
                 <div className="space-y-4 py-2">
-                    <p className="text-xs text-brand-inactive-text">
+                    <p className="text-sm text-brand-inactive-text">
                         A confirmação desta denúncia adicionará <strong>+5 pontos de score de risco</strong> ao alvo e marcará o registro como validado.
                     </p>
-                    <textarea
+                    <FormTextarea
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
                         placeholder="Justificativa da validação..."
-                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
+                        rows={3}
+                        className="w-full min-h-[90px]"
                     />
                 </div>
             </DefaultModal>

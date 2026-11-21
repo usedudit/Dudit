@@ -6,12 +6,8 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
+import { useDebouncedSearch } from "@/hooks/use-debounced-search"
 import { useNotification } from "@/hooks/use-notification"
-import {
-    EMPTY_DATE_PERIOD,
-    isDatePeriodFilterActive,
-    type DatePeriodFilterValue,
-} from "@/lib/utils/filter-date-period"
 
 // Reusable Components
 import {
@@ -56,102 +52,108 @@ import { diffChangedFields } from "@/lib/admin/changed-fields"
 import { PermissionProvider } from "@/lib/permission-context"
 import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions"
 import { StoreProvider } from "@/lib/store-context"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    resolveDatePeriodBounds,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 type PlanFilters = { frequency: string[]; billing: string[]; price: { min: string; max: string } }
 
 const EMPTY_PLAN_FILTERS: PlanFilters = { frequency: [], billing: [], price: { min: "", max: "" } }
 
 const PLAN_FREQUENCY_LABELS: Record<string, string> = {
-  daily: "Diária",
-  weekly: "Semanal",
-  monthly: "Mensal",
-  yearly: "Anual",
-  custom: "Personalizada",
+    daily: "Diária",
+    weekly: "Semanal",
+    monthly: "Mensal",
+    yearly: "Anual",
+    custom: "Personalizada",
 }
 
 const PLAN_BILLING_LABELS: Record<string, string> = {
-  auto_mercado_pago: "Mercado Pago",
-  manual: "Manual",
+    auto_mercado_pago: "Mercado Pago",
+    manual: "Manual",
 }
 
 const PLAN_FILTER_SECTIONS: FilterSectionConfig[] = [
-  {
-    id: "frequency",
-    title: "Frequência",
-    type: "checkbox-list",
-    options: ["daily", "weekly", "monthly", "yearly", "custom"],
-    optionLabels: PLAN_FREQUENCY_LABELS,
-  },
-  {
-    id: "billing",
-    title: "Cobrança",
-    type: "checkbox-list",
-    options: ["auto_mercado_pago", "manual"],
-    optionLabels: PLAN_BILLING_LABELS,
-  },
-  {
-    id: "price",
-    title: "Preço",
-    type: "range",
-    rangeConfig: {
-      minKey: "min",
-      maxKey: "max",
-      minPlaceholder: "Preço mínimo",
-      maxPlaceholder: "Preço máximo",
+    {
+        id: "frequency",
+        title: "Frequência",
+        type: "checkbox-list",
+        options: ["daily", "weekly", "monthly", "yearly", "custom"],
+        optionLabels: PLAN_FREQUENCY_LABELS,
     },
-  },
-  {
-    id: "datePeriod",
-    title: "Data de Criação",
-    type: "date-period",
-  },
+    {
+        id: "billing",
+        title: "Cobrança",
+        type: "checkbox-list",
+        options: ["auto_mercado_pago", "manual"],
+        optionLabels: PLAN_BILLING_LABELS,
+    },
+    {
+        id: "price",
+        title: "Preço",
+        type: "range",
+        rangeConfig: {
+            minKey: "min",
+            maxKey: "max",
+            minPlaceholder: "Preço mínimo",
+            maxPlaceholder: "Preço máximo",
+        },
+    },
+    {
+        id: "datePeriod",
+        title: "Data de Criação",
+        type: "date-period",
+    },
 ]
 
 const PlanFilterChips = ({
-  filters,
-  onClear,
+    filters,
+    onClear,
 }: {
-  filters: PlanFilters
-  onClear: (key: keyof PlanFilters) => void
+    filters: PlanFilters & { datePeriod: DatePeriodFilterValue }
+    onClear: (key: keyof PlanFilters | "datePeriod") => void
 }) => {
-  const priceValue =
-    filters.price.min || filters.price.max
-      ? [
-          filters.price.min ? `a partir de R$ ${filters.price.min}` : null,
-          filters.price.max ? `até R$ ${filters.price.max}` : null,
-        ]
-          .filter(Boolean)
-          .join(" ")
-      : ""
+    const priceValue =
+        filters.price.min || filters.price.max
+            ? [
+                filters.price.min ? `a partir de R$ ${filters.price.min}` : null,
+                filters.price.max ? `até R$ ${filters.price.max}` : null,
+            ]
+                .filter(Boolean)
+                .join(" ")
+            : ""
 
-  return (
-    <AnimatePresence>
-      {filters.frequency.length > 0 && (
-        <FilterChip
-          key="frequency"
-          label="Frequência"
-          value={filters.frequency.map((v) => PLAN_FREQUENCY_LABELS[v] || v).join(", ")}
-          onRemove={() => onClear("frequency")}
-        />
-      )}
-      {filters.billing.length > 0 && (
-        <FilterChip
-          key="billing"
-          label="Cobrança"
-          value={filters.billing.map((v) => PLAN_BILLING_LABELS[v] || v).join(", ")}
-          onRemove={() => onClear("billing")}
-        />
-      )}
-      {priceValue && (
-        <FilterChip
-          key="price"
-          label="Preço"
-          value={priceValue}
-          onRemove={() => onClear("price")}
-        />
-      )}
-    </AnimatePresence>
-  )
+    return (
+        <AnimatePresence>
+            {filters.frequency.length > 0 && (
+                <FilterChip
+                    key="frequency"
+                    label="Frequência"
+                    value={filters.frequency.map((v) => PLAN_FREQUENCY_LABELS[v] || v).join(", ")}
+                    onRemove={() => onClear("frequency")}
+                />
+            )}
+            {filters.billing.length > 0 && (
+                <FilterChip
+                    key="billing"
+                    label="Cobrança"
+                    value={filters.billing.map((v) => PLAN_BILLING_LABELS[v] || v).join(", ")}
+                    onRemove={() => onClear("billing")}
+                />
+            )}
+            {priceValue && (
+                <FilterChip
+                    key="price"
+                    label="Preço"
+                    value={priceValue}
+                    onRemove={() => onClear("price")}
+                />
+            )}
+        </AnimatePresence>
+    )
 }
 
 type SortKey = "name" | "seller" | "frequency" | "billing" | "startDate" | "endDate" | "status"
@@ -179,14 +181,25 @@ const COLUMNS: PlanColumn[] = [
 
 interface PlansListProps {
     initialItems: any[]
+    initialNextCursor?: string | null
+    initialHasMore?: boolean
 }
 
-export default function PlansList({ initialItems = [] }: PlansListProps) {
+export default function PlansList({ initialItems = [], initialNextCursor = null, initialHasMore = false }: PlansListProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { modal: actionModal, runAction } = useAdminActionModal()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
+
+    // Search - DECLARED BEFORE useEntityPage
+    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+
+    // Filters - DECLARED BEFORE useEntityPage
+    const [filters, setFilters] = useState<PlanFilters & { datePeriod: DatePeriodFilterValue }>({
+        ...EMPTY_PLAN_FILTERS,
+        datePeriod: { ...EMPTY_DATE_PERIOD },
+    })
 
     // useEntityPage Hook for managing URL state and query caching
     const entityPage = useEntityPage<any, any, string>({
@@ -194,17 +207,21 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
         partnerId: "admin",
         queryKey: ["admin", "recurring_plans", debouncedSearch, filters.datePeriod],
         initialItems,
-        initialNextCursor: null,
-        initialHasMore: false,
+        initialNextCursor,
+        initialHasMore,
         skipInitialData: debouncedSearch.length > 0 || isDatePeriodFilterActive(filters.datePeriod),
-        fetchPageFn: async () => {
-            const res = await listAdminCatalogPlans({ 
-                limit: 100, 
+        search: debouncedSearch,
+        setSearch,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await listAdminCatalogPlans({
+                limit: 20,
+                cursor,
                 search: debouncedSearch || undefined,
-                // TODO: Add date filters when server action supports them
+                startDate: filters.datePeriod.from || undefined,
+                endDate: filters.datePeriod.to || undefined,
             })
             if (!res.success || !res.data) throw new Error((res as any).error || "Erro ao carregar planos.")
-            return { items: res.data.items, nextCursor: null, hasMore: res.data.hasMore }
+            return { items: res.data.items, nextCursor: res.data.nextCursor || null, hasMore: res.data.hasMore }
         },
         dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
         getDetailFn: async (id: string) => {
@@ -234,9 +251,6 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
         currentEntity,
         afterMutation,
         queryClient,
-        search,
-        setSearch,
-        debouncedSearch,
     } = entityPage
 
     const handleMutation = useCallback(() => {
@@ -248,10 +262,6 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
     const [viewMode, setViewMode] = useState<"list" | "grid">(isTablet ? "grid" : "list")
     const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [filters, setFilters] = useState<PlanFilters & { datePeriod: DatePeriodFilterValue }>({
-        ...EMPTY_PLAN_FILTERS,
-        datePeriod: { ...EMPTY_DATE_PERIOD },
-    })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
         key: "name",
         direction: "asc",
@@ -278,18 +288,6 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, viewMode, rawPlans])
 
-    // Modals
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-    const [itemToDelete, setItemToDelete] = useState<any | null>(null)
-    const [isDeleting, setIsDeleting] = useState(false)
-
-    // Sync viewMode on breakpoint change
-    useEffect(() => {
-        if (isTablet && viewMode !== "grid") {
-            setViewMode("grid")
-        }
-    }, [isTablet, viewMode])
-
     // Reset pagination when search/filter/tab changes
     useEffect(() => {
         setPage(1)
@@ -301,6 +299,9 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
         if (currentEntity && currentEntity.id === entityState.entityId) return currentEntity
         return rawPlans.find((p: any) => p.id === entityState.entityId) || null
     }, [entityState.isOpen, entityState.entityId, currentEntity, rawPlans])
+
+    const activePartnerId = selectedPlan?.partnerId || selectedPlan?.partner_id || "admin"
+    const activeStore = selectedPlan?.store || selectedPlan?.stores || null
 
     // Filter logic
     const filteredPlans = useMemo(() => {
@@ -399,6 +400,11 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
     const handleEditPlan = (plan: any) => openEntity("edit", plan.id)
     const handleDetailsPlan = (plan: any) => openEntity("view", plan.id)
 
+    // Delete modal state - DECLARED BEFORE handlers that read it
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+    const [itemToDelete, setItemToDelete] = useState<any | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+
     const handleDeleteTrigger = (plan: any) => {
         setItemToDelete(plan)
         setIsDeleteModalOpen(true)
@@ -422,94 +428,75 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
             },
         })
         if (result.success) {
-            notifySuccess("Plano recorrente excluído pela administração!")
-            setSelectedIds(prev => {
-                const next = new Set(prev)
-                next.delete(itemToDelete.id)
-                return next
-            })
+            notifySuccess("Plano excluído", "Plano recorrente removido com sucesso.")
             handleMutation()
+        } else if (result.error) {
+            notifyError("Erro", result.error)
         }
         setIsDeleteModalOpen(false)
         setItemToDelete(null)
     }
 
-    // Admin save override handler for plans
-    const handleAdminSavePlan = async (payload: any): Promise<{ success?: boolean; error?: string; cancelled?: boolean } | void> => {
+    // Admin save override handler with diff, modal and logging
+    const handleAdminSavePlan = async (payload: any): Promise<{ success?: boolean; error?: string } | void> => {
         if (!selectedPlan) return
         const changedFields = diffChangedFields(selectedPlan, payload)
         const result = await runAction({
             title: "Salvar alterações no Plano Recorrente",
-            description: `Plano "${selectedPlan.name}" (${selectedPlan.partner_name || "Loja"})`,
+            description: `Plano "${selectedPlan.name}" (${selectedPlan.partner_name || selectedPlan.store_name || "Loja"})`,
             changedFields,
             force: true,
             confirmLabel: "Salvar",
             notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
             runner: async (actionPayload) => {
                 const res: any = await updateAdminRecurringPlan(
-                    { ...payload, planId: selectedPlan.id, partnerId: selectedPlan.partnerId || selectedPlan.partner_id },
+                    {
+                        ...payload,
+                        planId: selectedPlan.id,
+                        partnerId: selectedPlan.partnerId || selectedPlan.partner_id,
+                    },
                     {
                         reason: actionPayload.reason || null,
                         riskScore: actionPayload.riskScore,
                         notifySeller: actionPayload.notifySeller,
                         changedFields,
-                    }
+                    },
                 )
-                if (res?.success) return { success: true }
-                return { success: false, error: res?.error || "Erro ao salvar o plano." }
+                if (res.success) return { success: true }
+                return { success: false, error: res.error || "Erro ao salvar plano" }
             },
         })
-
-        if (result.cancelled) return { cancelled: true }
+        if (result.cancelled) return { success: false }
         if (result.success) {
-            notifySuccess("Plano atualizado com sucesso pela administração!")
-            closeEntity()
+            notifySuccess("Plano atualizado", "Plano recorrente atualizado com sucesso.")
             handleMutation()
             return { success: true }
         }
-        notifyError(result.error || "Erro ao salvar plano")
         return { success: false, error: result.error }
     }
 
-    const handleSort = (key: SortKey) => {
-        setSortConfig(prev => {
-            if (prev?.key === key) {
-                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-            }
-            return { key, direction: "asc" }
-        })
-    }
-
-    const isViewing = entityState.isOpen && entityState.action === "view"
-    const isEditing = entityState.isOpen && entityState.action === "edit"
-    const isCreating = entityState.isOpen && entityState.action === "create"
-
-    const activePartnerId = selectedPlan?.partnerId || selectedPlan?.partner_id || "admin"
-    const activeStore = selectedPlan?.store || selectedPlan?.stores || null
+    // Sync viewMode on breakpoint change
+    useEffect(() => {
+        if (isTablet && viewMode !== "grid") {
+            setViewMode("grid")
+        }
+    }, [isTablet, viewMode])
 
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
-                    <FadeIn key="form" className="w-full h-full">
-                        {!isCreating && !selectedPlan ? (
-                            isListLoading ? (
-                                <ERPDetailLoading />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center gap-4 h-full min-h-[200px] bg-white dark:bg-dark-background">
-                                    <IconPlaceholder
-                                        placeholderType="image"
-                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                        imageAlt="Plano não encontrado"
-                                        title="Plano não encontrado"
-                                        subtitle="Este plano não está disponível na sua lista atual."
-                                    />
-                                    <Button variant="outline" onClick={() => closeEntity()}>
-                                        Voltar para a lista
-                                    </Button>
-                                </div>
-                            )
-                        ) : isViewing && selectedPlan ? (
+                {entityState.isOpen && entityState.action === "view" ? (
+                    <FadeIn key="detail" className="w-full h-full">
+                        {isListLoading && !selectedPlan ? (
+                            <div className="flex items-center justify-center h-full min-h-[200px] w-full">
+                                <ThreeDotsLoader />
+                            </div>
+                        ) : !isListLoading && !selectedPlan ? (
+                            <div className="flex flex-col items-center justify-center h-full min-h-[200px] w-full gap-4">
+                                <p className="text-brand-inactive-text">Plano não encontrado.</p>
+                                <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
+                            </div>
+                        ) : (
                             <PermissionProvider
                                 role="OWNER"
                                 routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
@@ -526,210 +513,212 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
                                         key={`plan-detail-${selectedPlan.id}`}
                                         partnerId={activePartnerId}
                                         plan={selectedPlan}
-                                        onBack={() => closeEntity()}
+                                        onBack={closeEntity}
                                         canManage={true}
-                                        onEdit={(plan) => openEntity("edit", plan.id)}
+                                        onEdit={(plan: any) => handleEditPlan(plan)}
                                         onDelete={handleDeleteTrigger}
                                     />
                                 </StoreProvider>
                             </PermissionProvider>
-                        ) : isEditing && selectedPlan ? (
-                            <PermissionProvider
-                                role="OWNER"
-                                routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+                        )}
+                    </FadeIn>
+                ) : (entityState.action === "edit" || entityState.action === "create") ? (
+                    <FadeIn key={entityState.action} className="w-full h-full">
+                        <PermissionProvider
+                            role="OWNER"
+                            routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+                            partnerId={activePartnerId}
+                            businessInfo={{}}
+                            planSlug="escalar"
+                        >
+                            <StoreProvider
                                 partnerId={activePartnerId}
-                                businessInfo={{}}
-                                planSlug="escalar"
+                                initialStores={activeStore ? [activeStore] : []}
+                                activeStoreId={selectedPlan?.store_id || activeStore?.id || null}
                             >
-                                <StoreProvider
+                                <NewRecurringPlanPage
                                     partnerId={activePartnerId}
-                                    initialStores={activeStore ? [activeStore] : []}
-                                    activeStoreId={selectedPlan?.store_id || activeStore?.id || null}
-                                >
-                                    <NewRecurringPlanPage
-                                        partnerId={activePartnerId}
-                                        plan={selectedPlan}
-                                        onBack={() => closeEntity()}
-                                        onSuccess={() => {
-                                            closeEntity()
-                                            handleMutation()
-                                        }}
-                                        onSave={handleAdminSavePlan}
-                                    />
-                                </StoreProvider>
-                            </PermissionProvider>
-                        ) : null}
+                                    plan={entityState.action === "edit" ? selectedPlan : null}
+                                    onBack={() => {
+                                        closeEntity()
+                                        handleMutation()
+                                    }}
+                                    onSuccess={() => {
+                                        closeEntity()
+                                        handleMutation()
+                                    }}
+                                    onSave={entityState.action === "edit" ? handleAdminSavePlan : undefined}
+                                />
+                            </StoreProvider>
+                        </PermissionProvider>
                     </FadeIn>
                 ) : (
-                    <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                        {/* Desktop Header */}
-                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8 pt-4">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                        Planos Recorrentes
-                                    </h1>
-                                </div>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                    Gerencie todos os planos recorrentes cadastrados pelos vendedores na plataforma.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Page Controls */}
-                        <PlanPageControls
-                            activeTab={activeTab}
-                            setActiveTab={setActiveTab}
-                            tabCounts={tabCounts}
-                            viewMode={viewMode}
-                            onViewModeChange={setViewMode}
-                            search={search}
-                            onSearchChange={setSearch}
-                            onAddPlan={handleAddPlan}
-                            canManage={false}
-                            onOpenFilter={() => setIsFilterOpen(true)}
-                            hasActiveFilters={Boolean(
-                                filters.frequency.length > 0 ||
-                                filters.billing.length > 0 ||
-                                filters.price.min ||
-                                filters.price.max ||
-                                isDatePeriodFilterActive(filters.datePeriod)
-                            )}
-                            chips={
-                                <PlanFilterChips
-                                    filters={filters}
-                                    onClear={(key) =>
-                                        setFilters((prev) => ({
-                                            ...prev,
-                                            [key]: key === "price" ? { min: "", max: "" } : key === "datePeriod" ? { ...EMPTY_DATE_PERIOD } : [],
-                                        }))
-                                    }
-                                />
-                            }
-                        />
-
-                        {/* Selection Banner */}
-                        <div className="px-4 md:px-8">
-                            <SelectionBanner
-                                selectedCount={selectedIds.size}
-                                totalCount={filteredPlans.length}
-                                onSelectAll={() => setSelectedIds(new Set(filteredPlans.map((p: any) => p.id)))}
-                                onClearSelection={() => setSelectedIds(new Set())}
-                                itemName="planos"
-                                singularItemName="plano"
-                            />
-                        </div>
-
-                        {/* Content Area */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-8">
-                            {paginated.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center p-12 text-center min-h-[350px]">
-                                    <IconPlaceholder
-                                        icon={RepeatIcon}
-                                        containerSize="w-16 h-16 mb-2"
-                                        iconSize="w-6 h-6"
-                                        title="Nenhum plano recorrente encontrado"
-                                        subtitle="Não encontramos planos recorrentes para os filtros selecionados."
-                                    />
-                                </div>
-                            ) : viewMode === "grid" ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {paginated.map((plan: any) => (
-                                        <PlanGridCard
-                                            key={plan.id}
-                                            plan={plan}
-                                            selected={selectedIds.has(plan.id)}
-                                            onSelect={() => handleSelectRow(plan.id)}
-                                            canManage={true}
-                                            onEdit={handleEditPlan}
-                                            onDelete={handleDeleteTrigger}
-                                            onDetails={handleDetailsPlan}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="w-full overflow-hidden rounded-xl relative">
-                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
-                                            <thead>
-                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    {/* Checkbox Column */}
-                                                    <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                                                        <Checkbox
-                                                            checked={paginated.length > 0 && paginated.every((p: any) => selectedIds.has(p.id))}
-                                                            onChange={() => {
-                                                                const allSelected = paginated.every((p: any) => selectedIds.has(p.id))
-                                                                setSelectedIds(prev => {
-                                                                    const next = new Set(prev)
-                                                                    paginated.forEach((p: any) => allSelected ? next.delete(p.id) : next.add(p.id))
-                                                                    return next
-                                                                })
-                                                            }}
-                                                            className="bg-white dark:bg-dark-background"
-                                                        />
-                                                    </th>
-                                                    {COLUMNS.map((col) => {
-                                                        const isSorted = sortConfig?.key === col.key
-                                                        const isLast = col.id === COLUMNS[COLUMNS.length - 1].id
-                                                        return (
-                                                            <th
-                                                                key={col.id}
-                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                style={{ width: col.width }}
-                                                                onClick={() => {
-                                                                    if (!col.sortable || !col.key) return
-                                                                    handleSort(col.key as SortKey)
-                                                                }}
-                                                            >
-                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                    <span>{col.label}</span>
-                                                                    {col.sortable && (
-                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                            <ArrowUpDownIcon
-                                                                                size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </th>
-                                                        )
-                                                    })}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {paginated.map((plan: any) => (
-                                                    <PlanListRow
-                                                        key={plan.id}
-                                                        plan={plan}
-                                                        columns={COLUMNS}
-                                                        canManage={true}
-                                                        selected={selectedIds.has(plan.id)}
-                                                        onSelect={handleSelectRow}
-                                                        onEdit={handleEditPlan}
-                                                        onDelete={handleDeleteTrigger}
-                                                        onDetails={handleDetailsPlan}
-                                                    />
-                                                ))}
-                                            </tbody>
-                                        </table>
+                    <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background">
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                            {/* Desktop Header */}
+                            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                            Planos Recorrentes
+                                        </h1>
                                     </div>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                        Gerencie planos de assinatura recorrente da plataforma.
+                                    </p>
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="flex justify-center pt-6">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
+                            {/* Page Controls */}
+                            <PlanPageControls
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                tabCounts={tabCounts}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
+                                search={search}
+                                onSearchChange={setSearch}
+                                onAddPlan={handleAddPlan}
+                                canManage={false}
+                                onOpenFilter={() => setIsFilterOpen(true)}
+                                hasActiveFilters={Boolean(
+                                    filters.frequency.length > 0 ||
+                                    filters.billing.length > 0 ||
+                                    filters.price.min ||
+                                    filters.price.max ||
+                                    isDatePeriodFilterActive(filters.datePeriod)
+                                )}
+                                chips={
+                                    <PlanFilterChips
+                                        filters={filters}
+                                        onClear={(key) =>
+                                            setFilters((prev) => ({
+                                                ...prev,
+                                                [key]: key === "price" ? { min: "", max: "" } : key === "datePeriod" ? { ...EMPTY_DATE_PERIOD } : [],
+                                            }))
+                                        }
                                     />
-                                </div>
-                            )}
+                                }
+                            />
+
+                            {/* Selection Banner */}
+                            <div className="px-4 md:px-8">
+                                <SelectionBanner
+                                    selectedCount={selectedIds.size}
+                                    totalCount={filteredPlans.length}
+                                    onSelectAll={() => setSelectedIds(new Set(filteredPlans.map((p: any) => p.id)))}
+                                    onClearSelection={() => setSelectedIds(new Set())}
+                                    itemName="planos"
+                                    singularItemName="plano"
+                                />
+                            </div>
+
+                            {/* Content Area */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-8">
+                                {paginated.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center p-12 text-center min-h-[360px]">
+                                        <IconPlaceholder
+                                            icon={RepeatIcon}
+                                            containerSize="w-16 h-16 mb-2"
+                                            iconSize="w-6 h-6"
+                                            title="Nenhum plano encontrado"
+                                            subtitle="Não há planos correspondentes aos filtros aplicados."
+                                        />
+                                    </div>
+                                ) : viewMode === "list" ? (
+                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                            <Checkbox
+                                                                checked={selectedIds.size === paginated.length && paginated.length > 0}
+                                                                onChange={(checked) => {
+                                                                    setSelectedIds(checked ? new Set(paginated.map((p: any) => p.id)) : new Set())
+                                                                }}
+                                                            />
+                                                        </th>
+                                                        {COLUMNS.map((col, idx) => {
+                                                            const isSorted = sortConfig?.key === col.key
+                                                            return (
+                                                                <th
+                                                                    key={col.id}
+                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
+                                                                    style={{ width: col.width, minWidth: col.width }}
+                                                                    onClick={() => {
+                                                                        if (!col.sortable) return;
+                                                                        setSortConfig((prev) => ({
+                                                                            key: col.key as SortKey,
+                                                                            direction: prev?.key === col.key && prev?.direction === "asc" ? "desc" : "asc",
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                        <span>{col.label}</span>
+                                                                        {col.sortable && (
+                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                <ArrowUpDownIcon
+                                                                                    size={14}
+                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'} ${isSorted && sortConfig?.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </th>
+                                                            )
+                                                        })}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginated.map((plan: any) => (
+                                                        <PlanListRow
+                                                            key={plan.id}
+                                                            plan={plan}
+                                                            columns={COLUMNS}
+                                                            canManage={true}
+                                                            selected={selectedIds.has(plan.id)}
+                                                            onSelect={handleSelectRow}
+                                                            onEdit={handleEditPlan}
+                                                            onDetails={handleDetailsPlan}
+                                                            onDelete={handleDeleteTrigger}
+                                                        />
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                        {paginated.map((plan: any) => (
+                                            <PlanGridCard
+                                                key={plan.id}
+                                                plan={plan}
+                                                selected={selectedIds.has(plan.id)}
+                                                onSelect={() => handleSelectRow(plan.id)}
+                                                canManage={true}
+                                                onEdit={handleEditPlan}
+                                                onDetails={handleDetailsPlan}
+                                                onDelete={handleDeleteTrigger}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="flex justify-center pt-6">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={(p) => setPage(p)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </FadeIn>
                 )}
@@ -741,21 +730,26 @@ export default function PlansList({ initialItems = [] }: PlansListProps) {
                 onClose={() => setIsFilterOpen(false)}
                 sections={PLAN_FILTER_SECTIONS}
                 filters={filters}
-                setFilters={setFilters as any}
-                onClear={() => setFilters(EMPTY_PLAN_FILTERS)}
+                setFilters={setFilters}
+                onClear={() => {
+                    setFilters({ ...EMPTY_PLAN_FILTERS, datePeriod: { ...EMPTY_DATE_PERIOD } })
+                    setIsFilterOpen(false)
+                }}
             />
 
-            {/* Delete Confirmation Modal */}
-            <AlertModal
-                isOpen={isDeleteModalOpen}
-                onClose={() => setIsDeleteModalOpen(false)}
-                onConfirm={handleDeleteConfirm}
-                title="Excluir Plano Recorrente"
-                description={`Tem certeza que deseja excluir o plano "${itemToDelete?.name}"? Esta ação não pode ser desfeita.`}
-                confirmText="Excluir"
-                cancelText="Cancelar"
-                isLoading={isDeleting}
-            />
+            {/* Delete Modal */}
+            {isDeleteModalOpen && (
+                <AlertModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={() => setIsDeleteModalOpen(false)}
+                    onConfirm={handleDeleteConfirm}
+                    title="Excluir Plano Recorrente"
+                    description={`Tem certeza que deseja excluir o plano "${itemToDelete?.name}"? Esta ação não pode ser desfeita.`}
+                    confirmText="Excluir"
+                    variant="danger"
+                    isLoading={isDeleting}
+                />
+            )}
 
             {/* Admin Action Modal */}
             {actionModal}
