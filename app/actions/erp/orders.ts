@@ -53,6 +53,10 @@ import {
   syncReceivableForOrder,
   cancelPendingSettlementsForOrder,
 } from "@/lib/services/transaction.service";
+import {
+  resolveOrderRefundFinanceAccount,
+  summarizeRefundAccountResolution,
+} from "@/lib/payments/order-refund-account";
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine";
 import {
   getOrderDepositSummary,
@@ -1873,19 +1877,54 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
   customerName?: string | null;
   paidAmount: number;
   financeAccountId?: string | null;
+  explicitRefundAccountId?: string | null;
   createdByUserId?: string | null;
   storeId?: string | null;
   paymentBreakdown?: Array<{
     method?: string | null;
     amount?: number;
+    amountReceived?: number;
     paymentMethodId?: string | null;
+    provider?: string | null;
   }> | null;
   paymentMethod?: string | null;
+  paymentProvider?: string | null;
 }) {
   const paidAmount = Math.max(0, Number(params.paidAmount || 0));
   if (paidAmount <= 0.009) return { success: true as const };
 
-  let financeAccountId = params.financeAccountId || null;
+  let financeAccountId = params.explicitRefundAccountId || null;
+
+  if (!financeAccountId) {
+    // Resolve the actual account that received payment for this order:
+    // 1) paid income transactions -> 2) payment method default account ->
+    // 3) Mercado Pago gateway account -> 4) order.finance_account_id
+    const resolved = await resolveOrderRefundFinanceAccount(params.supabase, {
+      partnerId: params.partnerId,
+      storeId: params.storeId || null,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      financeAccountId: params.financeAccountId || null,
+      paymentMethod: params.paymentMethod || null,
+      paymentProvider: params.paymentProvider || null,
+      paymentBreakdown: params.paymentBreakdown || null,
+    });
+    if (resolved.accountId) {
+      let verifyQuery = params.supabase
+        .from("finance_accounts")
+        .select("id")
+        .eq("id", resolved.accountId)
+        .eq("partner_id", params.partnerId);
+      verifyQuery = params.storeId
+        ? verifyQuery.or(`store_id.is.null,store_id.eq.${params.storeId}`)
+        : verifyQuery.is("store_id", null);
+      const { data: verifiedAccount } = await verifyQuery.maybeSingle();
+      if (verifiedAccount?.id) {
+        financeAccountId = verifiedAccount.id;
+      }
+    }
+  }
+
   if (!financeAccountId) {
     // Fallback 1: Try to query the partner's default active financial account
     let defaultAccountQuery = params.supabase
@@ -2776,10 +2815,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") ||
     deliveryPayer;
 
-  const isImmediateInventoryDeduction =
-    shouldDeductInventory(data.deliveryStatus) ||
-    paymentState.situation === "paid" ||
-    paymentState.situation === "partially_paid";
+  // Baixa física ocorre somente quando o pedido já sai entregue/enviado (sent/delivered).
+  // Pedidos pagos mas ainda não enviados/retirados permanecem reservados (stock_reserved),
+  // espelhando o estoque físico real da prateleira e o comportamento do Tiny ERP.
+  const isImmediateInventoryDeduction = shouldDeductInventory(data.deliveryStatus);
 
   let paymentExpiresAt: string | null = null;
   if (
@@ -5162,12 +5201,8 @@ export async function updateERPOrderAction(
       }
     }
 
-    const situationJustBecamePaid =
-      currentOrder.situation !== "paid" && paymentState.situation === "paid";
-    if (
-      shouldDeductInventory(data.deliveryStatus) ||
-      (!currentOrder.inventory_deducted && situationJustBecamePaid)
-    ) {
+    // Baixa física ocorre somente quando o status de entrega entra em sent/delivered.
+    if (!currentOrder.inventory_deducted && shouldDeductInventory(data.deliveryStatus)) {
       const finalizeResult = await finalizeOrderInventory({
         client: supabase,
         partnerId: data.partnerId,
@@ -5587,6 +5622,140 @@ async function syncOrderDeliveryStatusToDeliveries(
 import { areTimestampsEquivalent } from "@/lib/orders/order-utils";
 export { areTimestampsEquivalent };
 
+export async function getOrderCancelRefundContextAction(payload: {
+  partnerId: string;
+  orderIds: string[];
+}) {
+  const user = await requireUser();
+  if (!user) return { success: false as const, error: "Não autenticado" };
+
+  if (
+    !Array.isArray(payload.orderIds) ||
+    payload.orderIds.length === 0 ||
+    payload.orderIds.length > 100
+  ) {
+    return { success: false as const, error: "Informe de 1 a 100 pedidos." };
+  }
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (
+    new Set(payload.orderIds).size !== payload.orderIds.length ||
+    payload.orderIds.some((id) => !uuidRegex.test(id))
+  ) {
+    return {
+      success: false as const,
+      error: "A lista contém IDs inválidos ou repetidos.",
+    };
+  }
+
+  let isAdmin = false;
+  try {
+    await requireAdminScope("moderation");
+    isAdmin = true;
+  } catch {
+    await requirePermission(payload.partnerId, "orders", "cancel", user);
+  }
+
+  const supabase = createAdminClient();
+  const { data: orders, error: ordersError } = await supabase
+    .from("orders")
+    .select(
+      "id, order_number, store_id, finance_account_id, payment_method, payment_provider, payment_breakdown",
+    )
+    .in("id", payload.orderIds)
+    .eq("partner_id", payload.partnerId);
+
+  if (ordersError || !orders || orders.length === 0) {
+    return {
+      success: false as const,
+      error: "Não foi possível carregar os pedidos selecionados.",
+    };
+  }
+
+  if (!isAdmin) {
+    for (const order of orders as any[]) {
+      if (order.store_id) {
+        await requireStorePermission(
+          order.store_id,
+          payload.partnerId,
+          "orders",
+          "cancel",
+        );
+      }
+    }
+  }
+
+  // Determine the finance_accounts store scope that is valid for every selected order
+  const orderStoreIds = new Set(
+    (orders as any[]).map((o) => (o.store_id ? String(o.store_id) : null)),
+  );
+  const singleStoreId =
+    orderStoreIds.size === 1
+      ? Array.from(orderStoreIds)[0]
+      : null;
+
+  let accountsQuery = supabase
+    .from("finance_accounts")
+    .select("id, name, type, is_default, is_active, store_id")
+    .eq("partner_id", payload.partnerId)
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  accountsQuery = singleStoreId
+    ? accountsQuery.or(`store_id.is.null,store_id.eq.${singleStoreId}`)
+    : accountsQuery.is("store_id", null);
+
+  const [{ data: accountsData, error: accountsError }, resolutions] =
+    await Promise.all([
+      accountsQuery,
+      Promise.all(
+        (orders as any[]).map((order) =>
+          resolveOrderRefundFinanceAccount(supabase, {
+            partnerId: payload.partnerId,
+            storeId: order.store_id || null,
+            orderId: order.id,
+            orderNumber: order.order_number || null,
+            financeAccountId: order.finance_account_id || null,
+            paymentMethod: order.payment_method || null,
+            paymentProvider: order.payment_provider || null,
+            paymentBreakdown: Array.isArray(order.payment_breakdown)
+              ? order.payment_breakdown
+              : null,
+          }),
+        ),
+      ),
+    ]);
+
+  if (accountsError) {
+    return {
+      success: false as const,
+      error: "Não foi possível carregar as contas bancárias.",
+    };
+  }
+
+  const accounts: Array<{
+    id: string;
+    name: string;
+    type: string;
+    is_default: boolean;
+  }> = (accountsData || []).map((acc: any) => ({
+    id: String(acc.id),
+    name: String(acc.name || "Conta sem nome"),
+    type: String(acc.type || "bank"),
+    is_default: Boolean(acc.is_default),
+  }));
+  const validAccountIds = new Set<string>(accounts.map((a) => a.id));
+  const summary = summarizeRefundAccountResolution(resolutions, validAccountIds);
+
+  return {
+    success: true as const,
+    accounts,
+    defaultAccountId: summary.defaultAccountId,
+    status: summary.status,
+    source: summary.source,
+  };
+}
+
 export async function updateOrdersStatusInBatchAction(payload: {
   orderIds: string[];
   partnerId: string;
@@ -5595,6 +5764,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
   cancelReason?: string;
   restoreStock?: boolean;
   generateAutomaticRefund?: boolean;
+  refundAccountId?: string | null;
   userName?: string;
   changeReason?: string;
   paidAmount?: number;
@@ -5623,6 +5793,16 @@ export async function updateOrdersStatusInBatchAction(payload: {
     typeof payload.generateAutomaticRefund !== "boolean"
   ) {
     return { error: "Opção de reembolso inválida." };
+  }
+  if (
+    payload.refundAccountId !== undefined &&
+    payload.refundAccountId !== null &&
+    payload.refundAccountId !== "" &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      String(payload.refundAccountId),
+    )
+  ) {
+    return { error: "Conta bancária de reembolso inválida." };
   }
   if (!Array.isArray(payload.orderIds) || payload.orderIds.length === 0 || payload.orderIds.length > 100) {
     return { error: "Informe de 1 a 100 pedidos para atualizar." };
@@ -5815,6 +5995,38 @@ export async function updateOrdersStatusInBatchAction(payload: {
     );
     if (ordersToCancel.length === 0) {
       return { error: "Nenhum pedido válido foi encontrado para cancelar." };
+    }
+
+    if (
+      capabilities.hasFinancial &&
+      payload.generateAutomaticRefund &&
+      payload.refundAccountId
+    ) {
+      const { data: selectedRefundAccount, error: refundAccountError } =
+        await supabase
+          .from("finance_accounts")
+          .select("id, store_id, is_active")
+          .eq("id", payload.refundAccountId)
+          .eq("partner_id", payload.partnerId)
+          .maybeSingle();
+
+      if (refundAccountError || !selectedRefundAccount || !selectedRefundAccount.is_active) {
+        return {
+          error:
+            "A conta bancária selecionada para o reembolso não foi encontrada ou está inativa.",
+        };
+      }
+      if (
+        selectedRefundAccount.store_id &&
+        ordersToCancel.some(
+          (o: any) => o.store_id !== selectedRefundAccount.store_id,
+        )
+      ) {
+        return {
+          error:
+            "A conta bancária selecionada não pertence à loja de todos os pedidos selecionados.",
+        };
+      }
     }
 
     const carrierShipmentsByOrderId = new Map<string, any>();
@@ -6058,12 +6270,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
               customerName: order.customer_name || null,
               paidAmount: refundAmount,
               financeAccountId: order.finance_account_id || null,
+              explicitRefundAccountId: payload.refundAccountId || null,
               createdByUserId: user.id,
               storeId: order.store_id || null,
               paymentBreakdown: Array.isArray(order.payment_breakdown)
                 ? order.payment_breakdown
                 : null,
               paymentMethod: order.payment_method || null,
+              paymentProvider: order.payment_provider || null,
             });
 
           if ("error" in refundResult) {

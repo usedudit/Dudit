@@ -73,8 +73,11 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
 
       if (typeof window !== "undefined" && citySlug) {
         try {
-          localStorage.setItem("dudit_city", citySlug)
-          document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+          const hasExplicitCookie = /(?:^|; )dudit_city=([^;]+)/.test(document.cookie)
+          if (!hasExplicitCookie) {
+            localStorage.setItem("dudit_city", citySlug)
+            document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+          }
         } catch {}
       }
     }
@@ -132,8 +135,11 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     if (derivedSlug) {
       if (typeof window !== "undefined") {
         try {
-          localStorage.setItem("dudit_city", derivedSlug)
-          document.cookie = `dudit_city=${derivedSlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+          const hasExplicitCookie = /(?:^|; )dudit_city=([^;]+)/.test(document.cookie)
+          if (!hasExplicitCookie) {
+            localStorage.setItem("dudit_city", derivedSlug)
+            document.cookie = `dudit_city=${derivedSlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+          }
         } catch {}
       }
       return { ...raw, citySlug: derivedSlug }

@@ -19,6 +19,7 @@ import {
 import { formatDate } from "@/lib/utils"
 import QuoteSkeleton from "@/components/erp/quotes/QuoteSkeleton"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import FilterChip from "@/components/reusable/FilterChip"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
@@ -104,11 +105,17 @@ interface Quote {
 }
 
 interface FilterState {
+    quoteNumber: string
+    customer: string
+    storeName: string
     status: string[]
     issuePeriod: DatePeriodFilterValue
 }
 
 const INITIAL_FILTERS: FilterState = {
+    quoteNumber: "",
+    customer: "",
+    storeName: "",
     status: [],
     issuePeriod: { ...EMPTY_DATE_PERIOD },
 }
@@ -177,7 +184,27 @@ export default function QuotesList({
     const [quoteToShare, setQuoteToShare] = useState<Quote | null>(null)
     const itemsPerPage = 8
 
-    const queryKey = useMemo(() => ["admin", "quotes", debouncedSearch, filters.issuePeriod, activeTab] as const, [debouncedSearch, filters.issuePeriod, activeTab])
+    const hasActiveQuery =
+        activeTab !== "Todos" ||
+        filters.quoteNumber.trim().length > 0 ||
+        filters.customer.trim().length > 0 ||
+        filters.storeName.trim().length > 0 ||
+        filters.status.length > 0 ||
+        isDatePeriodFilterActive(filters.issuePeriod)
+
+    const queryKey = useMemo(
+        () => [
+            "admin",
+            "quotes",
+            filters.quoteNumber,
+            filters.customer,
+            filters.storeName,
+            filters.status,
+            filters.issuePeriod,
+            activeTab,
+        ] as const,
+        [filters.quoteNumber, filters.customer, filters.storeName, filters.status, filters.issuePeriod, activeTab]
+    )
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const { modal: actionModal, runAction } = useAdminActionModal()
@@ -187,19 +214,31 @@ export default function QuotesList({
         entityType: "quotes",
         partnerId: "admin",
         queryKey,
-        initialItems: rawQuotes,
-        initialNextCursor,
-        initialHasMore,
-        skipInitialData: debouncedSearch.length > 0 || isDatePeriodFilterActive(filters.issuePeriod),
+        initialItems: [],
+        initialNextCursor: null,
+        initialHasMore: false,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
+            const labelToStatus: Record<string, string[]> = {
+                Rascunho: ["draft"],
+                Enviado: ["sent", "pending_client", "viewed"],
+                Aprovado: ["approved"],
+                Rejeitado: ["rejected"],
+                Expirado: ["expired"],
+            }
             let statuses: string[] | undefined
-            if (activeTab === "Enviados") statuses = ["sent", "pending_client", "viewed"]
+            if (filters.status.length > 0) {
+                statuses = filters.status.flatMap((label) => labelToStatus[label] || [label])
+            } else if (activeTab === "Enviados") statuses = ["sent", "pending_client", "viewed"]
             else if (activeTab === "Aprovados") statuses = ["approved"]
             else if (activeTab === "Rejeitados") statuses = ["rejected"]
             else if (activeTab === "Expirados") statuses = ["expired"]
 
-            const res = await getAdminQuotes(cursor, 100, {
-                search: debouncedSearch,
+            const res = await getAdminQuotes(cursor, 20, {
+                quoteNumber: filters.quoteNumber.trim() || undefined,
+                customer: filters.customer.trim() || undefined,
+                storeName: filters.storeName.trim() || undefined,
                 startDate: filters.issuePeriod.from || undefined,
                 endDate: filters.issuePeriod.to || undefined,
                 statuses,
@@ -321,6 +360,9 @@ export default function QuotesList({
     }, [checkScroll, viewMode, currentQuotes])
 
     const filterSections: FilterSectionConfig[] = [
+        { id: "quoteNumber", title: "Número do Orçamento", type: "text", placeholder: "Ex: ORC-1042 ou ID..." },
+        { id: "customer", title: "Cliente (Nome ou E-mail)", type: "text", placeholder: "Buscar por nome ou e-mail do cliente..." },
+        { id: "storeName", title: "Nome da Loja", type: "text", placeholder: "Buscar por nome da loja..." },
         { id: "status", title: "Status", type: "checkbox-list", options: ["Rascunho", "Enviado", "Aprovado", "Rejeitado", "Expirado"] },
         { id: "issuePeriod", title: "Período de emissão", type: "date-period" },
     ]
@@ -451,10 +493,7 @@ export default function QuotesList({
         }
     }, [totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-    const hasActiveFilters =
-        filters.status.length > 0 ||
-        isDatePeriodFilterActive(filters.issuePeriod) ||
-        debouncedSearch.length > 0
+    const hasActiveFilters = hasActiveQuery
     const hasQuotes = (currentQuotes?.length || 0) > 0
 
     const tabCounts = useMemo(() => {
@@ -710,22 +749,45 @@ export default function QuotesList({
                                 </div>
                             </div>
 
-                            {hasQuotes && (
-                                <QuotePageControls
-                                    activeTab={activeTab}
-                                    setActiveTab={setActiveTab}
-                                    search={search}
-                                    onSearchChange={setSearch}
-                                    onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
-                                    onExport={() => {}}
-                                    filters={filters}
-                                    setFilters={setFilters as any}
-                                    viewMode={viewMode}
-                                    onViewModeChange={setViewModeState}
-                                    hasActiveFilters={hasActiveFilters}
-                                    tabCounts={tabCounts}
-                                />
-                            )}
+                            <QuotePageControls
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                search=""
+                                onSearchChange={() => {}}
+                                hideSearch
+                                onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
+                                onExport={() => {}}
+                                filters={filters}
+                                setFilters={setFilters as any}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewModeState}
+                                hasActiveFilters={hasActiveFilters}
+                                extraChips={
+                                    <>
+                                        {filters.quoteNumber.trim() && (
+                                            <FilterChip
+                                                label="Orçamento"
+                                                value={filters.quoteNumber.trim()}
+                                                onRemove={() => setFilters((p) => ({ ...p, quoteNumber: "" }))}
+                                            />
+                                        )}
+                                        {filters.customer.trim() && (
+                                            <FilterChip
+                                                label="Cliente"
+                                                value={filters.customer.trim()}
+                                                onRemove={() => setFilters((p) => ({ ...p, customer: "" }))}
+                                            />
+                                        )}
+                                        {filters.storeName.trim() && (
+                                            <FilterChip
+                                                label="Loja"
+                                                value={filters.storeName.trim()}
+                                                onRemove={() => setFilters((p) => ({ ...p, storeName: "" }))}
+                                            />
+                                        )}
+                                    </>
+                                }
+                            />
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                                 <AnimatePresence mode="wait">
@@ -733,7 +795,7 @@ export default function QuotesList({
                                         <FadeIn key="loading">
                                             <QuoteSkeleton count={5} viewMode={viewMode} />
                                         </FadeIn>
-                                    ) : !hasQuotes ? (
+                                    ) : !hasActiveFilters ? (
                                         <FadeIn
                                             key="empty-no-data"
                                             className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
@@ -741,9 +803,14 @@ export default function QuotesList({
                                             <IconPlaceholder
                                                 placeholderType="image"
                                                 imageSrc="https://img.dudit.com.br/static/mascots/Orcamentos.png"
-                                                imageAlt="Sem orçamentos"
-                                                title="Nenhum orçamento cadastrado"
-                                                subtitle="Os orçamentos criados pelos parceiros aparecerão aqui."
+                                                imageAlt="Buscar orçamentos"
+                                                title="Busque orçamentos usando os filtros"
+                                                subtitle="Clique em Filtros e Busca para pesquisar por número do orçamento, cliente, loja ou status."
+                                                itemButton={{
+                                                    text: "Abrir Filtros",
+                                                    action: () => setModals(prev => ({ ...prev, filter: true })),
+                                                    variant: "outline",
+                                                }}
                                             />
                                         </FadeIn>
                                     ) : paginated.length === 0 ? (

@@ -37,7 +37,7 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { isSystemResourceActive } from "@/lib/system-resources"
-import { sendSlaExpired, sendExchangeCreated } from "@/lib/services/discord-general-webhook.service"
+import { sendSlaExpired } from "@/lib/services/discord-general-webhook.service"
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
@@ -1364,7 +1364,7 @@ export async function processReturnRequestAction(
             .from("return_requests")
             .select(`
                 id, partner_id, store_id, order_id, status, request_type, source, reason_category, desired_resolution, approved_resolution, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
-                orders!order_id(order_number, total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name, store_id),
+                orders!order_id(order_number, total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name, store_id, inventory_deducted, delivery_status),
                 return_items!return_items_return_request_id_fkey(net_item_value_snapshot)
             `)
             .eq("id", data.requestId)
@@ -1516,8 +1516,17 @@ export async function processReturnRequestAction(
             ? "FAILED"
             : (isApprovedStatus && data.refundAmount > 0 ? "APPROVED" : (data.refundStatus || "PENDING"))
 
+        const orderInfo = (request as any).orders
+        const { shouldDeductInventory, releaseOrderInventory } = await import("@/lib/stock/reservations")
+        const wasPhysicallyDeducted = Boolean(
+            orderInfo?.inventory_deducted ||
+            shouldDeductInventory(orderInfo?.delivery_status || null)
+        )
+
         const useSelectiveReturn = data.returnToInventoryItems !== undefined && data.returnToInventoryItems !== null
-        const pReturnToInventoryForRpc = useSelectiveReturn ? false : data.returnToInventory
+        // Se o pedido estava apenas RESERVADO (sem baixa física), passa false na RPC para não somar no estoque físico;
+        // a liberação da reserva é feita logo abaixo via releaseOrderInventory.
+        const pReturnToInventoryForRpc = (!wasPhysicallyDeducted || useSelectiveReturn) ? false : data.returnToInventory
 
         const approvedResolution = request.desired_resolution || request.approved_resolution
         const isExchange = approvedResolution === "exchange"
@@ -1616,83 +1625,95 @@ export async function processReturnRequestAction(
         }
 
         if (capabilities.hasStockMovements && returnToStockItems.length > 0) {
-            const { data: existingMovement } = await supabase
-                .from("stock_movements")
-                .select("id")
-                .eq("source_return_request_id", data.requestId)
-                .limit(1)
-                .maybeSingle()
+            const effectiveStoreId = (request as any).store_id || orderInfo?.store_id || null
 
-            if (!existingMovement) {
-                const effectiveStoreId = (request as any).store_id || (request as any).orders?.store_id || null
-
-                const { data: stockMovementRes, error: stockMovementErr } = await supabase.rpc("create_batch_stock_movement", {
-                    p_partner_id: request.partner_id,
-                    p_movement_type: "in",
-                    p_reason: "RETURN_IN",
-                    p_notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
-                    p_created_by: user.id,
-                    p_items: returnToStockItems,
-                    p_store_id: effectiveStoreId,
+            if (!wasPhysicallyDeducted) {
+                // O pedido ainda estava apenas RESERVADO (nunca houve baixa física no estoque).
+                // Liberar a reserva reduz stock_reserved e devolve para stock_available, SEM somar no estoque físico (stock_quantity).
+                await releaseOrderInventory({
+                    client: supabase,
+                    partnerId: request.partner_id,
+                    orderId: request.order_id,
+                    items: returnToStockItems,
+                    storeId: effectiveStoreId,
                 })
+            } else {
+                const { data: existingMovement } = await supabase
+                    .from("stock_movements")
+                    .select("id")
+                    .eq("source_return_request_id", data.requestId)
+                    .limit(1)
+                    .maybeSingle()
 
-                if (stockMovementErr) throw stockMovementErr
-
-                const v_stock_movement_id = stockMovementRes?.id || null
-                if (v_stock_movement_id) {
-                    await supabase
-                        .from("stock_movements")
-                        .update({
-                            source_return_request_id: data.requestId,
-                            store_id: effectiveStoreId,
-                            reason: "RETURN_IN",
-                            reference_name: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
-                            notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`
-                        })
-                        .eq("id", v_stock_movement_id)
-
-                    await supabase
-                        .from("return_requests")
-                        .update({
-                            inventory_movement_id: v_stock_movement_id
-                        })
-                        .eq("id", data.requestId)
-                }
-
-                // Sincroniza a devolução ao estoque no Tiny ERP de forma não-bloqueante
-                import("@/lib/services/integrations/tiny/tiny-integration")
-                    .then(async ({ syncDuditStockToTiny }) => {
-                        for (const retItem of returnToStockItems) {
-                            try {
-                                let newStock = 0
-                                if (retItem.variant_id) {
-                                    const { data: vRow } = await supabase
-                                        .from("product_variants")
-                                        .select("stock_quantity")
-                                        .eq("id", retItem.variant_id)
-                                        .maybeSingle()
-                                    newStock = Number(vRow?.stock_quantity || 0)
-                                } else {
-                                    const { data: pRow } = await supabase
-                                        .from("products")
-                                        .select("stock_quantity")
-                                        .eq("id", retItem.product_id)
-                                        .maybeSingle()
-                                    newStock = Number(pRow?.stock_quantity || 0)
-                                }
-                                await syncDuditStockToTiny({
-                                    partnerId: request.partner_id,
-                                    productId: retItem.product_id,
-                                    variantId: retItem.variant_id || undefined,
-                                    newStock,
-                                    reason: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
-                                })
-                            } catch (syncErr) {
-                                console.warn("[processReturnRequest] Erro ao sincronizar estoque devolvido no Tiny:", syncErr)
-                            }
-                        }
+                if (!existingMovement) {
+                    const { data: stockMovementRes, error: stockMovementErr } = await supabase.rpc("create_batch_stock_movement", {
+                        p_partner_id: request.partner_id,
+                        p_movement_type: "in",
+                        p_reason: "RETURN_IN",
+                        p_notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                        p_created_by: user.id,
+                        p_items: returnToStockItems,
+                        p_store_id: effectiveStoreId,
                     })
-                    .catch(() => {})
+
+                    if (stockMovementErr) throw stockMovementErr
+
+                    const v_stock_movement_id = stockMovementRes?.id || null
+                    if (v_stock_movement_id) {
+                        await supabase
+                            .from("stock_movements")
+                            .update({
+                                source_return_request_id: data.requestId,
+                                store_id: effectiveStoreId,
+                                reason: "RETURN_IN",
+                                reference_name: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                                notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`
+                            })
+                            .eq("id", v_stock_movement_id)
+
+                        await supabase
+                            .from("return_requests")
+                            .update({
+                                inventory_movement_id: v_stock_movement_id
+                            })
+                            .eq("id", data.requestId)
+                    }
+
+                    // Sincroniza a devolução ao estoque físico no Tiny ERP de forma não-bloqueante
+                    import("@/lib/services/integrations/tiny/tiny-integration")
+                        .then(async ({ syncDuditStockToTiny }) => {
+                            for (const retItem of returnToStockItems) {
+                                try {
+                                    let newStock = 0
+                                    if (retItem.variant_id) {
+                                        const { data: vRow } = await supabase
+                                            .from("product_variants")
+                                            .select("stock_quantity")
+                                            .eq("id", retItem.variant_id)
+                                            .maybeSingle()
+                                        newStock = Number(vRow?.stock_quantity || 0)
+                                    } else {
+                                        const { data: pRow } = await supabase
+                                            .from("products")
+                                            .select("stock_quantity")
+                                            .eq("id", retItem.product_id)
+                                            .maybeSingle()
+                                        newStock = Number(pRow?.stock_quantity || 0)
+                                    }
+                                    await syncDuditStockToTiny({
+                                        partnerId: request.partner_id,
+                                        productId: retItem.product_id,
+                                        variantId: retItem.variant_id || undefined,
+                                        newStock,
+                                        reason: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                                    })
+                                } catch (syncErr) {
+                                    console.warn("[processReturnRequest] Erro ao sincronizar estoque devolvido no Tiny:", syncErr)
+                                }
+                            }
+                        })
+                        .catch(() => {})
+                }
             }
         }
 
@@ -1978,23 +1999,6 @@ export async function processReturnRequestAction(
         }
 
         await Promise.allSettled(postTasks)
-
-        // Webhook Discord: notificar troca criada (fail-open)
-        if (isExchange && data.nextStatus === "APPROVED") {
-            sendExchangeCreated({
-                returnRequestId: data.requestId,
-                exchangeOrderId: result?.exchange_order_id || data.requestId,
-                orderNumber: (request as any).orders?.order_number,
-                partnerId: data.partnerId,
-                customerEmail: request.customer_email_snapshot,
-                items: data.exchangeItems.map(item => ({
-                    name: (item as any).product_name || item.product_id,
-                    quantity: item.quantity,
-                })),
-                shortfallAmount: toNumber(result?.exchange_shortfall_amount),
-                surplusAmount: toNumber(result?.exchange_surplus_amount),
-            }).catch(err => console.warn("[EXCHANGE] Discord webhook failed (non-blocking):", err))
-        }
 
         // ─── Admin edit: registra na timeline da devolução + auditoria ────────
         if (adminBypass && adminActorId) {

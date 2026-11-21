@@ -28,6 +28,7 @@ import {
     DropdownItem,
     Combobox,
     Tooltip,
+    ThreeDotsLoader,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
@@ -60,6 +61,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
 import ReturnPrintModal from "./ReturnPrintModal"
 import { RecipientNameModal } from "@/components/erp/orders/RecipientNameModal"
 
@@ -131,6 +133,8 @@ interface ReturnItemState extends Omit<ReturnItem, "reason" | "condition"> {
 type ReplacementItemState = {
     product: ProductBucketItem
     quantity: number
+    variantId?: string | null
+    variantName?: string | null
 }
 
 function getOrderPreviewImage(order?: any | null) {
@@ -233,7 +237,7 @@ export default function CreateReturnPage({
             String(order.customer_name || "").toLowerCase().includes(q),
         { pageSize: 10 }
     )
-    const productBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket)
+    const productBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket, { pageSize: 10 })
 
     const { businessInfo: contextBusinessInfo } = usePermissions()
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
@@ -326,6 +330,8 @@ export default function CreateReturnPage({
     const [replacementProduct, setReplacementProduct] = useState("")
     const [replacementItems, setReplacementItems] = useState<ReplacementItemState[]>([])
     const [isReplacementSearchOpen, setIsReplacementSearchOpen] = useState(false)
+    const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false)
+    const [selectedProductForVariant, setSelectedProductForVariant] = useState<any>(null)
     const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
     const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: { name: string }; callback?: () => void } | null>(null)
     const [exchangeBalanceResolution, setExchangeBalanceResolution] = useState<"store_credit" | "refund">("store_credit")
@@ -565,6 +571,7 @@ export default function CreateReturnPage({
                         has_variants: false,
                     },
                     quantity: Number(ei.quantity || 1),
+                    variantId: ei.variant_id || null,
                 }))
                 // Enrich missing metadata from product bucket while preserving snapshot unit_price
                 if (productBucket.bucket.length > 0) {
@@ -913,18 +920,29 @@ export default function CreateReturnPage({
         return Math.max(0, getReplacementStock(product))
     }, [salesSettings.allowNegativeStock, getReplacementStock])
 
-    const addReplacementProduct = useCallback((product: ProductBucketItem) => {
+    const addReplacementProduct = useCallback((product: ProductBucketItem, opts?: { variantId?: string | null; variantName?: string | null; qty?: number }) => {
+        const variantId = opts?.variantId || null
+        const variantName = opts?.variantName || null
+        const addQty = Math.max(1, Number(opts?.qty || 1))
+
         const proceed = () => {
             setReplacementItems(prev => {
-                if (prev.some(item => item.product.id === product.id)) return prev
-                return [...prev, { product, quantity: 1 }]
+                const existingIdx = prev.findIndex(
+                    item => item.product.id === product.id && (item.variantId || null) === variantId
+                )
+                if (existingIdx >= 0) {
+                    return prev.map((item, idx) =>
+                        idx === existingIdx ? { ...item, quantity: item.quantity + addQty } : item
+                    )
+                }
+                return [...prev, { product, quantity: addQty, variantId, variantName }]
             })
             productBucket.setSearchQuery("")
             setIsReplacementSearchOpen(false)
         }
 
         const availableStock = getReplacementStock(product)
-        if (!product.allow_sell_without_stock && 1 > availableStock) {
+        if (!product.allow_sell_without_stock && addQty > availableStock) {
             if (salesSettings.allowNegativeStock === false) {
                 notifyError(`O produto "${product.name}" está sem estoque e as configurações da empresa não permitem vendas com estoque negativo.`)
                 return
@@ -936,6 +954,75 @@ export default function CreateReturnPage({
 
         proceed()
     }, [productBucket, getReplacementStock, salesSettings.allowNegativeStock, notifyError])
+
+    const handleSelectReplacementProduct = useCallback((product: ProductBucketItem) => {
+        const prodAny = product as any
+        const variantsList = prodAny.variants || prodAny.product_variants || []
+        const hasVariants = Boolean(product.has_variants || (Array.isArray(variantsList) && variantsList.length > 0))
+
+        if (hasVariants) {
+            setSelectedProductForVariant(product)
+            setIsVariantSheetOpen(true)
+            setIsReplacementSearchOpen(false)
+            return
+        }
+
+        const promoPrice = prodAny.promotional_price
+        const categoryId = prodAny.category_id
+        const pr = computeItemDisplayPrice(
+            Number(product.price || 0),
+            promoPrice && Number(promoPrice) < Number(product.price || 0) ? Number(promoPrice) : null,
+            promotions,
+            { productId: product.id, categoryId: categoryId || undefined }
+        )
+
+        addReplacementProduct({
+            ...product,
+            price: pr.bestPrice,
+        })
+    }, [promotions, addReplacementProduct])
+
+    const handleReplacementVariantsConfirm = useCallback((
+        selections: Array<{ variantId: string; qty: number }>
+    ) => {
+        const product = selectedProductForVariant
+        if (!product) return
+        const variantsList = product.variants || product.product_variants || []
+
+        for (const sel of selections) {
+            if (!sel.qty || sel.qty <= 0) continue
+            const variant = variantsList.find((v: any) => v.id === sel.variantId)
+            if (!variant) continue
+            const variantLabel = variant.variant_name || variant.name || ""
+            const variantPrice = Number(variant.price ?? variant.sale_price ?? product.price ?? 0)
+            const variantPromo = variant.promotional_price ?? product.promotional_price
+            const pr = computeItemDisplayPrice(
+                variantPrice,
+                variantPromo && Number(variantPromo) < variantPrice ? Number(variantPromo) : null,
+                promotions,
+                { productId: product.id, categoryId: product.category_id || undefined }
+            )
+            const variantStock = Number(variant.stock_available ?? variant.stock_quantity ?? variant.stock ?? 0)
+            const variantImage = variant.variant_options?.image || variant.image || product.image || null
+
+            addReplacementProduct(
+                {
+                    ...product,
+                    name: variantLabel ? `${product.name} - ${variantLabel}` : product.name,
+                    sku: variant.sku || product.sku,
+                    price: pr.bestPrice,
+                    stock: variantStock,
+                    image: variantImage,
+                    has_variants: false,
+                },
+                { variantId: variant.id, variantName: variantLabel, qty: sel.qty }
+            )
+        }
+
+        setIsVariantSheetOpen(false)
+        setSelectedProductForVariant(null)
+        productBucket.setSearchQuery("")
+    }, [selectedProductForVariant, promotions, addReplacementProduct, productBucket])
 
     const updateReplacementQty = useCallback((index: number, quantity: number) => {
         const item = replacementItems[index]
@@ -1192,7 +1279,7 @@ export default function CreateReturnPage({
                 exchangeDeliveryStatus,
                 exchangeItems: replacementItems.map(item => ({
                     product_id: item.product.id,
-                    variant_id: null,
+                    variant_id: item.variantId || null,
                     quantity: item.quantity,
                     unit_price: Number(item.product.price || 0),
                     product_name: item.product.name || "",
@@ -2209,18 +2296,18 @@ export default function CreateReturnPage({
                                                                                 setIsReplacementSearchOpen(true)
                                                                                 void productBucket.loadBucket()
                                                                             }}
-                                                                            placeholder="Buscar por nome ou SKU"
-                                                                            prefix={<SearchIcon size={18} className="shrink-0 text-brand-inactive-text" />}
+                                                                            placeholder="Buscar itens para adicionar..."
+                                                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                                                             variant="full-rounded"
                                                                         />
 
                                                                         <AnimatePresence>
-                                                                            {isReplacementSearchOpen && productBucket.searchQuery.trim() && (
+                                                                            {isReplacementSearchOpen && productBucket.searchQuery && (
                                                                                 <motion.div
                                                                                     initial={{ opacity: 0, y: 5 }}
                                                                                     animate={{ opacity: 1, y: 0 }}
                                                                                     exit={{ opacity: 0, y: 5 }}
-                                                                                    className="absolute left-0 right-0 top-full z-[9999] mt-2 max-h-72 overflow-y-auto rounded-xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface custom-scrollbar"
+                                                                                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
                                                                                     onScroll={(e) => {
                                                                                         const target = e.currentTarget
                                                                                         if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
@@ -2229,36 +2316,18 @@ export default function CreateReturnPage({
                                                                                     }}
                                                                                 >
                                                                                     {productBucket.isLoading ? (
-                                                                                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
+                                                                                        <ThreeDotsLoader />
                                                                                     ) : productBucket.filteredResults.length > 0 ? (
-                                                                                        productBucket.filteredResults.map((product) => {
-                                                                                            const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
-                                                                                            const prodAny = product as any
-                                                                                            const promoPrice = prodAny.promotional_price
-                                                                                            const categoryId = prodAny.category_id
-                                                                                            const pr = computeItemDisplayPrice(
-                                                                                                Number(product.price || 0),
-                                                                                                promoPrice && Number(promoPrice) < Number(product.price || 0) ? Number(promoPrice) : null,
-                                                                                                promotions,
-                                                                                                { productId: product.id, categoryId: categoryId || undefined }
-                                                                                            )
-                                                                                            const displayStock = getReplacementStock(product)
-                                                                                            return (
-                                                                                                <ProductSearchResultItem
-                                                                                                    key={product.id}
-                                                                                                    item={product}
-                                                                                                    promotions={promotions}
-                                                                                                    displayStock={displayStock}
-                                                                                                    disabled={alreadyAdded}
-                                                                                                    onClick={() => addReplacementProduct({
-                                                                                                        ...product,
-                                                                                                        price: pr.bestPrice,
-                                                                                                    })}
-                                                                                                />
-                                                                                            )
-                                                                                        })
+                                                                                        productBucket.filteredResults.map((product) => (
+                                                                                            <ProductSearchResultItem
+                                                                                                key={product.id}
+                                                                                                item={product}
+                                                                                                promotions={promotions}
+                                                                                                onClick={() => handleSelectReplacementProduct(product)}
+                                                                                            />
+                                                                                        ))
                                                                                     ) : (
-                                                                                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto encontrado.</div>
+                                                                                        <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>
                                                                                     )}
                                                                                 </motion.div>
                                                                             )}
@@ -2281,7 +2350,7 @@ export default function CreateReturnPage({
                                                                                         {replacementItems.map((item, index) => {
                                                                                             const itemStock = getReplacementStock(item.product)
                                                                                             return (
-                                                                                                <tr key={item.product.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                                                <tr key={`${item.product.id}-${item.variantId || index}`} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                                                                         <div className="flex items-center gap-3">
                                                                                                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -2933,6 +3002,16 @@ export default function CreateReturnPage({
                 partnerId={partnerId}
                 onSelect={handleSelectCustomer}
                 selectedCustomerId={selectedOrder?.buyer_id}
+            />
+
+            <SelectProductVariantSheet
+                isOpen={isVariantSheetOpen}
+                onClose={() => {
+                    if (isSaving) return
+                    setIsVariantSheetOpen(false)
+                }}
+                product={selectedProductForVariant}
+                onConfirm={handleReplacementVariantsConfirm}
             />
 
             {isPrintModalOpen && returnRequest && (

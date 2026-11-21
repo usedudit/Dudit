@@ -90,14 +90,14 @@ export function Combobox({
         (opt) =>
             Boolean(opt) &&
             (((opt.label || "").trim().toLowerCase() === normalizedSearch.toLowerCase()) ||
-             ((opt.value || "").trim().toLowerCase() === normalizedSearch.toLowerCase()))
+                ((opt.value || "").trim().toLowerCase() === normalizedSearch.toLowerCase()))
     )
 
     const filteredOptions = safeOptions.filter(
         (option) =>
             Boolean(option) &&
             (((option.label || "").toLowerCase().includes(search.toLowerCase())) ||
-             ((option.value || "").toLowerCase().includes(search.toLowerCase()))),
+                ((option.value || "").toLowerCase().includes(search.toLowerCase()))),
     )
 
     const handleToggle = useCallback(
@@ -332,7 +332,7 @@ export function Combobox({
                                 <TooltipTrigger asChild>
                                     <button
                                         type="button"
-                                        className="p-0.5 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-body transition-colors rounded flex items-center justify-center"
+
                                         aria-label="Mais informações"
                                     >
                                         <InfoIcon className="w-4 h-4" />

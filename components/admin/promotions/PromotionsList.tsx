@@ -154,42 +154,50 @@ export default function PromotionsList({
         stores?: { id: string; name: string; isActive: boolean }[]
     }>({ products: [], services: [], categories: [], serviceCategories: [], customers: [], stores: [] })
 
-    useEffect(() => {
-        getAdminPromotionScopeData().then((data) => {
-            if (data) setScopeData(data)
-        }).catch(console.error)
-    }, [])
+    const [scopeDataLoaded, setScopeDataLoaded] = useState(false)
 
     const [activeTab, setActiveTab] = useState<string>("all")
 
-    // Local search state - DECLARED BEFORE useEntityPage
-    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-
     // Filters - DECLARED BEFORE useEntityPage
-    const [filters, setFilters] = useState<{
-        status: string[]
-        datePeriod: DatePeriodFilterValue
-    }>({
-        status: [],
-        datePeriod: { ...EMPTY_DATE_PERIOD },
-    })
+    const INITIAL_FILTERS = useMemo(() => ({
+        name: "",
+        storeName: "",
+        status: [] as string[],
+        datePeriod: { ...EMPTY_DATE_PERIOD } as DatePeriodFilterValue,
+    }), [])
 
-    const isDefaultView = activeTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+    const [filters, setFilters] = useState(INITIAL_FILTERS)
+
+    const hasActiveQuery =
+        activeTab !== "all" ||
+        filters.name.trim().length > 0 ||
+        filters.storeName.trim().length > 0 ||
+        filters.status.length > 0 ||
+        isDatePeriodFilterActive(filters.datePeriod)
 
     const entityPage = useEntityPage<any, any, any>({
         entityType: "campaigns",
         partnerId: "admin",
-        queryKey: ["admin-campaigns", activeTab, debouncedSearch, filters.datePeriod],
-        initialItems: initialData,
+        queryKey: ["admin-campaigns", activeTab, filters.name, filters.storeName, filters.status, filters.datePeriod],
+        initialItems: [],
         initialNextCursor: null,
         initialHasMore: false,
-        skipInitialData: !isDefaultView,
-        search: debouncedSearch,
-        setSearch,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getAdminCampaigns(cursor, 100, {
-                isActive: activeTab === "active" ? "active" : activeTab === "inactive" ? "inactive" : undefined,
-                search: debouncedSearch || undefined,
+            const statusFilter =
+                filters.status.length === 1
+                    ? filters.status[0]
+                    : activeTab === "active"
+                        ? "active"
+                        : activeTab === "inactive"
+                            ? "inactive"
+                            : undefined
+
+            const res = await getAdminCampaigns(cursor, 20, {
+                isActive: statusFilter,
+                name: filters.name.trim() || undefined,
+                storeName: filters.storeName.trim() || undefined,
                 startDate: filters.datePeriod.from || undefined,
                 endDate: filters.datePeriod.to || undefined,
             })
@@ -206,6 +214,10 @@ export default function PromotionsList({
 
     const {
         items: campaigns,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isListLoading,
         entityState,
         openEntity,
         closeEntity,
@@ -213,6 +225,15 @@ export default function PromotionsList({
         afterMutation,
         queryClient,
     } = entityPage
+
+    // Lazy-load scopeData ONLY when opening the create/edit/view form (0 queries on list mount)
+    useEffect(() => {
+        if (!entityState.isOpen || scopeDataLoaded) return
+        setScopeDataLoaded(true)
+        getAdminPromotionScopeData().then((data) => {
+            if (data) setScopeData(data)
+        }).catch(console.error)
+    }, [entityState.isOpen, scopeDataLoaded])
 
     const handleMutation = useCallback(() => {
         afterMutation()
@@ -246,6 +267,18 @@ export default function PromotionsList({
     const filterSections: FilterSectionConfig[] = useMemo(() => {
         return [
             {
+                id: "name",
+                title: "Nome / Título da Campanha",
+                type: "text",
+                placeholder: "Buscar por nome ou descrição da campanha...",
+            },
+            {
+                id: "storeName",
+                title: "Nome da Loja",
+                type: "text",
+                placeholder: "Buscar por nome da loja...",
+            },
+            {
                 id: "status",
                 title: "Status da Campanha",
                 type: "checkbox-list",
@@ -260,12 +293,7 @@ export default function PromotionsList({
         ]
     }, [])
 
-    const hasActiveFilters = useMemo(() => {
-        return (
-            (filters.status && filters.status.length > 0) ||
-            isDatePeriodFilterActive(filters.datePeriod)
-        )
-    }, [filters])
+    const hasActiveFilters = hasActiveQuery
 
     const filteredCampaigns = useMemo(() => {
         let result = [...(campaigns || [])]
@@ -436,27 +464,62 @@ export default function PromotionsList({
 
                             {/* Controls */}
                             <PromotionPageControls
-                                search={search}
-                                onSearchChange={setSearch}
+                                search=""
+                                onSearchChange={() => {}}
+                                hideSearch
                                 onOpenFilter={() => setIsFilterSheetOpen(true)}
                                 filters={filters}
-                                setFilters={setFilters}
+                                setFilters={setFilters as any}
                                 viewMode={viewMode}
                                 onViewModeChange={(m) => setViewModeState(m)}
                                 hasActiveFilters={hasActiveFilters}
                                 onAddCampaign={() => openEntity("create")}
+                                extraChips={
+                                    <>
+                                        {filters.name.trim() && (
+                                            <FilterChip
+                                                label="Campanha"
+                                                value={filters.name.trim()}
+                                                onRemove={() => setFilters((p) => ({ ...p, name: "" }))}
+                                            />
+                                        )}
+                                        {filters.storeName.trim() && (
+                                            <FilterChip
+                                                label="Loja"
+                                                value={filters.storeName.trim()}
+                                                onRemove={() => setFilters((p) => ({ ...p, storeName: "" }))}
+                                            />
+                                        )}
+                                    </>
+                                }
                             />
 
                             {/* Content */}
                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
-                                {paginatedCampaigns.length === 0 ? (
+                                {isListLoading ? (
+                                    <div className="flex items-center justify-center min-h-[350px]">
+                                        <ThreeDotsLoader />
+                                    </div>
+                                ) : paginatedCampaigns.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center p-12 text-center min-h-[350px]">
                                         <IconPlaceholder
                                             icon={TagIcon}
                                             containerSize="w-16 h-16 mb-2"
                                             iconSize="w-6 h-6"
-                                            title="Nenhuma campanha encontrada"
-                                            subtitle="Não encontramos campanhas para os filtros selecionados."
+                                            title={hasActiveFilters ? "Nenhuma campanha encontrada" : "Busque campanhas usando os filtros"}
+                                            subtitle={hasActiveFilters ? "Não encontramos campanhas para os filtros selecionados." : "Clique em Filtros e Busca para pesquisar por nome da campanha, loja, status ou período."}
+                                            itemButton={hasActiveFilters ? {
+                                                text: "Limpar filtros",
+                                                action: () => {
+                                                    setFilters(INITIAL_FILTERS)
+                                                    setActiveTab("all")
+                                                },
+                                                variant: "outline",
+                                            } : {
+                                                text: "Abrir Filtros",
+                                                action: () => setIsFilterSheetOpen(true),
+                                                variant: "outline",
+                                            }}
                                         />
                                     </div>
                                 ) : effectiveViewMode === "grid" ? (
@@ -687,7 +750,7 @@ export default function PromotionsList({
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => {
-                    setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })
+                    setFilters(INITIAL_FILTERS)
                     setPage(1)
                 }}
             />

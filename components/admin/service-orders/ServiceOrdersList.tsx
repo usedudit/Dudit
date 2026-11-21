@@ -115,11 +115,17 @@ export default function ServiceOrdersList({
     const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 
     // Filters - DECLARED BEFORE useEntityPage
-    const [filters, setFilters] = useState<any>({
-        status: [],
+    const INITIAL_FILTERS = useMemo(() => ({
+        orderNumber: "",
+        title: "",
+        customer: "",
+        storeName: "",
+        status: [] as string[],
         total: { min: "", max: "" },
-        expected_completion_date: { presets: [], from: "", to: "" },
-    })
+        expected_completion_date: { presets: [] as string[], from: "", to: "" },
+    }), [])
+
+    const [filters, setFilters] = useState<any>(INITIAL_FILTERS)
     const [activeTab, setActiveTab] = useState<"all" | "aberta" | "em_andamento" | "concluida" | "cancelada">("all")
     const [viewMode, setViewMode] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
@@ -135,22 +141,46 @@ export default function ServiceOrdersList({
     const [printOrderId, setPrintOrderId] = useState<string | null>(null)
     const itemsPerPage = 10
 
-    const isDefaultView = activeTab === "all" && !isDatePeriodFilterActive(filters.expected_completion_date)
+    const hasActiveQuery =
+        activeTab !== "all" ||
+        (filters.orderNumber || "").trim().length > 0 ||
+        (filters.title || "").trim().length > 0 ||
+        (filters.customer || "").trim().length > 0 ||
+        (filters.storeName || "").trim().length > 0 ||
+        (filters.status && filters.status.length > 0) ||
+        Boolean(filters.total?.min || filters.total?.max) ||
+        isDatePeriodFilterActive(filters.expected_completion_date)
 
     const entityPage = useEntityPage<any, any, any>({
         entityType: "service_orders",
         partnerId: "admin",
-        queryKey: ["admin-service-orders", activeTab, debouncedSearch, filters.expected_completion_date],
-        initialItems: rawOrders,
-        initialNextCursor,
-        initialHasMore,
-        skipInitialData: !isDefaultView,
-        search: debouncedSearch,
-        setSearch,
+        queryKey: [
+            "admin-service-orders",
+            activeTab,
+            filters.orderNumber,
+            filters.title,
+            filters.customer,
+            filters.storeName,
+            filters.status,
+            filters.expected_completion_date,
+        ],
+        initialItems: [],
+        initialNextCursor: null,
+        initialHasMore: false,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getAdminServiceOrders(cursor, 100, {
-                statuses: TAB_STATUSES[activeTab] || [],
-                search: debouncedSearch || undefined,
+            const selectedStatuses =
+                filters.status && filters.status.length > 0
+                    ? filters.status
+                    : TAB_STATUSES[activeTab] || []
+
+            const res = await getAdminServiceOrders(cursor, 20, {
+                statuses: selectedStatuses,
+                orderNumber: (filters.orderNumber || "").trim() || undefined,
+                title: (filters.title || "").trim() || undefined,
+                customer: (filters.customer || "").trim() || undefined,
+                storeName: (filters.storeName || "").trim() || undefined,
                 startDate: filters.expected_completion_date?.from || undefined,
                 endDate: filters.expected_completion_date?.to || undefined,
             })
@@ -168,6 +198,7 @@ export default function ServiceOrdersList({
     const {
         items: effectiveOrders,
         fetchNextPage, hasNextPage, isFetchingNextPage,
+        isListLoading,
         entityState, openEntity, closeEntity,
         currentEntity, isLoadingDetail,
         afterMutation, queryClient,
@@ -191,15 +222,6 @@ export default function ServiceOrdersList({
 
     const sortedOrders = useMemo(() => {
         let result = [...(effectiveOrders || [])]
-
-        // Filter Sheet: status
-        if (filters.status && filters.status.length > 0) {
-            result = result.filter(o => {
-                const meta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
-                const label = meta?.label || o.status
-                return filters.status.includes(label)
-            })
-        }
 
         // Filter Sheet: total range
         if (filters.total?.min) {
@@ -408,61 +430,48 @@ export default function ServiceOrdersList({
         isFetchingNextPage,
     })
 
-    const filterSections: FilterSectionConfig[] = useMemo(() => {
-        const statusLabels = [...new Set((effectiveOrders || []).map((o: any) => {
-            const meta = SERVICE_ORDER_STATUS_META[o.status as ServiceOrderStatus]
-            return meta?.label || o.status
-        }))]
+    const filterSections: FilterSectionConfig[] = useMemo(() => [
+        {
+            id: "orderNumber",
+            title: "Número da OS",
+            type: "text",
+            placeholder: "Ex: OS-1042 ou ID...",
+        },
+        {
+            id: "title",
+            title: "Título da OS",
+            type: "text",
+            placeholder: "Buscar pelo título da ordem de serviço...",
+        },
+        {
+            id: "customer",
+            title: "Cliente (Nome ou E-mail)",
+            type: "text",
+            placeholder: "Buscar por nome ou e-mail do cliente...",
+        },
+        {
+            id: "storeName",
+            title: "Nome da Loja",
+            type: "text",
+            placeholder: "Buscar por nome da loja...",
+        },
+        {
+            id: "status",
+            title: "Status",
+            type: "checkbox-list",
+            options: Object.keys(SERVICE_ORDER_STATUS_META),
+            optionLabels: Object.fromEntries(
+                Object.entries(SERVICE_ORDER_STATUS_META).map(([k, v]) => [k, v.label])
+            ),
+        },
+        {
+            id: "expected_completion_date",
+            title: "Data de Criação",
+            type: "date-period",
+        },
+    ], [])
 
-        const hasMultipleTotals = (effectiveOrders || []).some((o: any, i, arr) =>
-            i > 0 && Number(o.total_amount || 0) !== Number(arr[0].total_amount || 0)
-        )
-
-        const hasDates = (effectiveOrders || []).some((o: any) => o.expected_completion_date)
-
-        const sections: FilterSectionConfig[] = []
-
-        if (statusLabels.length > 1) {
-            sections.push({
-                id: "status",
-                title: "Status",
-                type: "checkbox-list",
-                options: statusLabels,
-            })
-        }
-
-        if (hasMultipleTotals) {
-            sections.push({
-                id: "total",
-                title: "Valor Total",
-                type: "range",
-                rangeConfig: {
-                    minKey: "min",
-                    maxKey: "max",
-                    minPlaceholder: "Mín (R$)",
-                    maxPlaceholder: "Máx (R$)",
-                },
-            })
-        }
-
-        if (hasDates) {
-            sections.push({
-                id: "expected_completion_date",
-                title: "Data Prevista",
-                type: "date-period",
-            })
-        }
-
-        return sections
-    }, [effectiveOrders])
-
-    const hasActiveFilters = useMemo(() => {
-        return (
-            (filters.status && filters.status.length > 0) ||
-            Boolean(filters.total?.min || filters.total?.max) ||
-            isDatePeriodFilterActive(filters.expected_completion_date)
-        )
-    }, [filters])
+    const hasActiveFilters = hasActiveQuery
 
     const renderGroupedBadge = (label: string, items: string[], key: string) => {
         if (!items || items.length === 0) return null
@@ -620,8 +629,9 @@ export default function ServiceOrdersList({
                                 setActiveTab(tab)
                                 setPage(1)
                             }}
-                            search={search}
-                            onSearchChange={handleSearchChange}
+                            search=""
+                            onSearchChange={() => {}}
+                            hideSearch
                             onOpenFilter={() => setShowFilters(true)}
                             onExport={() => {}}
                             onAddOrder={() => openEntity("create")}
@@ -630,19 +640,66 @@ export default function ServiceOrdersList({
                             viewMode={effectiveViewMode}
                             onViewModeChange={(m) => setViewMode(m)}
                             hasActiveFilters={hasActiveFilters}
-                            tabCounts={tabCounts}
+                            extraChips={
+                                <>
+                                    {(filters.orderNumber || "").trim() && (
+                                        <FilterChip
+                                            label="Nº OS"
+                                            value={filters.orderNumber.trim()}
+                                            onRemove={() => setFilters((p: any) => ({ ...p, orderNumber: "" }))}
+                                        />
+                                    )}
+                                    {(filters.title || "").trim() && (
+                                        <FilterChip
+                                            label="Título"
+                                            value={filters.title.trim()}
+                                            onRemove={() => setFilters((p: any) => ({ ...p, title: "" }))}
+                                        />
+                                    )}
+                                    {(filters.customer || "").trim() && (
+                                        <FilterChip
+                                            label="Cliente"
+                                            value={filters.customer.trim()}
+                                            onRemove={() => setFilters((p: any) => ({ ...p, customer: "" }))}
+                                        />
+                                    )}
+                                    {(filters.storeName || "").trim() && (
+                                        <FilterChip
+                                            label="Loja"
+                                            value={filters.storeName.trim()}
+                                            onRemove={() => setFilters((p: any) => ({ ...p, storeName: "" }))}
+                                        />
+                                    )}
+                                </>
+                            }
                         />
 
                         {/* Content Area */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-8">
-                            {paginatedOrders.length === 0 ? (
+                            {isListLoading ? (
+                                <div className="flex items-center justify-center min-h-[350px]">
+                                    <ThreeDotsLoader />
+                                </div>
+                            ) : paginatedOrders.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center p-12 text-center min-h-[350px]">
                                     <IconPlaceholder
                                         icon={WrenchIcon}
                                         containerSize="w-16 h-16 mb-2"
                                         iconSize="w-6 h-6"
-                                        title="Nenhuma ordem de serviço encontrada"
-                                        subtitle="Não encontramos ordens de serviço para os filtros selecionados."
+                                        title={hasActiveFilters ? "Nenhuma ordem de serviço encontrada" : "Busque ordens de serviço usando os filtros"}
+                                        subtitle={hasActiveFilters ? "Não encontramos ordens de serviço para os filtros selecionados." : "Clique em Filtros e Busca para pesquisar por número da OS, título, cliente, loja ou status."}
+                                        itemButton={hasActiveFilters ? {
+                                            text: "Limpar filtros",
+                                            action: () => {
+                                                setFilters(INITIAL_FILTERS)
+                                                setActiveTab("all")
+                                            },
+                                            variant: "outline",
+                                        } : {
+                                            text: "Abrir Filtros",
+                                            action: () => setShowFilters(true),
+                                            variant: "outline",
+                                        }}
                                     />
                                 </div>
                             ) : effectiveViewMode === "grid" ? (
@@ -784,7 +841,7 @@ export default function ServiceOrdersList({
                 filters={filters}
                 setFilters={setFilters as any}
                 onClear={() => {
-                    setFilters({ status: [], total: { min: "", max: "" }, expected_completion_date: { presets: [], from: "", to: "" } })
+                    setFilters(INITIAL_FILTERS)
                     setPage(1)
                 }}
             />

@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
-import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
+import { Button, Badge, IconPlaceholder, Pagination, AlertModal, ThreeDotsLoader } from "@/components/reusable"
+import FilterChip from "@/components/reusable/FilterChip"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import PartnerListRow from "./PartnerListRow"
 import PartnersPageControls from "./PartnersPageControls"
@@ -16,6 +17,7 @@ import {
     unsuspendPartner,
     suspendStore,
     unsuspendStore,
+    toggleStoreShowcase,
     disableTenantAccess,
     enableTenantAccess,
     getAdminPartnerStats,
@@ -54,6 +56,8 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
     // Modals
     const [suspendStoreTarget, setSuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [unsuspendStoreTarget, setUnsuspendStoreTarget] = useState<EnforcementPartner | null>(null)
+    const [disableShowcaseTarget, setDisableShowcaseTarget] = useState<EnforcementPartner | null>(null)
+    const [enableShowcaseTarget, setEnableShowcaseTarget] = useState<EnforcementPartner | null>(null)
     const [disableERPTarget, setDisableERPTarget] = useState<EnforcementPartner | null>(null)
     const [enableERPTarget, setEnableERPTarget] = useState<EnforcementPartner | null>(null)
     const [suspendPartnerTarget, setSuspendPartnerTarget] = useState<EnforcementPartner | null>(null)
@@ -68,34 +72,45 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         direction: "desc",
     })
 
-    // Local search state - DECLARED BEFORE useEntityPage
-    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-
     // Filters - DECLARED BEFORE useEntityPage
-    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
-        datePeriod: { ...EMPTY_DATE_PERIOD },
-    })
+    const INITIAL_FILTERS = useMemo(() => ({
+        storeName: "",
+        ownerName: "",
+        ownerEmail: "",
+        datePeriod: { ...EMPTY_DATE_PERIOD } as DatePeriodFilterValue,
+    }), [])
 
-    const isDefaultView = statusTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+    const [filters, setFilters] = useState(INITIAL_FILTERS)
+
+    const hasActiveQuery =
+        statusTab !== "all" ||
+        filters.storeName.trim().length > 0 ||
+        filters.ownerName.trim().length > 0 ||
+        filters.ownerEmail.trim().length > 0 ||
+        isDatePeriodFilterActive(filters.datePeriod)
 
     const entityPage = useEntityPage<any, any, any>({
         entityType: "partners",
         partnerId: "admin",
-        queryKey: ["admin-partners", statusTab, debouncedSearch, filters.datePeriod],
-        initialItems: initialData?.data || [],
-        initialNextCursor: initialData?.nextCursor || null,
-        initialHasMore: initialData?.hasMore || false,
-        skipInitialData: !isDefaultView,
-        search: debouncedSearch,
-        setSearch,
+        queryKey: ["admin-partners", statusTab, filters.storeName, filters.ownerName, filters.ownerEmail, filters.datePeriod],
+        initialItems: [],
+        initialNextCursor: null,
+        initialHasMore: false,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
             const res = await getPartners(
                 cursor,
-                100,
-                debouncedSearch || undefined,
+                20,
+                undefined,
                 statusTab === "all" ? undefined : statusTab,
                 filters.datePeriod.from || undefined,
                 filters.datePeriod.to || undefined,
+                {
+                    storeName: filters.storeName.trim() || undefined,
+                    ownerName: filters.ownerName.trim() || undefined,
+                    ownerEmail: filters.ownerEmail.trim() || undefined,
+                },
             )
             return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
@@ -112,6 +127,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
+        isListLoading,
         entityState: epEntityState,
         openEntity: epOpenEntity,
         closeEntity: epCloseEntity,
@@ -132,7 +148,6 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
 
     const handleMutation = useCallback(() => {
         afterMutation()
-        getAdminPartnerStats().then(setStats).catch(console.error)
     }, [afterMutation])
 
     const handleConfirmSuspendStore = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
@@ -166,6 +181,48 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                 handleMutation()
             } else {
                 toast.error(res.error || "Erro ao reativar loja")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmDisableShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        if (!disableShowcaseTarget) return
+        try {
+            const res = await toggleStoreShowcase(disableShowcaseTarget.id, false, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Vitrine online desativada com sucesso!")
+                setDisableShowcaseTarget(null)
+                handleMutation()
+            } else {
+                toast.error(res.error || "Erro ao desativar vitrine online")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmEnableShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        if (!enableShowcaseTarget) return
+        try {
+            const res = await toggleStoreShowcase(enableShowcaseTarget.id, true, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Vitrine online ativada com sucesso!")
+                setEnableShowcaseTarget(null)
+                handleMutation()
+            } else {
+                toast.error(res.error || "Erro ao ativar vitrine online")
             }
             return res
         } catch (err: any) {
@@ -265,7 +322,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
     const [page, setPage] = useState(1)
     useEffect(() => {
         setPage(1)
-    }, [statusTab, debouncedSearch, filters.datePeriod])
+    }, [statusTab, filters])
 
     // In-memory sorting (search and status are done server-side)
     const sortedPartners = useMemo(() => {
@@ -363,31 +420,61 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                 <PartnersPageControls
                     statusTab={statusTab}
                     setStatusTab={setStatusTab}
-                    search={search}
-                    setSearch={setSearch}
-                    tabCounts={stats}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
+                    chips={
+                        <>
+                            {filters.storeName.trim() && (
+                                <FilterChip
+                                    label="Loja"
+                                    value={filters.storeName.trim()}
+                                    onRemove={() => setFilters((p) => ({ ...p, storeName: "" }))}
+                                />
+                            )}
+                            {filters.ownerName.trim() && (
+                                <FilterChip
+                                    label="Proprietário"
+                                    value={filters.ownerName.trim()}
+                                    onRemove={() => setFilters((p) => ({ ...p, ownerName: "" }))}
+                                />
+                            )}
+                            {filters.ownerEmail.trim() && (
+                                <FilterChip
+                                    label="E-mail"
+                                    value={filters.ownerEmail.trim()}
+                                    onRemove={() => setFilters((p) => ({ ...p, ownerEmail: "" }))}
+                                />
+                            )}
+                        </>
+                    }
                 />
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 ? (
+                        {isListLoading ? (
+                            <FadeIn key="loading" className="w-full h-full flex items-center justify-center min-h-[400px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
+                        ) : paginatedItems.length === 0 ? (
                             <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                                     imageAlt="Nenhum parceiro"
-                                    title="Nenhuma loja encontrada"
-                                    subtitle={search || statusTab !== "all" ? "Tente ajustar seus filtros de busca." : "Nenhuma loja cadastrada nesta categoria."}
-                                    itemButton={search || statusTab !== "all" ? {
+                                    title={hasActiveQuery ? "Nenhuma loja encontrada" : "Busque lojas e parceiros usando os filtros"}
+                                    subtitle={hasActiveQuery ? "Tente ajustar seus filtros de busca." : "Clique em Filtros e Busca para pesquisar por nome da loja, proprietário ou e-mail."}
+                                    itemButton={hasActiveQuery ? {
                                         text: "Limpar Filtros",
                                         action: () => {
-                                            setSearch("")
+                                            setFilters(INITIAL_FILTERS)
                                             setStatusTab("all")
                                         },
                                         variant: "outline",
-                                    } : undefined}
+                                    } : {
+                                        text: "Abrir Filtros",
+                                        action: () => setIsFilterSheetOpen(true),
+                                        variant: "outline",
+                                    }}
                                 />
                             </FadeIn>
                         ) : (
@@ -418,6 +505,9 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                                                         <Badge variant={isSuspended ? "red" : "green"}>
                                                             {isSuspended ? "Suspensa" : "Ativa"}
                                                         </Badge>
+                                                        {partner.is_showcase_active === false && (
+                                                            <Badge variant="orange">Vitrine Off</Badge>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -473,6 +563,8 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                                                         onView={() => openEntity("view", partner.id)}
                                                         onSuspendStore={() => setSuspendStoreTarget(partner)}
                                                         onUnsuspendStore={() => setUnsuspendStoreTarget(partner)}
+                                                        onDisableShowcase={() => setDisableShowcaseTarget(partner)}
+                                                        onEnableShowcase={() => setEnableShowcaseTarget(partner)}
                                                         onDisableERP={() => setDisableERPTarget(partner)}
                                                         onEnableERP={() => setEnableERPTarget(partner)}
                                                         onSuspendPartner={() => setSuspendPartnerTarget(partner)}
@@ -526,6 +618,34 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                     entityId={unsuspendStoreTarget.id}
                     entityName={unsuspendStoreTarget.store_name}
                     currentRiskScore={unsuspendStoreTarget.risk_score}
+                />
+            )}
+
+            {/* 2b. Modal: Desativar Vitrine Online */}
+            {disableShowcaseTarget && (
+                <AdminEnforcementModal
+                    isOpen={!!disableShowcaseTarget}
+                    onClose={() => setDisableShowcaseTarget(null)}
+                    onConfirm={handleConfirmDisableShowcase}
+                    actionType="suspend"
+                    scope="showcase"
+                    entityId={disableShowcaseTarget.id}
+                    entityName={disableShowcaseTarget.store_name}
+                    currentRiskScore={disableShowcaseTarget.risk_score}
+                />
+            )}
+
+            {/* 2c. Modal: Ativar Vitrine Online */}
+            {enableShowcaseTarget && (
+                <AdminEnforcementModal
+                    isOpen={!!enableShowcaseTarget}
+                    onClose={() => setEnableShowcaseTarget(null)}
+                    onConfirm={handleConfirmEnableShowcase}
+                    actionType="unsuspend"
+                    scope="showcase"
+                    entityId={enableShowcaseTarget.id}
+                    entityName={enableShowcaseTarget.store_name}
+                    currentRiskScore={enableShowcaseTarget.risk_score}
                 />
             )}
 
@@ -590,12 +710,15 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                 isOpen={isFilterSheetOpen}
                 onClose={() => setIsFilterSheetOpen(false)}
                 sections={[
+                    { id: "storeName", title: "Nome da Loja", type: "text", placeholder: "Buscar por nome da loja..." },
+                    { id: "ownerName", title: "Nome do Proprietário", type: "text", placeholder: "Buscar por nome do proprietário..." },
+                    { id: "ownerEmail", title: "E-mail do Proprietário", type: "text", inputType: "email", placeholder: "Buscar por e-mail..." },
                     { id: "datePeriod", title: "Data de Cadastro", type: "date-period" },
                 ]}
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => {
-                    setFilters({ datePeriod: { ...EMPTY_DATE_PERIOD } })
+                    setFilters(INITIAL_FILTERS)
                     setIsFilterSheetOpen(false)
                 }}
             />

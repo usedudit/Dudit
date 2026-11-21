@@ -11,10 +11,12 @@ import { applyAdminActionContext, type AdminActionContext } from "@/lib/admin/ac
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { revalidateQuotes } from "@/lib/utils/revalidation"
 import { revalidatePath } from "next/cache"
-
-function sanitizeIlike(input: string): string {
-    return input.replace(/[%_\\]/g, (c) => `\\${c}`)
-}
+import {
+    isValidUuid,
+    resolveCustomerIdsByQuery,
+    resolveStoreIdsByName,
+    sanitizeIlike,
+} from "@/lib/admin/search-helpers"
 
 export interface AdminQuoteStats {
     total: number
@@ -49,11 +51,14 @@ export async function getAdminQuotesStats(): Promise<AdminQuoteStats> {
 
 export async function getAdminQuotes(
     cursor?: string | null,
-    limit: number = 50,
+    limit: number = 20,
     filters?: {
         status?: string
         statuses?: string[]
         search?: string
+        quoteNumber?: string
+        customer?: string
+        storeName?: string
         startDate?: string
         endDate?: string
     }
@@ -63,6 +68,15 @@ export async function getAdminQuotes(
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)
+
+    const [storeIds, customerIds] = await Promise.all([
+        resolveStoreIdsByName(admin, filters?.storeName),
+        resolveCustomerIdsByQuery(admin, filters?.customer),
+    ])
+
+    if ((storeIds !== null && storeIds.length === 0) || (customerIds !== null && customerIds.length === 0)) {
+        return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+    }
 
     let query = admin
         .from("quotes")
@@ -93,9 +107,32 @@ export async function getAdminQuotes(
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
         `)
 
+    if (storeIds !== null) {
+        query = query.in("store_id", storeIds)
+    }
+
+    if (customerIds !== null) {
+        query = query.in("customer_id", customerIds)
+    }
+
+    if (filters?.quoteNumber && filters.quoteNumber.trim().length > 0) {
+        const raw = filters.quoteNumber.trim().replace(/^#/, "")
+        const s = sanitizeIlike(raw)
+        if (s) {
+            query = isValidUuid(raw)
+                ? query.or(`quote_number.ilike.%${s}%,id.eq.${raw}`)
+                : query.ilike("quote_number", `%${s}%`)
+        }
+    }
+
     if (filters?.search && filters.search.trim().length > 0) {
-        const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`quote_number.ilike.%${s}%,notes.ilike.%${s}%,id.eq.${s},customers.name.ilike.%${s}%,customers.email.ilike.%${s}%,stores.name.ilike.%${s}%`)
+        const raw = filters.search.trim()
+        const s = sanitizeIlike(raw)
+        if (s) {
+            const parts = [`quote_number.ilike.%${s}%`, `notes.ilike.%${s}%`]
+            if (isValidUuid(raw)) parts.push(`id.eq.${raw}`)
+            query = query.or(parts.join(","))
+        }
     }
 
     if (filters?.statuses && filters.statuses.length > 0) {

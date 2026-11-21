@@ -48,6 +48,8 @@ interface ServiceOrderPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     tabCounts?: { Todas: number; Abertas: number; "Em Andamento": number; Concluidas: number; Canceladas: number }
+    hideSearch?: boolean
+    extraChips?: React.ReactNode
 }
 
 const TAB_CONFIG: Record<ServiceOrderPageControlsProps["activeTab"], { label: string; icon: typeof WrenchIcon; variant: "gray" | "green" | "yellow" | "blue" | "red" }> = {
@@ -72,6 +74,8 @@ const ServiceOrderPageControls: React.FC<ServiceOrderPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     tabCounts,
+    hideSearch = false,
+    extraChips,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -93,6 +97,7 @@ const ServiceOrderPageControls: React.FC<ServiceOrderPageControlsProps> = ({
 
     const BadgeList = () => (
         <AnimatePresence>
+            {extraChips}
             {filters.status.length > 0 && (
                 <FilterChip
                     label="Status"
@@ -154,26 +159,33 @@ const ServiceOrderPageControls: React.FC<ServiceOrderPageControlsProps> = ({
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
                 {/* MOBILE CONTROLS */}
                 <div className="md:hidden flex items-center gap-2 w-full">
-                    <div className="flex-1 min-w-0">
-                        <Input
-                            name="search"
-                            placeholder="Buscar..."
-                            value={search}
-                            onChange={(e) => onSearchChange(e.target.value)}
-                            className="h-[42px] w-full"
-                            variant="full-rounded"
-                            prefix={
-                                <SearchIcon
-                                    size={18}
-                                    className="text-brand-inactive-text shrink-0"
-                                />
-                            }
-                            label=""
-                        />
-                    </div>
+                    {!hideSearch && (
+                        <div className="flex-1 min-w-0">
+                            <Input
+                                name="search"
+                                placeholder="Buscar..."
+                                value={search}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                className="h-[42px] w-full"
+                                variant="full-rounded"
+                                prefix={
+                                    <SearchIcon
+                                        size={18}
+                                        className="text-brand-inactive-text shrink-0"
+                                    />
+                                }
+                                label=""
+                            />
+                        </div>
+                    )}
                     <div className="flex-none flex items-center gap-2">
-                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
-                            <FilterIcon className="w-4 h-4" />
+                        <Button
+                            variant="outline"
+                            onClick={onOpenFilter}
+                            className={hideSearch ? "h-[42px]" : "w-[42px] h-[42px] p-0"}
+                            leftIcon={hideSearch ? <FilterIcon size={16} /> : undefined}
+                        >
+                            {hideSearch ? "Filtros e Busca" : <FilterIcon className="w-4 h-4" />}
                         </Button>
                         <Dropdown
                             trigger={
@@ -200,29 +212,31 @@ const ServiceOrderPageControls: React.FC<ServiceOrderPageControlsProps> = ({
                 {/* DESKTOP CONTROLS */}
                 <div className="hidden md:flex items-center w-full gap-4">
                     <div className="flex items-center gap-3 shrink-0">
-                        <div className="w-80">
-                            <Input
-                                name="search"
-                                placeholder="Buscar por nº, título ou cliente..."
-                                value={search}
-                                onChange={(e) => onSearchChange(e.target.value)}
-                                className="h-[42px]"
-                                variant="full-rounded"
-                                prefix={
-                                    <SearchIcon
-                                        size={18}
-                                        className="text-brand-inactive-text shrink-0"
-                                    />
-                                }
-                                label=""
-                            />
-                        </div>
+                        {!hideSearch && (
+                            <div className="w-80">
+                                <Input
+                                    name="search"
+                                    placeholder="Buscar por nº, título ou cliente..."
+                                    value={search}
+                                    onChange={(e) => onSearchChange(e.target.value)}
+                                    className="h-[42px]"
+                                    variant="full-rounded"
+                                    prefix={
+                                        <SearchIcon
+                                            size={18}
+                                            className="text-brand-inactive-text shrink-0"
+                                        />
+                                    }
+                                    label=""
+                                />
+                            </div>
+                        )}
                         <Button
                             variant="outline"
                             onClick={onOpenFilter}
                             leftIcon={<FilterIcon size={18} />}
                         >
-                            Filtros
+                            {hideSearch ? "Filtros e Busca" : "Filtros"}
                         </Button>
                         {hasActiveFilters && (
                             <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1"></div>

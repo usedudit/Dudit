@@ -10,7 +10,10 @@ import {
     ActionsDropdown,
     DefaultModal,
     FormTextarea,
+    ThreeDotsLoader,
 } from "@/components/reusable"
+import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import FilterChip from "@/components/reusable/FilterChip"
 import { toast } from "@/hooks/use-notification"
 import {
     VideoIcon,
@@ -61,27 +64,38 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
     const [page, setPage] = useState(1)
 
     // Local states - DECLARED BEFORE useEntityPage
-    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
-        datePeriod: { ...EMPTY_DATE_PERIOD },
-    })
+    const INITIAL_FILTERS = useMemo(() => ({
+        title: "",
+        storeName: "",
+        status: [] as string[],
+        datePeriod: { ...EMPTY_DATE_PERIOD } as DatePeriodFilterValue,
+    }), [])
 
-    const isDefaultView = activeTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+    const [filters, setFilters] = useState(INITIAL_FILTERS)
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
+
+    const hasActiveQuery =
+        activeTab !== "all" ||
+        filters.title.trim().length > 0 ||
+        filters.storeName.trim().length > 0 ||
+        filters.status.length > 0 ||
+        isDatePeriodFilterActive(filters.datePeriod)
 
     const entityPage = useEntityPage<any, any, any>({
         entityType: "community_videos",
         partnerId: "admin",
-        queryKey: ["admin-community-videos", activeTab, debouncedSearch, filters.datePeriod],
-        initialItems: initialData,
+        queryKey: ["admin-community-videos", activeTab, filters.title, filters.storeName, filters.status, filters.datePeriod],
+        initialItems: [],
         initialNextCursor: null,
         initialHasMore: false,
-        skipInitialData: !isDefaultView,
-        search: debouncedSearch,
-        setSearch,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
-            const res = await getAdminCommunityVideos(cursor, 100, {
-                status: activeTab === "all" ? undefined : activeTab,
-                search: debouncedSearch || undefined,
+            const res = await getAdminCommunityVideos(cursor, 20, {
+                statuses: filters.status.length > 0 ? filters.status : undefined,
+                status: filters.status.length === 0 && activeTab !== "all" ? activeTab : undefined,
+                title: filters.title.trim() || undefined,
+                storeName: filters.storeName.trim() || undefined,
                 startDate: filters.datePeriod.from || undefined,
                 endDate: filters.datePeriod.to || undefined,
             })
@@ -100,6 +114,7 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
+        isListLoading,
         entityState,
         openEntity,
         closeEntity,
@@ -129,16 +144,43 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
     const { modal: actionModal, runAction } = useAdminActionModal()
 
     const tabs = useMemo(() => [
-        { id: "all", label: "Todos os Vídeos", count: videos.length },
-        { id: "pending", label: "Pendentes", count: videos.filter(v => v.moderation_status === "pending").length },
-        { id: "approved", label: "Aprovados", count: videos.filter(v => v.moderation_status === "approved").length },
-        { id: "rejected", label: "Rejeitados", count: videos.filter(v => v.moderation_status === "rejected").length },
-    ], [videos])
+        { id: "all", label: "Todos os Vídeos" },
+        { id: "pending", label: "Pendentes" },
+        { id: "approved", label: "Aprovados" },
+        { id: "rejected", label: "Rejeitados" },
+    ], [])
 
-    // Reset pagination when search/filter/tab changes
+    const filterSections: FilterSectionConfig[] = useMemo(() => [
+        {
+            id: "title",
+            title: "Título do Vídeo",
+            type: "text",
+            placeholder: "Buscar por título ou descrição...",
+        },
+        {
+            id: "storeName",
+            title: "Nome da Loja / Criador",
+            type: "text",
+            placeholder: "Buscar por nome da loja...",
+        },
+        {
+            id: "status",
+            title: "Status de Moderação",
+            type: "checkbox-list",
+            options: ["pending", "approved", "rejected"],
+            optionLabels: { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" },
+        },
+        {
+            id: "datePeriod",
+            title: "Data de Envio",
+            type: "date-period",
+        },
+    ], [])
+
+    // Reset pagination when filter/tab changes
     useMemo(() => {
         setPage(1)
-    }, [debouncedSearch, activeTab, filters.datePeriod])
+    }, [activeTab, filters])
 
     const handleOpenEdit = (video: any) => {
         setEditingVideo(video)
@@ -210,33 +252,42 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                                 }`}
                             >
                                 <span>{tab.label}</span>
-                                <span
-                                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                        isActive
-                                            ? "bg-white/20 text-white dark:bg-brand-dark/20 dark:text-brand-dark"
-                                            : "bg-brand-gray dark:bg-dark-border text-brand-inactive-text"
-                                    }`}
-                                >
-                                    {tab.count}
-                                </span>
                             </button>
                         )
                     })}
                 </div>
 
-                {/* Search & Actions Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="relative w-full sm:w-80 md:w-96">
-                        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
-                        <Input
-                            placeholder="Buscar vídeos por título ou loja..."
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value)
-                                setPage(1)
-                            }}
-                            className="pl-10 h-10 text-xs rounded-xl border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                        />
+                {/* Filters & Actions Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsFilterSheetOpen(true)}
+                            leftIcon={<FilterIcon size={16} />}
+                        >
+                            Filtros e Busca
+                        </Button>
+                        {filters.title.trim() && (
+                            <FilterChip
+                                label="Título"
+                                value={filters.title.trim()}
+                                onRemove={() => setFilters((p) => ({ ...p, title: "" }))}
+                            />
+                        )}
+                        {filters.storeName.trim() && (
+                            <FilterChip
+                                label="Loja"
+                                value={filters.storeName.trim()}
+                                onRemove={() => setFilters((p) => ({ ...p, storeName: "" }))}
+                            />
+                        )}
+                        {filters.status.length > 0 && (
+                            <FilterChip
+                                label="Status"
+                                value={filters.status.map((s) => STATUS_MAP[s]?.label || s).join(", ")}
+                                onRemove={() => setFilters((p) => ({ ...p, status: [] }))}
+                            />
+                        )}
                     </div>
 
                     <div className="flex items-center border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-0.5 ml-auto">
@@ -267,11 +318,27 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
             </div>
 
             {/* Content Area */}
-            {videos.length === 0 ? (
+            {isListLoading ? (
+                <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex items-center justify-center min-h-[360px]">
+                    <ThreeDotsLoader />
+                </div>
+            ) : videos.length === 0 ? (
                 <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex flex-col justify-center min-h-[360px]">
                     <IconPlaceholder
-                        title="Nenhum vídeo encontrado"
-                        subtitle="Não há vídeos correspondentes aos filtros aplicados."
+                        title={hasActiveQuery ? "Nenhum vídeo encontrado" : "Busque vídeos usando os filtros"}
+                        subtitle={hasActiveQuery ? "Não há vídeos correspondentes aos filtros aplicados." : "Clique em Filtros e Busca para pesquisar por título, loja ou status de moderação."}
+                        itemButton={hasActiveQuery ? {
+                            text: "Limpar filtros",
+                            action: () => {
+                                setFilters(INITIAL_FILTERS)
+                                setActiveTab("all")
+                            },
+                            variant: "outline",
+                        } : {
+                            text: "Abrir Filtros",
+                            action: () => setIsFilterSheetOpen(true),
+                            variant: "outline",
+                        }}
                         className="py-12"
                     />
                 </div>
@@ -595,6 +662,20 @@ export default function CommunityVideosList({ initialData, initialStats }: Commu
                     </div>
                 </DefaultModal>
             )}
+
+            {/* Filter Sheet */}
+            <FilterSheet
+                isOpen={isFilterSheetOpen}
+                onClose={() => setIsFilterSheetOpen(false)}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => {
+                    setFilters(INITIAL_FILTERS)
+                    setActiveTab("all")
+                    setIsFilterSheetOpen(false)
+                }}
+            />
 
             {/* Action Context Modal (Notification + Audit) */}
             {actionModal}

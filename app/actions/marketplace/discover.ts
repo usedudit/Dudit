@@ -1655,6 +1655,48 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
 // ─── 12. 🛍️ Vitrines (Lojas e Negócios Locais) ───────────────────────────────
 
+function mapVitrineItem(store: any) {
+    const p = store.partners
+    const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
+    const rawDelivery = Array.isArray(store.delivery_settings) ? store.delivery_settings[0] : store.delivery_settings
+    const storeName = store.name || p?.store_name || "Vendedor"
+    const storeImage = store.logo_url || p?.store_image_url
+    const categoryName = p?.category?.parent?.name || p?.category?.name || null
+    const reviewsCount = p?.reviews?.[0]?.count || 0
+    return {
+        id: store.id,
+        short_id: store.short_id || null,
+        slug: store.slug || null,
+        name: storeName,
+        logo_url: store.logo_url,
+        banner_url: store.banner_url,
+        store_name: storeName,
+        store_image_url: storeImage,
+        images: storeImage ? [storeImage] : [],
+        rating: store.rating,
+        reviewsCount,
+        category: categoryName,
+        delivery_settings: rawDelivery || null,
+        partners: {
+            id: store.id,
+            store_id: store.id,
+            short_id: store.short_id || null,
+            slug: store.slug || null,
+            store_name: storeName,
+            store_image_url: storeImage,
+            banner_url: store.banner_url || null,
+            store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
+            latitude: addr?.latitude || null,
+            longitude: addr?.longitude || null,
+            city: addr?.city || "",
+            state: addr?.state || "",
+            neighborhood: addr?.neighborhood || null,
+            delivery_settings: rawDelivery || null,
+        },
+        itemType: "vitrine" as const,
+    }
+}
+
 async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) {
@@ -1684,49 +1726,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const vitrineMapper = (store: any) => {
-        const p = store.partners
-        const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
-        const rawDelivery = Array.isArray(store.delivery_settings) ? store.delivery_settings[0] : store.delivery_settings
-        const storeName = store.name || p?.store_name || "Vendedor"
-        const storeImage = store.logo_url || p?.store_image_url
-        const categoryName = p?.category?.parent?.name || p?.category?.name || null
-        const reviewsCount = p?.reviews?.[0]?.count || 0
-        return {
-            id: store.id,
-            short_id: store.short_id || null,
-            slug: store.slug || null,
-            name: storeName,
-            logo_url: store.logo_url,
-            banner_url: store.banner_url,
-            store_name: storeName,
-            store_image_url: storeImage,
-            images: storeImage ? [storeImage] : [],
-            rating: store.rating,
-            reviewsCount,
-            category: categoryName,
-            delivery_settings: rawDelivery || null,
-            partners: {
-                id: store.id,
-                store_id: store.id,
-                short_id: store.short_id || null,
-                slug: store.slug || null,
-                store_name: storeName,
-                store_image_url: storeImage,
-                banner_url: store.banner_url || null,
-                store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-                latitude: addr?.latitude || null,
-                longitude: addr?.longitude || null,
-                city: addr?.city || "",
-                state: addr?.state || "",
-                neighborhood: addr?.neighborhood || null,
-                delivery_settings: rawDelivery || null,
-            },
-            itemType: "vitrine" as const,
-        }
-    }
-
-    const items = scoped.slice(0, 15).map(vitrineMapper)
+    const items = scoped.slice(0, 15).map(mapVitrineItem)
 
     return {
         id: "topVitrines",
@@ -1734,7 +1734,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.topVitrines,
         items,
-        _allItems: scoped.map(vitrineMapper),
+        _allItems: scoped.map(mapVitrineItem),
         seeMoreLink: `/explorar/${ctx.citySlug}?type=vitrines`,
     }
 }
@@ -1819,7 +1819,51 @@ async function fetchBrasilTodo(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         gatilho: "curiosidade",
         items,
         _allItems: diversified.map(item => processProduct(item as RawProduct)),
-        seeMoreLink: "/explorar/brasil",
+        seeMoreLink: "/explorar/brasil?type=produtos",
+    }
+}
+
+// ─── 15. Melhores Vitrines em todo o Brasil ──────────────────────────────────
+
+async function fetchBrasilTodoVitrines(tiers: PartnerTiers): Promise<HomeSection | null> {
+    const allIds = [...tiers.allIds]
+    if (allIds.length === 0) {
+        dLog(`[Discover] SKIP brasilTodoVitrines reason=no_partners`)
+        return null
+    }
+
+    const data = await getSharedHomeStoresPool(allIds.join(","), allIds)
+    if (!data || data.length === 0) {
+        dLog(`[Discover] SKIP brasilTodoVitrines reason=no_data`)
+        return null
+    }
+
+    const sorted = [...(data as any[])].sort((a, b) => {
+        const aInactive = getPartnerShowcaseInactive(a) ? 1 : 0
+        const bInactive = getPartnerShowcaseInactive(b) ? 1 : 0
+        if (aInactive !== bInactive) return aInactive - bInactive
+
+        const repA = Number(a.marketplace_reputation ?? a.partners?.marketplace_reputation ?? 0)
+        const ratingA = Number(a.rating ?? 0) / 5
+        const scoreA = repA > 0 ? (repA * 0.7 + ratingA * 0.3) : ratingA
+
+        const repB = Number(b.marketplace_reputation ?? b.partners?.marketplace_reputation ?? 0)
+        const ratingB = Number(b.rating ?? 0) / 5
+        const scoreB = repB > 0 ? (repB * 0.7 + ratingB * 0.3) : ratingB
+
+        return scoreB - scoreA
+    })
+
+    const mapped = sorted.map(mapVitrineItem)
+
+    return {
+        id: "brasilTodoVitrines",
+        title: "Melhores vitrines",
+        subtitle: "Lojas e negócios em destaque pelo Brasil",
+        gatilho: GATILHOS_MAP.topVitrines,
+        items: mapped.slice(0, 15),
+        _allItems: mapped,
+        seeMoreLink: "/explorar/brasil?type=vitrines",
     }
 }
 
@@ -1837,11 +1881,12 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     }
 
     // 1. Core anchors in parallel
-    const [trendingRes, vitrinesRes, servicesRes, brasilTodoRes] = await Promise.all([
+    const [trendingRes, vitrinesRes, servicesRes, brasilTodoRes, brasilTodoVitrinesRes] = await Promise.all([
         fetchTrending(tiers, ctx).catch(() => null),
         fetchVitrines(tiers, ctx).catch(() => null),
         fetchServices(tiers, ctx).catch(() => null),
         fetchBrasilTodo(tiers, ctx).catch(() => null),
+        fetchBrasilTodoVitrines(tiers).catch(() => null),
     ])
 
     // 2. Consolidated Launch Section Layout: Produtos, Serviços, Vitrines, Brasil Todo
@@ -1876,9 +1921,13 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         addSection(vitrinesRes)
     }
 
-    // Slot 4: Destaques em todo o Brasil
+    // Slot 4: Destaques em todo o Brasil (Produtos e Vitrines)
     if (brasilTodoRes && brasilTodoRes.items.length > 0) {
         addSection(brasilTodoRes)
+    }
+
+    if (brasilTodoVitrinesRes && brasilTodoVitrinesRes.items.length > 0) {
+        addSection(brasilTodoVitrinesRes)
     }
 
     // Ultimate fallback if still completely empty

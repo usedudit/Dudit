@@ -34,17 +34,28 @@ function getEntryIcon(entry: HistoryEntry) {
     const type = (entry.entry_type || "").toLowerCase()
     const content = entry.change_lines.join(" ").toLowerCase()
 
-    // Priority 1: Cancellation, Failure or Rejection
+    // Priority 1: Cancellation, Failure, Rejection, Ban or Suspension
     if (
         type.includes("cancel") || content.includes("cancel") ||
         type.includes("failed") || content.includes("falh") ||
-        type.includes("reject") || content.includes("rejeit")
+        type.includes("reject") || content.includes("rejeit") ||
+        type.includes("disable") ||
+        (type.includes("ban") && !type.includes("unban")) ||
+        (type.includes("suspend") && !type.includes("unsuspend"))
     ) {
         return BlockedIcon
     }
 
-    // Priority 2: Delivered / Completed
-    if (type.includes("delivered") || content.includes("entregue com sucesso") || content.includes("pedido entregue")) {
+    // Priority 2: Delivered / Completed / Approved / Reactivated
+    if (
+        type.includes("delivered") ||
+        type.includes("approved") ||
+        type.includes("unban") ||
+        type.includes("unsuspend") ||
+        type.includes("enable") ||
+        content.includes("entregue com sucesso") ||
+        content.includes("pedido entregue")
+    ) {
         return CheckCircleIcon
     }
 

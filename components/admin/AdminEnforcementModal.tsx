@@ -12,7 +12,7 @@ import {
 } from "@/lib/icons"
 import { requestStepUpToken } from "@/app/actions/admin/step-up"
 
-export type EnforcementScope = "store" | "erp" | "partner" | "user"
+export type EnforcementScope = "store" | "erp" | "partner" | "user" | "showcase"
 export type EnforcementActionType = "suspend" | "unsuspend"
 
 export interface AdminEnforcementModalProps {
@@ -93,6 +93,19 @@ const SCOPE_CONFIG: Record<EnforcementScope, {
             "A conta do usuário será desbloqueada.",
             "O usuário poderá realizar login normalmente e utilizar seus acessos."
         ]
+    },
+    showcase: {
+        label: "Vitrine Online da Loja",
+        icon: StoreIcon,
+        suspendImpacts: [
+            "A vitrine pública desta loja será ocultada do marketplace.",
+            "Clientes não poderão visualizar a vitrine nem fazer novos pedidos online.",
+            "O acesso ao painel ERP (PDV, estoque, financeiro e agendamentos) continua funcionando normalmente."
+        ],
+        unsuspendImpacts: [
+            "A vitrine pública desta loja voltará a ficar visível no marketplace.",
+            "Clientes poderão acessar o catálogo e realizar novos pedidos online."
+        ]
     }
 }
 
@@ -128,6 +141,14 @@ const SUSPEND_PRESETS: Record<EnforcementScope, string[]> = {
         "Violação das Diretrizes da Comunidade",
         "Chargebacks / Contestações Não Autorizadas",
         "Uso de Bots / Scraping Não Autorizado"
+    ],
+    showcase: [
+        "Catálogo com Produtos ou Imagens Irregulares",
+        "Preços ou Informações Enganosas na Vitrine",
+        "Revisão de Conformidade / Moderação em Andamento",
+        "Pendência de Regularização Fiscal ou Cadastral",
+        "Reclamações Recorrentes em Pedidos Online",
+        "Solicitação Administrativa Temporária"
     ]
 }
 
@@ -155,6 +176,12 @@ const UNSUSPEND_PRESETS: Record<EnforcementScope, string[]> = {
         "Esclarecimento de Contestação Financeira",
         "Revisão Periódica da Moderação",
         "Desbloqueio Administrativo Concedido"
+    ],
+    showcase: [
+        "Catálogo e Vitrine Regularizados",
+        "Revisão de Moderação Concluída",
+        "Pendências Cadastrais Resolvidas",
+        "Reativação Administrativa Concedida"
     ]
 }
 
@@ -210,7 +237,13 @@ export function AdminEnforcementModal({
             setSelectedDurationOption(null)
             setCustomDays("14")
             setReason(isSuspend ? "" : "Reativação administrativa após análise.")
-            setRiskScore(isSuspend ? (currentRiskScore > 50 ? currentRiskScore : 60) : 0)
+            setRiskScore(
+                scope === "showcase"
+                    ? currentRiskScore
+                    : isSuspend
+                        ? (currentRiskScore > 50 ? currentRiskScore : 60)
+                        : 0
+            )
             setNotifyOwner(true)
             setAdminPassword("")
             setShowPassword(false)
@@ -308,7 +341,11 @@ export function AdminEnforcementModal({
         <DefaultModal
             isOpen={isOpen}
             onClose={onClose}
-            title={isSuspend ? "Aplicar Suspensão Disciplinar" : "Reativar e Restaurar Acesso"}
+            title={
+                scope === "showcase"
+                    ? (isSuspend ? "Desativar Vitrine Online" : "Ativar Vitrine Online")
+                    : (isSuspend ? "Aplicar Suspensão Disciplinar" : "Reativar e Restaurar Acesso")
+            }
             maxWidth="2xl"
             description={`Passo ${step} de 2: ${step === 1 ? "Parâmetros e Configuração" : "Autenticação e Confirmação"}`}
             footer={
@@ -333,17 +370,19 @@ export function AdminEnforcementModal({
                 <ListItem
                     icon={<ScopeIcon />}
                     title={entityName}
-                    description={scope}
+                    description={config.label}
                     right={<Badge variant={isSuspend ? "red" : "green"} className="shrink-0 text-xs uppercase font-bold">
-                        {isSuspend ? "Suspensão" : "Reativação"}
+                        {scope === "showcase"
+                            ? (isSuspend ? "Desativar Vitrine" : "Ativar Vitrine")
+                            : (isSuspend ? "Suspensão" : "Reativação")}
                     </Badge>}
                 />
 
                 {/* STEP 1: CONFIGURATION */}
                 {step === 1 && (
                     <div className="space-y-5">
-                        {/* Suspension Duration Options (Only for Suspend) */}
-                        {isSuspend && (
+                        {/* Suspension Duration Options (Only for Suspend, not Showcase toggle) */}
+                        {isSuspend && scope !== "showcase" && (
                             <FormSection title="Período de Vigência da Suspensão:">
                                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                     {DURATION_OPTIONS.map((opt) => {

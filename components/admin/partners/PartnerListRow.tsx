@@ -18,6 +18,8 @@ interface PartnerListRowProps {
     onView: (partner: EnforcementPartner) => void
     onSuspendStore: (partner: EnforcementPartner) => void
     onUnsuspendStore: (partner: EnforcementPartner) => void
+    onDisableShowcase: (partner: EnforcementPartner) => void
+    onEnableShowcase: (partner: EnforcementPartner) => void
     onDisableERP: (partner: EnforcementPartner) => void
     onEnableERP: (partner: EnforcementPartner) => void
     onSuspendPartner: (partner: EnforcementPartner) => void
@@ -30,12 +32,15 @@ const PartnerListRow = React.memo(({
     onView,
     onSuspendStore,
     onUnsuspendStore,
+    onDisableShowcase,
+    onEnableShowcase,
     onDisableERP,
     onEnableERP,
     onSuspendPartner,
     onUnsuspendPartner,
 }: PartnerListRowProps) => {
     const isStore = partner.type === "store"
+    const isShowcaseActive = partner.is_showcase_active !== false
 
     return (
         <motion.tr
@@ -100,6 +105,9 @@ const PartnerListRow = React.memo(({
                     {partner.erp_disabled && (
                         <Badge variant="red">ERP Desativado</Badge>
                     )}
+                    {!isShowcaseActive && (
+                        <Badge variant="orange">Vitrine Desativada</Badge>
+                    )}
                     {partner.suspended_case_id && (
                         <span className="font-mono text-[10px] text-red-600 dark:text-red-400 font-bold">
                             {partner.suspended_case_id}
@@ -119,6 +127,16 @@ const PartnerListRow = React.memo(({
                         ) : (
                             <DropdownItem onClick={() => onSuspendStore(partner)} className="text-brand-red">
                                 <BlockedIcon size={16} /> Suspender Esta Loja
+                            </DropdownItem>
+                        )}
+
+                        {isShowcaseActive ? (
+                            <DropdownItem onClick={() => onDisableShowcase(partner)} className="text-brand-orange">
+                                <StoreIcon size={16} /> Desativar Vitrine Online
+                            </DropdownItem>
+                        ) : (
+                            <DropdownItem onClick={() => onEnableShowcase(partner)} className="text-brand-green">
+                                <StoreIcon size={16} /> Ativar Vitrine Online
                             </DropdownItem>
                         )}
 

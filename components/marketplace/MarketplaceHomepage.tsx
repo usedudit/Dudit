@@ -126,7 +126,7 @@ export default function MarketplaceHome({
 
     const hasNoLocation = !selectedCityName
     const isCountryScope = selectedCityName === "Brasil" || selectedCitySlug === "brasil"
-    const localSections = sections.filter(s => s.id !== "brasilTodo" && s.items && s.items.length > 0)
+    const localSections = sections.filter(s => s.id !== "brasilTodo" && s.id !== "brasilTodoVitrines" && s.items && s.items.length > 0)
     const hasNoProductsOrVitrines = isCountryScope
         ? sections.length === 0
         : localSections.length === 0
@@ -656,6 +656,7 @@ export default function MarketplaceHome({
     let content;
 
     const brasilTodoSection = sections.find(s => s.id === "brasilTodo")
+    const brasilTodoVitrinesSection = sections.find(s => s.id === "brasilTodoVitrines")
 
     if (hasNoLocation || hasNoProductsOrVitrines) {
         content = (
@@ -674,6 +675,7 @@ export default function MarketplaceHome({
                     onSelectCitySlug={handleSelectCitySlug}
                     citiesList={citiesList}
                     brasilTodoSection={brasilTodoSection}
+                    brasilTodoVitrinesSection={brasilTodoVitrinesSection}
                     userCoords={userCoords}
                 />
 
@@ -682,10 +684,10 @@ export default function MarketplaceHome({
             </div>
         )
     } else {
-        const productSection = sections.find(s => s.id !== "services" && s.id !== "topVitrines" && s.id !== "brasilTodo")
+        const productSection = sections.find(s => s.id !== "services" && s.id !== "topVitrines" && s.id !== "brasilTodo" && s.id !== "brasilTodoVitrines")
         const serviceSection = sections.find(s => s.id === "services")
         const vitrineSection = sections.find(s => s.id === "topVitrines")
-        const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection && s !== brasilTodoSection)
+        const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection && s !== brasilTodoSection && s !== brasilTodoVitrinesSection)
 
         const exploreHref = useMemo(() => {
             if (selectedCityName === "Brasil") return "/explorar/brasil"

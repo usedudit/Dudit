@@ -64,7 +64,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import NotesSheet from "@/components/erp/shared/NotesSheet"
-import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
+import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, getOrderCancelRefundContextAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel, canonicalDeliveryStatus, DELIVERY_STATUS_FILTER_OPTIONS, getFulfillmentModeLabel } from "@/lib/orders/status"
 import { getCarrierStatusLabel, getCarrierStatusVariant, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -322,6 +322,11 @@ export default function OrdersPage({
     const [cancelReason, setCancelReason] = useState("")
     const [restoreStockOnCancel, setRestoreStockOnCancel] = useState(true)
     const [generateAutomaticRefundOnCancel, setGenerateAutomaticRefundOnCancel] = useState(true)
+    const [refundAccountId, setRefundAccountId] = useState("")
+    const [refundAccounts, setRefundAccounts] = useState<Array<{ id: string; name: string; type: string; is_default: boolean }>>([])
+    const [refundAccountStatus, setRefundAccountStatus] = useState<"resolved" | "multiple" | "none" | null>(null)
+    const [loadingRefundAccounts, setLoadingRefundAccounts] = useState(false)
+    const [refundAccountsError, setRefundAccountsError] = useState<string | null>(null)
     const [singleCancelId, setSingleCancelId] = useState<string | null>(null)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
@@ -1029,6 +1034,9 @@ export default function OrdersPage({
         setCancelReason("")
         setRestoreStockOnCancel(true)
         setGenerateAutomaticRefundOnCancel(true)
+        setRefundAccountId("")
+        setRefundAccountStatus(null)
+        setRefundAccountsError(null)
         setConfirmations(p => ({ ...p, bulkCancel: true }))
     }
 
@@ -1049,6 +1057,45 @@ export default function OrdersPage({
             return hasPayment && remainingRefund > 0.009
         })
     }, [cancellableOrdersSelection])
+
+    useEffect(() => {
+        if (!confirmations.bulkCancel || !shouldShowAutomaticRefundCheckbox) {
+            return
+        }
+        const orderIds = singleCancelId ? [singleCancelId] : Array.from(selection.ids)
+        if (orderIds.length === 0) return
+
+        let cancelled = false
+        setLoadingRefundAccounts(true)
+        setRefundAccountsError(null)
+        setRefundAccountId("")
+        setRefundAccountStatus(null)
+
+        getOrderCancelRefundContextAction({ partnerId, orderIds })
+            .then((res) => {
+                if (cancelled) return
+                if (!res.success) {
+                    setRefundAccounts([])
+                    setRefundAccountsError(res.error || "Não foi possível carregar as contas bancárias.")
+                    return
+                }
+                setRefundAccounts(res.accounts)
+                setRefundAccountStatus(res.status)
+                setRefundAccountId(res.defaultAccountId || "")
+            })
+            .catch(() => {
+                if (cancelled) return
+                setRefundAccounts([])
+                setRefundAccountsError("Não foi possível carregar as contas bancárias.")
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingRefundAccounts(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [confirmations.bulkCancel, shouldShowAutomaticRefundCheckbox, singleCancelId, selection.ids, partnerId])
 
     const automaticRefundLabel = useMemo(() => {
         if (cancellableOrdersSelection.length === 1) {
@@ -1195,6 +1242,7 @@ export default function OrdersPage({
         const savedReason = cancelReason.trim() || undefined
         const savedRestoreStock = shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false
         const savedRefund = shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false
+        const savedRefundAccountId = savedRefund ? (refundAccountId || undefined) : undefined
         const isSingle = ids.length === 1
 
         setConfirmations(p => ({ ...p, bulkCancel: false }))
@@ -1202,6 +1250,9 @@ export default function OrdersPage({
         setCancelReason("")
         setRestoreStockOnCancel(true)
         setGenerateAutomaticRefundOnCancel(true)
+        setRefundAccountId("")
+        setRefundAccountStatus(null)
+        setRefundAccountsError(null)
         setSelection({ ids: new Set() })
 
         undoManager.schedule({
@@ -1209,7 +1260,7 @@ export default function OrdersPage({
             title: isSingle ? "Cancelando pedido..." : `Cancelando ${ids.length} pedidos...`,
             description: "Você tem 10 segundos para desfazer.",
             itemCount: ids.length,
-            payload: { ids, savedReason, savedRestoreStock, savedRefund },
+            payload: { ids, savedReason, savedRestoreStock, savedRefund, savedRefundAccountId },
             onExecute: async (p) => {
                 const result = await updateOrdersStatusInBatchAction({
                     orderIds: p.ids,
@@ -1218,6 +1269,7 @@ export default function OrdersPage({
                     cancelReason: p.savedReason,
                     restoreStock: p.savedRestoreStock,
                     generateAutomaticRefund: p.savedRefund,
+                    refundAccountId: p.savedRefundAccountId,
                     userName: currentUserName
                 })
                 if (!result.success) {
@@ -1717,6 +1769,9 @@ export default function OrdersPage({
                     setCancelReason("")
                     setRestoreStockOnCancel(true)
                     setGenerateAutomaticRefundOnCancel(true)
+                    setRefundAccountId("")
+                    setRefundAccountStatus(null)
+                    setRefundAccountsError(null)
                 }}
                 onConfirm={() => confirmBulk("cancel")}
                 title={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
@@ -1738,17 +1793,69 @@ export default function OrdersPage({
                                 </label>
                             )}
                             {shouldShowAutomaticRefundCheckbox && (
-                                <label className="flex items-center gap-3 py-2 cursor-pointer">
-                                    <Checkbox checked={generateAutomaticRefundOnCancel} onChange={(checked) => setGenerateAutomaticRefundOnCancel(Boolean(checked))} />
-                                    <span className="text-sm text-brand-dark dark:text-dark-heading">{automaticRefundLabel}</span>
-                                </label>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-3 py-2 cursor-pointer">
+                                        <Checkbox checked={generateAutomaticRefundOnCancel} onChange={(checked) => setGenerateAutomaticRefundOnCancel(Boolean(checked))} />
+                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{automaticRefundLabel}</span>
+                                    </label>
+                                    {generateAutomaticRefundOnCancel && (
+                                        <div className="space-y-1.5 pt-1">
+                                            {loadingRefundAccounts ? (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Carregando contas bancárias...
+                                                </p>
+                                            ) : refundAccountsError ? (
+                                                <p className="text-xs text-brand-red">
+                                                    {refundAccountsError}
+                                                </p>
+                                            ) : refundAccounts.length === 0 ? (
+                                                <p className="text-xs text-brand-red">
+                                                    Nenhuma conta bancária ativa encontrada. Cadastre uma conta no Financeiro ou desmarque o reembolso automático.
+                                                </p>
+                                            ) : (
+                                                <>
+                                                    <FormDropdown
+                                                        label="Conta bancária para o reembolso"
+                                                        placeholder="Selecione a conta bancária"
+                                                        value={refundAccountId}
+                                                        setValue={setRefundAccountId}
+                                                        options={refundAccounts.map((acc) => ({
+                                                            value: acc.id,
+                                                            label: acc.name,
+                                                        }))}
+                                                    />
+                                                    {refundAccountStatus === "resolved" && (
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                            Conta identificada no pagamento do pedido (você pode alterar se desejar).
+                                                        </p>
+                                                    )}
+                                                    {refundAccountStatus === "multiple" && (
+                                                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                                                            Mais de um método ou conta identificado. Selecione manualmente de qual conta sairá o reembolso.
+                                                        </p>
+                                                    )}
+                                                    {refundAccountStatus === "none" && (
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                            Nenhuma conta bancária vinculada ao pagamento. Selecione de qual conta sairá o reembolso.
+                                                        </p>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
                 }
                 confirmText={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
                 variant="danger"
-                disabled={!cancelReason.trim()}
+                disabled={
+                    !cancelReason.trim() ||
+                    (shouldShowAutomaticRefundCheckbox &&
+                        generateAutomaticRefundOnCancel &&
+                        (loadingRefundAccounts || !refundAccountId))
+                }
             />
 
             <BulkEditActionsModal

@@ -58,6 +58,8 @@ export enum AdminActionType {
     PARTNER_UNSUSPEND = "partner.unsuspend",
     PARTNER_DISABLE_ERP = "partner.disable_erp",
     PARTNER_ENABLE_ERP = "partner.enable_erp",
+    STORE_DISABLE_SHOWCASE = "partner.disable_showcase",
+    STORE_ENABLE_SHOWCASE = "partner.enable_showcase",
 
     // Product/Service
     PRODUCT_SOFT_DELETE = "product.soft_delete",
@@ -349,6 +351,7 @@ export interface EnforcementPartner {
     owner_name: string
     owner_user_id: string
     is_active: boolean
+    is_showcase_active?: boolean
     erp_disabled: boolean
     suspended_at: string | null
     suspended_until: string | null
@@ -365,6 +368,7 @@ export interface AdminStoreEntry {
     id: string
     name: string
     is_active: boolean
+    is_showcase_active?: boolean
     suspended_at: string | null
     suspended_until?: string | null
     suspended_reason: string | null

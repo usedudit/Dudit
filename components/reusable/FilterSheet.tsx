@@ -15,12 +15,14 @@ import { DATE_PERIOD_PRESETS, EMPTY_DATE_PERIOD, type DatePeriodFilterValue } fr
 
 // --- Tipos de Configuração do Filtro ---
 
-export type FilterType = "checkbox-list" | "range" | "date-period" | "switch"
+export type FilterType = "checkbox-list" | "range" | "date-period" | "switch" | "text"
 
 export interface FilterSectionConfig {
     id: string
     title: string
     type: FilterType
+    placeholder?: string // Para text
+    inputType?: "text" | "email" | "number" // Para text
     options?: string[] // Para checkbox-list
     optionLabels?: Record<string, string> // Mapeamento de valor -> rótulo legível
     rangeConfig?: {    // Para range (preço/estoque)
@@ -116,6 +118,35 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
 
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-2">
                 {sections.map((section) => {
+                    if (section.type === "text") {
+                        const val = typeof localFilters[section.id] === "string" ? localFilters[section.id] : ""
+                        return (
+                            <div
+                                key={section.id}
+                                className="pb-3 border-b border-brand-border dark:border-dark-border last:border-0"
+                            >
+                                <Input
+                                    name={section.id}
+                                    label={section.title}
+                                    type={section.inputType || "text"}
+                                    placeholder={section.placeholder || `Filtrar por ${section.title.toLowerCase()}...`}
+                                    value={val}
+                                    onChange={(e) =>
+                                        setLocalFilters((prev) => ({ ...prev, [section.id]: e.target.value }))
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault()
+                                            setFilters(localFilters)
+                                            onClose()
+                                        }
+                                    }}
+                                    className="h-10 text-sm"
+                                />
+                            </div>
+                        )
+                    }
+
                     if (section.type === "switch") {
                         const checked = !!localFilters[section.id]
                         return (

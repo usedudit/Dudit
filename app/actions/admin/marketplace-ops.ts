@@ -6,10 +6,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
 import { normalizeAdminReturnRow } from "@/lib/returns/normalize-admin-return"
-
-function sanitizeIlike(input: string): string {
-    return input.replace(/[%_\\]/g, c => `\\${c}`)
-}
+import { isValidUuid, resolveStoreIdsByName, sanitizeIlike } from "@/lib/admin/search-helpers"
 
 export interface AdminOrderStats {
     total: number
@@ -54,6 +51,9 @@ export async function getAdminMarketplaceOrders(
         paymentMethod?: string | string[]
         channel?: string | string[]
         search?: string
+        orderNumber?: string
+        customerName?: string
+        storeName?: string
         startDate?: string
         endDate?: string
     }
@@ -63,6 +63,11 @@ export async function getAdminMarketplaceOrders(
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)
+
+    const storeIds = await resolveStoreIdsByName(admin, filters?.storeName)
+    if (storeIds !== null && storeIds.length === 0) {
+        return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+    }
 
     let query = admin
         .from("orders")
@@ -97,9 +102,33 @@ export async function getAdminMarketplaceOrders(
         return [value]
     }
 
+    if (storeIds !== null) {
+        query = query.in("store_id", storeIds)
+    }
+
+    if (filters?.orderNumber && filters.orderNumber.trim().length > 0) {
+        const raw = filters.orderNumber.trim().replace(/^#/, "")
+        const s = sanitizeIlike(raw)
+        if (s) {
+            query = isValidUuid(raw)
+                ? query.or(`order_number.ilike.%${s}%,id.eq.${raw}`)
+                : query.ilike("order_number", `%${s}%`)
+        }
+    }
+
+    if (filters?.customerName && filters.customerName.trim().length > 0) {
+        const s = sanitizeIlike(filters.customerName)
+        if (s) query = query.ilike("customer_name", `%${s}%`)
+    }
+
     if (filters?.search && filters.search.trim().length > 0) {
-        const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
+        const raw = filters.search.trim()
+        const s = sanitizeIlike(raw)
+        if (s) {
+            const parts = [`order_number.ilike.%${s}%`, `customer_name.ilike.%${s}%`]
+            if (isValidUuid(raw)) parts.push(`id.eq.${raw}`)
+            query = query.or(parts.join(","))
+        }
     }
 
     const statusValues = toFilterArray(filters?.status)
@@ -436,6 +465,9 @@ export async function getAdminReturnRequests(
         type?: string
         source?: string
         search?: string
+        orderNumber?: string
+        customer?: string
+        storeName?: string
         startDate?: string
         endDate?: string
     }
@@ -445,6 +477,11 @@ export async function getAdminReturnRequests(
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)
+
+    const storeIds = await resolveStoreIdsByName(admin, filters?.storeName)
+    if (storeIds !== null && storeIds.length === 0) {
+        return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+    }
 
     let query = admin
         .from("return_requests")
@@ -482,9 +519,39 @@ export async function getAdminReturnRequests(
         `)
         .is("deleted_at", null)
 
+    if (storeIds !== null) {
+        query = query.in("store_id", storeIds)
+    }
+
+    if (filters?.orderNumber && filters.orderNumber.trim().length > 0) {
+        const raw = filters.orderNumber.trim().replace(/^#/, "")
+        const s = sanitizeIlike(raw)
+        if (s) {
+            query = isValidUuid(raw)
+                ? query.or(`order_number_snapshot.ilike.%${s}%,id.eq.${raw}`)
+                : query.ilike("order_number_snapshot", `%${s}%`)
+        }
+    }
+
+    if (filters?.customer && filters.customer.trim().length > 0) {
+        const s = sanitizeIlike(filters.customer)
+        if (s) {
+            query = query.or(`customer_name_snapshot.ilike.%${s}%,customer_email_snapshot.ilike.%${s}%`)
+        }
+    }
+
     if (filters?.search && filters.search.trim().length > 0) {
-        const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`customer_name_snapshot.ilike.%${s}%,order_number_snapshot.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%,customer_email_snapshot.ilike.%${s}%`)
+        const raw = filters.search.trim()
+        const s = sanitizeIlike(raw)
+        if (s) {
+            const parts = [
+                `customer_name_snapshot.ilike.%${s}%`,
+                `order_number_snapshot.ilike.%${s}%`,
+                `customer_email_snapshot.ilike.%${s}%`,
+            ]
+            if (isValidUuid(raw)) parts.push(`id.eq.${raw}`)
+            query = query.or(parts.join(","))
+        }
     }
 
     if (Array.isArray(filters?.status)) {

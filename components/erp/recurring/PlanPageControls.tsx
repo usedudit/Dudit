@@ -28,6 +28,7 @@ interface PlanPageControlsProps {
   hasActiveFilters: boolean
   chips?: React.ReactNode
   tabCounts?: { Todos: number; Ativo: number; Inativo: number; Arquivado: number }
+  hideSearch?: boolean
 }
 
 export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
@@ -42,7 +43,8 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
   onOpenFilter,
   hasActiveFilters,
   chips,
-  tabCounts
+  tabCounts,
+  hideSearch = false,
 }) => {
   return (
     <>
@@ -72,11 +74,15 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
           onOpenFilter={onOpenFilter}
           hasActiveFilters={hasActiveFilters}
           chips={chips}
-          search={{
-            value: search,
-            onChange: onSearchChange,
-            placeholder: "Buscar planos...",
-          }}
+          search={
+            hideSearch
+              ? undefined
+              : {
+                  value: search,
+                  onChange: onSearchChange,
+                  placeholder: "Buscar planos...",
+                }
+          }
           mobileExtra={
             canManage ? (
               <Button

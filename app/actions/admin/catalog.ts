@@ -66,6 +66,7 @@ import {
     mapItemsToDb,
 } from "@/lib/recurring/plan-form-helpers"
 import { getAdminEntityTimeline } from "@/app/actions/admin/moderation"
+import { resolvePartnerIdsByStoreName, sanitizeIlike } from "@/lib/admin/search-helpers"
 
 type AdminClient = ReturnType<typeof getAdminClient>
 
@@ -248,6 +249,11 @@ export async function listAdminCatalogServices(input?: {
 
 export async function listAdminCatalogPlans(input?: {
     search?: string
+    name?: string
+    storeName?: string
+    status?: string
+    frequency?: string[]
+    billing?: string[]
     partnerId?: string
     limit?: number
     cursor?: string | null
@@ -258,6 +264,11 @@ export async function listAdminCatalogPlans(input?: {
         await adminReadGate()
         const admin = getAdminClient()
         const limit = Math.min(Math.max(Number(input?.limit) || PAGE_SIZE, 1), 100)
+
+        const storePartnerIds = await resolvePartnerIdsByStoreName(admin, input?.storeName)
+        if (storePartnerIds !== null && storePartnerIds.length === 0) {
+            return successResponse({ items: [], hasMore: false, nextCursor: null })
+        }
 
         let query = admin
             .from("recurring_plans")
@@ -270,10 +281,33 @@ export async function listAdminCatalogPlans(input?: {
 
         const partnerId = sanitizeUUID(input?.partnerId || "")
         if (partnerId) query = query.eq("partner_id", partnerId)
+        else if (storePartnerIds !== null) query = query.in("partner_id", storePartnerIds)
+
+        const nameFilter = sanitizeIlike(input?.name || "")
+        if (nameFilter) {
+            query = query.ilike("name", `%${nameFilter}%`)
+        }
 
         const search = sanitizeSearchTerm(input?.search)
         if (search) {
             query = query.or(`name.ilike.%${search}%`)
+        }
+
+        if (input?.status && input.status !== "Todos" && input.status !== "all") {
+            const statusMap: Record<string, string> = {
+                Ativo: "active",
+                Inativo: "inactive",
+                Arquivado: "archived",
+            }
+            query = query.eq("status", statusMap[input.status] || input.status)
+        }
+
+        if (input?.frequency && input.frequency.length > 0) {
+            query = query.in("frequency_type", input.frequency)
+        }
+
+        if (input?.billing && input.billing.length > 0) {
+            query = query.in("billing_mode", input.billing)
         }
 
         if (input?.cursor) {

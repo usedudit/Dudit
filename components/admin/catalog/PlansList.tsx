@@ -59,9 +59,21 @@ import {
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
 
-type PlanFilters = { frequency: string[]; billing: string[]; price: { min: string; max: string } }
+type PlanFilters = {
+    name: string
+    storeName: string
+    frequency: string[]
+    billing: string[]
+    price: { min: string; max: string }
+}
 
-const EMPTY_PLAN_FILTERS: PlanFilters = { frequency: [], billing: [], price: { min: "", max: "" } }
+const EMPTY_PLAN_FILTERS: PlanFilters = {
+    name: "",
+    storeName: "",
+    frequency: [],
+    billing: [],
+    price: { min: "", max: "" },
+}
 
 const PLAN_FREQUENCY_LABELS: Record<string, string> = {
     daily: "Diária",
@@ -77,6 +89,18 @@ const PLAN_BILLING_LABELS: Record<string, string> = {
 }
 
 const PLAN_FILTER_SECTIONS: FilterSectionConfig[] = [
+    {
+        id: "name",
+        title: "Nome do Plano",
+        type: "text",
+        placeholder: "Buscar por nome do plano...",
+    },
+    {
+        id: "storeName",
+        title: "Nome da Loja / Parceiro",
+        type: "text",
+        placeholder: "Buscar por nome da loja...",
+    },
     {
         id: "frequency",
         title: "Frequência",
@@ -128,6 +152,22 @@ const PlanFilterChips = ({
 
     return (
         <AnimatePresence>
+            {filters.name.trim() && (
+                <FilterChip
+                    key="name"
+                    label="Plano"
+                    value={filters.name.trim()}
+                    onRemove={() => onClear("name")}
+                />
+            )}
+            {filters.storeName.trim() && (
+                <FilterChip
+                    key="storeName"
+                    label="Loja"
+                    value={filters.storeName.trim()}
+                    onRemove={() => onClear("storeName")}
+                />
+            )}
             {filters.frequency.length > 0 && (
                 <FilterChip
                     key="frequency"
@@ -192,31 +232,50 @@ export default function PlansList({ initialItems = [], initialNextCursor = null,
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
-    // Search - DECLARED BEFORE useEntityPage
-    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-
-    // Filters - DECLARED BEFORE useEntityPage
+    // Filters & Tab - DECLARED BEFORE useEntityPage
+    const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
     const [filters, setFilters] = useState<PlanFilters & { datePeriod: DatePeriodFilterValue }>({
         ...EMPTY_PLAN_FILTERS,
         datePeriod: { ...EMPTY_DATE_PERIOD },
     })
 
+    const hasActiveQuery =
+        activeTab !== "Todos" ||
+        filters.name.trim().length > 0 ||
+        filters.storeName.trim().length > 0 ||
+        filters.frequency.length > 0 ||
+        filters.billing.length > 0 ||
+        Boolean(filters.price.min || filters.price.max) ||
+        isDatePeriodFilterActive(filters.datePeriod)
+
     // useEntityPage Hook for managing URL state and query caching
     const entityPage = useEntityPage<any, any, string>({
         entityType: "recurring_plans",
         partnerId: "admin",
-        queryKey: ["admin", "recurring_plans", debouncedSearch, filters.datePeriod],
-        initialItems,
-        initialNextCursor,
-        initialHasMore,
-        skipInitialData: debouncedSearch.length > 0 || isDatePeriodFilterActive(filters.datePeriod),
-        search: debouncedSearch,
-        setSearch,
+        queryKey: [
+            "admin",
+            "recurring_plans",
+            activeTab,
+            filters.name,
+            filters.storeName,
+            filters.frequency,
+            filters.billing,
+            filters.datePeriod,
+        ],
+        initialItems: [],
+        initialNextCursor: null,
+        initialHasMore: false,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
             const res = await listAdminCatalogPlans({
                 limit: 20,
                 cursor,
-                search: debouncedSearch || undefined,
+                name: filters.name.trim() || undefined,
+                storeName: filters.storeName.trim() || undefined,
+                status: activeTab === "Todos" ? undefined : activeTab,
+                frequency: filters.frequency.length > 0 ? filters.frequency : undefined,
+                billing: filters.billing.length > 0 ? filters.billing : undefined,
                 startDate: filters.datePeriod.from || undefined,
                 endDate: filters.datePeriod.to || undefined,
             })
@@ -260,7 +319,6 @@ export default function PlansList({ initialItems = [], initialNextCursor = null,
 
     // Local states
     const [viewMode, setViewMode] = useState<"list" | "grid">(isTablet ? "grid" : "list")
-    const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
         key: "name",
@@ -288,10 +346,10 @@ export default function PlansList({ initialItems = [], initialNextCursor = null,
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, viewMode, rawPlans])
 
-    // Reset pagination when search/filter/tab changes
+    // Reset pagination when filter/tab changes
     useEffect(() => {
         setPage(1)
-    }, [debouncedSearch, activeTab, filters.datePeriod])
+    }, [activeTab, filters])
 
     // Selected plan for detail/edit
     const selectedPlan = useMemo(() => {
@@ -573,28 +631,29 @@ export default function PlansList({ initialItems = [], initialNextCursor = null,
                             <PlanPageControls
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}
-                                tabCounts={tabCounts}
                                 viewMode={viewMode}
                                 onViewModeChange={setViewMode}
-                                search={search}
-                                onSearchChange={setSearch}
+                                search=""
+                                onSearchChange={() => {}}
+                                hideSearch
                                 onAddPlan={handleAddPlan}
                                 canManage={false}
                                 onOpenFilter={() => setIsFilterOpen(true)}
-                                hasActiveFilters={Boolean(
-                                    filters.frequency.length > 0 ||
-                                    filters.billing.length > 0 ||
-                                    filters.price.min ||
-                                    filters.price.max ||
-                                    isDatePeriodFilterActive(filters.datePeriod)
-                                )}
+                                hasActiveFilters={hasActiveQuery}
                                 chips={
                                     <PlanFilterChips
                                         filters={filters}
                                         onClear={(key) =>
                                             setFilters((prev) => ({
                                                 ...prev,
-                                                [key]: key === "price" ? { min: "", max: "" } : key === "datePeriod" ? { ...EMPTY_DATE_PERIOD } : [],
+                                                [key]:
+                                                    key === "name" || key === "storeName"
+                                                        ? ""
+                                                        : key === "price"
+                                                            ? { min: "", max: "" }
+                                                            : key === "datePeriod"
+                                                                ? { ...EMPTY_DATE_PERIOD }
+                                                                : [],
                                             }))
                                         }
                                     />
@@ -615,14 +674,30 @@ export default function PlansList({ initialItems = [], initialNextCursor = null,
 
                             {/* Content Area */}
                             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-8">
-                                {paginated.length === 0 ? (
+                                {isListLoading ? (
+                                    <div className="flex items-center justify-center min-h-[360px]">
+                                        <ThreeDotsLoader />
+                                    </div>
+                                ) : paginated.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center p-12 text-center min-h-[360px]">
                                         <IconPlaceholder
                                             icon={RepeatIcon}
                                             containerSize="w-16 h-16 mb-2"
                                             iconSize="w-6 h-6"
-                                            title="Nenhum plano encontrado"
-                                            subtitle="Não há planos correspondentes aos filtros aplicados."
+                                            title={hasActiveQuery ? "Nenhum plano encontrado" : "Busque planos recorrentes usando os filtros"}
+                                            subtitle={hasActiveQuery ? "Não há planos correspondentes aos filtros aplicados." : "Clique em Filtros para pesquisar por nome do plano, loja, frequência ou status."}
+                                            itemButton={hasActiveQuery ? {
+                                                text: "Limpar filtros",
+                                                action: () => {
+                                                    setFilters({ ...EMPTY_PLAN_FILTERS, datePeriod: { ...EMPTY_DATE_PERIOD } })
+                                                    setActiveTab("Todos")
+                                                },
+                                                variant: "outline",
+                                            } : {
+                                                text: "Abrir Filtros",
+                                                action: () => setIsFilterOpen(true),
+                                                variant: "outline",
+                                            }}
                                         />
                                     </div>
                                 ) : viewMode === "list" ? (

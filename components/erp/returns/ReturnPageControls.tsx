@@ -13,6 +13,8 @@ interface ReturnPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     addDisabled?: boolean
+    hideSearch?: boolean
+    chips?: React.ReactNode
 }
 
 export default function ReturnPageControls({
@@ -24,24 +26,33 @@ export default function ReturnPageControls({
     viewMode,
     onViewModeChange,
     addDisabled = false,
+    hideSearch = false,
+    chips,
 }: ReturnPageControlsProps) {
     return (
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
             {/* Mobile View */}
             <div className="md:hidden flex items-center gap-2 w-full">
-                <div className="flex-1">
-                    <Input
-                        name="search"
-                        placeholder="Buscar devoluções..."
-                        value={search}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        variant="full-rounded"
-                        label=""
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                    />
-                </div>
-                <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
-                    <FilterIcon className="w-4 h-4" />
+                {!hideSearch && (
+                    <div className="flex-1">
+                        <Input
+                            name="search"
+                            placeholder="Buscar devoluções..."
+                            value={search}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            variant="full-rounded"
+                            label=""
+                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                        />
+                    </div>
+                )}
+                <Button
+                    variant="outline"
+                    onClick={onOpenFilter}
+                    className={hideSearch ? "h-[42px]" : "w-[42px] h-[42px] p-0"}
+                    leftIcon={hideSearch ? <FilterIcon size={16} /> : undefined}
+                >
+                    {hideSearch ? "Filtros e Busca" : <FilterIcon className="w-4 h-4" />}
                 </Button>
                 <Dropdown
                     trigger={
@@ -69,22 +80,26 @@ export default function ReturnPageControls({
             {/* Desktop View */}
             <div className="hidden md:flex items-center w-full gap-4">
                 <div className="flex items-center gap-3 shrink-0">
-                    <div className="w-80">
-                        <Input
-                            name="search"
-                            placeholder="Buscar por ID, pedido ou cliente..."
-                            value={search}
-                            onChange={(e) => onSearchChange(e.target.value)}
-                            variant="full-rounded"
-                            label=""
-                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                        />
-                    </div>
+                    {!hideSearch && (
+                        <div className="w-80">
+                            <Input
+                                name="search"
+                                placeholder="Buscar por ID, pedido ou cliente..."
+                                value={search}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                variant="full-rounded"
+                                label=""
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            />
+                        </div>
+                    )}
                     <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon size={18} />}>
-                        Filtros
+                        {hideSearch ? "Filtros e Busca" : "Filtros"}
                     </Button>
                 </div>
-                <div className="flex-1" />
+                <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                    {chips}
+                </div>
                 <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
                     <button
                         onClick={() => onViewModeChange("list")}

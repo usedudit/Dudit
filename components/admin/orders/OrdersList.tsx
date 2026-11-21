@@ -9,13 +9,12 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { PackageIcon, StoreIcon, ExportFileIcon, ReturnIcon, TruckIcon, UserIcon, CancelCircleIcon, ShoppingCartIcon, ClockIcon, CheckCircleIcon, MoneyIcon } from "@/lib/icons"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
-import { getAdminMarketplaceOrders, getAdminMarketplaceOrdersStats, type AdminOrderStats } from "@/app/actions/admin/marketplace-ops"
+import { getAdminMarketplaceOrders, type AdminOrderStats } from "@/app/actions/admin/marketplace-ops"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } from "@/lib/utils/filter-date-period"
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
-import { useDebouncedSearch } from "@/hooks/use-debounced-search"
 import AdminOrderDetailClientWrapper from "./AdminOrderDetailClientWrapper"
 import { AdminOrderDetailView } from "./AdminOrderDetailView"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
@@ -33,6 +32,9 @@ interface OrdersListProps {
 const ITEMS_PER_PAGE = 8
 
 const INITIAL_FILTERS: OrderFilterState = {
+    orderNumber: "",
+    customerName: "",
+    storeName: "",
     status: [],
     deliveryStatus: [],
     paymentMethod: [],
@@ -60,18 +62,12 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     const [viewMode, setViewMode] = useState<"list" | "grid">(isTablet ? "grid" : "list")
     const [isPending, startTransition] = useTransition()
 
-    // Stats
-    const [stats, setStats] = useState<AdminOrderStats | undefined>(initialStats)
-
     // Filters & Modals
     const [filters, setFilters] = useState<OrderFilterState>(INITIAL_FILTERS)
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
-    // Search state (debounced so the server is only queried after typing stops)
-    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-
     // Server-side filters derived from the UI state
-    const buildServerFilters = useCallback((term: string) => {
+    const buildServerFilters = useCallback(() => {
         const bounds = isDatePeriodFilterActive(filters.datePeriod)
             ? resolveDatePeriodBounds(filters.datePeriod)
             : { startYmd: null as string | null, endYmd: null as string | null }
@@ -86,11 +82,13 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         const status = filters.status.length > 0 ? filters.status : tabStatus ? [tabStatus] : undefined
 
         return {
+            orderNumber: filters.orderNumber.trim() || undefined,
+            customerName: filters.customerName.trim() || undefined,
+            storeName: filters.storeName.trim() || undefined,
             status,
             deliveryStatus: filters.deliveryStatus.length > 0 ? filters.deliveryStatus : undefined,
             paymentMethod: filters.paymentMethod.length > 0 ? filters.paymentMethod : undefined,
             channel: filters.channel.length > 0 ? filters.channel : undefined,
-            search: term.trim() || undefined,
             startDate: bounds.startYmd || undefined,
             endDate: bounds.endYmd || undefined,
         }
@@ -149,45 +147,32 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         setShowSelectionBanner(false)
     }
 
-    // Silent background refresh (only called manually or after mutations)
-    const refreshOrders = useCallback(() => {
-        startTransition(async () => {
-            try {
-                const [res, statsRes] = await Promise.all([
-                    getAdminMarketplaceOrders(null, 50, buildServerFilters(debouncedSearch)),
-                    getAdminMarketplaceOrdersStats(),
-                ])
-                setOrders(res.data || [])
-                setNextCursor(res.nextCursor)
-                setHasMore(res.hasMore)
-                setPage(1)
-                setStats(statsRes)
-            } catch (err) {
-                console.error("Failed to refresh admin orders:", err)
-            }
-        })
-    }, [buildServerFilters, debouncedSearch])
-
-    // Server-side search / filters: refetch the first page whenever they change
+    // Server-side search / filters: only query when at least one filter or non-default tab is active
     useEffect(() => {
         const isDefaultView =
             activeTab === "all" &&
-            debouncedSearch.trim().length === 0 &&
+            filters.orderNumber.trim().length === 0 &&
+            filters.customerName.trim().length === 0 &&
+            filters.storeName.trim().length === 0 &&
             filters.status.length === 0 &&
             filters.deliveryStatus.length === 0 &&
             filters.paymentMethod.length === 0 &&
             filters.channel.length === 0 &&
             !isDatePeriodFilterActive(filters.datePeriod)
 
-        if (isFirstFetchRef.current) {
-            isFirstFetchRef.current = false
-            if (isDefaultView) return
+        if (isDefaultView) {
+            setOrders([])
+            setNextCursor(null)
+            setHasMore(false)
+            setPage(1)
+            setIsLoading(false)
+            return
         }
 
         let cancelled = false
         setIsLoading(true)
 
-        getAdminMarketplaceOrders(null, 50, buildServerFilters(debouncedSearch))
+        getAdminMarketplaceOrders(null, 20, buildServerFilters())
             .then((res) => {
                 if (cancelled) return
                 setOrders(res.data || [])
@@ -205,13 +190,13 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         return () => {
             cancelled = true
         }
-    }, [activeTab, debouncedSearch, filters, buildServerFilters])
+    }, [activeTab, filters, buildServerFilters])
 
     const loadMoreOrders = useCallback(async () => {
         if (!hasMore || !nextCursor || isFetchingMore) return
         setIsFetchingMore(true)
         try {
-            const res = await getAdminMarketplaceOrders(nextCursor, 50, buildServerFilters(debouncedSearch))
+            const res = await getAdminMarketplaceOrders(nextCursor, 20, buildServerFilters())
             setOrders((prev) => {
                 const existing = new Set(prev.map((order) => order.id))
                 return [...prev, ...(res.data || []).filter((order: any) => !existing.has(order.id))]
@@ -223,7 +208,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         } finally {
             setIsFetchingMore(false)
         }
-    }, [hasMore, nextCursor, isFetchingMore, buildServerFilters, debouncedSearch])
+    }, [hasMore, nextCursor, isFetchingMore, buildServerFilters])
 
     // Table columns matching ERP + seller column
     interface AdminColumn {
@@ -245,8 +230,26 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         { id: "actions", label: "Ações", align: "center", width: "80px", sortable: false },
     ], [])
 
-    // Filter Config for FilterSheet - matching ERP
+    // Filter Config for FilterSheet
     const filterSections: FilterSectionConfig[] = useMemo(() => [
+        {
+            id: "orderNumber",
+            title: "Número do Pedido",
+            type: "text",
+            placeholder: "Ex: 1042 ou ID do pedido...",
+        },
+        {
+            id: "customerName",
+            title: "Nome do Cliente",
+            type: "text",
+            placeholder: "Buscar por nome do cliente...",
+        },
+        {
+            id: "storeName",
+            title: "Nome da Loja",
+            type: "text",
+            placeholder: "Buscar por nome da loja...",
+        },
         {
             id: "datePeriod",
             title: "Data do pedido",
@@ -280,7 +283,9 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
 
     const hasActiveFilters = useMemo(() => {
         return (
-            search.trim().length > 0 ||
+            filters.orderNumber.trim().length > 0 ||
+            filters.customerName.trim().length > 0 ||
+            filters.storeName.trim().length > 0 ||
             activeTab !== "all" ||
             filters.status.length > 0 ||
             filters.deliveryStatus.length > 0 ||
@@ -288,71 +293,11 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
             filters.channel.length > 0 ||
             isDatePeriodFilterActive(filters.datePeriod)
         )
-    }, [search, activeTab, filters])
+    }, [activeTab, filters])
 
-    // Instant in-memory filtering (0ms) - matching ERP logic
+    // In-memory sorting (filtering is done server-side)
     const filteredOrders = useMemo(() => {
-        const term = search.trim().toLowerCase()
-        const dateBounds = isDatePeriodFilterActive(filters.datePeriod)
-            ? resolveDatePeriodBounds(filters.datePeriod)
-            : { startYmd: null, endYmd: null }
-
-        let result = orders.filter((order) => {
-            // Tab filter - matching ERP
-            if (activeTab === "pending" && order.situation !== "pending") return false
-            if (activeTab === "paid" && order.situation !== "paid") return false
-            if (activeTab === "shipped" && !["sent", "in_transit", "delivered"].includes(order.delivery_status)) return false
-            if (activeTab === "cancelled" && order.situation !== "cancelled") return false
-
-            // Search filter - matching ERP
-            if (term) {
-                const num = String(order.order_number || order.id || "").toLowerCase()
-                const cust = String(order.customer_name || "").toLowerCase()
-                const st = String(order.stores?.name || "").toLowerCase()
-                const itemNames = (order.order_items || []).map((i: any) => String(i.product_name || "").toLowerCase()).join(" ")
-                const seller = String(order.stores?.name || "").toLowerCase()
-                if (!num.includes(term) && !cust.includes(term) && !st.includes(term) && !seller.includes(term) && !itemNames.includes(term)) {
-                    return false
-                }
-            }
-
-            // FilterSheet status - matching ERP
-            if (filters.status.length > 0) {
-                const s = order.situation
-                const matches = filters.status.some(opt => {
-                    if (opt === "Pendente") return s === "pending"
-                    if (opt === "Pago") return s === "paid"
-                    if (opt === "Cancelado") return s === "cancelled"
-                    if (opt === "Enviado") return ["sent", "in_transit", "delivered"].includes(order.delivery_status)
-                    if (opt === "Entregue") return s === "delivered"
-                    if (opt === "Em análise") return s === "in_process"
-                    if (opt === "Parcialmente Pago") return s === "partially_paid"
-                    return s === opt
-                })
-                if (!matches) return false
-            }
-
-            // FilterSheet delivery status
-            if (filters.deliveryStatus.length > 0 && !filters.deliveryStatus.includes(order.delivery_status)) {
-                return false
-            }
-
-            // FilterSheet payment method
-            if (filters.paymentMethod.length > 0 && !filters.paymentMethod.includes(order.payment_method)) {
-                return false
-            }
-
-            // FilterSheet channel
-            if (filters.channel.length > 0 && !filters.channel.includes(order.order_source)) {
-                return false
-            }
-
-            // Date Period
-            if (dateBounds.startYmd && new Date(order.created_at) < new Date(dateBounds.startYmd)) return false
-            if (dateBounds.endYmd && new Date(order.created_at) > new Date(dateBounds.endYmd + "T23:59:59")) return false
-
-            return true
-        })
+        let result = [...orders]
 
         // In-memory sorting
         if (sortConfig) {
@@ -396,7 +341,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         }
 
         return result
-    }, [orders, activeTab, search, filters, sortConfig])
+    }, [orders, sortConfig])
 
     // Pagination (Strict 8 items) - matching ERP
     const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ITEMS_PER_PAGE))
@@ -633,43 +578,41 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                 <OrdersPageControls
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
-                    search={search}
-                    onSearchChange={setSearch}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     hasActiveFilters={hasActiveFilters}
-                    tabCounts={{
-                        total: stats?.total ?? 0,
-                        pending: stats?.pending ?? 0,
-                        paid: stats?.paid ?? 0,
-                        shipped: stats?.shipped ?? 0,
-                        cancelled: stats?.cancelled ?? 0,
-                    }}
                 />
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 ? (
+                        {isLoading ? (
+                            <FadeIn key="loading" className="w-full h-full flex items-center justify-center min-h-[400px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
+                        ) : paginatedItems.length === 0 ? (
                             <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                                     imageAlt="Nenhum pedido"
-                                    title="Nenhum pedido encontrado"
-                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhum pedido registrado nesta categoria."}
+                                    title={hasActiveFilters ? "Nenhum pedido encontrado" : "Busque pedidos usando os filtros"}
+                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Clique em Filtros e Busca para pesquisar por número do pedido, cliente, loja ou status."}
                                     itemButton={hasActiveFilters ? {
                                         text: "Limpar Filtros",
                                         action: () => {
-                                            setSearch("")
                                             setFilters(INITIAL_FILTERS)
                                             setActiveTab("all")
                                         },
                                         variant: "outline",
-                                    } : undefined}
+                                    } : {
+                                        text: "Abrir Filtros",
+                                        action: () => setIsFilterSheetOpen(true),
+                                        variant: "outline",
+                                    }}
                                 />
                             </FadeIn>
                         ) : (

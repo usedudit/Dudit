@@ -287,6 +287,7 @@ export class TinyClient {
     } = {}
   ): Promise<{ status: string; saldoEstoque?: number | string }> {
     const estoqueObj: Record<string, any> = {
+      idProduto: Number(idProduto) || String(idProduto),
       tipo: options.tipo || "B",
       quantidade: Math.max(0, Number(quantidade || 0)),
       observacoes: (options.observacoes || "Atualizado via Dudit").substring(0, 100),
@@ -301,8 +302,7 @@ export class TinyClient {
     }
 
     const res = await this.request("produto.atualizar.estoque.php", {
-      idProduto: String(idProduto),
-      estoque: estoqueObj,
+      estoque: JSON.stringify({ estoque: estoqueObj }),
     })
 
     return res

@@ -1,34 +1,27 @@
 "use client"
 
 import React from "react"
-import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
-import { TabCountBadge } from "@/components/reusable/TabCountBadge"
+import { Button, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import {
-    SearchIcon,
     StoreIcon,
     BlockedIcon,
     AlertTriangleIcon,
     CheckCircleIcon,
-    FilterIcon
+    FilterIcon,
 } from "@/lib/icons"
-import type { AdminPartnerStats } from "@/app/actions/admin/enforcement"
 
 interface PartnersPageControlsProps {
-    search: string
-    setSearch: (val: string) => void
     statusTab: string
     setStatusTab: (val: string) => void
-    tabCounts?: AdminPartnerStats
     onOpenFilter?: () => void
+    chips?: React.ReactNode
 }
 
 const PartnersPageControls = ({
-    search,
-    setSearch,
     statusTab,
     setStatusTab,
-    tabCounts,
     onOpenFilter,
+    chips,
 }: PartnersPageControlsProps) => {
     return (
         <>
@@ -36,32 +29,16 @@ const PartnersPageControls = ({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={statusTab} onValueChange={setStatusTab}>
                     <TabsList className="px-0">
-                        <TabsTrigger
-                            value="all"
-                            icon={StoreIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.total} variant="gray" />}
-                        >
+                        <TabsTrigger value="all" icon={StoreIcon}>
                             Todos
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="active"
-                            icon={CheckCircleIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="green" />}
-                        >
+                        <TabsTrigger value="active" icon={CheckCircleIcon}>
                             Ativos
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="suspended"
-                            icon={AlertTriangleIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.suspended} variant="red" />}
-                        >
+                        <TabsTrigger value="suspended" icon={AlertTriangleIcon}>
                             Suspensos
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="high_risk"
-                            icon={BlockedIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.highRisk} variant="yellow" />}
-                        >
+                        <TabsTrigger value="high_risk" icon={BlockedIcon}>
                             Alto Risco
                         </TabsTrigger>
                     </TabsList>
@@ -69,26 +46,20 @@ const PartnersPageControls = ({
             </div>
 
             {/* --- CONTROLS BAR --- */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full px-4 md:px-8 mb-6">
-                <div className="w-full sm:w-96">
-                    <Input
-                        placeholder="Buscar por nome da loja ou parceiro..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        variant="full-rounded"
-                        className="h-[42px]"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                    />
-                </div>
-
+            <div className="flex flex-wrap items-center gap-3 w-full px-4 md:px-8 mb-6">
                 {onOpenFilter && (
                     <Button
                         variant="outline"
                         onClick={onOpenFilter}
                         leftIcon={<FilterIcon size={18} />}
                     >
-                        Filtros
+                        Filtros e Busca
                     </Button>
+                )}
+                {chips && (
+                    <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                        {chips}
+                    </div>
                 )}
             </div>
         </>
@@ -96,4 +67,3 @@ const PartnersPageControls = ({
 }
 
 export default PartnersPageControls
-

@@ -180,7 +180,7 @@ BEGIN
         p_items := v_stock_items,
         p_store_id := v_store_id,
         p_reference_name := 'Pedido #' || v_exchange_order_number,
-        p_reference_type := 'order'
+        p_reference_type := NULL
       );
 
       v_stock_movement_id := NULLIF(v_stock_movement->>'id', '')::UUID;

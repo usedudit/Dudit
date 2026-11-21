@@ -11,10 +11,7 @@ import { applyAdminActionContext, type AdminActionContext } from "@/lib/admin/ac
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { revalidatePath } from "next/cache"
-
-function sanitizeIlike(input: string): string {
-    return input.replace(/[%_\\]/g, (c) => `\\${c}`)
-}
+import { isValidUuid, resolveStoreIdsByName, sanitizeIlike } from "@/lib/admin/search-helpers"
 
 export interface AdminCampaignStats {
     total: number
@@ -50,6 +47,8 @@ export async function getAdminCampaigns(
     filters?: {
         isActive?: string
         search?: string
+        name?: string
+        storeName?: string
         startDate?: string
         endDate?: string
     }
@@ -59,6 +58,11 @@ export async function getAdminCampaigns(
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)
+
+    const storeIds = await resolveStoreIdsByName(admin, filters?.storeName)
+    if (storeIds !== null && storeIds.length === 0) {
+        return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+    }
 
     let query = admin
         .from("campaigns")
@@ -78,9 +82,23 @@ export async function getAdminCampaigns(
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
         `)
 
+    if (storeIds !== null) {
+        query = query.in("store_id", storeIds)
+    }
+
+    if (filters?.name && filters.name.trim().length > 0) {
+        const s = sanitizeIlike(filters.name)
+        if (s) query = query.or(`name.ilike.%${s}%,description.ilike.%${s}%`)
+    }
+
     if (filters?.search && filters.search.trim().length > 0) {
-        const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`name.ilike.%${s}%,description.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
+        const raw = filters.search.trim()
+        const s = sanitizeIlike(raw)
+        if (s) {
+            const parts = [`name.ilike.%${s}%`, `description.ilike.%${s}%`]
+            if (isValidUuid(raw)) parts.push(`id.eq.${raw}`)
+            query = query.or(parts.join(","))
+        }
     }
 
     if (filters?.isActive === "active") {

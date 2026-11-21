@@ -199,7 +199,7 @@ describe("TinyClient", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const callArgs = fetchSpy.mock.calls[0]
     expect(callArgs[0]).toContain("produto.atualizar.estoque.php")
-    expect(callArgs[1]?.body).toContain("idProduto=12345")
+    expect(callArgs[1]?.body).toContain(encodeURIComponent('"idProduto":12345'))
     expect(callArgs[1]?.body).toContain(encodeURIComponent('"quantidade":42'))
   })
 })

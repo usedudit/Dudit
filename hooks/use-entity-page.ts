@@ -37,6 +37,8 @@ export interface UseEntityPageOptions<
      * the hook fetches fresh page 1 instead of seeding with unfiltered data.
      */
     skipInitialData?: boolean
+    /** When false, disables fetching until enabled becomes true (default: true). */
+    enabled?: boolean
     fetchPageFn: (args: { cursor: TCursor | null }) => Promise<{
         items: TListItem[]
         nextCursor: TCursor | null
@@ -84,6 +86,7 @@ export function useEntityPage<
         staleTime: staleTimeProp,
         priority,
         skipInitialData,
+        enabled = true,
     } = options
 
     const staleTime = staleTimeProp ?? (priority ? PRIORITY_STALE_TIME[priority] : 30000)
@@ -104,7 +107,8 @@ export function useEntityPage<
         isLoading: isListLoading,
     } = useInfiniteList<TListItem, TCursor>({
         queryKey,
-        initialPage: skipInitialData
+        enabled,
+        initialPage: skipInitialData || !enabled
             ? undefined
             : {
                 items: initialItems,

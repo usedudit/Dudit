@@ -39,8 +39,8 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     shortDescription: "Recupere até 25% dos carrinhos abandonados com lembretes inteligentes automáticos.",
     fullDescription:
       "Quando um cliente adiciona produtos na sacola mas não conclui a compra em até 4 horas, o robô da Dudit envia uma notificação personalizada relembrando os itens e facilitando a finalização em 1 clique.",
-    price: 14.9,
-    imageSrc: "https://img.dudit.com.br/static/mascots/SacolaVazia.png",
+    price: 4.99,
+    imageSrc: "https://img.dudit.com.br/static/addons/RecoverCart.png",
     category: "vendas",
     features: [
       "Detecção automática de sacolas paradas após 4 horas",
@@ -61,8 +61,8 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     shortDescription: "Aumente seu ticket médio oferecendo produtos complementares na tela de pagamento.",
     fullDescription:
       "Exiba um produto complementar com 1 clique de adição no momento em que o cliente já está com a carteira na mão pronto para pagar na sua vitrine.",
-    price: 9.9,
-    imageSrc: "https://img.dudit.com.br/static/mascots/Vitrine.png",
+    price: 4.99,
+    imageSrc: "https://img.dudit.com.br/static/addons/OrderBump.png",
     category: "vendas",
     features: [
       "Oferta nativa e discreta no checkout da sua vitrine",
@@ -83,8 +83,8 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     shortDescription: "Traga seus clientes de volta na data certa do retorno de procedimentos e serviços.",
     fullDescription:
       "Defina o intervalo recomendado de retorno para cada serviço (ex: corte de cabelo a cada 30 dias, limpeza de pele a cada 45 dias, revisão veicular a cada 6 meses). O sistema avisa o cliente no momento exato de agendar de novo.",
-    price: 14.9,
-    imageSrc: "https://img.dudit.com.br/static/mascots/Agendamentos.png",
+    price: 4.99,
+    imageSrc: "https://img.dudit.com.br/static/addons/OrderBump.png",
     category: "retencao",
     features: [
       "Gatilho baseado no intervalo configurado em cada serviço",
@@ -105,8 +105,8 @@ export const ADDON_REGISTRY: Record<AddonSlug, AddonDefinition> = {
     shortDescription: "Fidelize clientes enviando parabéns e um cupom exclusivo no dia do aniversário.",
     fullDescription:
       "Surpreenda seu cliente no dia mais especial do ano dele! O sistema identifica aniversariantes do dia e gera um cupom promocional para ele comemorar comprando de você.",
-    price: 9.9,
-    imageSrc: "https://img.dudit.com.br/static/mascots/Cupons.png",
+    price: 4.99,
+    imageSrc: "https://img.dudit.com.br/static/addons/OrderBump.png",
     category: "fidelizacao",
     features: [
       "Identificação automática pela data de nascimento cadastrada",
@@ -488,7 +488,7 @@ export async function createAddonMpSubscription(
 
     // 3. Cancelar preapproval pendente anterior (se houver) para não acumular cobranças abandonadas
     if (existing?.subscription_status === "pending" && existing.mp_preapproval_id) {
-      await cancelMpPreapproval(existing.mp_preapproval_id).catch(() => {})
+      await cancelMpPreapproval(existing.mp_preapproval_id).catch(() => { })
     }
 
     // 4. Criar preapproval no Mercado Pago usando as credenciais da plataforma Dudit
@@ -497,7 +497,7 @@ export async function createAddonMpSubscription(
     const backUrl = `${appUrl}/erp/configuracoes?tab=integracoes&section=aplicativos&addon_checkout=${addonSlug}`
 
     const mpPayload = {
-      reason: `Dudit Aplicativo: ${addon.name} - Assinatura mensal`,
+      reason: `Dudit - ${addon.name}`.slice(0, 60),
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",

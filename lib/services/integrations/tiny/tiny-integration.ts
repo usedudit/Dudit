@@ -159,7 +159,21 @@ export async function syncTinyProductsToDudit(params: {
           const promotionalPrice = detail.preco_promocional ? Number(detail.preco_promocional) : null
           const costPrice = Number((detail as any).preco_custo || 0) || 0
           const unit = detail.unidade?.trim() || "UN"
-          const stock = Number(detail.saldo || 0)
+          const hasVariations = Array.isArray((detail as any).variacoes) && (detail as any).variacoes.length > 0
+          // produto.obter.php não retorna o saldo real de estoque no Tiny;
+          // para produtos simples (sem variações), busca o saldo físico e reservado via produto.obter.estoque.php
+          let stock = Math.max(0, Number(detail.saldo || 0))
+          let stockReserved = 0
+          if (!hasVariations) {
+            try {
+              const stockInfo = await client.getProductStock(detail.id)
+              stock = Math.max(0, Number(stockInfo.saldo || 0))
+              stockReserved = Math.max(0, Number(stockInfo.saldoReservado || 0))
+            } catch {
+              stock = Math.max(0, Number(detail.saldo || 0))
+              stockReserved = 0
+            }
+          }
           const minStock = Number(detail.estoque_minimo || 0)
           const gtin = detail.gtin?.trim() || null
           const description = detail.observacoes?.trim() || null
@@ -213,6 +227,7 @@ export async function syncTinyProductsToDudit(params: {
                 unit,
                 min_stock: minStock,
                 stock_quantity: stock,
+                stock_reserved: stockReserved,
                 description: description || undefined,
                 images: images.length > 0 ? images : undefined,
                 status: isActive ? "ativo" : "inativo",
@@ -247,6 +262,7 @@ export async function syncTinyProductsToDudit(params: {
                 unit,
                 min_stock: minStock,
                 stock_quantity: stock,
+                stock_reserved: stockReserved,
                 description: description || "",
                 images: images.length > 0 ? images : [],
                 status: isActive ? "ativo" : "inativo",
@@ -313,6 +329,7 @@ export async function syncTinyProductsToDudit(params: {
           // Se tiver variações (produto pai com grade/variações no Tiny), sincroniza em product_variants
           if (targetProductId && Array.isArray((detail as any).variacoes) && (detail as any).variacoes.length > 0) {
             let totalVariantStock = 0
+            let totalVariantReserved = 0
             for (const vObj of (detail as any).variacoes) {
               const v = vObj.variacao
               if (!v) continue
@@ -322,15 +339,19 @@ export async function syncTinyProductsToDudit(params: {
               const gradeType = v.grade ? Object.keys(v.grade).join(" / ") : "Opção"
 
               let vStock = 0
+              let vReserved = 0
               if (v.id) {
                 try {
                   const stockInfo = await client.getProductStock(v.id)
                   vStock = Math.max(0, Number(stockInfo.saldo || 0))
+                  vReserved = Math.max(0, Number(stockInfo.saldoReservado || 0))
                 } catch {
                   vStock = 0
+                  vReserved = 0
                 }
               }
               totalVariantStock += vStock
+              totalVariantReserved += vReserved
 
               const vPrice = Number(v.preco || price)
               // No Dudit, product_variants.price_adjustment armazena o preço final de venda da variação
@@ -386,6 +407,7 @@ export async function syncTinyProductsToDudit(params: {
                     sku: vSku,
                     price_adjustment: variantFinalPrice,
                     stock_quantity: vStock,
+                    stock_reserved: vReserved,
                     variant_options: v.grade || {},
                     is_active: true,
                     updated_at: now,
@@ -402,6 +424,7 @@ export async function syncTinyProductsToDudit(params: {
                     sku: vSku,
                     price_adjustment: variantFinalPrice,
                     stock_quantity: vStock,
+                    stock_reserved: vReserved,
                     variant_options: v.grade || {},
                     is_active: true,
                     created_at: now,
@@ -410,13 +433,15 @@ export async function syncTinyProductsToDudit(params: {
               }
             }
 
-            // Atualiza o estoque total do produto pai como a soma das variações
-            if (totalVariantStock > 0) {
-              await supabase
-                .from("products")
-                .update({ stock_quantity: totalVariantStock })
-                .eq("id", targetProductId)
-            }
+            // Atualiza o estoque físico e reservado do produto pai como a soma das variações
+            // (o trigger sync_products_stock_availability recalcula stock_available = stock_quantity - stock_reserved)
+            await supabase
+              .from("products")
+              .update({
+                stock_quantity: totalVariantStock,
+                stock_reserved: totalVariantReserved,
+              })
+              .eq("id", targetProductId)
           }
         } catch (itemErr: any) {
           errors.push(`Falha no produto ID ${summary.id}: ${itemErr?.message}`)

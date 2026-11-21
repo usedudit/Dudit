@@ -26,6 +26,8 @@ export const ACTION_TYPE_LABELS: Record<string, string> = {
     "partner.enable_erp": "Habilitação de ERP",
     "partner.suspend_store": "Suspensão de Loja",
     "partner.unsuspend_store": "Reativação de Loja",
+    "partner.disable_showcase": "Desativação de Vitrine Online",
+    "partner.enable_showcase": "Ativação de Vitrine Online",
     "product.soft_delete": "Exclusão de Produto",
     "service.soft_delete": "Exclusão de Serviço",
     "recurring_plan.delete": "Exclusão de Plano",

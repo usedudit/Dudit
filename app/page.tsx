@@ -151,13 +151,31 @@ export default async function HomePage() {
     const dbProfile = sessionData?.profile
 
     // Resolve city selection:
-    // 1. For authenticated users with an address, their default address is the primary source of truth.
-    // 2. For visitors or users without an address, resolve from explicit city cookie.
+    // 1. Explicit city cookie (user selected a city or used current location) takes priority.
+    // 2. For authenticated users without an explicit override cookie, use their default address.
     // 3. Fallback to default state SP (Brasil scope).
     let citySlug: string | null = null
     let cityName: string | null = null
 
-    if (dbProfile?.city && dbProfile?.state) {
+    const cookieStore = await cookies()
+    const cookieCity = cookieStore.get("dudit_city")?.value
+
+    if (cookieCity === "brasil") {
+        citySlug = "brasil"
+        cityName = "Brasil"
+    } else if (cookieCity?.startsWith("estado-")) {
+        const uf = cookieCity.replace("estado-", "").toLowerCase()
+        citySlug = cookieCity
+        cityName = ESTADO_MAP[uf] || `Estado de ${uf.toUpperCase()}`
+    } else if (cookieCity) {
+        const resolved = await resolveCityAndStateFromSlug(cookieCity)
+        if (resolved) {
+            citySlug = cookieCity
+            cityName = resolved.city
+        }
+    }
+
+    if ((!citySlug || !cityName) && dbProfile?.city && dbProfile?.state) {
         cityName = dbProfile.city
         const normalizedCity = dbProfile.city
             .toLowerCase()
@@ -166,23 +184,6 @@ export default async function HomePage() {
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)/g, "")
         citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
-    } else {
-        const cookieStore = await cookies()
-        const cookieCity = cookieStore.get("dudit_city")?.value
-        if (cookieCity === "brasil") {
-            citySlug = "brasil"
-            cityName = "Brasil"
-        } else if (cookieCity?.startsWith("estado-")) {
-            const uf = cookieCity.replace("estado-", "").toLowerCase()
-            citySlug = cookieCity
-            cityName = ESTADO_MAP[uf] || `Estado de ${uf.toUpperCase()}`
-        } else if (cookieCity) {
-            const resolved = await resolveCityAndStateFromSlug(cookieCity)
-            if (resolved) {
-                citySlug = cookieCity
-                cityName = resolved.city
-            }
-        }
     }
 
     let isDefaultStateSP = false

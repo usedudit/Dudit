@@ -25,10 +25,12 @@ import {
     clearExpiredEnforcementsForUserPartners,
 } from "@/lib/services/enforcement-expiration.service"
 
-// SECURITY FIX (MED-01): Sanitize wildcard chars in ILIKE queries
-function sanitizeIlike(input: string): string {
-    return input.replace(/[%_\\]/g, c => `\\${c}`)
-}
+import {
+    isValidUuid,
+    resolveAuthUsersByEmail,
+    resolvePartnerIdsByOwnerName,
+    sanitizeIlike,
+} from "@/lib/admin/search-helpers"
 import type { EnforcementUser, EnforcementPartner, CursorPaginatedResult } from "@/lib/admin/types"
 
 // ─── Helper: Generate Clean Human-Readable Case Protocol ID (CAS-XXXXXXXX) ───
@@ -63,6 +65,41 @@ async function incrementRiskScore(partnerId: string, points: number): Promise<vo
     } catch (e) {
         console.error("[RISK_SCORE] Failed to increment:", partnerId, e)
     }
+}
+
+// ─── Helper: resolve admin actor names for audit events ────────────────────
+
+async function enrichAdminAuditEventsWithActorNames(supabase: any, events: any[]): Promise<any[]> {
+    if (!Array.isArray(events) || events.length === 0) return []
+
+    const adminIds = Array.from(
+        new Set(events.map((e: any) => e?.admin_user_id).filter(Boolean))
+    )
+    const nameMap = new Map<string, string>()
+
+    if (adminIds.length > 0) {
+        try {
+            const { data: profiles } = await supabase
+                .from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", adminIds)
+            for (const p of profiles || []) {
+                if (p?.user_id && p?.full_name) {
+                    nameMap.set(p.user_id, p.full_name)
+                }
+            }
+        } catch (err) {
+            console.warn("[ENFORCEMENT] Failed to resolve admin actor names:", err)
+        }
+    }
+
+    return events.map((ev: any) => ({
+        ...ev,
+        actor_name:
+            (ev?.admin_user_id && nameMap.get(ev.admin_user_id)) ||
+            ev?.metadata?.adminName ||
+            "Equipe Dudit",
+    }))
 }
 
 // ─── Helper: deactivate all products for a partner ──────────────────────
@@ -114,7 +151,12 @@ export async function getUsers(
     search?: string,
     status?: string,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    fieldFilters?: {
+        name?: string
+        email?: string
+        contact?: string
+    }
 ): Promise<CursorPaginatedResult<EnforcementUser>> {
     await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
@@ -129,30 +171,48 @@ export async function getUsers(
         .select("user_id")
     const adminUserIds = new Set((adminRoles || []).map((r: any) => r.user_id))
 
+    const emailQuery = fieldFilters?.email?.trim() || (search && search.trim().includes("@") ? search.trim() : "")
+    const preResolvedEmailUsers = emailQuery
+        ? await resolveAuthUsersByEmail(supabase, emailQuery, 50)
+        : null
+
+    if (preResolvedEmailUsers !== null && preResolvedEmailUsers.length === 0) {
+        return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+    }
+
     let query = supabase
         .from("user_profiles")
         .select("user_id, full_name, avatar_url, phone, cpf, cpf_lookup_hash, banned_at, banned_until, banned_reason, banned_case_id, created_at")
 
-    if (search && search.trim().length > 0) {
+    if (preResolvedEmailUsers !== null) {
+        query = query.in("user_id", preResolvedEmailUsers.map((u) => u.id))
+    }
+
+    if (fieldFilters?.name && fieldFilters.name.trim().length > 0) {
+        const s = sanitizeIlike(fieldFilters.name)
+        if (s) query = query.ilike("full_name", `%${s}%`)
+    }
+
+    if (fieldFilters?.contact && fieldFilters.contact.trim().length > 0) {
+        const raw = fieldFilters.contact.trim()
+        const s = sanitizeIlike(raw)
+        const digits = raw.replace(/\D/g, "")
+        const cpfHash = digits.length === 11
+            ? (await import("@/lib/crypto")).generateCpfLookupHash(digits)
+            : null
+        const parts = [`phone.ilike.%${s}%`]
+        if (cpfHash) parts.push(`cpf_lookup_hash.eq.${cpfHash}`)
+        query = query.or(parts.join(","))
+    }
+
+    if (search && search.trim().length > 0 && !search.trim().includes("@")) {
         const sanitized = sanitizeIlike(search.trim())
         const digits = search.trim().replace(/\D/g, "")
         const cpfHash = digits.length === 11
             ? (await import("@/lib/crypto")).generateCpfLookupHash(digits)
             : null
-        // Search in user_profiles: name, phone, CPF
         const orConditions = `full_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%${cpfHash ? `,cpf_lookup_hash.eq.${cpfHash}` : ""}`
         query = query.or(orConditions)
-    }
-
-    // If search looks like an email, also search auth.users by email
-    let emailUserId: string | null = null
-    if (search && search.trim().includes("@")) {
-        try {
-            const { data: authUser } = await supabase.auth.admin.getUserByEmail(search.trim())
-            if (authUser?.user?.id) {
-                emailUserId = authUser.user.id
-            }
-        } catch {}
     }
 
     if (status === "active" || status === "Ativos") {
@@ -163,11 +223,6 @@ export async function getUsers(
 
     if (startDate) query = query.gte("created_at", startDate)
     if (endDate) query = query.lte("created_at", endDate)
-
-    // If we found a user by email, filter by that user_id
-    if (emailUserId) {
-        query = query.eq("user_id", emailUserId)
-    }
 
     if (cursor) {
         query = query.lt("created_at", cursor)
@@ -320,12 +375,14 @@ export async function getAdminUserDetail(userId: string): Promise<any | null> {
         .limit(10)
 
     // 6. Audit logs targeting this user
-    const { data: auditEvents } = await supabase
+    const { data: rawAuditEvents } = await supabase
         .from("admin_audit_logs")
         .select("*")
         .eq("target_id", userId)
         .order("created_at", { ascending: false })
-        .limit(20)
+        .limit(50)
+
+    const auditEvents = await enrichAdminAuditEventsWithActorNames(supabase, rawAuditEvents || [])
 
     return {
         profile,
@@ -333,7 +390,7 @@ export async function getAdminUserDetail(userId: string): Promise<any | null> {
         partner,
         orders: orders || [],
         returns: returns || [],
-        auditEvents: auditEvents || [],
+        auditEvents,
     }
 }
 
@@ -573,11 +630,11 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
             } else if (actualStoreId) {
                 auditQuery = auditQuery.eq("target_id", actualStoreId)
             }
-            const { data: audits, error: auditErr } = await auditQuery.order("created_at", { ascending: false }).limit(30)
+            const { data: audits, error: auditErr } = await auditQuery.order("created_at", { ascending: false }).limit(50)
             if (auditErr) {
                 console.warn("[getAdminPartnerDetail] Warning querying audit logs:", auditErr.message)
             }
-            auditEvents = audits || []
+            auditEvents = await enrichAdminAuditEventsWithActorNames(supabase, audits || [])
         } catch (audErr) {
             console.error("[getAdminPartnerDetail] Failed to load audit logs:", audErr)
         }
@@ -798,7 +855,12 @@ export async function getPartners(
     search?: string,
     status?: string,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    fieldFilters?: {
+        storeName?: string
+        ownerName?: string
+        ownerEmail?: string
+    }
 ): Promise<CursorPaginatedResult<EnforcementPartner>> {
     const admin = await requireAdminScope("user_enforcement", "moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
@@ -807,20 +869,73 @@ export async function getPartners(
     await expireAllExpiredEnforcements(supabase)
     const pageSize = Math.min(limit, 50)
 
+    // Resolve optional partner filters (owner name / owner email)
+    let allowedPartnerIds: string[] | null = null
+
+    if (fieldFilters?.ownerName && fieldFilters.ownerName.trim().length > 0) {
+        const ownerPartnerIds = await resolvePartnerIdsByOwnerName(supabase, fieldFilters.ownerName)
+        if (!ownerPartnerIds || ownerPartnerIds.length === 0) {
+            return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+        }
+        allowedPartnerIds = ownerPartnerIds
+    }
+
+    if (fieldFilters?.ownerEmail && fieldFilters.ownerEmail.trim().length > 0) {
+        const emailUsers = await resolveAuthUsersByEmail(supabase, fieldFilters.ownerEmail, 50)
+        if (!emailUsers || emailUsers.length === 0) {
+            return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+        }
+        const { data: emailPartners } = await supabase
+            .from("partners")
+            .select("id")
+            .in("user_id", emailUsers.map((u) => u.id))
+            .limit(100)
+
+        const emailPartnerIds = (emailPartners || []).map((p: any) => String(p.id))
+        if (emailPartnerIds.length === 0) {
+            return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+        }
+        const nextPartnerIds: string[] = allowedPartnerIds
+            ? allowedPartnerIds.filter((id) => emailPartnerIds.includes(id))
+            : emailPartnerIds
+        if (nextPartnerIds.length === 0) {
+            return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+        }
+        allowedPartnerIds = nextPartnerIds
+    }
+
     // Main query: fetch stores with partner info
     let storeQuery = supabase
         .from("stores")
-        .select("id, name, is_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+        .select("id, name, is_active, is_showcase_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+
+    if (allowedPartnerIds !== null) {
+        storeQuery = storeQuery.in("partner_id", allowedPartnerIds)
+    }
+
+    if (fieldFilters?.storeName && fieldFilters.storeName.trim().length > 0) {
+        const s = sanitizeIlike(fieldFilters.storeName)
+        if (s) storeQuery = storeQuery.ilike("name", `%${s}%`)
+    }
 
     if (search && search.trim().length > 0) {
-        const sanitized = sanitizeIlike(search.trim())
-        storeQuery = storeQuery.or(`name.ilike.%${sanitized}%,id.eq.${sanitized},partner_id.eq.${sanitized}`)
+        const raw = search.trim()
+        const sanitized = sanitizeIlike(raw)
+        if (sanitized) {
+            const parts = [`name.ilike.%${sanitized}%`]
+            if (isValidUuid(raw)) {
+                parts.push(`id.eq.${raw}`, `partner_id.eq.${raw}`)
+            }
+            storeQuery = storeQuery.or(parts.join(","))
+        }
     }
 
     if (status === "active") {
         storeQuery = storeQuery.eq("is_active", true).is("suspended_at", null)
     } else if (status === "suspended") {
         storeQuery = storeQuery.not("suspended_at", "is", null)
+    } else if (status === "high_risk") {
+        storeQuery = storeQuery.gte("risk_score", 50)
     } else if (status === "erp_disabled") {
         storeQuery = storeQuery.eq("is_active", false)
     }
@@ -872,7 +987,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: allStores } = await supabase
             .from("stores")
-            .select("id, name, is_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+            .select("id, name, is_active, is_showcase_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
             .in("partner_id", partnerIds)
         if (allStores) {
             for (const s of allStores) {
@@ -891,6 +1006,7 @@ export async function getPartners(
             owner_name: ownerMap.get(partner?.user_id) || "Desconhecido",
             owner_user_id: partner?.user_id || "",
             is_active: s.is_active,
+            is_showcase_active: s.is_showcase_active !== false,
             erp_disabled: partner ? !!partner.erp_disabled : false,
             suspended_at: s.suspended_at || partner?.suspended_at || null,
             suspended_until: s.suspended_until || partner?.suspended_until || null,
@@ -904,7 +1020,9 @@ export async function getPartners(
                 id: st.id,
                 name: st.name,
                 is_active: st.is_active,
+                is_showcase_active: st.is_showcase_active !== false,
                 suspended_at: st.suspended_at,
+                suspended_until: st.suspended_until,
                 suspended_reason: st.suspended_reason,
                 suspended_case_id: st.suspended_case_id,
                 risk_score: st.risk_score || 0,
@@ -2008,6 +2126,162 @@ export async function softDeleteService(
         targetId: serviceId,
         metadata: { reason: reason.trim(), serviceName: service.name },
     })
+
+    return { success: true }
+}
+
+// ─── Toggle Store Online Showcase (Vitrine Online) ⚠️ (step-up required) ────
+
+export async function toggleStoreShowcase(
+    storeId: string,
+    enable: boolean,
+    reason: string = "",
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyOwner: boolean = true
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdminScope("user_enforcement", "admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
+
+    const trimmedReason = (reason || "").trim()
+    if (!enable && trimmedReason.length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+    const finalReason =
+        trimmedReason.length >= 5
+            ? trimmedReason
+            : enable
+                ? "Reativação administrativa da vitrine online"
+                : "Desativação administrativa da vitrine online"
+
+    const supabase: any = getAdminClient()
+
+    const { data: store, error: fetchError } = await supabase
+        .from("stores")
+        .select("id, name, slug, partner_id, is_showcase_active, risk_score")
+        .eq("id", storeId)
+        .single()
+
+    if (fetchError || !store) {
+        return { success: false, error: "Loja não encontrada" }
+    }
+
+    const currentlyActive = store.is_showcase_active !== false
+    if (enable && currentlyActive) {
+        return { success: false, error: "A vitrine online desta loja já está ativa" }
+    }
+    if (!enable && !currentlyActive) {
+        return { success: false, error: "A vitrine online desta loja já está desativada" }
+    }
+
+    const updatePayload: Record<string, any> = {
+        is_showcase_active: enable,
+    }
+    if (riskScore !== undefined && riskScore !== null) {
+        updatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
+    const { error: updateError } = await supabase
+        .from("stores")
+        .update(updatePayload)
+        .eq("id", storeId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    // Keep partner-level is_showcase_active in sync without hiding sibling active stores
+    if (store.partner_id) {
+        if (enable) {
+            await supabase
+                .from("partners")
+                .update({ is_showcase_active: true })
+                .eq("id", store.partner_id)
+        } else {
+            const { data: siblingStores } = await supabase
+                .from("stores")
+                .select("id, is_showcase_active")
+                .eq("partner_id", store.partner_id)
+            const anyActive = (siblingStores || []).some((s: any) => s.is_showcase_active !== false)
+            if (!anyActive) {
+                await supabase
+                    .from("partners")
+                    .update({ is_showcase_active: false })
+                    .eq("id", store.partner_id)
+            }
+        }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: enable ? AdminActionType.STORE_ENABLE_SHOWCASE : AdminActionType.STORE_DISABLE_SHOWCASE,
+        targetType: "partner",
+        targetId: storeId,
+        metadata: {
+            reason: finalReason,
+            storeName: store.name,
+            storeId,
+            partnerId: store.partner_id,
+            is_showcase_active: enable,
+            riskScore,
+        },
+    })
+
+    // Cache invalidation (storefront, explore, partner profile)
+    try {
+        const { invalidateStoreCache } = await import("@/lib/cache/invalidation")
+        await invalidateStoreCache(storeId, store.partner_id, store.slug || undefined)
+    } catch (e) {
+        console.error("[ENFORCEMENT] Store cache invalidation error:", e)
+    }
+
+    try {
+        const { revalidateExploreSearch, revalidateMarketplace } = await import("@/lib/utils/revalidation")
+        await Promise.allSettled([revalidateExploreSearch({ silent: true }), revalidateMarketplace()])
+    } catch (e) {
+        console.error("[ENFORCEMENT] Explore revalidation error:", e)
+    }
+
+    if (notifyOwner && store.partner_id) {
+        try {
+            const { createNotificationsForUsers, getStoreTeamUserIds, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            let teamUserIds = await getStoreTeamUserIds({
+                partnerId: store.partner_id,
+                storeId,
+                roles: MANAGEMENT_ROLES,
+            })
+            if (teamUserIds.length === 0) {
+                teamUserIds = await getPartnerTeamUserIds(store.partner_id, MANAGEMENT_ROLES)
+            }
+
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: enable
+                        ? `Vitrine Online Reativada: ${store.name}`
+                        : `Vitrine Online Desativada: ${store.name}`,
+                    message: enable
+                        ? `A vitrine online da loja "${store.name}" foi reativada pela administração e voltou a ficar visível no marketplace. Motivo: ${finalReason}.`
+                        : `A vitrine online da loja "${store.name}" foi desativada temporariamente pela administração. O acesso ao ERP permanece normal. Motivo: ${finalReason}.`,
+                    entityType: "announcement",
+                    entityId: storeId,
+                    data: {
+                        store_id: storeId,
+                        store_name: store.name,
+                        partner_id: store.partner_id,
+                        audience: "seller",
+                        url: "/erp/configuracoes",
+                    },
+                    idempotencyKey: `store_showcase_${enable ? "enabled" : "disabled"}:${storeId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send showcase toggle notification:", notifErr)
+        }
+    }
 
     return { success: true }
 }

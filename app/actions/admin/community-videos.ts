@@ -10,10 +10,7 @@ import { AdminActionType } from "@/lib/admin/types"
 import { applyAdminActionContext, type AdminActionContext } from "@/lib/admin/action-context"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { revalidatePath } from "next/cache"
-
-function sanitizeIlike(input: string): string {
-    return input.replace(/[%_\\]/g, (c) => `\\${c}`)
-}
+import { isValidUuid, resolveStoreIdsByName, sanitizeIlike } from "@/lib/admin/search-helpers"
 
 export interface AdminVideoStats {
     total: number
@@ -48,7 +45,10 @@ export async function getAdminCommunityVideos(
     limit: number = 20,
     filters?: {
         status?: string
+        statuses?: string[]
         search?: string
+        title?: string
+        storeName?: string
         startDate?: string
         endDate?: string
     }
@@ -58,6 +58,11 @@ export async function getAdminCommunityVideos(
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)
+
+    const storeIds = await resolveStoreIdsByName(admin, filters?.storeName)
+    if (storeIds !== null && storeIds.length === 0) {
+        return { data: [], nextCursor: null, prevCursor: cursor || null, hasMore: false }
+    }
 
     let query = admin
         .from("community_videos")
@@ -78,12 +83,28 @@ export async function getAdminCommunityVideos(
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id))
         `)
 
-    if (filters?.search && filters.search.trim().length > 0) {
-        const s = sanitizeIlike(filters.search.trim())
-        query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%,id.eq.${s},stores.name.ilike.%${s}%`)
+    if (storeIds !== null) {
+        query = query.in("store_id", storeIds)
     }
 
-    if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
+    if (filters?.title && filters.title.trim().length > 0) {
+        const s = sanitizeIlike(filters.title)
+        if (s) query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
+    }
+
+    if (filters?.search && filters.search.trim().length > 0) {
+        const raw = filters.search.trim()
+        const s = sanitizeIlike(raw)
+        if (s) {
+            const parts = [`title.ilike.%${s}%`, `description.ilike.%${s}%`]
+            if (isValidUuid(raw)) parts.push(`id.eq.${raw}`)
+            query = query.or(parts.join(","))
+        }
+    }
+
+    if (filters?.statuses && filters.statuses.length > 0) {
+        query = query.in("moderation_status", filters.statuses)
+    } else if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
         query = query.eq("moderation_status", filters.status)
     }
 

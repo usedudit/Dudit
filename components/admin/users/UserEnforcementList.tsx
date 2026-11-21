@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
-import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
+import { Button, Badge, IconPlaceholder, Pagination, AlertModal, ThreeDotsLoader } from "@/components/reusable"
+import FilterChip from "@/components/reusable/FilterChip"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import UserEnforcementListRow from "./UserEnforcementListRow"
 import UserEnforcementPageControls from "./UserEnforcementPageControls"
@@ -54,34 +55,45 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         direction: "desc",
     })
 
-    // Local search state - DECLARED BEFORE useEntityPage
-    const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-
     // Filters - DECLARED BEFORE useEntityPage
-    const [filters, setFilters] = useState<{ datePeriod: DatePeriodFilterValue }>({
-        datePeriod: { ...EMPTY_DATE_PERIOD },
-    })
+    const INITIAL_FILTERS = useMemo(() => ({
+        name: "",
+        email: "",
+        contact: "",
+        datePeriod: { ...EMPTY_DATE_PERIOD } as DatePeriodFilterValue,
+    }), [])
 
-    const isDefaultView = statusTab === "all" && !isDatePeriodFilterActive(filters.datePeriod)
+    const [filters, setFilters] = useState(INITIAL_FILTERS)
+
+    const hasActiveQuery =
+        statusTab !== "all" ||
+        filters.name.trim().length > 0 ||
+        filters.email.trim().length > 0 ||
+        filters.contact.trim().length > 0 ||
+        isDatePeriodFilterActive(filters.datePeriod)
 
     const entityPage = useEntityPage<any, any, any>({
         entityType: "users",
         partnerId: "admin",
-        queryKey: ["admin-users", statusTab, debouncedSearch, filters.datePeriod],
-        initialItems: initialData?.data || [],
-        initialNextCursor: initialData?.nextCursor || null,
-        initialHasMore: initialData?.hasMore || false,
-        skipInitialData: !isDefaultView,
-        search: debouncedSearch,
-        setSearch,
+        queryKey: ["admin-users", statusTab, filters.name, filters.email, filters.contact, filters.datePeriod],
+        initialItems: [],
+        initialNextCursor: null,
+        initialHasMore: false,
+        skipInitialData: true,
+        enabled: hasActiveQuery,
         fetchPageFn: async ({ cursor }) => {
             const res = await getUsers(
                 cursor,
-                100,
-                debouncedSearch || undefined,
+                20,
+                undefined,
                 statusTab === "all" ? undefined : statusTab,
                 filters.datePeriod.from || undefined,
                 filters.datePeriod.to || undefined,
+                {
+                    name: filters.name.trim() || undefined,
+                    email: filters.email.trim() || undefined,
+                    contact: filters.contact.trim() || undefined,
+                },
             )
             return { items: res.data || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
@@ -98,6 +110,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
+        isListLoading,
         entityState: epEntityState,
         openEntity: epOpenEntity,
         closeEntity: epCloseEntity,
@@ -118,7 +131,6 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
 
     const handleMutation = useCallback(() => {
         afterMutation()
-        getAdminUserStats().then(setStats).catch(console.error)
     }, [afterMutation])
 
     const handleConfirmBan = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
@@ -167,7 +179,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
     const [page, setPage] = useState(1)
     useEffect(() => {
         setPage(1)
-    }, [statusTab, debouncedSearch, filters.datePeriod])
+    }, [statusTab, filters])
 
     // In-memory sorting (search and status are done server-side)
     const sortedUsers = useMemo(() => {
@@ -265,31 +277,61 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                 <UserEnforcementPageControls
                     statusTab={statusTab}
                     setStatusTab={setStatusTab}
-                    search={search}
-                    setSearch={setSearch}
-                    tabCounts={stats}
                     onOpenFilter={() => setIsFilterSheetOpen(true)}
+                    chips={
+                        <>
+                            {filters.name.trim() && (
+                                <FilterChip
+                                    label="Nome"
+                                    value={filters.name.trim()}
+                                    onRemove={() => setFilters((p) => ({ ...p, name: "" }))}
+                                />
+                            )}
+                            {filters.email.trim() && (
+                                <FilterChip
+                                    label="E-mail"
+                                    value={filters.email.trim()}
+                                    onRemove={() => setFilters((p) => ({ ...p, email: "" }))}
+                                />
+                            )}
+                            {filters.contact.trim() && (
+                                <FilterChip
+                                    label="Telefone / CPF"
+                                    value={filters.contact.trim()}
+                                    onRemove={() => setFilters((p) => ({ ...p, contact: "" }))}
+                                />
+                            )}
+                        </>
+                    }
                 />
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 lg:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 ? (
+                        {isListLoading ? (
+                            <FadeIn key="loading" className="w-full h-full flex items-center justify-center min-h-[400px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
+                        ) : paginatedItems.length === 0 ? (
                             <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                                     imageAlt="Nenhum usuário"
-                                    title="Nenhum usuário encontrado"
-                                    subtitle={search || statusTab !== "all" ? "Tente ajustar seus filtros de busca." : "Nenhum usuário cadastrado nesta categoria."}
-                                    itemButton={search || statusTab !== "all" ? {
+                                    title={hasActiveQuery ? "Nenhum usuário encontrado" : "Busque usuários usando os filtros"}
+                                    subtitle={hasActiveQuery ? "Tente ajustar seus filtros de busca." : "Clique em Filtros e Busca para pesquisar por nome, e-mail, telefone ou CPF."}
+                                    itemButton={hasActiveQuery ? {
                                         text: "Limpar Filtros",
                                         action: () => {
-                                            setSearch("")
+                                            setFilters(INITIAL_FILTERS)
                                             setStatusTab("all")
                                         },
                                         variant: "outline",
-                                    } : undefined}
+                                    } : {
+                                        text: "Abrir Filtros",
+                                        action: () => setIsFilterSheetOpen(true),
+                                        variant: "outline",
+                                    }}
                                 />
                             </FadeIn>
                         ) : (
@@ -431,12 +473,15 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
                 isOpen={isFilterSheetOpen}
                 onClose={() => setIsFilterSheetOpen(false)}
                 sections={[
+                    { id: "name", title: "Nome do Usuário", type: "text", placeholder: "Buscar por nome..." },
+                    { id: "email", title: "E-mail", type: "text", inputType: "email", placeholder: "Buscar por e-mail..." },
+                    { id: "contact", title: "Telefone ou CPF", type: "text", placeholder: "Buscar por telefone ou CPF..." },
                     { id: "datePeriod", title: "Data de Cadastro", type: "date-period" },
                 ]}
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => {
-                    setFilters({ datePeriod: { ...EMPTY_DATE_PERIOD } })
+                    setFilters(INITIAL_FILTERS)
                     setIsFilterSheetOpen(false)
                 }}
             />

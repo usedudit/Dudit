@@ -35,6 +35,8 @@ import {
     InfoCard,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
+import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
+import { formatAdminAuditLogsToHistoryEntries } from "@/lib/admin/audit-timeline"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -45,6 +47,7 @@ import {
     unsuspendPartner,
     suspendStore,
     unsuspendStore,
+    toggleStoreShowcase,
     disableTenantAccess,
     enableTenantAccess,
     updateStoreRiskScore,
@@ -126,6 +129,8 @@ export function AdminPartnerDetailView({
     // Modals
     const [suspendStoreModalOpen, setSuspendStoreModalOpen] = useState(false)
     const [unsuspendStoreModalOpen, setUnsuspendStoreModalOpen] = useState(false)
+    const [disableShowcaseModalOpen, setDisableShowcaseModalOpen] = useState(false)
+    const [enableShowcaseModalOpen, setEnableShowcaseModalOpen] = useState(false)
     const [disableErpModalOpen, setDisableErpModalOpen] = useState(false)
     const [enableErpModalOpen, setEnableErpModalOpen] = useState(false)
     const [suspendPartnerModalOpen, setSuspendPartnerModalOpen] = useState(false)
@@ -234,8 +239,51 @@ export function AdminPartnerDetailView({
     } = detail
 
     const isStoreSuspended = !!store.suspended_at || !store.is_active
+    const isShowcaseActive = store.is_showcase_active !== false
     const isErpDisabled = !!partner?.erp_disabled
     const isPartnerSuspended = partner ? (!!partner.suspended_at || !partner.is_active) : false
+
+    const handleConfirmDisableShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        try {
+            const res = await toggleStoreShowcase(store.id, false, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Vitrine online desativada com sucesso!")
+                setDisableShowcaseModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao desativar vitrine online")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmEnableShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        try {
+            const res = await toggleStoreShowcase(store.id, true, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Vitrine online ativada com sucesso!")
+                setEnableShowcaseModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao ativar vitrine online")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
 
     // Pagination calculations
     const paginatedProducts = recentProducts.slice((productPage - 1) * ITEMS_PER_PAGE, productPage * ITEMS_PER_PAGE)
@@ -454,6 +502,11 @@ export function AdminPartnerDetailView({
                                                 <Badge variant={isStoreSuspended ? "red" : "green"}>
                                                     {isStoreSuspended ? "Loja Suspensa" : "Loja Ativa"}
                                                 </Badge>
+                                                {!isShowcaseActive && (
+                                                    <Badge variant="orange">
+                                                        Vitrine Desativada
+                                                    </Badge>
+                                                )}
                                                 {isErpDisabled && (
                                                     <Badge variant="red">
                                                         ERP Desativado
@@ -505,8 +558,23 @@ export function AdminPartnerDetailView({
                                                 </Button>
                                             )}
 
-                                            {/* Dropdown de Ações Administrativas (ERP / Parceiro) */}
+                                            {/* Dropdown de Ações Administrativas (Vitrine / ERP / Parceiro) */}
                                             <ActionsDropdown>
+                                                {isShowcaseActive ? (
+                                                    <DropdownItem
+                                                        onClick={() => setDisableShowcaseModalOpen(true)}
+                                                        className="text-brand-orange"
+                                                    >
+                                                        <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine Online
+                                                    </DropdownItem>
+                                                ) : (
+                                                    <DropdownItem
+                                                        onClick={() => setEnableShowcaseModalOpen(true)}
+                                                    >
+                                                        <StoreIcon size={16} className="text-brand-green" /> Ativar Vitrine Online
+                                                    </DropdownItem>
+                                                )}
+
                                                 {isErpDisabled ? (
                                                     <DropdownItem
                                                         onClick={() => setEnableErpModalOpen(true)}
@@ -559,6 +627,24 @@ export function AdminPartnerDetailView({
                                 {/* Aba 1: Dados da Loja */}
                                 <TabsContent value="general" className="mt-0">
                                     <FadeIn key="general">
+                                        {/* Banner: Vitrine Online Desativada */}
+                                        {!isShowcaseActive && (
+                                            <InfoCard
+                                                title="Vitrine Online Desativada"
+                                                message="Esta loja está oculta no marketplace e não recebe pedidos online. O acesso ao painel ERP continua funcionando normalmente."
+                                                color="orange"
+                                                bottomElement={
+                                                    <Button
+                                                        variant="link"
+                                                        onClick={() => setEnableShowcaseModalOpen(true)}
+                                                    >
+                                                        <span className="text-sm uppercase font-semibold">
+                                                            Reativar Vitrine Online
+                                                        </span>
+                                                    </Button>
+                                                }
+                                            />
+                                        )}
                                         {/* Banner: ERP Desativado */}
                                         {isErpDisabled && (
                                             <InfoCard
@@ -1108,36 +1194,10 @@ export function AdminPartnerDetailView({
                                 <TabsContent value="audit" className="mt-0">
                                     <FadeIn key="audit">
                                         <FormSection title={`Histórico de Auditoria (${auditEvents.length})`}>
-                                            {auditEvents.length === 0 ? (
-                                                <IconPlaceholder
-                                                    icon={ClockIcon}
-                                                    containerSize="w-14 h-14 mb-2"
-                                                    iconSize="w-6 h-6"
-                                                    title="Nenhum evento registrado"
-                                                    subtitle="Não há logs administrativos ou alterações registradas para este parceiro."
-                                                />
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    {auditEvents.map((ev: any) => (
-                                                        <div
-                                                            key={ev.id || `${ev.created_at}-${Math.random()}`}
-                                                            className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                                                        >
-                                                            <div className="flex flex-col">
-                                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                    {ev.action_type || "Ação Administrativa"}
-                                                                </span>
-                                                                <span className="text-xs text-brand-inactive-text">
-                                                                    {ev.metadata?.reason || ev.details?.reason || (typeof ev.metadata === 'object' && ev.metadata ? JSON.stringify(ev.metadata) : ev.details ? JSON.stringify(ev.details) : "Ação administrativa registrada")}
-                                                                </span>
-                                                            </div>
-                                                            <span className="text-xs text-brand-inactive-text shrink-0">
-                                                                {formatDateTime(ev.created_at)}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            <HistoryTimeline
+                                                entries={formatAdminAuditLogsToHistoryEntries(auditEvents)}
+                                                emptyMessage="Não há logs administrativos ou alterações registradas para este parceiro."
+                                            />
                                         </FormSection>
                                     </FadeIn>
                                 </TabsContent>
@@ -1185,6 +1245,15 @@ export function AdminPartnerDetailView({
                         <ThreeDotsIcon size={20} />
                     </Button>
                 }>
+                    {isShowcaseActive ? (
+                        <DropdownItem onClick={() => setDisableShowcaseModalOpen(true)} className="text-brand-orange">
+                            <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine Online
+                        </DropdownItem>
+                    ) : (
+                        <DropdownItem onClick={() => setEnableShowcaseModalOpen(true)}>
+                            <StoreIcon size={16} className="text-brand-green" /> Ativar Vitrine Online
+                        </DropdownItem>
+                    )}
                     {isErpDisabled ? (
                         <DropdownItem onClick={() => setEnableErpModalOpen(true)}>
                             <CheckCircleIcon size={16} className="text-brand-green" /> Reativar ERP
@@ -1287,6 +1356,30 @@ export function AdminPartnerDetailView({
                 onConfirm={handleConfirmUnsuspendStore}
                 actionType="unsuspend"
                 scope="store"
+                entityId={store.id}
+                entityName={store.name}
+                currentRiskScore={store.risk_score}
+            />
+
+            {/* 2b. Modal: Desativar Vitrine Online */}
+            < AdminEnforcementModal
+                isOpen={disableShowcaseModalOpen}
+                onClose={() => setDisableShowcaseModalOpen(false)}
+                onConfirm={handleConfirmDisableShowcase}
+                actionType="suspend"
+                scope="showcase"
+                entityId={store.id}
+                entityName={store.name}
+                currentRiskScore={store.risk_score}
+            />
+
+            {/* 2c. Modal: Ativar Vitrine Online */}
+            < AdminEnforcementModal
+                isOpen={enableShowcaseModalOpen}
+                onClose={() => setEnableShowcaseModalOpen(false)}
+                onConfirm={handleConfirmEnableShowcase}
+                actionType="unsuspend"
+                scope="showcase"
                 entityId={store.id}
                 entityName={store.name}
                 currentRiskScore={store.risk_score}

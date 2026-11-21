@@ -36,6 +36,8 @@ import {
     InfoCard,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
+import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
+import { formatAdminAuditLogsToHistoryEntries } from "@/lib/admin/audit-timeline"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
@@ -539,37 +541,11 @@ export function AdminUserDetailView({
                                     {/* Aba 4: Auditoria */}
                                     <TabsContent value="audit" className="mt-0">
                                         <FadeIn key="audit">
-                                            <FormSection title="Logs de Auditoria">
-                                                {auditEvents.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={ClockIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhum evento registrado"
-                                                        subtitle="Não há ações administrativas registradas para este usuário."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-3">
-                                                        {auditEvents.map((ev: any) => (
-                                                            <div
-                                                                key={ev.id}
-                                                                className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                                                            >
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                        {ev.action_type || "Ação Administrativa"}
-                                                                    </span>
-                                                                    <span className="text-xs text-brand-inactive-text">
-                                                                        {ev.details?.reason || JSON.stringify(ev.details || {})}
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-xs text-brand-inactive-text shrink-0">
-                                                                    {formatDateTime(ev.created_at)}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                            <FormSection title={`Logs de Auditoria (${auditEvents.length})`}>
+                                                <HistoryTimeline
+                                                    entries={formatAdminAuditLogsToHistoryEntries(auditEvents)}
+                                                    emptyMessage="Não há ações administrativas registradas para este usuário."
+                                                />
                                             </FormSection>
                                         </FadeIn>
                                     </TabsContent>
