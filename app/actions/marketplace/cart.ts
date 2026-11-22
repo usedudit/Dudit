@@ -2030,12 +2030,12 @@ export async function checkoutCartAction(
   }
 
   // Para pedidos de checkout sem Mercado Pago (ex: pagamento na entrega/retirada ou crédito de loja),
-  // exporta para o Tiny ERP imediatamente de forma não-bloqueante e idempotente
+  // exporta para o ERP conectado (Tiny / Bling) imediatamente de forma não-bloqueante e idempotente
   if (!useMercadoPago && order?.id) {
-    import("@/lib/services/integrations/tiny/tiny-integration")
-      .then(({ exportDuditOrderToTiny }) => {
-        exportDuditOrderToTiny(order.id).catch((tinyErr) => {
-          console.error("[checkoutCartAction] Tiny export failed:", tinyErr)
+    import("@/lib/services/integrations/erp-sync")
+      .then(({ exportOrderToConnectedErps }) => {
+        exportOrderToConnectedErps(order.id).catch((erpErr) => {
+          console.error("[checkoutCartAction] ERP export failed:", erpErr)
         })
       })
       .catch(() => {})

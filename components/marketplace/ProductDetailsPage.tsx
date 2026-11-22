@@ -3075,9 +3075,8 @@ export function ProductDetailsPageClient({
                                         {specifications.map((spec, i) => (
                                             <div
                                                 key={i}
-                                                className={`flex justify-between items-center px-4 py-3 gap-4 ${
-                                                    i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"
-                                                } ${i < specifications.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                                className={`flex justify-between items-center px-4 py-3 gap-4 ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"
+                                                    } ${i < specifications.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
                                             >
                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium break-words">
                                                     {spec.name}
@@ -3138,11 +3137,20 @@ export function ProductDetailsPageClient({
                                         href={checkoutWhatsAppUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        onClick={() => trackEvent("whatsapp_lead_clicked", { product_id: product.id, partner_id: partner.id, store_id: product.store_id })}
-                                        className="flex-1 h-12 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-full transition-colors text-sm"
                                     >
-                                        <WhatsappIcon size={20} className="fill-white" />
-                                        Finalizar pelo WhatsApp
+                                        <Button
+                                            onClick={() =>
+                                                trackEvent("whatsapp_lead_clicked", {
+                                                    product_id: product.id,
+                                                    partner_id: partner.id,
+                                                    store_id: product.store_id,
+                                                })
+                                            }
+                                            className="w-full h-[46px]"
+                                            leftIcon={<WhatsappIcon />}
+                                        >
+                                            Finalizar pelo WhatsApp
+                                        </Button>
                                     </a>
                                 ) : (
                                     <p className="flex-1 text-center text-sm text-brand-inactive-text dark:text-dark-body">

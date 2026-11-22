@@ -28,6 +28,14 @@ import {
     saveTinyConfigAction,
     type TinyStatus,
 } from "@/app/actions/erp/integrations/tiny"
+import {
+    getBlingStatusAction,
+    saveBlingCredentialsAction,
+    disconnectBlingAction,
+    syncBlingProductsAction,
+    saveBlingConfigAction,
+    type BlingStatus,
+} from "@/app/actions/erp/integrations/bling"
 import type { SuperFreteEnvironment } from "@/lib/services/shipping/superfrete"
 import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import {
@@ -128,7 +136,7 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | "addonKnowMore" | "addonSubscribe" | null>(null)
+    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | "blingConfig" | "addonKnowMore" | "addonSubscribe" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
     const [sfKnowMoreStep, setSfKnowMoreStep] = useState(0)
     const [tinyKnowMoreStep, setTinyKnowMoreStep] = useState(0)
@@ -152,6 +160,19 @@ export const IntegrationsSubPage = ({
     const [tinyActiveTab, setTinyActiveTab] = useState<"sync" | "webhook">("sync")
     const [tinyWebhookCopied, setTinyWebhookCopied] = useState(false)
     const [confirmTinyDisconnectOpen, setConfirmTinyDisconnectOpen] = useState(false)
+
+    // Bling ERP (API v3) integration state
+    const [blingStatus, setBlingStatus] = useState<BlingStatus | null>(null)
+    const [blingIsLoading, setBlingIsLoading] = useState(false)
+    const [blingClientIdInput, setBlingClientIdInput] = useState("")
+    const [blingClientSecretInput, setBlingClientSecretInput] = useState("")
+    const [blingSyncStock, setBlingSyncStock] = useState(true)
+    const [blingAutoExportOrders, setBlingAutoExportOrders] = useState(true)
+    const [blingIsSavingCreds, setBlingIsSavingCreds] = useState(false)
+    const [blingIsSyncing, setBlingIsSyncing] = useState(false)
+    const [blingWebhookCopied, setBlingWebhookCopied] = useState(false)
+    const [blingRedirectCopied, setBlingRedirectCopied] = useState(false)
+    const [confirmBlingDisconnectOpen, setConfirmBlingDisconnectOpen] = useState(false)
 
     // Accepted payment methods state
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
@@ -806,14 +827,130 @@ export const IntegrationsSubPage = ({
         }
     }
 
+    const fetchBlingStatus = useCallback(async () => {
+        try {
+            const res = await getBlingStatusAction()
+            if (res.success && res.data) {
+                setBlingStatus(res.data)
+                if (res.data.config) {
+                    if (res.data.config.sync_stock !== undefined) setBlingSyncStock(res.data.config.sync_stock)
+                    if (res.data.config.auto_export_orders !== undefined) setBlingAutoExportOrders(res.data.config.auto_export_orders)
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch Bling status", err)
+        }
+    }, [])
+
+    const handleSaveBlingCredentials = async () => {
+        if (!blingClientIdInput.trim() || !blingClientSecretInput.trim()) {
+            toast.error("Informe o Client ID e o Client Secret do aplicativo Bling.")
+            return
+        }
+        setBlingIsSavingCreds(true)
+        try {
+            const res = await saveBlingCredentialsAction({
+                clientId: blingClientIdInput.trim(),
+                clientSecret: blingClientSecretInput.trim(),
+            })
+            if (res.success) {
+                toast.success("Credenciais salvas! Agora clique em Conectar com Bling.")
+                setBlingClientIdInput("")
+                setBlingClientSecretInput("")
+                await fetchBlingStatus()
+            } else {
+                toast.error(res.error || "Erro ao salvar credenciais do Bling")
+            }
+        } catch {
+            toast.error("Erro inesperado ao salvar credenciais do Bling")
+        } finally {
+            setBlingIsSavingCreds(false)
+        }
+    }
+
+    const handleBlingStartOAuth = () => {
+        window.location.href = "/api/integrations/bling/oauth/start"
+    }
+
+    const handleBlingDisconnect = async () => {
+        setBlingIsLoading(true)
+        try {
+            const res = await disconnectBlingAction()
+            if (res.success) {
+                toast.success("Bling ERP desconectado")
+                setConfirmBlingDisconnectOpen(false)
+                setActiveModal(null)
+                await fetchBlingStatus()
+            } else {
+                toast.error(res.error || "Erro ao desconectar Bling ERP")
+            }
+        } catch {
+            toast.error("Erro inesperado ao desconectar Bling ERP")
+        } finally {
+            setBlingIsLoading(false)
+        }
+    }
+
+    const handleBlingSync = async () => {
+        setBlingIsSyncing(true)
+        try {
+            const res = await syncBlingProductsAction()
+            if (res.success) {
+                const count = (res.totalCreated || 0) + (res.totalUpdated || 0)
+                if (count > 0) {
+                    toast.success(`Sincronização Bling concluída! ${res.totalCreated || 0} criados, ${res.totalUpdated || 0} atualizados.`)
+                } else {
+                    toast.info(`Nenhum produto novo ou alterado no Bling ERP (${res.totalProcessed || 0} verificados).`)
+                }
+                await fetchBlingStatus()
+            } else {
+                toast.error(res.error || "Falha na sincronização com Bling ERP")
+            }
+        } catch {
+            toast.error("Erro inesperado ao sincronizar com Bling ERP")
+        } finally {
+            setBlingIsSyncing(false)
+        }
+    }
+
+    const handleSaveBlingConfig = async () => {
+        try {
+            const res = await saveBlingConfigAction({
+                syncStock: blingSyncStock,
+                autoExportOrders: blingAutoExportOrders,
+            })
+            if (res.success) {
+                toast.success("Configurações do Bling salvas!")
+                setActiveModal(null)
+                await fetchBlingStatus()
+            } else {
+                toast.error(res.error || "Erro ao salvar configurações do Bling")
+            }
+        } catch {
+            toast.error("Erro inesperado ao salvar configurações do Bling")
+        }
+    }
+
     useEffect(() => {
         checkPlan()
         fetchWaStatus()
         fetchMpAcceptedMethods()
         fetchSfStatus()
         fetchTinyStatus()
+        fetchBlingStatus()
         fetchAddons()
-    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus, fetchTinyStatus, fetchAddons])
+    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus, fetchTinyStatus, fetchBlingStatus, fetchAddons])
+
+    useEffect(() => {
+        if (typeof window === "undefined") return
+        const params = new URLSearchParams(window.location.search)
+        if (params.get("bling_connected") === "1") {
+            toast.success("Bling ERP conectado com sucesso via OAuth 2.0!")
+            fetchBlingStatus()
+        } else if (params.get("bling_error")) {
+            toast.error(`Erro ao conectar Bling ERP: ${params.get("bling_error")}`)
+        }
+    }, [fetchBlingStatus])
 
     const handleConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -1468,6 +1605,73 @@ export const IntegrationsSubPage = ({
                                                         }
                                                     }}
                                                     className={tinyIsLoading ? "opacity-50 cursor-not-allowed" : ""}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Bling ERP (API v3) Card */}
+                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
+                                        <div>
+                                            <div className="flex gap-4 items-start">
+                                                <div className="w-12 h-12 rounded-md bg-emerald-600 text-white font-bold text-lg flex items-center justify-center shrink-0">
+                                                    B
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
+                                                            Bling ERP (v3)
+                                                        </span>
+                                                        {blingStatus?.connected ? (
+                                                            <Badge variant="green"></Badge>
+                                                        ) : (
+                                                            <Badge variant="gray"></Badge>
+                                                        )}
+                                                    </div>
+                                                    <a
+                                                        href="https://www.bling.com.br"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs text-brand-blue hover:underline w-max mt-1 font-medium block"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        bling.com.br
+                                                    </a>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
+                                                Sincronize catálogo, variações, estoque físico/reservado, pedidos e notas fiscais diretamente com o Bling ERP via API v3 (OAuth 2.0).
+                                            </p>
+                                            {blingStatus?.connected && blingStatus?.metadata?.last_sync_at && (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
+                                                    Última sincronização: {new Date(blingStatus.metadata.last_sync_at).toLocaleString("pt-BR")}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-4">
+                                            <hr className="my-4 border-brand-border dark:border-dark-border" />
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex justify-start gap-2">
+                                                    <Button
+                                                        variant="link"
+                                                        onClick={() => setActiveModal("blingConfig")}
+                                                    >
+                                                        {blingStatus?.connected ? "Configurar" : "Conectar"}
+                                                    </Button>
+                                                </div>
+                                                <Switch
+                                                    checked={Boolean(blingStatus?.connected)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (blingIsLoading) return
+                                                        if (checked) {
+                                                            setActiveModal("blingConfig")
+                                                        } else {
+                                                            setConfirmBlingDisconnectOpen(true)
+                                                        }
+                                                    }}
+                                                    className={blingIsLoading ? "opacity-50 cursor-not-allowed" : ""}
                                                 />
                                             </div>
                                         </div>
@@ -2836,6 +3040,197 @@ export const IntegrationsSubPage = ({
                         }}
                         title="Desconectar Tiny ERP"
                         message="Tem certeza que deseja desconectar o Tiny ERP? A sincronização de estoque e o envio de novos pedidos deixarão de funcionar."
+                        confirmText="Desconectar"
+                        variant="danger"
+                        isDestructive
+                    />
+
+                    {/* Bling ERP (API v3) Config Modal */}
+                    <DefaultModal
+                        isOpen={activeModal === "blingConfig"}
+                        onClose={() => setActiveModal(null)}
+                        title="Configurar Bling ERP (API v3)"
+                        maxWidth="lg"
+                    >
+                        <div className="p-6 space-y-5">
+                            {!blingStatus?.connected ? (
+                                <div className="space-y-4">
+                                    <InfoCard
+                                        message="A API v3 do Bling usa conexão segura via OAuth 2.0. Se você já criou um Aplicativo Privado no Bling para testes, informe o Client ID e Client Secret abaixo e clique em Conectar."
+                                        color="green"
+                                    />
+
+                                    {blingStatus?.redirectUri && (
+                                        <div className="p-3 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/40 dark:bg-dark-border/20 space-y-1.5">
+                                            <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                Link de Redirecionamento (Redirect URI) para cadastrar no Bling:
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    readOnly
+                                                    value={blingStatus.redirectUri}
+                                                    className="flex-1 text-xs font-mono px-2.5 py-1.5 rounded-lg bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading select-all outline-none"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(blingStatus.redirectUri || "")
+                                                        setBlingRedirectCopied(true)
+                                                        toast.success("URL de redirecionamento copiada!")
+                                                        setTimeout(() => setBlingRedirectCopied(false), 2000)
+                                                    }}
+                                                >
+                                                    {blingRedirectCopied ? "Copiado" : "Copiar"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3 pt-1">
+                                        <div>
+                                            <label className="text-xs font-medium text-brand-dark dark:text-dark-heading block mb-1">
+                                                Client ID {blingStatus?.hasOAuthAppConfigured ? "(opcional — já configurado)" : "*"}
+                                            </label>
+                                            <Input
+                                                value={blingClientIdInput}
+                                                onChange={(e) => setBlingClientIdInput(e.target.value)}
+                                                placeholder="Cole o Client ID do aplicativo Bling"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-medium text-brand-dark dark:text-dark-heading block mb-1">
+                                                Client Secret {blingStatus?.hasOAuthAppConfigured ? "(opcional — já configurado)" : "*"}
+                                            </label>
+                                            <Input
+                                                type="password"
+                                                value={blingClientSecretInput}
+                                                onChange={(e) => setBlingClientSecretInput(e.target.value)}
+                                                placeholder="Cole o Client Secret do aplicativo Bling"
+                                            />
+                                        </div>
+                                        {(blingClientIdInput.trim() || blingClientSecretInput.trim()) && (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={handleSaveBlingCredentials}
+                                                isLoading={blingIsSavingCreds}
+                                            >
+                                                Salvar Client ID e Client Secret
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-3 pt-2">
+                                        <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+                                            Cancelar
+                                        </Button>
+                                        <Button
+                                            className="flex-1"
+                                            onClick={handleBlingStartOAuth}
+                                            disabled={!blingStatus?.hasOAuthAppConfigured}
+                                        >
+                                            Conectar com Bling
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    <div className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                        <div>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Sincronizar Estoque Automaticamente
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Atualiza estoque físico e reservado entre Dudit e Bling
+                                            </p>
+                                        </div>
+                                        <Switch checked={blingSyncStock} onCheckedChange={setBlingSyncStock} />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                        <div>
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Exportar Pedidos Automaticamente
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Envia vendas do Checkout, ERP e PDV automaticamente para o Bling
+                                            </p>
+                                        </div>
+                                        <Switch checked={blingAutoExportOrders} onCheckedChange={setBlingAutoExportOrders} />
+                                    </div>
+
+                                    {blingStatus?.webhookUrl && (
+                                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                URL de Webhook (Estoque & NF-e em Tempo Real)
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Cadastre esta URL nos Webhooks do seu aplicativo no Bling para eventos de Estoque e NF-e:
+                                            </p>
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <input
+                                                    readOnly
+                                                    value={blingStatus.webhookUrl}
+                                                    className="flex-1 text-xs font-mono px-3 py-2 rounded-lg bg-brand-light-bg/60 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading select-all outline-none"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(blingStatus.webhookUrl || "")
+                                                        setBlingWebhookCopied(true)
+                                                        toast.success("URL de webhook copiada!")
+                                                        setTimeout(() => setBlingWebhookCopied(false), 2000)
+                                                    }}
+                                                >
+                                                    {blingWebhookCopied ? "Copiado" : "Copiar"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={handleBlingSync}
+                                            isLoading={blingIsSyncing}
+                                        >
+                                            Sincronizar Produtos Agora
+                                        </Button>
+                                        <Button className="flex-1" onClick={handleSaveBlingConfig}>
+                                            Salvar Configurações
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border flex justify-between items-center">
+                                        <Button
+                                            variant="link"
+                                            className="text-red-600 px-0"
+                                            onClick={() => setConfirmBlingDisconnectOpen(true)}
+                                        >
+                                            Desconectar Bling ERP
+                                        </Button>
+                                        <Button variant="link" className="px-0" onClick={handleBlingStartOAuth}>
+                                            Reautorizar OAuth
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </DefaultModal>
+
+                    {/* Confirm Disconnect Bling ERP */}
+                    <AlertModal
+                        isOpen={confirmBlingDisconnectOpen}
+                        onClose={() => setConfirmBlingDisconnectOpen(false)}
+                        onConfirm={() => {
+                            setConfirmBlingDisconnectOpen(false)
+                            handleBlingDisconnect()
+                        }}
+                        title="Desconectar Bling ERP"
+                        message="Tem certeza que deseja desconectar o Bling ERP? A sincronização de estoque e o envio de novos pedidos deixarão de funcionar."
                         confirmText="Desconectar"
                         variant="danger"
                         isDestructive

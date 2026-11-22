@@ -144,14 +144,14 @@ export async function confirmPickupPaymentAction(params: {
     }
   } catch {}
 
-  // Export order to Tiny ERP if configured (non-blocking)
+  // Export order to connected ERP (Tiny / Bling) if configured (non-blocking)
   try {
-    const { exportDuditOrderToTiny } = await import("@/lib/services/integrations/tiny/tiny-integration")
-    exportDuditOrderToTiny(params.orderId).catch((err) => {
-      console.error("[confirmPickupPaymentAction] Tiny export failed:", err)
+    const { exportOrderToConnectedErps } = await import("@/lib/services/integrations/erp-sync")
+    exportOrderToConnectedErps(params.orderId).catch((err) => {
+      console.error("[confirmPickupPaymentAction] ERP export failed:", err)
     })
-  } catch (tinyErr) {
-    console.error("[confirmPickupPaymentAction] Error loading Tiny integration:", tinyErr)
+  } catch (erpErr) {
+    console.error("[confirmPickupPaymentAction] Error loading ERP sync:", erpErr)
   }
 
   await revalidateOrders(ctx.partnerId)

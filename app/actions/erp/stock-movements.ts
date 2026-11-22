@@ -176,9 +176,9 @@ export async function createStockMovementAction(data: {
 
         await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
 
-        // Sincroniza estoque no Tiny ERP de forma não-bloqueante
-        import("@/lib/services/integrations/tiny/tiny-integration")
-          .then(async ({ syncDuditStockToTiny }) => {
+        // Sincroniza estoque no ERP conectado (Tiny / Bling) de forma não-bloqueante
+        import("@/lib/services/integrations/erp-sync")
+          .then(async ({ syncStockToConnectedErps }) => {
             let newStock = 0
             if (data.variantId) {
               const { data: vRow } = await supabase
@@ -195,7 +195,7 @@ export async function createStockMovementAction(data: {
                 .maybeSingle()
               newStock = Number(pRow?.stock_quantity || 0)
             }
-            await syncDuditStockToTiny({
+            await syncStockToConnectedErps({
               partnerId,
               productId: data.productId,
               variantId: data.variantId || undefined,
@@ -378,9 +378,9 @@ export async function createBatchStockMovementAction(data: {
             await invalidateProductCache(item.productId, partnerId, 'update', { silent: true })
         }
 
-        // Sincroniza estoque no Tiny ERP de forma não-bloqueante
-        import("@/lib/services/integrations/tiny/tiny-integration")
-            .then(async ({ syncDuditStockToTiny }) => {
+        // Sincroniza estoque no ERP conectado (Tiny / Bling) de forma não-bloqueante
+        import("@/lib/services/integrations/erp-sync")
+            .then(async ({ syncStockToConnectedErps }) => {
                 for (const item of data.items) {
                     try {
                         let newStock = 0
@@ -399,7 +399,7 @@ export async function createBatchStockMovementAction(data: {
                                 .maybeSingle()
                             newStock = Number(pRow?.stock_quantity || 0)
                         }
-                        await syncDuditStockToTiny({
+                        await syncStockToConnectedErps({
                             partnerId,
                             productId: item.productId,
                             variantId: item.variantId || undefined,

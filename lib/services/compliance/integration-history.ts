@@ -126,13 +126,14 @@ export async function recordIntegrationConnected(
     const existingSame = (openRows || []).find(
       (r: any) =>
         (r.external_account_id || null) === accountId &&
-        (r.external_account_email_hash || null) === emailHash
+        (!r.external_account_email_hash || r.external_account_email_hash === emailHash)
     )
 
     if (existingSame) {
       await admin
         .from("partner_integration_history")
         .update({
+          external_account_email_hash: emailHash ?? undefined,
           external_account_email_encrypted: emailEncrypted ?? undefined,
           external_account_email_masked: emailMasked ?? undefined,
           external_account_label: label ?? undefined,

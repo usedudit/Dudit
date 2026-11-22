@@ -1679,9 +1679,9 @@ export async function processReturnRequestAction(
                             .eq("id", data.requestId)
                     }
 
-                    // Sincroniza a devolução ao estoque físico no Tiny ERP de forma não-bloqueante
-                    import("@/lib/services/integrations/tiny/tiny-integration")
-                        .then(async ({ syncDuditStockToTiny }) => {
+                    // Sincroniza a devolução ao estoque físico no ERP conectado (Tiny / Bling) de forma não-bloqueante
+                    import("@/lib/services/integrations/erp-sync")
+                        .then(async ({ syncStockToConnectedErps }) => {
                             for (const retItem of returnToStockItems) {
                                 try {
                                     let newStock = 0
@@ -1700,7 +1700,7 @@ export async function processReturnRequestAction(
                                             .maybeSingle()
                                         newStock = Number(pRow?.stock_quantity || 0)
                                     }
-                                    await syncDuditStockToTiny({
+                                    await syncStockToConnectedErps({
                                         partnerId: request.partner_id,
                                         productId: retItem.product_id,
                                         variantId: retItem.variant_id || undefined,
@@ -1708,7 +1708,7 @@ export async function processReturnRequestAction(
                                         reason: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
                                     })
                                 } catch (syncErr) {
-                                    console.warn("[processReturnRequest] Erro ao sincronizar estoque devolvido no Tiny:", syncErr)
+                                    console.warn("[processReturnRequest] Erro ao sincronizar estoque devolvido no ERP:", syncErr)
                                 }
                             }
                         })
@@ -1766,11 +1766,11 @@ export async function processReturnRequestAction(
                     source: "erp",
                 })
 
-                // Sincroniza cancelamento do pedido no Tiny ERP se integrado
+                // Sincroniza cancelamento do pedido no ERP conectado (Tiny / Bling)
                 try {
-                    const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
-                    updateTinyOrderStatus({ orderId: request.order_id, situacao: "cancelado" }).catch((tinyErr) => {
-                        console.error("[processReturnRequest] Erro ao sincronizar cancelamento no Tiny:", tinyErr)
+                    const { updateOrderStatusOnConnectedErps } = await import("@/lib/services/integrations/erp-sync")
+                    updateOrderStatusOnConnectedErps({ orderId: request.order_id, situacao: "cancelado" }).catch((erpErr) => {
+                        console.error("[processReturnRequest] Erro ao sincronizar cancelamento no ERP:", erpErr)
                     })
                 } catch {}
             }
@@ -1792,9 +1792,9 @@ export async function processReturnRequestAction(
 
             if (isFullReturn) {
                 try {
-                    const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
-                    updateTinyOrderStatus({ orderId: request.order_id, situacao: "cancelado" }).catch((tinyErr) => {
-                        console.error("[processReturnRequest] Erro ao cancelar pedido devolvido no Tiny:", tinyErr)
+                    const { updateOrderStatusOnConnectedErps } = await import("@/lib/services/integrations/erp-sync")
+                    updateOrderStatusOnConnectedErps({ orderId: request.order_id, situacao: "cancelado" }).catch((erpErr) => {
+                        console.error("[processReturnRequest] Erro ao cancelar pedido devolvido no ERP:", erpErr)
                     })
                 } catch {}
             }
@@ -1814,10 +1814,10 @@ export async function processReturnRequestAction(
                 }
 
                 if (exchangeOrderId) {
-                    import("@/lib/services/integrations/tiny/tiny-integration")
-                        .then(({ exportDuditOrderToTiny }) =>
-                            exportDuditOrderToTiny(exchangeOrderId).catch((err) => {
-                                console.error("[processReturnRequest] Erro ao exportar pedido de troca no Tiny:", err)
+                    import("@/lib/services/integrations/erp-sync")
+                        .then(({ exportOrderToConnectedErps }) =>
+                            exportOrderToConnectedErps(exchangeOrderId).catch((err) => {
+                                console.error("[processReturnRequest] Erro ao exportar pedido de troca no ERP:", err)
                             })
                         )
                         .catch(() => {})

@@ -3173,12 +3173,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
   // Export order to Tiny ERP if configured (non-blocking)
   try {
-    import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
-      exportDuditOrderToTiny(order.id).catch((err) => {
-        console.error("[createERPOrderAction] Tiny export failed:", err)
+    import("@/lib/services/integrations/erp-sync").then(({ exportOrderToConnectedErps }) => {
+      exportOrderToConnectedErps(order.id).catch((err) => {
+        console.error("[createERPOrderAction] ERP export failed:", err)
       })
-    }).catch((tinyErr) => {
-      console.error("[createERPOrderAction] Error loading Tiny integration:", tinyErr)
+    }).catch((erpErr) => {
+      console.error("[createERPOrderAction] Error loading ERP sync:", erpErr)
     })
   } catch {}
 
@@ -4893,12 +4893,12 @@ export async function updateERPOrderAction(
 
     // Export order to Tiny ERP if configured (non-blocking)
     try {
-      import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
-        exportDuditOrderToTiny(orderId).catch((err) => {
-          console.error("[saveOrderAction] Tiny export failed:", err)
+      import("@/lib/services/integrations/erp-sync").then(({ exportOrderToConnectedErps }) => {
+        exportOrderToConnectedErps(orderId).catch((err) => {
+          console.error("[saveOrderAction] ERP export failed:", err)
         })
-      }).catch((tinyErr) => {
-        console.error("[saveOrderAction] Error loading Tiny integration:", tinyErr)
+      }).catch((erpErr) => {
+        console.error("[saveOrderAction] Error loading ERP sync:", erpErr)
       })
     } catch {}
   }
@@ -6340,8 +6340,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
       const tinyCancelPromise = (async () => {
         try {
-          const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
-          await updateTinyOrderStatus({ orderId: order.id, situacao: "cancelado" })
+          const { updateOrderStatusOnConnectedErps } = await import("@/lib/services/integrations/erp-sync")
+          await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: "cancelado" })
         } catch (tinyErr) {
           console.error("[orders_cancel_tiny] error:", tinyErr)
         }
@@ -6800,12 +6800,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         // Export order to Tiny ERP if configured (non-blocking)
         try {
-          import("@/lib/services/integrations/tiny/tiny-integration").then(({ exportDuditOrderToTiny }) => {
-            exportDuditOrderToTiny(order.id).catch((err) => {
-              console.error("[updateOrderStatusAction] Tiny export failed:", err)
+          import("@/lib/services/integrations/erp-sync").then(({ exportOrderToConnectedErps }) => {
+            exportOrderToConnectedErps(order.id).catch((err) => {
+              console.error("[updateOrderStatusAction] ERP export failed:", err)
             })
-          }).catch((tinyErr) => {
-            console.error("[updateOrderStatusAction] Error loading Tiny integration:", tinyErr)
+          }).catch((erpErr) => {
+            console.error("[updateOrderStatusAction] Error loading ERP sync:", erpErr)
           })
         } catch {}
       }

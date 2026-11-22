@@ -45,6 +45,7 @@ const PROVIDER_OPTIONS = [
   { value: "mercadopago", label: "Mercado Pago" },
   { value: "superfrete", label: "SuperFrete" },
   { value: "tiny", label: "Tiny ERP" },
+  { value: "bling", label: "Bling ERP" },
 ]
 
 function formatDateTime(iso: string | null | undefined): string {

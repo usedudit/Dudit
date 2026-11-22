@@ -2107,16 +2107,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     couponUsagePromise,
   ]);
 
-  // Export order to Tiny ERP if configured (non-blocking)
+  // Export order to connected ERP (Tiny / Bling) if configured (non-blocking)
   if (orderId) {
-    import("@/lib/services/integrations/tiny/tiny-integration")
-      .then(({ exportDuditOrderToTiny }) => {
-        exportDuditOrderToTiny(orderId).catch((tinyErr) => {
-          console.error("[finalizePreSaleAction] Tiny export failed:", tinyErr)
+    import("@/lib/services/integrations/erp-sync")
+      .then(({ exportOrderToConnectedErps }) => {
+        exportOrderToConnectedErps(orderId).catch((erpErr) => {
+          console.error("[finalizePreSaleAction] ERP export failed:", erpErr)
         })
       })
       .catch((err) => {
-        console.error("[finalizePreSaleAction] Error loading Tiny integration:", err)
+        console.error("[finalizePreSaleAction] Error loading ERP sync:", err)
       })
   }
 
