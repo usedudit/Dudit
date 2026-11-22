@@ -8,7 +8,10 @@ interface ConfirmOptions {
   title: string
   message: string
   confirmText?: string
+  cancelText?: string
   icon?: React.ReactElement<{ className?: string }>
+  variant?: "danger" | "success" | "warning" | "info"
+  isDestructive?: boolean
 }
 
 export function useAlertModal() {
@@ -17,11 +20,20 @@ export function useAlertModal() {
     title: "",
     message: "",
     confirmText: "Confirmar",
+    cancelText: "Cancelar",
+    variant: "danger",
+    isDestructive: false,
   })
   const [resolveCallback, setResolveCallback] = useState<((value: boolean) => void) | null>(null)
 
   const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
-    setOptions(opts)
+    setOptions({
+      confirmText: "Confirmar",
+      cancelText: "Cancelar",
+      variant: "danger",
+      isDestructive: false,
+      ...opts,
+    })
     setIsOpen(true)
 
     return new Promise((resolve) => {

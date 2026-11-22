@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 import { SWRConfig } from "swr"
@@ -29,19 +29,32 @@ export function SupabaseProvider({
     const [isLoading, setIsLoading] = useState(false)
     const [sessionData, setSessionData] = useState<any | null>(initialSessionData)
     const [isSessionLoading, setIsSessionLoading] = useState(false)
+    const lastUserIdRef = useRef<string | null>(initialUser?.id ?? null)
 
     useEffect(() => {
+        const LAST_USER_STORAGE_KEY = "dudit_last_user_id"
+
         const clearAccountScopedBrowserState = () => {
             if (typeof window === "undefined") return
 
-            // These values used to be global browser state. Clear them on
-            // account transitions so a new user cannot inherit the previous
-            // user's ERP/store selection or marketplace city.
-            localStorage.removeItem("dudit_city")
-            localStorage.removeItem("cachedStores")
-            localStorage.removeItem("cachedStoresTimestamp")
-            localStorage.removeItem("selectedStoreId")
+            // These values are account-scoped browser state. Clear them ONLY on
+            // actual account transitions (logout or switching to a different account)
+            // so a new user cannot inherit the previous user's ERP/store selection
+            // or marketplace city — never on same-user session rehydration/reloads.
+            try {
+                localStorage.removeItem("dudit_city")
+                localStorage.removeItem("cachedStores")
+                localStorage.removeItem("cachedStoresTimestamp")
+                localStorage.removeItem("selectedStoreId")
+            } catch { }
             document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0"
+        }
+
+        if (initialUser?.id) {
+            lastUserIdRef.current = initialUser.id
+            try {
+                localStorage.setItem(LAST_USER_STORAGE_KEY, initialUser.id)
+            } catch { }
         }
 
         // Only fetch user client-side if SSR didn't provide one AND an auth cookie exists.
@@ -66,6 +79,10 @@ export function SupabaseProvider({
                             throw error
                         }
                         if (data?.user) {
+                            lastUserIdRef.current = data.user.id
+                            try {
+                                localStorage.setItem(LAST_USER_STORAGE_KEY, data.user.id)
+                            } catch { }
                             setUser(data.user)
                         }
                     } catch (err) {
@@ -84,9 +101,36 @@ export function SupabaseProvider({
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-            setUser(session?.user ?? null)
-            if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+            const nextUser = session?.user ?? null
+            const nextUserId = nextUser?.id ?? null
+            setUser(nextUser)
+
+            if (event === "SIGNED_OUT") {
                 clearAccountScopedBrowserState()
+                lastUserIdRef.current = null
+                try {
+                    localStorage.removeItem(LAST_USER_STORAGE_KEY)
+                } catch { }
+                return
+            }
+
+            if (event === "SIGNED_IN" && nextUserId) {
+                let storedLastUserId: string | null = null
+                try {
+                    storedLastUserId = localStorage.getItem(LAST_USER_STORAGE_KEY)
+                } catch { }
+
+                const previousUserId = lastUserIdRef.current ?? storedLastUserId
+                const isSameUser = previousUserId === nextUserId
+
+                if (!isSameUser) {
+                    clearAccountScopedBrowserState()
+                }
+
+                lastUserIdRef.current = nextUserId
+                try {
+                    localStorage.setItem(LAST_USER_STORAGE_KEY, nextUserId)
+                } catch { }
             }
         })
 

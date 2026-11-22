@@ -96,7 +96,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                                 onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                                 className="flex items-center gap-1 text-brand-primary dark:text-brand-primary font-bold text-sm mt-3 hover:underline cursor-pointer"
                             >
-                                {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                 <ChevronDownIcon size={16} className={`transition-transform duration-200 ${isDescriptionExpanded ? "rotate-180" : ""}`} />
                             </button>
                         )}

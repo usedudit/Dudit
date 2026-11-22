@@ -11,6 +11,7 @@ import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-image
 import { formatFullDate } from "@/lib/utils"
 import { useNotification } from "@/hooks/use-notification"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { useAlertModal } from "@/hooks/use-confirm-modal"
 import { fade, View } from "./profile-shared"
 import Link from "next/link"
 
@@ -62,6 +63,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
 
     const { success: notifySuccess, error: notifyError } = useNotification()
     const csrfToken = useCSRFToken()
+    const { confirm } = useAlertModal()
 
     const REVIEWS_PER_PAGE = 10
 
@@ -126,7 +128,14 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
     }
 
     const handleDeleteReview = async (reviewId: string) => {
-        if (!confirm("Tem certeza que deseja excluir esta avaliação? Essa ação não pode ser desfeita e você não poderá avaliar este item novamente.")) return
+        const confirmed = await confirm({
+            title: "Excluir avaliação?",
+            message: "Tem certeza que deseja excluir esta avaliação? Essa ação não pode ser desfeita e você não poderá avaliar este item novamente.",
+            confirmText: "Excluir",
+            cancelText: "Cancelar",
+            variant: "danger",
+        })
+        if (!confirmed) return
 
         setIsDeleting(true)
         try {

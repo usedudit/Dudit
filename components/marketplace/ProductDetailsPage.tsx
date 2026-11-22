@@ -1464,11 +1464,12 @@ export function ProductDetailsPageClient({
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                     {soldCount > 0 && (
-                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">
-                            {soldCount} {soldCount === 1 ? "vendido" : "vendidos"}
-                        </span>
+                        <>
+                            <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                                {soldCount} {soldCount === 1 ? "vendido" : "vendidos"}
+                            </span><span className="text-brand-inactive-text dark:text-dark-body text-xs">|</span>
+                        </>
                     )}
-                    <span className="text-brand-inactive-text dark:text-dark-body text-xs">|</span>
                     <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">
                         {product.product_type?.toLowerCase() === "digital" ? "Produto Digital" : (product.product_type?.toLowerCase() === "service" || product.product_type?.toLowerCase() === "serviço" || product.product_type?.toLowerCase() === "servico") ? "Serviço" : "Produto Físico"}
                     </span>
@@ -2955,7 +2956,7 @@ export function ProductDetailsPageClient({
                                 {product.description?.length > 200 && (
                                     <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                                         className="flex items-center gap-1 text-brand-green font-bold text-sm mt-3 hover:underline">
-                                        {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                        {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                         <ChevronDownIcon size={16} className={`transition-transform ${isDescriptionExpanded ? "rotate-180" : ""}`} />
                                     </button>
                                 )}

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { usePermissions } from "@/lib/permission-context"
 import { useStore } from "@/lib/store-context"
+import { useAlertModal } from "@/hooks/use-confirm-modal"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 import ReturnListRow, { getReturnStatusMeta } from "./ReturnListRow"
@@ -95,6 +96,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
     const { openPlanUpgrade } = usePlanUpgrade()
     const { planSlug, canRbac } = usePermissions()
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
+    const { confirm } = useAlertModal()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -594,8 +596,15 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                      <Button
                                        variant="ghostred"
                                        className="h-10 px-3"
-                                        onClick={() => {
-                                         if (!confirm(`Excluir ${selection.ids.size} devolução(ões)?`)) return
+                                        onClick={async () => {
+                                         const confirmed = await confirm({
+                                             title: "Excluir devoluções?",
+                                             message: `Tem certeza que deseja excluir ${selection.ids.size} devolução(ões)? Esta ação não pode ser desfeita.`,
+                                             confirmText: "Excluir",
+                                             cancelText: "Cancelar",
+                                             variant: "danger",
+                                         })
+                                         if (!confirmed) return
                                          batchDeleteReturns(Array.from(selection.ids))
                                         }}
                                        leftIcon={<TrashIcon size={18} />}

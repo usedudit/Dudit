@@ -170,7 +170,7 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                         })
                     }
                 })
-                .catch(() => {})
+                .catch(() => { })
         }
     }, [video?.linked_item_id, video?.linked_item_type, linkedItem?.imageUrl, linkedItem?.name, linkedItem?.price])
 
@@ -391,7 +391,7 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                                                     onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                                                                     className="flex items-center gap-1 text-brand-primary dark:text-brand-primary font-bold text-sm mt-3 hover:underline cursor-pointer"
                                                                 >
-                                                                    {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                                                    {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                                                     <ChevronDownIcon size={16} className={`transition-transform duration-200 ${isDescriptionExpanded ? "rotate-180" : ""}`} />
                                                                 </button>
                                                             )}

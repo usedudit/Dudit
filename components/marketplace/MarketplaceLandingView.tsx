@@ -279,7 +279,6 @@ export function MarketplaceLandingView({
                                     <HorizontalCarousel
                                         key={brasilTodoVitrinesSection.id}
                                         title={brasilTodoVitrinesSection.title}
-                                        subtitle={brasilTodoVitrinesSection.subtitle}
                                         items={brasilTodoVitrinesSection.items}
                                         onSeeAll={
                                             brasilTodoVitrinesSection.seeMoreLink

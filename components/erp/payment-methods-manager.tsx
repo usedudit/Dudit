@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PlusIcon, EditIcon, TrashIcon } from "@/lib/icons"
 import { PaymentMethodDialog } from "./payment-method-dialog"
+import { useAlertModal } from "@/hooks/use-confirm-modal"
 
 interface PaymentMethod {
   id: string
@@ -40,6 +41,7 @@ export function PaymentMethodsManager({ partnerId, paymentMethods: initial }: Pa
   const [paymentMethods, setPaymentMethods] = useState(initial)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null)
+  const { confirm } = useAlertModal()
 
   const handleEdit = (method: PaymentMethod) => {
     setEditingMethod(method)
@@ -47,7 +49,14 @@ export function PaymentMethodsManager({ partnerId, paymentMethods: initial }: Pa
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Deseja realmente excluir este método de pagamento?")) return
+    const confirmed = await confirm({
+        title: "Excluir método de pagamento?",
+        message: "Deseja realmente excluir este método de pagamento?",
+        confirmText: "Excluir",
+        cancelText: "Cancelar",
+        variant: "danger",
+    })
+    if (!confirmed) return
 
     // TODO: Implementar ação de delete
     setPaymentMethods(paymentMethods.filter((m) => m.id !== id))

@@ -62,6 +62,7 @@ import { useAdminActionModal, type AdminActionPayload } from "@/components/admin
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useNotification } from "@/hooks/use-notification";
 import { useR2Upload } from "@/hooks/use-r2-upload";
+import { useAlertModal } from "@/hooks/use-confirm-modal";
 import ImageCropperModal from "@/components/ImageCropperModal";
 import { PermissionProvider } from "@/lib/permission-context";
 import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions";
@@ -171,6 +172,7 @@ export default function AdminReturnDetailView({ detail, onBack, initialMode = "v
   const { toast } = useToast();
   const { success: notifySuccess, error: notifyError } = useNotification();
   const { modal: actionModal, runAction } = useAdminActionModal();
+  const { confirm } = useAlertModal();
   const [activeTab, setActiveTab] = useState("general");
   const [isScrolled, setIsScrolled] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -319,7 +321,7 @@ export default function AdminReturnDetailView({ detail, onBack, initialMode = "v
     }
   }, [request]);
 
-  const handleBack = useCallback(() => {
+  const handleBack = useCallback(async () => {
     if (isEditMode) {
       // Check for unsaved changes
       const hasChanges = 
@@ -333,7 +335,14 @@ export default function AdminReturnDetailView({ detail, onBack, initialMode = "v
       
       if (hasChanges) {
         // Could show a confirmation dialog here
-        if (!confirm("Você tem alterações não salvas. Deseja sair mesmo assim?")) {
+        const confirmed = await confirm({
+            title: "Sair sem salvar?",
+            message: "Você tem alterações não salvas. Deseja sair mesmo assim?",
+            confirmText: "Sair sem salvar",
+            cancelText: "Continuar editando",
+            variant: "warning",
+        })
+        if (!confirmed) {
           return;
         }
       }

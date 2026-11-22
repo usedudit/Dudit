@@ -1439,7 +1439,7 @@ export function PlanDetailsPageClient({
                                 {plan.description?.length > 200 && (
                                     <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                                         className="flex items-center gap-1 text-brand-green font-bold text-sm mt-3 hover:underline">
-                                        {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                        {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                         <ChevronDownIcon size={16} className={`transition-transform ${isDescriptionExpanded ? "rotate-180" : ""}`} />
                                     </button>
                                 )}

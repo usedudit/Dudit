@@ -8,6 +8,7 @@ import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, QRCodeIcon, CheckCircleIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
+import { useAlertModal } from "@/hooks/use-confirm-modal"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
 import {
@@ -85,6 +86,7 @@ export function WhatsAppIntegrationPage({
     const [activeTab, setActiveTab] = useState("evolution")
     const [testPhone, setTestPhone] = useState("")
 
+    const { confirm } = useAlertModal()
     const { setHeaderOverride } = useSidebar()
 
     useEffect(() => {
@@ -242,7 +244,14 @@ export function WhatsAppIntegrationPage({
     // ─── Meta actions ────────────────────────────────────────────────────
 
     const handleDisconnect = async () => {
-        if (!confirm("Desconectar integração WhatsApp (Meta)?")) return
+        const confirmed = await confirm({
+            title: "Desconectar integração WhatsApp (Meta)?",
+            message: "Esta ação vai desconectar a integração com a API do WhatsApp Business (Meta).",
+            confirmText: "Desconectar",
+            cancelText: "Cancelar",
+            variant: "danger",
+        })
+        if (!confirmed) return
         setIsLoading(true)
         try {
             const res = await scopedDisconnectMeta()
@@ -315,7 +324,14 @@ export function WhatsAppIntegrationPage({
     }
 
     const handleEvoDisconnect = async () => {
-        if (!confirm("Desconectar WhatsApp (Evolution)?")) return
+        const confirmed = await confirm({
+            title: "Desconectar WhatsApp (Evolution)?",
+            message: "Esta ação vai desconectar o WhatsApp conectado via Evolution API.",
+            confirmText: "Desconectar",
+            cancelText: "Cancelar",
+            variant: "danger",
+        })
+        if (!confirmed) return
         setEvoIsLoading(true)
         try {
             const res = await scopedDisconnectEvolution()
