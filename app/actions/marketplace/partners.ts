@@ -280,6 +280,8 @@ async function _getPartnerReviews(partnerId: string) {
       services:service_id (name)
     `)
     .eq("partner_id", partnerId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .order("created_at", { ascending: false })
 
   if (error || !reviewsData) {
@@ -319,7 +321,7 @@ async function _getPartnerStats(partnerId: string) {
   const supabase = getAdminClient()
   const [store, reviews] = await Promise.all([
     supabase.from("stores").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("reviews").select("*", { count: "exact", head: true }).or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
+    supabase.from("reviews").select("*", { count: "exact", head: true }).is("deleted_at", null).not("is_hidden", "is", true).or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
   ])
 
   return {
@@ -351,11 +353,12 @@ async function _getPartnerPublicCoupons(partnerId: string) {
       starts_at,
       ends_at,
       customer_scope,
-      is_automatic,
+      show_in_marketplace,
       is_active
     `)
     .eq("partner_id", partnerId)
     .eq("is_active", true)
+    .eq("show_in_marketplace", true)
     .or(`starts_at.is.null,starts_at.lte.${now}`)
     .or(`ends_at.is.null,ends_at.gte.${now}`)
     .order("created_at", { ascending: false })
@@ -539,7 +542,7 @@ export const getCachedPartnerStats = async (partnerId: string) => {
       const supabase = getAdminClient()
       const [store, reviews] = await Promise.all([
         supabase.from("stores").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("reviews").select("*", { count: "exact", head: true }).or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
+        supabase.from("reviews").select("*", { count: "exact", head: true }).is("deleted_at", null).not("is_hidden", "is", true).or(`partner_id.eq.${partnerId},store_id.in.(select id from stores where partner_id = '${partnerId}')`)
       ])
 
       return {
@@ -569,6 +572,8 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
           services:service_id (name)
         `)
         .eq("partner_id", partnerId)
+        .is("deleted_at", null)
+        .not("is_hidden", "is", true)
         .order("created_at", { ascending: false })
 
       if (error || !reviewsData) {

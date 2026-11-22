@@ -10,7 +10,7 @@ import { getBlogCategory } from "@/lib/blog/categories"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import BlogArticle from "@/components/blog/BlogArticle"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 const BASE_URL = "https://dudit.com.br"
 const DEFAULT_OG_IMAGE = "https://img.dudit.com.br/static/og-image.png"

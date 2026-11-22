@@ -2,10 +2,10 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, Tabs, TabsList, TabsTrigger, TabsContent, Spinner } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, FormSection, Tooltip, Tabs, TabsList, TabsTrigger, TabsContent, Spinner } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
-import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
+import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, InfoIcon, QRCodeIcon, CopyIcon, CheckIcon, LinkIcon } from "@/lib/icons"
 import {
     disconnectMercadoPagoAction,
     getMercadoPagoStatusAction,
@@ -149,6 +149,8 @@ export const IntegrationsSubPage = ({
     const [tinyAutoExportOrders, setTinyAutoExportOrders] = useState(true)
     const [tinyIsConnecting, setTinyIsConnecting] = useState(false)
     const [tinyIsSyncing, setTinyIsSyncing] = useState(false)
+    const [tinyActiveTab, setTinyActiveTab] = useState<"sync" | "webhook">("sync")
+    const [tinyWebhookCopied, setTinyWebhookCopied] = useState(false)
     const [confirmTinyDisconnectOpen, setConfirmTinyDisconnectOpen] = useState(false)
 
     // Accepted payment methods state
@@ -750,6 +752,19 @@ export const IntegrationsSubPage = ({
         }
     }
 
+    const handleCopyTinyWebhook = async () => {
+        const url = tinyStatus?.webhookUrl
+        if (!url) return
+        try {
+            await navigator.clipboard.writeText(url)
+            setTinyWebhookCopied(true)
+            toast({ title: "URL copiada!", description: "Cole a URL nas configurações de Webhooks do Tiny ERP." })
+            setTimeout(() => setTinyWebhookCopied(false), 2000)
+        } catch {
+            toast.error("Não foi possível copiar a URL.")
+        }
+    }
+
     const handleTinySyncProducts = async () => {
         setTinyIsSyncing(true)
         try {
@@ -880,7 +895,7 @@ export const IntegrationsSubPage = ({
         },
     ]
 
-    const TINY_KNOW_MORE_STEPS: { title: string; description?: string; list?: string[] }[] = [
+    const TINY_KNOW_MORE_STEPS: { title: string; description?: React.ReactNode; list?: string[] }[] = [
         {
             title: "O que é o Tiny ERP?",
             description: "O Tiny ERP (do ecossistema Olist) é um dos sistemas de gestão e emissão fiscal mais utilizados no e-commerce brasileiro.\n\nCom a integração na Dudit, sua loja física, seu estoque e sua gestão financeira ficam conectados diretamente ao marketplace da Dudit, sem nenhum retrabalho de cadastro manual.\n\nTudo funciona de forma rápida, sincronizada e automática.",
@@ -901,7 +916,33 @@ export const IntegrationsSubPage = ({
         },
         {
             title: "Como obter o Token de API no Tiny?",
-            description: "Para conectar, você só precisa gerar o Token de API gratuito na sua conta do Tiny. Siga o passo a passo:\n\n1. Acesse o seu painel no Tiny ERP (tiny.com.br)\n2. No menu superior, vá em Início > Loja de Extensões\n3. Busque pela extensão gratuita 'Token API' e clique em Instalar\n4. Acesse Menu > Configurações > E-commerce > Token API\n5. Clique no botão 'Gerar token API' e copie a chave gerada\n\nDepois cole essa chave na Dudit e clique em Conectar!",
+            description: (
+                <>
+                    Para conectar, você só precisa gerar o Token de API gratuito na sua conta do Tiny. Siga o passo a passo:
+                    {"\n\n"}1. Acesse a{" "}
+                    <a
+                        href="https://erp.olist.com/loja_aplicativos"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-brand-green hover:underline"
+                    >
+                        Loja de Extensões
+                    </a>{" "}
+                    no Tiny ERP
+                    {"\n"}2. Busque pela extensão gratuita &apos;Token API&apos; e clique em Instalar
+                    {"\n"}3. Acesse as{" "}
+                    <a
+                        href="https://erp.olist.com/configuracoes_api_web_services"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-brand-green hover:underline"
+                    >
+                        Configurações de Token API
+                    </a>
+                    {"\n"}4. Clique no botão &apos;Gerar token API&apos; e copie a chave gerada
+                    {"\n\n"}Depois cole essa chave na Dudit e clique em Conectar!
+                </>
+            ),
         },
     ]
 
@@ -1847,18 +1888,18 @@ export const IntegrationsSubPage = ({
                                         className="flex-1"
                                     >
                                         <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
-                                            {KNOW_MORE_STEPS[knowMoreStep].title}
+                                            {SF_KNOW_MORE_STEPS[sfKnowMoreStep].title}
                                         </h3>
 
-                                        {KNOW_MORE_STEPS[knowMoreStep].description && (
+                                        {SF_KNOW_MORE_STEPS[sfKnowMoreStep].description && (
                                             <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
-                                                {KNOW_MORE_STEPS[knowMoreStep].description}
+                                                {SF_KNOW_MORE_STEPS[sfKnowMoreStep].description}
                                             </p>
                                         )}
 
-                                        {KNOW_MORE_STEPS[knowMoreStep].list && (
+                                        {SF_KNOW_MORE_STEPS[sfKnowMoreStep].list && (
                                             <ul className="space-y-4 mt-6">
-                                                {KNOW_MORE_STEPS[knowMoreStep].list.map((item, i) => (
+                                                {SF_KNOW_MORE_STEPS[sfKnowMoreStep].list.map((item, i) => (
                                                     <li key={i} className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
                                                         <span className="flex shrink-0 items-center justify-center text-md">
                                                             ●
@@ -2468,124 +2509,164 @@ export const IntegrationsSubPage = ({
                     >
                         <div className="space-y-6">
                             {tinyStatus?.connected ? (
-                                <><InfoCard
-                                    title="Conexão ativa com o Tiny ERP"
-                                    message={<div>
-                                        <p>
-                                            Seus produtos e pedidos podem ser sincronizados automaticamente.
-                                        </p>
-
-                                        {tinyStatus.metadata?.last_sync_at && (
-                                            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                                                Última sincronização:{" "}
-                                                {new Date(
-                                                    tinyStatus.metadata.last_sync_at
-                                                ).toLocaleString("pt-BR")}
-
-                                                {tinyStatus.metadata.synced_count !== undefined && (
-                                                    <> ({tinyStatus.metadata.synced_count} produtos)</>
-                                                )}
+                                <>
+                                    <InfoCard
+                                        title="Conexão ativa com o Tiny ERP"
+                                        message={<div>
+                                            <p>
+                                                Seus produtos e pedidos podem ser sincronizados automaticamente.
                                             </p>
-                                        )}
-                                    </div>} /><div className="space-y-4">
-                                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/50 dark:bg-dark-surface/50 space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        Sincronizar Estoque
-                                                    </p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        Mantém as quantidades da Dudit atualizadas com o Tiny.
-                                                    </p>
-                                                </div>
-                                                <Switch
-                                                    checked={tinySyncStock}
-                                                    onCheckedChange={setTinySyncStock} />
-                                            </div>
 
-                                            <hr className="border-brand-border dark:border-dark-border" />
+                                            {tinyStatus.metadata?.last_sync_at && (
+                                                <p className="text-xs mt-2">
+                                                    Última sincronização:{" "}
+                                                    {new Date(
+                                                        tinyStatus.metadata.last_sync_at
+                                                    ).toLocaleString("pt-BR")}
 
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        Exportar Pedidos Pagos
-                                                    </p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        Gera o pedido de venda no Tiny assim que aprovado no Mercado Pago.
-                                                    </p>
-                                                </div>
-                                                <Switch
-                                                    checked={tinyAutoExportOrders}
-                                                    onCheckedChange={setTinyAutoExportOrders} />
-                                            </div>
-                                        </div>
-
-                                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Catálogo de Produtos
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
-                                                Puxe os produtos cadastrados no seu Tiny ERP diretamente para o catálogo e vitrine da Dudit.
-                                            </p>
-                                            <Button
-                                                className="w-full"
-                                                variant="outline"
-                                                onClick={handleTinySyncProducts}
-                                                disabled={tinyIsSyncing}
-                                                isLoading={tinyIsSyncing}
-                                            >
-                                                {tinyIsSyncing ? "Sincronizando Catálogo..." : "Sincronizar Produtos Agora"}
-                                            </Button>
-                                        </div>
-
-                                        {tinyStatus?.webhookUrl && (
-                                            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        Webhook em Tempo Real (Estoque & NF-e)
-                                                    </p>
-                                                    <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                                                        Ativo
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    Cole esta URL nas configurações de Webhooks do Tiny para atualizar estoque em tempo real e anexar automaticamente as Notas Fiscais (NF-e/DANFE) nos pedidos:
+                                                    {tinyStatus.metadata.synced_count !== undefined && (
+                                                        <> ({tinyStatus.metadata.synced_count} produtos)</>
+                                                    )}
                                                 </p>
-                                                <div className="flex items-center gap-2 pt-1">
-                                                    <input
-                                                        readOnly
-                                                        value={tinyStatus.webhookUrl}
-                                                        className="flex-1 text-xs font-mono px-3 py-2 rounded-lg bg-brand-light-bg/60 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading select-all outline-none"
-                                                    />
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(tinyStatus.webhookUrl || "")
-                                                            toast({ title: "URL copiada!", description: "Cole a URL nas configurações de Webhooks do Tiny ERP." })
-                                                        }}
-                                                    >
-                                                        Copiar
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>}
+                                        color="green" />
+                                    <Tabs
+                                        value={tinyActiveTab}
+                                        onValueChange={(v) => setTinyActiveTab(v as "sync" | "webhook")}
+                                        className="w-full"
+                                    >
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b">
+                                            <TabsTrigger value="sync" icon={ArrowLeftRightIcon}>
+                                                Sincronização
+                                            </TabsTrigger>
+                                            <TabsTrigger value="webhook" icon={LinkIcon}>
+                                                Webhook
+                                            </TabsTrigger>
+                                        </TabsList>
 
-                                        <div className="flex gap-3 pt-2">
-                                            <Button
-                                                variant="outlinered"
-                                                onClick={() => setConfirmTinyDisconnectOpen(true)}
-                                            >
-                                                Desconectar
-                                            </Button>
-                                            <Button
-                                                className="flex-1"
-                                                onClick={handleSaveTinyConfig}
-                                            >
-                                                Salvar Preferências
-                                            </Button>
-                                        </div>
-                                    </div></>
+                                        <TabsContent value="sync" className="mt-0">
+                                            <div className="space-y-6 pt-5">
+                                                <div className="rounded-xl border border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center justify-between gap-4 p-4 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                Sincronizar Estoque
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                Mantém as quantidades da Dudit atualizadas com o Tiny.
+                                                            </p>
+                                                        </div>
+                                                        <Switch
+                                                            checked={tinySyncStock}
+                                                            onCheckedChange={setTinySyncStock} />
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between gap-4 p-4">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                Exportar Pedidos Pagos
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                Gera o pedido de venda no Tiny assim que aprovado no Mercado Pago.
+                                                            </p>
+                                                        </div>
+                                                        <Switch
+                                                            checked={tinyAutoExportOrders}
+                                                            onCheckedChange={setTinyAutoExportOrders} />
+                                                    </div>
+                                                </div>
+
+                                                <FormSection
+                                                    title="Catálogo de Produtos"
+                                                    description="Puxe os produtos cadastrados no seu Tiny ERP diretamente para o catálogo e vitrine da Dudit."
+                                                >
+                                                    <Button
+                                                        className="w-full"
+                                                        variant="outline"
+                                                        onClick={handleTinySyncProducts}
+                                                        disabled={tinyIsSyncing}
+                                                        isLoading={tinyIsSyncing}
+                                                    >
+                                                        {tinyIsSyncing ? "Sincronizando Catálogo..." : "Sincronizar Produtos Agora"}
+                                                    </Button>
+                                                </FormSection>
+                                            </div>
+                                        </TabsContent>
+
+                                        <TabsContent value="webhook" className="mt-0">
+                                            <div className="pt-5">
+                                                <FormSection
+                                                    title="Webhook em Tempo Real (Estoque & NF-e)"
+                                                    titleRight={
+                                                        <Tooltip text={tinyStatus.webhookUrl ? "Webhook ativo" : "Webhook inativo"}>
+                                                            <Badge variant={tinyStatus.webhookUrl ? "green" : "red"} />
+                                                        </Tooltip>
+                                                    }
+                                                >
+                                                    <div className="space-y-3">
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                            Cole esta URL nas{" "}
+                                                            <a
+                                                                href="https://erp.olist.com/configuracoes_webhooks_empresa"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="font-semibold text-brand-green hover:underline"
+                                                            >
+                                                                configurações de Webhooks
+                                                            </a>{" "}
+                                                            do Tiny para atualizar estoque em tempo real e anexar automaticamente as Notas Fiscais (NF-e/DANFE) nos pedidos:
+                                                        </p>
+
+                                                        {tinyStatus.webhookUrl ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Input
+                                                                    readOnly
+                                                                    value={tinyStatus.webhookUrl}
+                                                                    className="min-w-0"
+                                                                />
+                                                                <Tooltip text={tinyWebhookCopied ? "Copiado!" : "Copiar URL"}>
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="icon"
+                                                                        className="shrink-0 h-[42px] w-[42px]"
+                                                                        onClick={handleCopyTinyWebhook}
+                                                                        aria-label="Copiar URL do webhook"
+                                                                    >
+                                                                        {tinyWebhookCopied ? (
+                                                                            <CheckIcon size={16} className="text-brand-green" />
+                                                                        ) : (
+                                                                            <CopyIcon size={16} />
+                                                                        )}
+                                                                    </Button>
+                                                                </Tooltip>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                O webhook será gerado automaticamente após a conexão com o Tiny.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </FormSection>
+                                            </div>
+                                        </TabsContent>
+                                    </Tabs>
+
+                                    <div className="flex gap-3">
+                                        <Button
+                                            variant="outlinered"
+                                            onClick={() => setConfirmTinyDisconnectOpen(true)}
+                                        >
+                                            Desconectar
+                                        </Button>
+                                        <Button
+                                            className="flex-1"
+                                            onClick={handleSaveTinyConfig}
+                                        >
+                                            Salvar Preferências
+                                        </Button>
+                                    </div>
+                                </>
                             ) : (
                                 <div className="space-y-4">
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
@@ -2600,7 +2681,7 @@ export const IntegrationsSubPage = ({
                                         type="password"
                                     />
 
-                                    <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/50 dark:bg-dark-surface/50 space-y-3">
+                                    <div className="border-t border-brand-border dark:border-dark-border space-y-3 pt-3">
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">

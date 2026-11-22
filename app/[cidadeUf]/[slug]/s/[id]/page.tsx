@@ -23,7 +23,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const service = await getMarketplaceService(id)
 
     if (!service) {
-        return { title: 'Serviço não encontrado' }
+        return {
+            title: 'Serviço não encontrado',
+            robots: { index: false, follow: true },
+        }
     }
 
     const p = Array.isArray(service.partners) ? service.partners[0] : service.partners

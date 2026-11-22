@@ -18,6 +18,34 @@ interface ReviewsViewProps {
     navigate: (view: View) => void
 }
 
+const MAX_REVIEW_EDITS = 2
+const REVIEW_EDIT_WINDOW_DAYS = 90
+const REVIEW_EDIT_WINDOW_MS = REVIEW_EDIT_WINDOW_DAYS * 24 * 60 * 60 * 1000
+
+function getReviewEditStatus(review: any) {
+    const editCount = typeof review?.edit_count === "number" ? review.edit_count : 0
+    const remainingEdits = Math.max(0, MAX_REVIEW_EDITS - editCount)
+    const createdAtMs = review?.created_at ? new Date(review.created_at).getTime() : NaN
+    const isExpired = Number.isFinite(createdAtMs) && Date.now() - createdAtMs > REVIEW_EDIT_WINDOW_MS
+    const isHidden = Boolean(review?.is_hidden)
+
+    let disabledReason: string | null = null
+    if (isHidden) {
+        disabledReason = "Oculta pela moderação"
+    } else if (remainingEdits <= 0) {
+        disabledReason = `Limite de ${MAX_REVIEW_EDITS} edições atingido`
+    } else if (isExpired) {
+        disabledReason = `Prazo de ${REVIEW_EDIT_WINDOW_DAYS} dias expirado`
+    }
+
+    return {
+        canEdit: !disabledReason,
+        remainingEdits,
+        isHidden,
+        disabledReason,
+    }
+}
+
 export function ReviewsView({ navigate }: ReviewsViewProps) {
     const [reviews, setReviews] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -98,7 +126,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
     }
 
     const handleDeleteReview = async (reviewId: string) => {
-        if (!confirm("Tem certeza que deseja excluir esta avaliação?")) return
+        if (!confirm("Tem certeza que deseja excluir esta avaliação? Essa ação não pode ser desfeita e você não poderá avaliar este item novamente.")) return
 
         setIsDeleting(true)
         try {
@@ -253,21 +281,48 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
 
                                         <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-3">
                                             Avaliado em {formatFullDate(review.created_at)}
+                                            {review.updated_at && (
+                                                <span> · Editado em {formatFullDate(review.updated_at)}</span>
+                                            )}
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Edit Action Button */}
-                                <div className="flex gap-2 w-full md:w-auto md:shrink-0 justify-end pt-3 md:pt-0 border-t md:border-t-0 border-brand-border dark:border-dark-border">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full md:w-auto"
-                                        onClick={() => handleOpenEdit(review)}
-                                    >
-                                        Editar avaliação
-                                    </Button>
-                                </div>
+                                {/* Edit / Delete Action */}
+                                {(() => {
+                                    const editStatus = getReviewEditStatus(review)
+                                    return (
+                                        <div className="flex flex-col items-end gap-1.5 w-full md:w-auto md:shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-brand-border dark:border-dark-border">
+                                            {editStatus.canEdit ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full md:w-auto"
+                                                    onClick={() => handleOpenEdit(review)}
+                                                >
+                                                    Editar avaliação
+                                                </Button>
+                                            ) : (
+                                                <div className="flex flex-col items-end gap-1.5 w-full md:w-auto">
+                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                        {editStatus.disabledReason}
+                                                    </span>
+                                                    {!editStatus.isHidden && (
+                                                        <Button
+                                                            variant="outlinered"
+                                                            size="sm"
+                                                            className="w-full md:w-auto"
+                                                            onClick={() => handleDeleteReview(review.id)}
+                                                            disabled={isDeleting}
+                                                        >
+                                                            Excluir avaliação
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })()}
                             </div>
                         )
                     })}
@@ -333,6 +388,19 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                             showCharacterCount
                         />
                     </div>
+
+                    {editingReview && (() => {
+                        const { remainingEdits } = getReviewEditStatus(editingReview)
+                        return (
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body bg-brand-gray/50 dark:bg-zinc-800/40 rounded-lg px-3 py-2">
+                                Você ainda pode editar esta avaliação{" "}
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                    {remainingEdits} {remainingEdits === 1 ? "vez" : "vezes"}
+                                </span>{" "}
+                                (dentro do prazo de {REVIEW_EDIT_WINDOW_DAYS} dias após a avaliação).
+                            </p>
+                        )
+                    })()}
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2">
                         <Button

@@ -71,6 +71,7 @@ interface RawProduct {
     price: number
     promotional_price?: number
     images?: any
+    video_thumbnail?: string | null
     rating?: number
     stock_quantity?: number
     stock_available?: number
@@ -273,15 +274,21 @@ const getCachedPartnerIdsByTier = (
 ) => unstable_cache(
     async (): Promise<PartnerTiersRaw> => {
         const supabase = getAdminClient()
-        const { data: stores, error } = await supabase
+        const { data: rawStores, error } = await supabase
             .from("stores")
-            .select("id, partner_id, addresses!store_id!left(city, state)")
+            .select("id, partner_id, showcase_suspended_at, showcase_suspended_until, partners!inner(showcase_suspended_at, showcase_suspended_until), addresses!store_id!left(city, state)")
             .eq("is_active", true)
 
         if (error) {
             dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
             return { cityIds: [], stateIds: [], allIds: [], cityStoreIds: [], stateStoreIds: [], allStoreIds: [] }
         }
+
+        const { isShowcaseAdminSuspended } = await import("@/lib/commerce/store-showcase")
+        const stores = (rawStores || []).filter((s: any) => {
+            const p = Array.isArray(s.partners) ? s.partners[0] : s.partners
+            return !isShowcaseAdminSuspended(s) && !isShowcaseAdminSuspended(p)
+        })
 
         if (!stores || stores.length === 0) {
             dWarn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
@@ -457,15 +464,15 @@ function applyTierSort<T>(
 
 // ─── Product query fields ───────────────────────────────────────────────────
 
-const BASE_FIELDS = `id, short_id, store_id, partner_id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
+const BASE_FIELDS = `id, short_id, store_id, partner_id, name, price, promotional_price, images, video_thumbnail, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
-    id, is_showcase_active
+    id, is_showcase_active, showcase_suspended_at, showcase_suspended_until
 ),
 stores!left(
     id, short_id, name, slug, description, logo_url, banner_url,
-    phone, is_showcase_active, marketplace_reputation,
+    phone, is_showcase_active, showcase_suspended_at, showcase_suspended_until, marketplace_reputation,
     addresses!store_id!left(city, state, neighborhood, latitude, longitude),
     delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)
 )`
@@ -543,6 +550,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
         price: effectivePrice,
         originalPrice,
         images: item.images || [],
+        video_thumbnail: item.video_thumbnail || null,
         rating: item.rating,
         category: categoryName,
         subcategoryName,
@@ -613,9 +621,13 @@ const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string
     const topScored = (topScoredRes.data || []) as RawProduct[]
     const recent = (recentRes.data || []) as RawProduct[]
 
+    const { isShowcaseAdminSuspended } = await import("@/lib/commerce/store-showcase")
     const seen = new Set<string>()
     const pool: RawProduct[] = []
     for (const item of [...topScored, ...recent]) {
+        const rawP = Array.isArray((item as any).partners) ? (item as any).partners[0] : (item as any).partners
+        const rawS = Array.isArray((item as any).stores) ? (item as any).stores[0] : (item as any).stores
+        if (isShowcaseAdminSuspended(rawS) || isShowcaseAdminSuspended(rawP)) continue
         if (!seen.has(item.id)) {
             seen.add(item.id)
             pool.push(item)
@@ -632,7 +644,7 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
     const makeQuery = () => {
         let q = supabase
             .from("services")
-            .select(`id, short_id, store_id, partner_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_score, views_count, bookings_last_30_days, favorites_count, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+            .select(`id, short_id, store_id, partner_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, video_thumbnail, rating, created_at, marketplace_score, views_count, bookings_last_30_days, favorites_count, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
             .in("status", ["ativo", "active"])
             .is("deleted_at", null)
             .eq("show_in_marketplace", true)
@@ -651,9 +663,13 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
     const topScored = (topScoredRes.data || []) as any[]
     const recent = (recentRes.data || []) as any[]
 
+    const { isShowcaseAdminSuspended } = await import("@/lib/commerce/store-showcase")
     const seen = new Set<string>()
     const pool: any[] = []
     for (const item of [...topScored, ...recent]) {
+        const rawP = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const rawS = Array.isArray(item.stores) ? item.stores[0] : item.stores
+        if (isShowcaseAdminSuspended(rawS) || isShowcaseAdminSuspended(rawP)) continue
         if (!seen.has(item.id)) {
             seen.add(item.id)
             pool.push(item)
@@ -670,10 +686,10 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
         .from("stores")
         .select(`
             id, short_id, name, slug, description, logo_url, banner_url,
-            phone, rating, is_showcase_active, partner_id, marketplace_reputation,
+            phone, rating, is_showcase_active, showcase_suspended_at, showcase_suspended_until, partner_id, marketplace_reputation,
             addresses!store_id!left(city, state, neighborhood, latitude, longitude),
             delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer),
-            partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+            partners!inner(id, showcase_suspended_at, showcase_suspended_until, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
         .in("partner_id", allIds)
@@ -683,7 +699,11 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
 
 
     if (error || !data) return []
-    return data as any[]
+    const { isShowcaseAdminSuspended } = await import("@/lib/commerce/store-showcase")
+    return (data as any[]).filter((s: any) => {
+        const p = Array.isArray(s.partners) ? s.partners[0] : s.partners
+        return !isShowcaseAdminSuspended(s) && !isShowcaseAdminSuspended(p)
+    })
 })
 
 // ─── SECTION FETCHERS ───────────────────────────────────────────────────────
@@ -1054,6 +1074,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
                 name: item.name,
                 price: Number(item.price || 0),
                 images: item.images || [],
+                video_thumbnail: item.video_thumbnail || null,
                 rating: item.rating,
                 partners: partner,
                 itemType: "servico" as const,
@@ -1625,6 +1646,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             price: basePrice,
             originalPrice,
             images: item.images || [],
+            video_thumbnail: item.video_thumbnail || null,
             rating: item.rating,
             category: categoryName,
             subcategoryName,

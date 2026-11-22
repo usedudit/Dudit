@@ -8,7 +8,11 @@ export interface SoftDeletePayload {
   deleted_by: string
   deleted_reason: string | null
   status: string
-  is_active?: boolean
+  is_active: boolean
+}
+
+export interface CatalogSoftDeletePayload extends SoftDeletePayload {
+  show_in_marketplace: boolean
 }
 
 export interface RestorePayload {
@@ -16,7 +20,7 @@ export interface RestorePayload {
   deleted_by: null
   deleted_reason: null
   status: string
-  is_active?: boolean
+  is_active: boolean
 }
 
 export interface ArchivePayload {
@@ -24,7 +28,7 @@ export interface ArchivePayload {
   deleted_by: null
   deleted_reason: null
   status: string
-  is_active?: boolean
+  is_active: boolean
 }
 
 /**
@@ -59,6 +63,18 @@ export function buildSoftDeletePayload(userId: string, reason?: string | null): 
     deleted_by: userId,
     deleted_reason: reason || null,
     status: "deleted",
+    is_active: false,
+  }
+}
+
+/**
+ * Helper to build a soft delete payload for marketplace catalog items (products/services),
+ * also disabling marketplace visibility so deleted rows are never exposed publicly.
+ */
+export function buildCatalogSoftDeletePayload(userId: string, reason?: string | null): CatalogSoftDeletePayload {
+  return {
+    ...buildSoftDeletePayload(userId, reason),
+    show_in_marketplace: false,
   }
 }
 
@@ -71,6 +87,7 @@ export function buildRestorePayload(status: "ativo" | "active" = "ativo"): Resto
     deleted_by: null,
     deleted_reason: null,
     status,
+    is_active: true,
   }
 }
 
@@ -83,5 +100,6 @@ export function buildArchivePayload(status: "arquivado" | "archived" = "arquivad
     deleted_by: null,
     deleted_reason: null,
     status,
+    is_active: false,
   }
 }

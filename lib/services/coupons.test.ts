@@ -46,7 +46,7 @@ describe("validateCouponRow", () => {
     max_discount_value: null,
     min_cart_value: null,
     is_active: true,
-    is_automatic: false,
+    show_in_marketplace: true,
     apply_scope: "all",
     customer_scope: "all",
     allow_combination: true,
@@ -157,5 +157,44 @@ describe("validateCouponRow", () => {
 
     expect(result.valid).toBe(false)
     expect(result.errorMessage).toBe("Valor mínimo da sacola não atingido.")
+  })
+
+  it("rejects coupon on online storefront when show_in_marketplace is false", async () => {
+    const couponInternalOnly = {
+      ...baseCoupon,
+      show_in_marketplace: false,
+    }
+
+    const supabase = createMockSupabase()
+
+    const result = await validateCouponRow(supabase, couponInternalOnly, {
+      partnerId: "partner-1",
+      subtotal: 100,
+      items: [{ productId: "p1", quantity: 1, price: 100 }],
+      marketplaceOnly: true,
+    })
+
+    expect(result.valid).toBe(false)
+    expect(result.errorMessage).toBe("Este cupom não está disponível na vitrine online.")
+  })
+
+  it("allows coupon in ERP/PDV (marketplaceOnly omitted) even when show_in_marketplace is false", async () => {
+    const couponInternalOnly = {
+      ...baseCoupon,
+      show_in_marketplace: false,
+    }
+
+    const supabase = createMockSupabase({
+      products: [{ id: "p1", category_id: "cat1", price: 100, promotional_price: null }],
+    })
+
+    const result = await validateCouponRow(supabase, couponInternalOnly, {
+      partnerId: "partner-1",
+      subtotal: 100,
+      items: [{ productId: "p1", quantity: 1, price: 100 }],
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.discountAmount).toBe(10)
   })
 })

@@ -9,6 +9,15 @@ import { SecureLogger } from "@/lib/secure-logger"
 import { auditLog } from "@/lib/security/audit-logger"
 import { redis } from "@/lib/redis"
 import crypto from "crypto"
+import {
+  collectComplianceIntegrationSnapshot,
+  hashNormalizedValue,
+  maskEmailAddress,
+  maskTaxDocument,
+  safeEncryptCompliancePii,
+  type StoredComplianceStoreSnapshot,
+} from "@/lib/services/compliance/integration-history"
+import { decryptCpfIfEncrypted } from "@/lib/crypto"
 
 export interface PreDeleteReport {
   productsCount: number
@@ -597,9 +606,10 @@ export class AccountDeletionService {
     const admin = getAdminClient()
     let anonymizedCount = 0
 
-    // Fetch user details for email hashing before deleting
+    // Fetch user details for email hashing & encrypted compliance retention before deleting
     let emailHash = "unknown"
     let userEmail = ""
+    let userFullName: string | null = null
     try {
       const { data: authUser } = await admin.auth.admin.getUserById(userId)
       if (authUser?.user?.email) {
@@ -609,21 +619,75 @@ export class AccountDeletionService {
           .update(userEmail.toLowerCase().trim())
           .digest("hex")
       }
+      const metaName = authUser?.user?.user_metadata?.full_name || authUser?.user?.user_metadata?.name
+      if (typeof metaName === "string" && metaName.trim()) {
+        userFullName = metaName.trim()
+      }
     } catch (e) {
       SecureLogger.error("Failed to query auth user email for compliance log hash", { userId, error: e })
     }
 
-    // Retrieve MP subscription details
+    if (!userFullName) {
+      try {
+        const { data: profile } = await admin
+          .from("user_profiles")
+          .select("full_name")
+          .eq("user_id", userId)
+          .maybeSingle()
+        if (typeof profile?.full_name === "string" && profile.full_name.trim()) {
+          userFullName = profile.full_name.trim()
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    // Retrieve MP subscription details, integration history snapshot, and store fiscal snapshot
     let mpSubscriptionId = null
     const mpCustomerId = null
-    if (partnerId) {
-      const { data: sub } = await admin
-        .from("subscriptions")
-        .select("mercado_pago_subscription_id")
-        .eq("partner_id", partnerId)
-        .maybeSingle()
+    let integrationsSnapshot: any[] = []
+    let integrationAccountIds: string[] = []
+    let integrationEmailHashes: string[] = []
+    const partnerStoresSnapshot: StoredComplianceStoreSnapshot[] = []
 
-      mpSubscriptionId = sub?.mercado_pago_subscription_id || null
+    if (partnerId) {
+      const [subRes, integrationData, storesRes] = await Promise.all([
+        admin
+          .from("subscriptions")
+          .select("mercado_pago_subscription_id")
+          .eq("partner_id", partnerId)
+          .maybeSingle(),
+        collectComplianceIntegrationSnapshot(admin, partnerId),
+        admin
+          .from("stores")
+          .select("id, name, cnpj, cpf")
+          .eq("partner_id", partnerId),
+      ])
+
+      mpSubscriptionId = subRes?.data?.mercado_pago_subscription_id || null
+      integrationsSnapshot = integrationData.snapshot
+      integrationAccountIds = integrationData.accountIds
+      integrationEmailHashes = integrationData.emailHashes
+
+      for (const store of storesRes?.data || []) {
+        let rawDoc: string | null = store.cnpj || null
+        if (!rawDoc && store.cpf) {
+          try {
+            rawDoc = await decryptCpfIfEncrypted(store.cpf)
+          } catch {
+            rawDoc = null
+          }
+        }
+        const docInfo = maskTaxDocument(rawDoc)
+        partnerStoresSnapshot.push({
+          store_id: String(store.id),
+          name: store.name ? String(store.name) : null,
+          document_type: docInfo.type,
+          document_masked: docInfo.masked,
+          document_hash: docInfo.digits ? hashNormalizedValue(docInfo.digits) : null,
+          document_encrypted: docInfo.digits ? safeEncryptCompliancePii(docInfo.digits) : null,
+        })
+      }
     }
 
     // 1. Anonymize Orders (must maintain customer_name to satisfy CHECK constraint orders_customer_not_null)
@@ -695,8 +759,15 @@ export class AccountDeletionService {
       user_id_hash: userIdHash,
       partner_id: partnerId,
       email_hash: emailHash,
+      email_encrypted: userEmail ? safeEncryptCompliancePii(userEmail.toLowerCase().trim()) : null,
+      email_masked: maskEmailAddress(userEmail),
+      user_full_name_encrypted: safeEncryptCompliancePii(userFullName),
       mp_subscription_id: mpSubscriptionId,
       mp_customer_id: mpCustomerId,
+      integrations_snapshot: integrationsSnapshot,
+      partner_stores_snapshot: partnerStoresSnapshot,
+      integration_account_ids: integrationAccountIds,
+      integration_email_hashes: integrationEmailHashes,
       request_ip: ip,
       request_country: country,
       user_agent: userAgent,

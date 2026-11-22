@@ -1,4 +1,5 @@
 import { sanitizeAddressComplement } from "@/lib/utils/phone-utils"
+import { getEffectiveMaxDeliveryKm } from "@/lib/delivery/fee"
 
 export type LocationPoint = {
     lat: number
@@ -204,6 +205,13 @@ export function estimateDeliveryFeeLabel(params?: DeliveryFeeEstimateParams | nu
         return "Apenas retirada"
     }
 
+    const distanceKm = params.distanceKm != null && !isNaN(Number(params.distanceKm)) ? Number(params.distanceKm) : null
+    const effectiveMaxKm = getEffectiveMaxDeliveryKm(params)
+
+    if (distanceKm != null && effectiveMaxKm != null && distanceKm > effectiveMaxKm) {
+        return null // Fora do raio de entrega
+    }
+
     if (params.deliveryPayer === "seller") {
         return "Grátis"
     }
@@ -217,12 +225,6 @@ export function estimateDeliveryFeeLabel(params?: DeliveryFeeEstimateParams | nu
     const baseFee = Number(params.baseFee ?? 0)
     const includedKm = Number(params.includedKm ?? 0)
     const extraKmPrice = Number(params.extraKmPrice ?? 0)
-    const maxDeliveryKm = params.maxDeliveryKm != null && !isNaN(Number(params.maxDeliveryKm)) ? Number(params.maxDeliveryKm) : null
-    const distanceKm = params.distanceKm != null && !isNaN(Number(params.distanceKm)) ? Number(params.distanceKm) : null
-
-    if (distanceKm != null && maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm) {
-        return null // Fora do raio de entrega
-    }
 
     if (baseFee === 0 && extraKmPrice === 0) {
         return "Grátis"
@@ -482,8 +484,10 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
 
         const distanceKm = Number(calculateDistance(normalizedUser, normalizedPartner).toFixed(1))
         const deliverySettings = partner?.delivery_settings || (item as any)?.delivery_settings || null
+        const effectiveMaxKm = getEffectiveMaxDeliveryKm(deliverySettings)
+        const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
         
-        const deliveryFeeFormatted = estimateDeliveryFeeLabel({
+        const deliveryFeeFormatted = isOutsideRadius ? null : estimateDeliveryFeeLabel({
             distanceKm,
             baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
             includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
@@ -494,7 +498,7 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
         })
 
         const distanceFormatted = formatDistanceLabel(distanceKm)
-        const deliveryTimeFormatted = estimateDeliveryTimeRange(distanceKm)
+        const deliveryTimeFormatted = isOutsideRadius ? null : estimateDeliveryTimeRange(distanceKm)
 
         return {
             ...item,

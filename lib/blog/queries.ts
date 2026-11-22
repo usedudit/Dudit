@@ -1,8 +1,10 @@
 import "server-only"
 
 import { cache } from "react"
+import { unstable_cache } from "next/cache"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { createSupabasePerformanceFetch } from "@/lib/supabase/performance-fetch"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import type { BlogPost, BlogPostSummary } from "./types"
 
 const SUMMARY_COLUMNS = `
@@ -17,6 +19,14 @@ const FULL_COLUMNS = `
     seo_title, seo_description, seo_keywords, key_takeaways, faq,
     reading_time_minutes, views_count, published_at, created_at, updated_at
 `
+
+/**
+ * Public blog content changes only through the admin panel, which revalidates
+ * `TAGS.blogPosts`. The TTL is just a safety net for edits made directly in the
+ * database. Keeping the data cached across requests avoids a Supabase roundtrip
+ * on every category/article navigation.
+ */
+const BLOG_DATA_REVALIDATE_SECONDS = 300
 
 let _publicClient: SupabaseClient | null | undefined
 
@@ -80,51 +90,99 @@ function normalizePost(row: any): BlogPost {
     }
 }
 
-export const getPublishedBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
-    const client = getPublicBlogClient()
-    if (!client) return []
+const getCachedPublishedBlogPosts = unstable_cache(
+    async (): Promise<BlogPostSummary[]> => {
+        const client = getPublicBlogClient()
+        if (!client) return []
 
-    const { data, error } = await client
-        .from("blog_posts")
-        .select(SUMMARY_COLUMNS)
-        .eq("status", "published")
-        .lte("published_at", new Date().toISOString())
-        .order("is_featured", { ascending: false })
-        .order("published_at", { ascending: false })
-        .limit(120)
+        const { data, error } = await client
+            .from("blog_posts")
+            .select(SUMMARY_COLUMNS)
+            .eq("status", "published")
+            .lte("published_at", new Date().toISOString())
+            .order("is_featured", { ascending: false })
+            .order("published_at", { ascending: false })
+            .limit(120)
 
-    if (error) {
-        console.error("[BLOG] Failed to load published posts:", error.message)
-        return []
-    }
+        if (error) {
+            console.error("[BLOG] Failed to load published posts:", error.message)
+            return []
+        }
 
-    return (data || []).map(normalizeSummary)
-})
+        return (data || []).map(normalizeSummary)
+    },
+    ["blog-published-posts"],
+    {
+        tags: [TAGS.blogPosts],
+        revalidate: BLOG_DATA_REVALIDATE_SECONDS,
+    },
+)
 
-export const getPublishedBlogPostsByCategory = cache(async (category: string): Promise<BlogPostSummary[]> => {
-    const posts = await getPublishedBlogPosts()
-    return posts.filter((post) => post.category === category)
-})
+export const getPublishedBlogPosts = cache(() => getCachedPublishedBlogPosts())
 
-export const getPublishedBlogPostBySlug = cache(async (slug: string): Promise<BlogPost | null> => {
-    const client = getPublicBlogClient()
-    if (!client) return null
+const getCachedPublishedBlogPostsByCategory = unstable_cache(
+    async (category: string): Promise<BlogPostSummary[]> => {
+        const client = getPublicBlogClient()
+        if (!client) return []
 
-    const { data, error } = await client
-        .from("blog_posts")
-        .select(FULL_COLUMNS)
-        .eq("slug", slug)
-        .eq("status", "published")
-        .lte("published_at", new Date().toISOString())
-        .maybeSingle()
+        const { data, error } = await client
+            .from("blog_posts")
+            .select(SUMMARY_COLUMNS)
+            .eq("status", "published")
+            .eq("category", category)
+            .lte("published_at", new Date().toISOString())
+            .order("is_featured", { ascending: false })
+            .order("published_at", { ascending: false })
+            .limit(60)
 
-    if (error) {
-        console.error("[BLOG] Failed to load post by slug:", error.message)
-        return null
-    }
+        if (error) {
+            console.error("[BLOG] Failed to load posts by category:", error.message)
+            return []
+        }
 
-    return data ? normalizePost(data) : null
-})
+        return (data || []).map(normalizeSummary)
+    },
+    ["blog-published-posts-by-category"],
+    {
+        tags: [TAGS.blogPosts],
+        revalidate: BLOG_DATA_REVALIDATE_SECONDS,
+    },
+)
+
+export const getPublishedBlogPostsByCategory = cache((category: string) =>
+    getCachedPublishedBlogPostsByCategory(category),
+)
+
+const getCachedPublishedBlogPostBySlug = unstable_cache(
+    async (slug: string): Promise<BlogPost | null> => {
+        const client = getPublicBlogClient()
+        if (!client) return null
+
+        const { data, error } = await client
+            .from("blog_posts")
+            .select(FULL_COLUMNS)
+            .eq("slug", slug)
+            .eq("status", "published")
+            .lte("published_at", new Date().toISOString())
+            .maybeSingle()
+
+        if (error) {
+            console.error("[BLOG] Failed to load post by slug:", error.message)
+            return null
+        }
+
+        return data ? normalizePost(data) : null
+    },
+    ["blog-published-post-by-slug"],
+    {
+        tags: [TAGS.blogPosts],
+        revalidate: BLOG_DATA_REVALIDATE_SECONDS,
+    },
+)
+
+export const getPublishedBlogPostBySlug = cache((slug: string) =>
+    getCachedPublishedBlogPostBySlug(slug),
+)
 
 export const getRelatedBlogPosts = cache(async (category: string, excludeId: string, limit = 3): Promise<BlogPostSummary[]> => {
     const posts = await getPublishedBlogPosts()
@@ -133,22 +191,31 @@ export const getRelatedBlogPosts = cache(async (category: string, excludeId: str
     return [...sameCategory, ...others].slice(0, limit)
 })
 
-export const getPublishedBlogSlugs = cache(async (): Promise<{ slug: string; updated_at: string; category: string }[]> => {
-    const client = getPublicBlogClient()
-    if (!client) return []
+const getCachedPublishedBlogSlugs = unstable_cache(
+    async (): Promise<{ slug: string; updated_at: string; category: string }[]> => {
+        const client = getPublicBlogClient()
+        if (!client) return []
 
-    const { data, error } = await client
-        .from("blog_posts")
-        .select("slug, updated_at, category")
-        .eq("status", "published")
-        .lte("published_at", new Date().toISOString())
-        .order("published_at", { ascending: false })
-        .limit(2000)
+        const { data, error } = await client
+            .from("blog_posts")
+            .select("slug, updated_at, category")
+            .eq("status", "published")
+            .lte("published_at", new Date().toISOString())
+            .order("published_at", { ascending: false })
+            .limit(2000)
 
-    if (error) {
-        console.error("[BLOG] Failed to load slugs:", error.message)
-        return []
-    }
+        if (error) {
+            console.error("[BLOG] Failed to load slugs:", error.message)
+            return []
+        }
 
-    return data || []
-})
+        return data || []
+    },
+    ["blog-published-slugs"],
+    {
+        tags: [TAGS.blogPosts],
+        revalidate: 3600,
+    },
+)
+
+export const getPublishedBlogSlugs = cache(() => getCachedPublishedBlogSlugs())

@@ -18,6 +18,10 @@ import {
   type TinyIntegrationConfig,
   type TinyIntegrationMetadata,
 } from "@/lib/services/integrations/tiny/tiny-integration"
+import {
+  recordIntegrationConnected,
+  recordIntegrationDisconnected,
+} from "@/lib/services/compliance/integration-history"
 
 export interface TinyStatus {
   connected: boolean
@@ -135,13 +139,14 @@ export async function connectTinyAction(payload: {
       auto_export_orders: payload.autoExportOrders ?? existingConfig.auto_export_orders ?? true,
     }
 
+    const connectedAt = new Date().toISOString()
     const { error } = await supabase.from("partner_integrations").upsert(
       {
         partner_id: ctx.partnerId,
         provider_slug: TINY_PROVIDER,
         status: "connected",
         access_token_encrypted: encryptedToken,
-        connected_at: new Date().toISOString(),
+        connected_at: connectedAt,
         disconnected_at: null,
         config: nextConfig,
       },
@@ -151,6 +156,12 @@ export async function connectTinyAction(payload: {
     if (error) {
       return { success: false, error: error.message }
     }
+
+    await recordIntegrationConnected(supabase, {
+      partnerId: ctx.partnerId,
+      providerSlug: TINY_PROVIDER,
+      connectedAt,
+    })
 
     await safeRevalidateTag(TAGS.partner(ctx.partnerId))
     revalidatePath("/erp/configuracoes")
@@ -179,13 +190,21 @@ export async function disconnectTinyAction(): Promise<{
   const supabase = getAdminClient()
 
   try {
+    const disconnectedAt = new Date().toISOString()
+
+    await recordIntegrationDisconnected(supabase, {
+      partnerId: ctx.partnerId,
+      providerSlug: TINY_PROVIDER,
+      disconnectedAt,
+    })
+
     const { error } = await supabase
       .from("partner_integrations")
       .update({
         status: "disconnected",
         access_token_encrypted: null,
-        disconnected_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        disconnected_at: disconnectedAt,
+        updated_at: disconnectedAt,
       })
       .eq("partner_id", ctx.partnerId)
       .eq("provider_slug", TINY_PROVIDER)

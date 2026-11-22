@@ -852,9 +852,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 videoDuration: d.video_duration || null,
                 technicalSpecs: {
                     attributes: d.attributes || [],
-                    addon_groups: d.addon_groups || [],
-                    accepts_offers: !!d.accepts_offers,
-                    accepts_trades: !!d.accepts_trades,
+                    ...(Array.isArray(d.addon_groups) && d.addon_groups.length > 0 ? { addon_groups: d.addon_groups } : {}),
+                    ...(d.accepts_offers ? { accepts_offers: true } : {}),
+                    ...(d.accepts_trades ? { accepts_trades: true } : {}),
                 },
                 addon_groups: d.addon_groups || [],
                 accepts_offers: !!d.accepts_offers,

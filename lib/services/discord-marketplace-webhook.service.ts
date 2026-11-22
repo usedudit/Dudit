@@ -309,6 +309,8 @@ export async function sendContentReported(payload: {
     service: "Serviço",
     partner: "Vendedor",
     review: "Avaliação",
+    recurring_plan: "Assinatura",
+    community_video: "Vídeo da comunidade",
   }
 
   const severityMap: Record<string, { emoji: string; color: number }> = {

@@ -22,7 +22,7 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
-import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
+import { buildCatalogSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit, adjustItemUsageCounter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import {
@@ -105,7 +105,7 @@ export async function getERPServicesPageAction(
                 const supabase = getAdminClient()
                 let q = supabase
                     .from("services")
-                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, show_in_marketplace, service_categories!category_id(name), subcategory_rel:service_categories!subcategory_id(name), resources, tags, technical_details")
+                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, video_thumbnail, unit, duration_minutes, created_at, description, show_in_marketplace, service_categories!category_id(name), subcategory_rel:service_categories!subcategory_id(name), resources, tags, technical_details")
                     .eq("partner_id", partnerId)
                 if (options?.storeId) q = q.or(`store_id.eq.${options.storeId},store_id.is.null`)
                 if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
@@ -545,7 +545,7 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
         await requirePermission(existing.partner_id, "services", "delete", user)
 
         // 1. Soft delete update payload
-        const payload = buildSoftDeletePayload(user.id, reason)
+        const payload = buildCatalogSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
@@ -631,6 +631,7 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
             source: "manual"
         })
 
+        await invalidateServiceCache(serviceId, existing.partner_id, 'update')
         await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ restored: true })
@@ -710,6 +711,7 @@ export async function unarchiveServiceAction(serviceId: string): Promise<ActionR
             source: "manual"
         })
 
+        await invalidateServiceCache(serviceId, existing.partner_id, 'update')
         await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ restored: true })
@@ -736,7 +738,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
         await requirePermission(partnerId, "services", "delete", user)
 
         // 1. Explicit batch update (soft delete)
-        const payload = buildSoftDeletePayload(user.id, reason)
+        const payload = buildCatalogSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("services").update(payload).in("id", serviceIds)
         if (error) return errorResponse(error.message)
 
@@ -747,7 +749,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
             await adjustItemUsageCounter(partnerId, "services_count", -countableServices)
         }
 
-        await Promise.all(serviceIds.map(id => removeFromExploreRedis(id, "servico", true)))
+        await Promise.all(serviceIds.map(id => invalidateServiceCache(id, partnerId, 'delete')))
 
         // 2. Log audit event for each service in batch
         const reqHeaders = await headers()

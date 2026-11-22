@@ -12,7 +12,7 @@ import {
 } from "@/lib/icons"
 import { requestStepUpToken } from "@/app/actions/admin/step-up"
 
-export type EnforcementScope = "store" | "erp" | "partner" | "user" | "showcase"
+export type EnforcementScope = "store" | "erp" | "partner" | "user" | "showcase" | "partner_showcase"
 export type EnforcementActionType = "suspend" | "unsuspend"
 
 export interface AdminEnforcementModalProps {
@@ -98,13 +98,28 @@ const SCOPE_CONFIG: Record<EnforcementScope, {
         label: "Vitrine Online da Loja",
         icon: StoreIcon,
         suspendImpacts: [
-            "A vitrine pública desta loja será ocultada do marketplace.",
-            "Clientes não poderão visualizar a vitrine nem fazer novos pedidos online.",
+            "A vitrine pública desta loja será ocultada completamente do marketplace (busca, explorar, home e página da loja).",
+            "Clientes não poderão visualizar a vitrine, produtos ou fazer novos pedidos online.",
+            "O lojista não poderá reativar a vitrine manualmente pelo ERP.",
             "O acesso ao painel ERP (PDV, estoque, financeiro e agendamentos) continua funcionando normalmente."
         ],
         unsuspendImpacts: [
             "A vitrine pública desta loja voltará a ficar visível no marketplace.",
             "Clientes poderão acessar o catálogo e realizar novos pedidos online."
+        ]
+    },
+    partner_showcase: {
+        label: "Vitrine Online (Todas as Lojas do ERP)",
+        icon: ShieldIcon,
+        suspendImpacts: [
+            "As vitrines públicas de TODAS as lojas desta organização serão ocultadas completamente do marketplace.",
+            "Clientes não poderão visualizar nenhuma loja/catálogo nem fazer pedidos online.",
+            "O lojista não poderá reativar as vitrines manualmente pelo ERP.",
+            "O acesso ao painel ERP (PDV, estoque, financeiro e agendamentos) continua funcionando normalmente."
+        ],
+        unsuspendImpacts: [
+            "As vitrines públicas de todas as lojas desta organização voltarão a ficar visíveis no marketplace.",
+            "Clientes poderão acessar os catálogos e realizar novos pedidos online."
         ]
     }
 }
@@ -149,6 +164,14 @@ const SUSPEND_PRESETS: Record<EnforcementScope, string[]> = {
         "Pendência de Regularização Fiscal ou Cadastral",
         "Reclamações Recorrentes em Pedidos Online",
         "Solicitação Administrativa Temporária"
+    ],
+    partner_showcase: [
+        "Catálogo com Produtos ou Imagens Irregulares na Rede",
+        "Revisão de Conformidade / Moderação em Todas as Lojas",
+        "Pendência de Regularização Fiscal ou Cadastral da Organização",
+        "Reclamações Recorrentes em Pedidos Online",
+        "Uso exclusivo do ERP (Vitrine Online Desativada)",
+        "Solicitação Administrativa Temporária"
     ]
 }
 
@@ -179,6 +202,12 @@ const UNSUSPEND_PRESETS: Record<EnforcementScope, string[]> = {
     ],
     showcase: [
         "Catálogo e Vitrine Regularizados",
+        "Revisão de Moderação Concluída",
+        "Pendências Cadastrais Resolvidas",
+        "Reativação Administrativa Concedida"
+    ],
+    partner_showcase: [
+        "Catálogos e Vitrines da Organização Regularizados",
         "Revisão de Moderação Concluída",
         "Pendências Cadastrais Resolvidas",
         "Reativação Administrativa Concedida"
@@ -238,7 +267,7 @@ export function AdminEnforcementModal({
             setCustomDays("14")
             setReason(isSuspend ? "" : "Reativação administrativa após análise.")
             setRiskScore(
-                scope === "showcase"
+                scope === "showcase" || scope === "partner_showcase"
                     ? currentRiskScore
                     : isSuspend
                         ? (currentRiskScore > 50 ? currentRiskScore : 60)
@@ -342,9 +371,11 @@ export function AdminEnforcementModal({
             isOpen={isOpen}
             onClose={onClose}
             title={
-                scope === "showcase"
-                    ? (isSuspend ? "Desativar Vitrine Online" : "Ativar Vitrine Online")
-                    : (isSuspend ? "Aplicar Suspensão Disciplinar" : "Reativar e Restaurar Acesso")
+                scope === "partner_showcase"
+                    ? (isSuspend ? "Desativar Vitrine Online (ERP Inteiro)" : "Reativar Vitrine Online (ERP Inteiro)")
+                    : scope === "showcase"
+                        ? (isSuspend ? "Desativar Vitrine Online" : "Reativar Vitrine Online")
+                        : (isSuspend ? "Aplicar Suspensão Disciplinar" : "Reativar e Restaurar Acesso")
             }
             maxWidth="2xl"
             description={`Passo ${step} de 2: ${step === 1 ? "Parâmetros e Configuração" : "Autenticação e Confirmação"}`}
@@ -372,8 +403,8 @@ export function AdminEnforcementModal({
                     title={entityName}
                     description={config.label}
                     right={<Badge variant={isSuspend ? "red" : "green"} className="shrink-0 text-xs uppercase font-bold">
-                        {scope === "showcase"
-                            ? (isSuspend ? "Desativar Vitrine" : "Ativar Vitrine")
+                        {scope === "showcase" || scope === "partner_showcase"
+                            ? (isSuspend ? "Desativar Vitrine" : "Reativar Vitrine")
                             : (isSuspend ? "Suspensão" : "Reativação")}
                     </Badge>}
                 />
@@ -381,8 +412,8 @@ export function AdminEnforcementModal({
                 {/* STEP 1: CONFIGURATION */}
                 {step === 1 && (
                     <div className="space-y-5">
-                        {/* Suspension Duration Options (Only for Suspend, not Showcase toggle) */}
-                        {isSuspend && scope !== "showcase" && (
+                        {/* Suspension Duration Options */}
+                        {isSuspend && (
                             <FormSection title="Período de Vigência da Suspensão:">
                                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                     {DURATION_OPTIONS.map((opt) => {

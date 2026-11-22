@@ -9,7 +9,7 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { isUuid } from "@/lib/utils/short-id"
-import { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
+import { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR, isShowcaseAdminSuspended } from "@/lib/commerce/store-showcase"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 import { computeNextExecutionAt } from "@/lib/services/recurring/frequency"
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
@@ -417,11 +417,13 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           user_id,
           partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
           is_showcase_active,
+          showcase_suspended_at,
+          showcase_suspended_until,
           created_at,
           addresses (id, street, number, neighborhood, city, state, zip_code),
           payment_methods (*)
         ),
-        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais, is_showcase_active, addresses!store_id!left(id, street, number, neighborhood, city, state, zip_code, latitude, longitude)),
+        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais, is_showcase_active, showcase_suspended_at, showcase_suspended_until, addresses!store_id!left(id, street, number, neighborhood, city, state, zip_code, latitude, longitude)),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, short_id, name, price, images),
@@ -444,6 +446,12 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
     if (error) throw error
 
     if (!data) return null
+
+    const rawPartnerCheck = Array.isArray(data.partners) ? data.partners[0] : data.partners
+    const rawStoreCheck = Array.isArray(data.stores) ? data.stores[0] : data.stores
+    if (isShowcaseAdminSuspended(rawStoreCheck) || isShowcaseAdminSuspended(rawPartnerCheck)) {
+      return null
+    }
 
     let computedPrice = 0
     let firstImage: string | null = null

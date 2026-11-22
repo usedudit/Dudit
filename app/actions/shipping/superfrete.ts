@@ -46,6 +46,10 @@ import {
   type ShippingItemLogistics,
   type PartnerIntegrationRow,
 } from "@/lib/services/shipping/superfrete-integration"
+import {
+  recordIntegrationConnected,
+  recordIntegrationDisconnected,
+} from "@/lib/services/compliance/integration-history"
 
 // Versão do fluxo de webhook. A versão 2 passou a salvar o secret_token real
 // devolvido pela SuperFrete na criação; conexões antigas gravaram um UUID local
@@ -185,6 +189,7 @@ export async function connectSuperFreteAction(payload: {
 
     const encryptedToken = encrypt(token, "superfrete")
 
+    const connectedAt = new Date().toISOString()
     const { error } = await supabase.from("partner_integrations").upsert(
       {
         partner_id: ctx.partnerId,
@@ -198,7 +203,7 @@ export async function connectSuperFreteAction(payload: {
         // setup abaixo gravar o par webhook_id/secret correto.
         webhook_id: null,
         webhook_secret_encrypted: null,
-        connected_at: new Date().toISOString(),
+        connected_at: connectedAt,
         disconnected_at: null,
         config: { ...existingConfig, environment },
       },
@@ -208,6 +213,14 @@ export async function connectSuperFreteAction(payload: {
     if (error) {
       return { success: false, error: error.message }
     }
+
+    await recordIntegrationConnected(supabase, {
+      partnerId: ctx.partnerId,
+      providerSlug: SUPERFRETE_PROVIDER,
+      externalAccountId: userInfo.id || null,
+      externalAccountEmail: userInfo.email || null,
+      connectedAt,
+    })
 
     let webhookConfigured = false
     try {
@@ -275,6 +288,17 @@ export async function disconnectSuperFreteAction(): Promise<{ success: boolean; 
       }
     }
 
+    const disconnectedAt = new Date().toISOString()
+
+    await recordIntegrationDisconnected(supabase, {
+      partnerId: ctx.partnerId,
+      providerSlug: SUPERFRETE_PROVIDER,
+      disconnectedAt,
+      fallbackAccountId: integration?.account_id ?? null,
+      fallbackAccountEmail: integration?.account_email ?? null,
+      fallbackConnectedAt: integration?.connected_at ?? null,
+    })
+
     const { error } = await supabase
       .from("partner_integrations")
       .update({
@@ -284,7 +308,7 @@ export async function disconnectSuperFreteAction(): Promise<{ success: boolean; 
         account_email: null,
         webhook_id: null,
         webhook_secret_encrypted: null,
-        disconnected_at: new Date().toISOString(),
+        disconnected_at: disconnectedAt,
       })
       .eq("partner_id", ctx.partnerId)
       .eq("provider_slug", SUPERFRETE_PROVIDER)

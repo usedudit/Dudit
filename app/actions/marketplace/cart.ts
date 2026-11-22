@@ -20,7 +20,7 @@ import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finan
 import { resolveDeliverySettingsRow, resolveStoreFulfillmentCapabilities, calculateServiceTravelFeeForOrder } from "@/app/actions/shared/delivery"
 import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
-import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
+import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
@@ -505,13 +505,13 @@ export async function addToCartAction(
   if (variantId) {
     let query = adminClient
       .from("product_variants")
-      .select("id, product_id, stock_available, stock_quantity, is_active, products!inner(partner_id, store_id, allow_sell_without_stock, is_active, partners!inner(user_id))")
+      .select("id, product_id, stock_available, stock_quantity, is_active, products!inner(partner_id, store_id, allow_sell_without_stock, is_active, status, deleted_at, show_in_marketplace, partners!inner(user_id))")
       .eq("id", variantId)
     productPromise = query.maybeSingle()
   } else {
     let query = adminClient
       .from("products")
-      .select("partner_id, store_id, stock_available, stock_quantity, allow_sell_without_stock, is_active, partners!inner(user_id)")
+      .select("partner_id, store_id, stock_available, stock_quantity, allow_sell_without_stock, is_active, status, deleted_at, show_in_marketplace, partners!inner(user_id)")
       .eq("id", productId)
     productPromise = query.maybeSingle()
   }
@@ -593,9 +593,17 @@ export async function addToCartAction(
 
   // 3.1. Validação de Estoque e Status Ativo
   const parentProd = variantId ? (entity.products as any) : entity
+  const isParentPubliclyAvailable =
+    parentProd?.is_active !== false &&
+    !parentProd?.deleted_at &&
+    parentProd?.show_in_marketplace !== false &&
+    parentProd?.status !== "deleted" &&
+    parentProd?.status !== "arquivado" &&
+    parentProd?.status !== "archived" &&
+    parentProd?.status !== "inativo"
   const isItemActive = variantId
-    ? entity.is_active !== false && parentProd?.is_active !== false
-    : entity.is_active !== false
+    ? entity.is_active !== false && isParentPubliclyAvailable
+    : isParentPubliclyAvailable
 
   if (!isItemActive) {
     return { error: "Este produto está temporariamente indisponível." }
@@ -706,7 +714,7 @@ export async function updateCartQuantityAction(cartItemId: string, quantity: num
     .from("cart_items")
     .select(`
       id, user_id, item_type, product_id, variant_id,
-      products(id, stock_available, stock_quantity, allow_sell_without_stock, is_active),
+      products(id, stock_available, stock_quantity, allow_sell_without_stock, is_active, status, deleted_at, show_in_marketplace),
       product_variants(id, stock_available, stock_quantity, is_active)
     `)
     .eq("id", cartItemId)
@@ -719,9 +727,17 @@ export async function updateCartQuantityAction(cartItemId: string, quantity: num
     const variant = item.product_variants as any
     const isVariant = Boolean(item.variant_id && variant)
 
+    const isProdAvailable =
+      prod?.is_active !== false &&
+      !prod?.deleted_at &&
+      prod?.show_in_marketplace !== false &&
+      prod?.status !== "deleted" &&
+      prod?.status !== "arquivado" &&
+      prod?.status !== "archived" &&
+      prod?.status !== "inativo"
     const isItemActive = isVariant
-      ? variant.is_active !== false && prod?.is_active !== false
-      : prod?.is_active !== false
+      ? variant.is_active !== false && isProdAvailable
+      : isProdAvailable
 
     if (!isItemActive) {
       return { error: "Este produto está temporariamente indisponível." }
@@ -1443,26 +1459,13 @@ export async function checkoutCartAction(
       subtotal: totalAmount,
       shippingCost: deliveryFee,
       items: couponItems,
+      marketplaceOnly: true,
     }, adminClient)
 
     if (couponResult.valid) {
       couponIdToSave = couponResult.couponId || null
       couponDiscountAmount = couponResult.discountAmount
       couponPricingData = couponResult.pricingCoupon || null
-    }
-  } else if (marketplaceCapabilities.couponsEnabled) {
-    const autoResult = await findBestAutomaticCoupon({
-      partnerId,
-      customerId: customerIdForPromo,
-      subtotal: totalAmount,
-      shippingCost: deliveryFee,
-      items: couponItems,
-    }, adminClient)
-
-    if (autoResult.valid) {
-      couponIdToSave = autoResult.couponId || null
-      couponDiscountAmount = autoResult.discountAmount
-      couponPricingData = autoResult.pricingCoupon || null
     }
   }
 

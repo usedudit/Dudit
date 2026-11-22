@@ -146,6 +146,7 @@ export async function expirePastDueSubscription(sub: {
   }
 
   partnerPlanCache.delete(sub.partner_id)
+  partnerBannerCache.delete(sub.partner_id)
 }
 
 // ─── In-memory Cache ────────────────────────────────────────────────────────
@@ -162,10 +163,12 @@ interface CacheEntry<T> {
  * and the next plan resolution call.
  */
 const PARTNER_PLAN_TTL_MS = 120_000    // 2 minutes (webhooks/updates invalidate immediately)
+const PARTNER_BANNER_TTL_MS = 120_000  // 2 minutes (invalidated alongside partnerPlanCache)
 const ALL_PLANS_TTL_MS = 600_000       // 10 minutes
 const USAGE_COUNTERS_TTL_MS = 45_000   // 45 seconds (mutations invalidate immediately)
 
 const partnerPlanCache = new Map<string, CacheEntry<Plan>>()
+const partnerBannerCache = new Map<string, CacheEntry<SubscriptionBannerInfo | null>>()
 const usageCountersCache = new Map<string, CacheEntry<UsageCounters | null>>()
 const allPlansCache: { entry: CacheEntry<Plan[]> | null } = { entry: null }
 
@@ -287,6 +290,11 @@ export interface SubscriptionBannerInfo {
 
 export const getPartnerSubscriptionBannerInfo = cache(
   async (partnerId: string): Promise<SubscriptionBannerInfo | null> => {
+    const cachedEntry = partnerBannerCache.get(partnerId)
+    if (cachedEntry && Date.now() <= cachedEntry.expiresAt) {
+      return cachedEntry.data
+    }
+
     const admin = getAdminClient()
     const { data, error } = await admin
       .from("subscriptions")
@@ -298,7 +306,13 @@ export const getPartnerSubscriptionBannerInfo = cache(
     if (error) return null
 
     const rows = (data || []) as any[]
-    if (rows.length === 0) return null
+    if (rows.length === 0) {
+      partnerBannerCache.set(partnerId, {
+        data: null,
+        expiresAt: Date.now() + PARTNER_BANNER_TTL_MS,
+      })
+      return null
+    }
 
     // Prefer the subscription that actually grants access. A newer "pending"
     // row is usually an unfinished plan-change checkout and must not hide the
@@ -311,9 +325,15 @@ export const getPartnerSubscriptionBannerInfo = cache(
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )[0] || null
 
-    if (!selected) return null
+    if (!selected) {
+      partnerBannerCache.set(partnerId, {
+        data: null,
+        expiresAt: Date.now() + PARTNER_BANNER_TTL_MS,
+      })
+      return null
+    }
 
-    return {
+    const bannerInfo: SubscriptionBannerInfo = {
       status: String(selected.status),
       past_due_at: selected.past_due_at || null,
       trial_end: selected.trial_end || null,
@@ -322,6 +342,13 @@ export const getPartnerSubscriptionBannerInfo = cache(
         (selected.plan_snapshot as any)?.name ||
         null,
     }
+
+    partnerBannerCache.set(partnerId, {
+      data: bannerInfo,
+      expiresAt: Date.now() + PARTNER_BANNER_TTL_MS,
+    })
+
+    return bannerInfo
   },
 )
 
@@ -594,9 +621,9 @@ export async function getLimit(partnerId: string, limitName: string): Promise<nu
  * Returns null if no counters row exists yet.
  */
 export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCounters | null> => {
-  const cached = getCached(usageCountersCache.get(partnerId))
-  if (cached !== null && cached !== undefined) {
-    return cached
+  const cachedEntry = usageCountersCache.get(partnerId)
+  if (cachedEntry && Date.now() <= cachedEntry.expiresAt) {
+    return cachedEntry.data
   }
 
   const admin = getAdminClient()
@@ -777,6 +804,7 @@ export async function checkLimit(
  */
 export function invalidatePartnerPlanCache(partnerId: string): void {
   partnerPlanCache.delete(partnerId)
+  partnerBannerCache.delete(partnerId)
   usageCountersCache.delete(partnerId)
   import("@/lib/marketplace-capabilities")
     .then((m) => m.invalidateMarketplaceCapabilitiesCache?.(partnerId))
@@ -789,6 +817,7 @@ export function invalidatePartnerPlanCache(partnerId: string): void {
  */
 export function invalidateAllPlanCaches(): void {
   partnerPlanCache.clear()
+  partnerBannerCache.clear()
   usageCountersCache.clear()
   allPlansCache.entry = null
   freePlanCache = null

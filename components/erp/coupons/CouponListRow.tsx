@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
-import { SparklesIcon, TagIcon } from "@/lib/icons"
+import { StoreIcon, TagIcon } from "@/lib/icons"
 import {
   CouponRow,
   getCouponApplyScopeLabel,
@@ -86,9 +86,9 @@ const CouponListItem = React.memo(
           return (
             <div className={`flex ${getJustifyClass(columns.find((column) => column.id === "status")?.align)}`}>
               <div className="flex flex-wrap justify-end gap-2">
-                {coupon.is_automatic && (
-                  <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap">
-                    Automático
+                {coupon.show_in_marketplace !== false && (
+                  <Badge variant="blue" icon={<StoreIcon />} className="whitespace-nowrap">
+                    Vitrine online
                   </Badge>
                 )}
                 <Badge variant={getCouponStatusVariant(coupon)} className="whitespace-nowrap">

@@ -907,7 +907,7 @@ export async function getPartners(
     // Main query: fetch stores with partner info
     let storeQuery = supabase
         .from("stores")
-        .select("id, name, is_active, is_showcase_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+        .select("id, name, is_active, is_showcase_active, showcase_suspended_at, showcase_suspended_until, showcase_suspended_reason, showcase_suspended_case_id, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
 
     if (allowedPartnerIds !== null) {
         storeQuery = storeQuery.in("partner_id", allowedPartnerIds)
@@ -934,6 +934,8 @@ export async function getPartners(
         storeQuery = storeQuery.eq("is_active", true).is("suspended_at", null)
     } else if (status === "suspended") {
         storeQuery = storeQuery.not("suspended_at", "is", null)
+    } else if (status === "showcase_suspended") {
+        storeQuery = storeQuery.not("showcase_suspended_at", "is", null)
     } else if (status === "high_risk") {
         storeQuery = storeQuery.gte("risk_score", 50)
     } else if (status === "erp_disabled") {
@@ -966,7 +968,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: partners } = await supabase
             .from("partners")
-            .select("id, user_id, is_active, erp_disabled, suspended_at, suspended_until, suspended_reason, suspended_case_id, created_at, stores(name, risk_score)")
+            .select("id, user_id, is_active, erp_disabled, suspended_at, suspended_until, suspended_reason, suspended_case_id, showcase_suspended_at, showcase_suspended_until, showcase_suspended_reason, showcase_suspended_case_id, created_at, stores(name, risk_score)")
             .in("id", partnerIds)
         if (partners) {
             partnerMap = new Map(partners.map((p: any) => [p.id, p]))
@@ -987,7 +989,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: allStores } = await supabase
             .from("stores")
-            .select("id, name, is_active, is_showcase_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
+            .select("id, name, is_active, is_showcase_active, showcase_suspended_at, showcase_suspended_until, showcase_suspended_reason, showcase_suspended_case_id, suspended_at, suspended_until, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
             .in("partner_id", partnerIds)
         if (allStores) {
             for (const s of allStores) {
@@ -1007,6 +1009,14 @@ export async function getPartners(
             owner_user_id: partner?.user_id || "",
             is_active: s.is_active,
             is_showcase_active: s.is_showcase_active !== false,
+            showcase_suspended_at: s.showcase_suspended_at || null,
+            showcase_suspended_until: s.showcase_suspended_until || null,
+            showcase_suspended_reason: s.showcase_suspended_reason || null,
+            showcase_suspended_case_id: s.showcase_suspended_case_id || null,
+            partner_showcase_suspended_at: partner?.showcase_suspended_at || null,
+            partner_showcase_suspended_until: partner?.showcase_suspended_until || null,
+            partner_showcase_suspended_reason: partner?.showcase_suspended_reason || null,
+            partner_showcase_suspended_case_id: partner?.showcase_suspended_case_id || null,
             erp_disabled: partner ? !!partner.erp_disabled : false,
             suspended_at: s.suspended_at || partner?.suspended_at || null,
             suspended_until: s.suspended_until || partner?.suspended_until || null,
@@ -1021,6 +1031,10 @@ export async function getPartners(
                 name: st.name,
                 is_active: st.is_active,
                 is_showcase_active: st.is_showcase_active !== false,
+                showcase_suspended_at: st.showcase_suspended_at || null,
+                showcase_suspended_until: st.showcase_suspended_until || null,
+                showcase_suspended_reason: st.showcase_suspended_reason || null,
+                showcase_suspended_case_id: st.showcase_suspended_case_id || null,
                 suspended_at: st.suspended_at,
                 suspended_until: st.suspended_until,
                 suspended_reason: st.suspended_reason,
@@ -2138,8 +2152,9 @@ export async function toggleStoreShowcase(
     reason: string = "",
     stepUpToken: string = "admin-confirmed",
     riskScore?: number | null,
-    notifyOwner: boolean = true
-): Promise<{ success: boolean; error?: string }> {
+    notifyOwner: boolean = true,
+    durationDays: number | null = null
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
@@ -2159,7 +2174,7 @@ export async function toggleStoreShowcase(
 
     const { data: store, error: fetchError } = await supabase
         .from("stores")
-        .select("id, name, slug, partner_id, is_showcase_active, risk_score")
+        .select("id, name, slug, partner_id, is_showcase_active, showcase_suspended_at, showcase_suspended_until, risk_score")
         .eq("id", storeId)
         .single()
 
@@ -2167,17 +2182,35 @@ export async function toggleStoreShowcase(
         return { success: false, error: "Loja não encontrada" }
     }
 
-    const currentlyActive = store.is_showcase_active !== false
-    if (enable && currentlyActive) {
-        return { success: false, error: "A vitrine online desta loja já está ativa" }
+    const currentlyAdminSuspended = !!store.showcase_suspended_at
+    if (enable && !currentlyAdminSuspended) {
+        return { success: false, error: "A vitrine online desta loja não está desativada pela administração" }
     }
-    if (!enable && !currentlyActive) {
-        return { success: false, error: "A vitrine online desta loja já está desativada" }
+    if (!enable && currentlyAdminSuspended) {
+        return { success: false, error: "A vitrine online desta loja já está desativada pela administração" }
     }
 
-    const updatePayload: Record<string, any> = {
-        is_showcase_active: enable,
-    }
+    const suspendedUntil = !enable && durationDays && durationDays > 0
+        ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+        : null
+    const caseId = !enable ? generateCaseId("CAS") : undefined
+
+    const updatePayload: Record<string, any> = enable
+        ? {
+            showcase_suspended_at: null,
+            showcase_suspended_until: null,
+            showcase_suspended_reason: null,
+            showcase_suspended_by: null,
+            showcase_suspended_case_id: null,
+        }
+        : {
+            showcase_suspended_at: new Date().toISOString(),
+            showcase_suspended_until: suspendedUntil,
+            showcase_suspended_reason: finalReason,
+            showcase_suspended_by: admin.userId,
+            showcase_suspended_case_id: caseId,
+        }
+
     if (riskScore !== undefined && riskScore !== null) {
         updatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
     }
@@ -2191,39 +2224,20 @@ export async function toggleStoreShowcase(
         return { success: false, error: updateError.message }
     }
 
-    // Keep partner-level is_showcase_active in sync without hiding sibling active stores
-    if (store.partner_id) {
-        if (enable) {
-            await supabase
-                .from("partners")
-                .update({ is_showcase_active: true })
-                .eq("id", store.partner_id)
-        } else {
-            const { data: siblingStores } = await supabase
-                .from("stores")
-                .select("id, is_showcase_active")
-                .eq("partner_id", store.partner_id)
-            const anyActive = (siblingStores || []).some((s: any) => s.is_showcase_active !== false)
-            if (!anyActive) {
-                await supabase
-                    .from("partners")
-                    .update({ is_showcase_active: false })
-                    .eq("id", store.partner_id)
-            }
-        }
-    }
-
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: enable ? AdminActionType.STORE_ENABLE_SHOWCASE : AdminActionType.STORE_DISABLE_SHOWCASE,
         targetType: "partner",
         targetId: storeId,
         metadata: {
+            case_id: caseId,
             reason: finalReason,
             storeName: store.name,
             storeId,
             partnerId: store.partner_id,
-            is_showcase_active: enable,
+            showcase_suspended: !enable,
+            durationDays: !enable ? (durationDays || "permanent") : undefined,
+            suspendedUntil,
             riskScore,
         },
     })
@@ -2264,13 +2278,14 @@ export async function toggleStoreShowcase(
                         : `Vitrine Online Desativada: ${store.name}`,
                     message: enable
                         ? `A vitrine online da loja "${store.name}" foi reativada pela administração e voltou a ficar visível no marketplace. Motivo: ${finalReason}.`
-                        : `A vitrine online da loja "${store.name}" foi desativada temporariamente pela administração. O acesso ao ERP permanece normal. Motivo: ${finalReason}.`,
+                        : `A vitrine online da loja "${store.name}" foi desativada pela administração e está oculta no marketplace. O acesso ao ERP permanece normal. Motivo: ${finalReason}.${caseId ? ` Protocolo: ${caseId}.` : ""}`,
                     entityType: "announcement",
                     entityId: storeId,
                     data: {
                         store_id: storeId,
                         store_name: store.name,
                         partner_id: store.partner_id,
+                        case_id: caseId,
                         audience: "seller",
                         url: "/erp/configuracoes",
                     },
@@ -2283,5 +2298,182 @@ export async function toggleStoreShowcase(
         }
     }
 
-    return { success: true }
+    return { success: true, caseId }
+}
+
+// ─── Toggle Partner Online Showcase (All Stores of ERP) ⚠️ (step-up required) ──
+
+export async function togglePartnerShowcase(
+    partnerId: string,
+    enable: boolean,
+    reason: string = "",
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyOwner: boolean = true,
+    durationDays: number | null = null
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
+    const admin = await requireAdminScope("user_enforcement", "admin")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
+
+    const trimmedReason = (reason || "").trim()
+    if (!enable && trimmedReason.length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+    const finalReason =
+        trimmedReason.length >= 5
+            ? trimmedReason
+            : enable
+                ? "Reativação administrativa das vitrines online do ERP"
+                : "Desativação administrativa das vitrines online do ERP"
+
+    const supabase: any = getAdminClient()
+
+    const { data: partner, error: fetchError } = await supabase
+        .from("partners")
+        .select("id, user_id, showcase_suspended_at, showcase_suspended_until")
+        .eq("id", partnerId)
+        .single()
+
+    if (fetchError || !partner) {
+        return { success: false, error: "Parceiro não encontrado" }
+    }
+
+    assertNotSelf(admin.userId, partner.user_id)
+    if (!enable) {
+        await assertNotProtected(partner.user_id)
+    }
+
+    const { data: partnerStores } = await supabase
+        .from("stores")
+        .select("id, name, slug, is_headquarters, showcase_suspended_at")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+
+    const storesList = partnerStores || []
+    const storeName = storesList[0]?.name || "Organização"
+    const anyStoreSuspended = storesList.some((s: any) => !!s.showcase_suspended_at)
+    const currentlyAdminSuspended = !!partner.showcase_suspended_at
+
+    if (enable && !currentlyAdminSuspended && !anyStoreSuspended) {
+        return { success: false, error: "As vitrines online deste parceiro já estão ativas" }
+    }
+    if (!enable && currentlyAdminSuspended) {
+        return { success: false, error: "As vitrines online deste parceiro já estão desativadas pela administração" }
+    }
+
+    const nowIso = new Date().toISOString()
+    const suspendedUntil = !enable && durationDays && durationDays > 0
+        ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+        : null
+    const caseId = !enable ? generateCaseId("CAS") : undefined
+
+    const showcasePayload: Record<string, any> = enable
+        ? {
+            showcase_suspended_at: null,
+            showcase_suspended_until: null,
+            showcase_suspended_reason: null,
+            showcase_suspended_by: null,
+            showcase_suspended_case_id: null,
+        }
+        : {
+            showcase_suspended_at: nowIso,
+            showcase_suspended_until: suspendedUntil,
+            showcase_suspended_reason: finalReason,
+            showcase_suspended_by: admin.userId,
+            showcase_suspended_case_id: caseId,
+        }
+
+    const { error: partnerUpdateErr } = await supabase
+        .from("partners")
+        .update(showcasePayload)
+        .eq("id", partnerId)
+
+    if (partnerUpdateErr) {
+        return { success: false, error: partnerUpdateErr.message }
+    }
+
+    const storeUpdatePayload: Record<string, any> = { ...showcasePayload }
+    if (riskScore !== undefined && riskScore !== null) {
+        storeUpdatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
+    const { error: storesUpdateErr } = await supabase
+        .from("stores")
+        .update(storeUpdatePayload)
+        .eq("partner_id", partnerId)
+
+    if (storesUpdateErr) {
+        return { success: false, error: storesUpdateErr.message }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: enable ? AdminActionType.PARTNER_ENABLE_SHOWCASE : AdminActionType.PARTNER_DISABLE_SHOWCASE,
+        targetType: "partner",
+        targetId: partnerId,
+        metadata: {
+            case_id: caseId,
+            reason: finalReason,
+            storeName,
+            partnerId,
+            storesCount: storesList.length,
+            showcase_suspended: !enable,
+            durationDays: !enable ? (durationDays || "permanent") : undefined,
+            suspendedUntil,
+            riskScore,
+        },
+    })
+
+    // Cache invalidation for all stores of this partner + marketplace/explore
+    try {
+        const { invalidateStoreCache } = await import("@/lib/cache/invalidation")
+        await Promise.allSettled(
+            storesList.map((st: any) => invalidateStoreCache(st.id, partnerId, st.slug || undefined))
+        )
+    } catch (e) {
+        console.error("[ENFORCEMENT] Partner stores cache invalidation error:", e)
+    }
+
+    try {
+        const { revalidateExploreSearch, revalidateMarketplace } = await import("@/lib/utils/revalidation")
+        await Promise.allSettled([revalidateExploreSearch({ silent: true }), revalidateMarketplace()])
+    } catch (e) {
+        console.error("[ENFORCEMENT] Explore revalidation error:", e)
+    }
+
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(partnerId, MANAGEMENT_ROLES)
+
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: enable
+                        ? `Vitrines Online Reativadas: ${storeName}`
+                        : `Vitrines Online Desativadas: ${storeName}`,
+                    message: enable
+                        ? `As vitrines online de todas as lojas da organização "${storeName}" foram reativadas pela administração e voltaram a ficar visíveis no marketplace. Motivo: ${finalReason}.`
+                        : `As vitrines online de todas as lojas da organização "${storeName}" foram desativadas pela administração e estão ocultas no marketplace. O acesso ao painel ERP permanece normal. Motivo: ${finalReason}.${caseId ? ` Protocolo: ${caseId}.` : ""}`,
+                    entityType: "announcement",
+                    entityId: partnerId,
+                    data: {
+                        partner_id: partnerId,
+                        store_name: storeName,
+                        case_id: caseId,
+                        audience: "seller",
+                        url: "/erp/configuracoes",
+                    },
+                    idempotencyKey: `partner_showcase_${enable ? "enabled" : "disabled"}:${partnerId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send partner showcase toggle notification:", notifErr)
+        }
+    }
+
+    return { success: true, caseId }
 }

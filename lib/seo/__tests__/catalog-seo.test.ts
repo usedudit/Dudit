@@ -29,6 +29,23 @@ describe("catalog-seo", () => {
     ])
   })
 
+  it("normalizes ERP technical_specs wrapper with attributes array", () => {
+    const raw = {
+      attributes: [
+        { id: 1, name: "Marca", value: "Coca-Cola" },
+        { id: 2, name: "Volume", value: "2 Litros" },
+      ],
+      addon_groups: [],
+      accepts_offers: false,
+      accepts_trades: false,
+    }
+    expect(normalizeCatalogSpecs(raw)).toEqual([
+      { name: "Marca", value: "Coca-Cola" },
+      { name: "Volume", value: "2 Litros" },
+    ])
+    expect(normalizeCatalogSpecs({ attributes: [], addon_groups: [], accepts_offers: false })).toEqual([])
+  })
+
   it("normalizes tags from array and string", () => {
     expect(normalizeCatalogTags(["Celular", " Apple "])).toEqual(["celular", "apple"])
     expect(normalizeCatalogTags("smartphone, android, 5g")).toEqual(["smartphone", "android", "5g"])

@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { EyeIcon, EyeOffIcon } from "@/lib/icons"
 
 interface ServiceGridCardProps {
@@ -41,8 +41,7 @@ const ServiceGridCard = React.memo(
         onPrefetchTouchStart,
     }: ServiceGridCardProps) => {
 
-        const hasImage = service.images && service.images.length > 0 && service.images[0] && service.images[0].trim() !== ''
-        const imageUrl = hasImage && service.images ? getR2ImageUrl(service.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
+        const imageUrl = getPrimaryProductDisplayImage(service, "thumbnail", { allowFlagged: true })
 
         const formatCurrency = (value: number) => {
             return new Intl.NumberFormat("pt-BR", {

@@ -774,18 +774,6 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         value={endDate}
                                                         onChange={(e) => setEndDate(e.target.value)}
                                                     />
-                                                </div>
-                                            </SidebarCard>
-
-                                            <SidebarCard hasSeparator hasTopStrip title="Cobrança e Créditos">
-                                                <div className="space-y-5">
-                                                    <FormDropdown
-                                                        label="Modo de Cobrança"
-                                                        value={billingMode}
-                                                        setValue={(val) => setBillingMode(val as any)}
-                                                        options={billingModeOptions}
-                                                        disabled
-                                                    />
 
                                                     <FormDropdown
                                                         label="Validade dos Créditos"

@@ -143,8 +143,8 @@ export default function CouponDetailPage({
                                                         <Badge variant={getCouponStatusVariant(coupon)}>{getCouponStatusLabel(coupon)}</Badge>
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body">Automático</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{coupon.is_automatic ? "Sim" : "Não"}</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body">Vitrine online</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{coupon.show_in_marketplace !== false ? "Disponível" : "Indisponível"}</span>
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Usos realizados</span>

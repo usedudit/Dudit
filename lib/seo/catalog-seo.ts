@@ -34,7 +34,12 @@ export function normalizeCatalogSpecs(specs: any): NormalizedSpec[] {
   }
 
   if (typeof raw === "object" && raw !== null) {
+    if (Array.isArray(raw.attributes)) {
+      return normalizeCatalogSpecs(raw.attributes)
+    }
+
     const ignoredKeys = new Set([
+      "attributes",
       "addon_groups",
       "condition",
       "condicao",

@@ -60,6 +60,8 @@ export enum AdminActionType {
     PARTNER_ENABLE_ERP = "partner.enable_erp",
     STORE_DISABLE_SHOWCASE = "partner.disable_showcase",
     STORE_ENABLE_SHOWCASE = "partner.enable_showcase",
+    PARTNER_DISABLE_SHOWCASE = "partner.disable_all_showcases",
+    PARTNER_ENABLE_SHOWCASE = "partner.enable_all_showcases",
 
     // Product/Service
     PRODUCT_SOFT_DELETE = "product.soft_delete",
@@ -126,6 +128,9 @@ export enum AdminActionType {
     DELIVERY_DRIVER_INVITE_REVOKE = "delivery_driver.invite_revoke",
     DELIVERY_DRIVER_UPDATE = "delivery_driver.update",
     DELIVERY_DRIVER_DEACTIVATE = "delivery_driver.deactivate",
+
+    // Compliance & KYC (break-glass)
+    COMPLIANCE_REVEAL_PII = "compliance.reveal_pii",
 }
 
 // ─── Audit Log Types ────────────────────────────────────────────────────────
@@ -149,6 +154,7 @@ export type AuditTargetType =
     | "quote"
     | "promotion"
     | "blog_post"
+    | "compliance_log"
 
 export interface AdminAuditLogEntry {
     adminUserId: string
@@ -352,6 +358,14 @@ export interface EnforcementPartner {
     owner_user_id: string
     is_active: boolean
     is_showcase_active?: boolean
+    showcase_suspended_at?: string | null
+    showcase_suspended_until?: string | null
+    showcase_suspended_reason?: string | null
+    showcase_suspended_case_id?: string | null
+    partner_showcase_suspended_at?: string | null
+    partner_showcase_suspended_until?: string | null
+    partner_showcase_suspended_reason?: string | null
+    partner_showcase_suspended_case_id?: string | null
     erp_disabled: boolean
     suspended_at: string | null
     suspended_until: string | null
@@ -369,6 +383,10 @@ export interface AdminStoreEntry {
     name: string
     is_active: boolean
     is_showcase_active?: boolean
+    showcase_suspended_at?: string | null
+    showcase_suspended_until?: string | null
+    showcase_suspended_reason?: string | null
+    showcase_suspended_case_id?: string | null
     suspended_at: string | null
     suspended_until?: string | null
     suspended_reason: string | null

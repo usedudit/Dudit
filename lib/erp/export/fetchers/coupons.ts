@@ -10,13 +10,13 @@ import type { CouponsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const COUPON_SELECT = `
-  id, code, discount_type, discount_value, apply_scope, is_automatic, is_active,
+  id, code, discount_type, discount_value, apply_scope, show_in_marketplace, is_active,
   min_cart_value, usage_limit, starts_at, ends_at, created_at,
   coupon_usages(count)
 `
 
 const COUPON_SELECT_ALL = `
-  id, code, discount_type, discount_value, apply_scope, is_automatic, is_active,
+  id, code, discount_type, discount_value, apply_scope, show_in_marketplace, is_active,
   allow_combination, min_cart_value, max_discount_value, usage_limit,
   usage_per_customer, first_purchase_only, customer_scope, starts_at, ends_at,
   created_at,
@@ -48,7 +48,7 @@ export async function fetchCouponsExport(
 
       if (filters.activeTab === "Ativos") query = query.eq("is_active", true)
       else if (filters.activeTab === "Inativos") query = query.eq("is_active", false)
-      else if (filters.activeTab === "Automaticos") query = query.eq("is_automatic", true)
+      else if (filters.activeTab === "Vitrine") query = query.eq("show_in_marketplace", true)
 
       if (statuses.length === 1) query = query.eq("is_active", statuses[0] === "Ativo")
       else if (statuses.length > 1) query = query.in("is_active", statuses.map((s) => s === "Ativo"))

@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
-import { validateCoupon, findBestAutomaticCoupon, validateCouponRow, type CouponValidationResult } from "@/lib/services/coupons"
+import { validateCoupon, validateCouponRow, type CouponValidationResult } from "@/lib/services/coupons"
 import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 import { setCouponStores, getCouponStoreIds } from "@/lib/services/promotions.service"
 
@@ -32,7 +32,7 @@ const CouponSchema = z.object({
     endsAt: z.string().nullable(),
     isActive: z.boolean().default(true),
     customerScope: z.enum(["all", "specific"]).default("all"),
-    isAutomatic: z.boolean().default(false),
+    showInMarketplace: z.boolean().default(true),
     productIds: z.array(z.string().uuid()).optional().default([]),
     categoryIds: z.array(z.string().uuid()).optional().default([]),
     serviceIds: z.array(z.string().uuid()).optional().default([]),
@@ -124,7 +124,7 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
             is_active: data.isActive,
             customer_scope: data.customerScope,
             store_id: data.storeId || (data.storeIds && data.storeIds.length > 0 ? data.storeIds[0] : null),
-            is_automatic: data.isAutomatic,
+            show_in_marketplace: data.showInMarketplace,
         })
         .select("id")
         .single()
@@ -184,7 +184,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
             is_active: data.isActive,
             customer_scope: data.customerScope,
             store_id: data.storeId || (data.storeIds && data.storeIds.length > 0 ? data.storeIds[0] : null),
-            is_automatic: data.isAutomatic,
+            show_in_marketplace: data.showInMarketplace,
         })
         .eq("id", couponId)
         .eq("partner_id", data.partnerId)
@@ -274,18 +274,6 @@ export async function validateCouponAction(input: {
     return validateCoupon(input)
 }
 
-export async function findAutomaticCouponAction(input: {
-    partnerId: string
-    customerId?: string | null
-    subtotal: number
-    shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
-}) {
-    await requireUser()
-    await requirePermission(input.partnerId, "orders", "view")
-    return findBestAutomaticCoupon(input)
-}
-
 export async function getCouponCustomersAction(partnerId: string, couponId: string) {
     await requireUser()
     await requirePermission(partnerId, "coupons", "view")
@@ -318,7 +306,7 @@ export async function validateMarketplaceCouponAction(input: {
     // Use admin client to bypass RLS (coupons table only allows partner_users to read)
     const { getAdminClient } = await import("@/lib/supabase/admin")
     const admin = getAdminClient()
-    return validateCoupon(input, admin)
+    return validateCoupon({ ...input, marketplaceOnly: true }, admin)
 }
 
 export async function listApplicableMarketplaceCouponsAction(input: {
@@ -355,12 +343,12 @@ export async function listApplicableMarketplaceCouponsAction(input: {
             ends_at,
             customer_scope,
             allow_combination,
-            is_automatic,
+            show_in_marketplace,
             is_active
         `)
         .eq("partner_id", input.partnerId)
         .eq("is_active", true)
-        .eq("is_automatic", false)
+        .eq("show_in_marketplace", true)
         .order("code")
 
     if (error) {
@@ -368,7 +356,7 @@ export async function listApplicableMarketplaceCouponsAction(input: {
     }
 
     const validationPromises = (coupons || []).map(async (coupon: any) => {
-        const result = await validateCouponRow(admin, coupon, input)
+        const result = await validateCouponRow(admin, coupon, { ...input, marketplaceOnly: true })
         return { coupon, result }
     })
 

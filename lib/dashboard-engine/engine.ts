@@ -39,7 +39,7 @@ export async function getDashboardLayout(
     : await getActiveStoreId();
 
   // Store e queries de fallback
-  const STORE_SELECT = "id, short_id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, business_info, addresses!store_id!left(city, state)"
+  const STORE_SELECT = "id, short_id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, subcategory_id, opening_hours, business_info, addresses!store_id!left(city, state)"
 
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
@@ -62,7 +62,7 @@ export async function getDashboardLayout(
     // Parcerias/Dados Gerais
     supabase
       .from("partners")
-      .select("category_id, is_showcase_active, business_info, partner_integrations(provider_slug, status, account_id)")
+      .select("category_id, subcategory_id, is_showcase_active, business_info, partner_integrations(provider_slug, status, account_id)")
       .eq("id", partnerId)
       .single(),
 
@@ -196,10 +196,22 @@ export async function getDashboardLayout(
   const sellsProducts = isSystemResourceActive(businessInfo, "products");
   const sellsServices = isSystemResourceActive(businessInfo, "services");
 
-  const hasPhone = !!store?.phone;
-  const hasCategory = !!(store?.category_id || partner.category_id);
-  let addressData = addressRes.data || [];
-  // Fallback: se não encontrou endereço via partner_id, busca via store_id
+  const hasPhone = Boolean(store?.phone && String(store.phone).trim().length > 0);
+  const hasCategory = Boolean(
+    store?.category_id ||
+    store?.subcategory_id ||
+    partner.category_id ||
+    partner.subcategory_id
+  );
+  const embeddedStoreAddresses = Array.isArray(store?.addresses)
+    ? store.addresses
+    : store?.addresses
+      ? [store.addresses]
+      : [];
+  let addressData = (addressRes.data && addressRes.data.length > 0)
+    ? addressRes.data
+    : embeddedStoreAddresses;
+  // Fallback: se não encontrou endereço via partner_id nem no join da loja, busca via store_id
   if ((!addressData || addressData.length === 0) && store?.id) {
     const { data: storeAddress } = await supabase
       .from("addresses")

@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, Checkbox } from "@/components/reusable"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 
 interface ServiceMobileItemProps {
     service: any
@@ -40,7 +40,7 @@ const ServiceMobileItem = React.memo(
                 <div className="flex items-start gap-4 h-auto">
                     <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 overflow-hidden">
                         <img
-                            src={getR2ImageUrl(service.images?.[0], "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                            src={getPrimaryProductDisplayImage(service, "thumbnail", { allowFlagged: true })}
                             alt={service.name}
                             className="w-full h-full object-cover"
                         />

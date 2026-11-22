@@ -1,6 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { Product, ProductInput, ProductWithDetails } from "@/lib/types/product"
-import { buildSoftDeletePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { buildCatalogSoftDeletePayload, scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
 export class ProductService {
   private async getSupabase() {
@@ -116,7 +116,7 @@ export class ProductService {
     const supabase = await this.getSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id || "00000000-0000-0000-0000-000000000000"
-    const payload = buildSoftDeletePayload(userId)
+    const payload = buildCatalogSoftDeletePayload(userId)
     const { error } = await supabase.from("products").update(payload).eq("id", productId).eq("partner_id", partnerId)
 
     if (error) {
@@ -130,7 +130,7 @@ export class ProductService {
     const supabase = await this.getSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id || "00000000-0000-0000-0000-000000000000"
-    const payload = buildSoftDeletePayload(userId)
+    const payload = buildCatalogSoftDeletePayload(userId)
     const { error } = await supabase.from("products").update(payload).in("id", productIds).eq("partner_id", partnerId)
 
     if (error) {

@@ -63,7 +63,20 @@ export function ReportModal({
         }
     }
 
-    const targetLabel = targetType === "product" ? "este produto" : targetType === "service" ? "este serviço" : targetType === "partner" ? "este vendedor" : "este item"
+    const targetLabel =
+        targetType === "product"
+            ? "este produto"
+            : targetType === "service"
+            ? "este serviço"
+            : targetType === "partner"
+            ? "este vendedor"
+            : targetType === "review"
+            ? "esta avaliação"
+            : targetType === "recurring_plan"
+            ? "esta assinatura"
+            : targetType === "community_video"
+            ? "este vídeo"
+            : "este item"
 
     // Filtra as opções baseadas no targetType
     const getRelevantReasons = (): ReportReasonCode[] => {
@@ -93,6 +106,28 @@ export function ReportModal({
                 "illegal_or_dangerous",
                 "inappropriate_content",
                 "spam_or_misleading",
+                "other"
+            ];
+        }
+        if (targetType === "recurring_plan") {
+            return [
+                "scam_or_fraud",
+                "fake_listing",
+                "illegal_or_dangerous",
+                "inappropriate_content",
+                "spam_or_misleading",
+                "copyright_violation",
+                "other"
+            ];
+        }
+        if (targetType === "community_video") {
+            return [
+                "inappropriate_content",
+                "spam_or_misleading",
+                "scam_or_fraud",
+                "harassment_or_hate",
+                "illegal_or_dangerous",
+                "copyright_violation",
                 "other"
             ];
         }
@@ -136,7 +171,7 @@ export function ReportModal({
                 </div>
 
                 <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
-                    Comunicar algo errado sobre {targetType === "partner" ? "este vendedor" : targetType === "review" ? "esta avaliação" : targetType === "service" ? "este serviço" : "este produto"}
+                    Comunicar algo errado sobre {targetLabel}
                 </h4>
                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-8 text-center leading-relaxed">
                     Percebeu algo que não parece correto em <strong>{targetName}</strong>? Conte para nós. Seu relato é anônimo e será analisado pela nossa equipe.

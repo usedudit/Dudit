@@ -29,7 +29,7 @@ import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_cou
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
-import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
+import { buildCatalogSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import {
@@ -274,7 +274,7 @@ export async function deleteProductAction(productId: string, reason?: string | n
         const admin = getAdminClient()
 
         // 1. Soft delete update payload
-        const payload = buildSoftDeletePayload(user.id, reason)
+        const payload = buildCatalogSoftDeletePayload(user.id, reason)
         const deleteResult = await admin.from("products").update(payload).eq("id", productId)
         if (deleteResult.error) return { error: deleteResult.error.message }
 
@@ -2790,7 +2790,7 @@ export async function deleteProductsInBatchAction(productIds: string[], reason?:
         const { data: products } = await admin.from("products").select("id, name, sku, status, deleted_at").in("id", sanitized)
 
         // 1. Explicit batch update (soft delete)
-        const payload = buildSoftDeletePayload(user.id, reason)
+        const payload = buildCatalogSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("products").update(payload).in("id", sanitized).eq("partner_id", partnerId)
         if (error) return { error: error.message }
 

@@ -632,8 +632,9 @@ export function ExplorarPageClient({
             return
         }
 
-        // 1. If logged in, persist the user's saved address city
-        if (userProfile?.city && userProfile?.state) {
+        // 1. If logged in and no explicit browsing city cookie is set, seed from the user's saved address
+        const hasExplicitCookie = /(?:^|; )dudit_city=([^;]+)/.test(document.cookie)
+        if (!hasExplicitCookie && userProfile?.city && userProfile?.state) {
             const normCity = userProfile.city
                 .toLowerCase()
                 .normalize("NFD")
@@ -1162,19 +1163,16 @@ export function ExplorarPageClient({
 
     const handleSelectCity = (citySlug: string | null) => {
         triggerFilterLoading()
-        const isLoggedIn = Boolean(userProfile)
         if (citySlug) {
-            // Only persist to cookie/localStorage for logged-in users
-            // Logged-out users: just update local state + URL
-            if (isLoggedIn) {
-                document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+            document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+            try {
                 localStorage.setItem("dudit_city", citySlug)
-            }
+            } catch { }
         } else {
-            if (isLoggedIn) {
-                document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            try {
                 localStorage.removeItem("dudit_city")
-            }
+            } catch { }
         }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")

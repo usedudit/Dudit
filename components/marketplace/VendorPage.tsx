@@ -17,6 +17,7 @@ import { trackEvent } from "@/lib/analytics"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours, getOpenNowStatus } from "@/lib/utils/opening-hours"
 import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange, estimateDeliveryTimeRange } from "@/lib/services/location.service"
+import { getEffectiveMaxDeliveryKm } from "@/lib/delivery/fee"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { ListItem } from "@/components/reusable/ListItem"
@@ -1014,7 +1015,7 @@ function DeliveryCalculatorBottomSheet({
         let fee = 0
         let feeLabel: string | null = null
         let outOfRadius = false
-        const maxDeliveryKm = settings?.max_delivery_km ?? settings?.maxDeliveryKm ? Number(settings?.max_delivery_km ?? settings?.maxDeliveryKm) : null
+        const maxDeliveryKm = getEffectiveMaxDeliveryKm(settings)
 
         // Se a loja não tem coordenadas salvas no parceiro, chamamos quoteDeliveryFeeAction que resolve no banco
         if (distanceKm == null && (partner.partner_id || partner.partnerId)) {
@@ -1032,6 +1033,9 @@ function DeliveryCalculatorBottomSheet({
                     if (quoteRes.maxDeliveryKm != null && distanceKm != null && distanceKm > quoteRes.maxDeliveryKm) {
                         outOfRadius = true
                     }
+                } else if (quoteRes && (quoteRes as any).isOutsideRadius) {
+                    distanceKm = (quoteRes as any).distanceKm != null ? Number((quoteRes as any).distanceKm.toFixed(1)) : null
+                    outOfRadius = true
                 }
             } catch { }
         }
@@ -1497,9 +1501,17 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     const isOutside = Boolean(quoteRes.isOutsideRadius || (quoteRes.maxDeliveryKm != null && dist != null && dist > quoteRes.maxDeliveryKm))
                     setServerDelivery({
                         distanceKm: dist,
-                        feeLabel: fee === 0 ? "Grátis" : formatCurrency(fee),
-                        isFreeDelivery: fee === 0,
+                        feeLabel: isOutside ? null : (fee === 0 ? "Grátis" : formatCurrency(fee)),
+                        isFreeDelivery: !isOutside && fee === 0,
                         outOfRadius: isOutside,
+                    })
+                } else if (active && quoteRes?.isOutsideRadius) {
+                    const dist = quoteRes.distanceKm != null ? Number(quoteRes.distanceKm.toFixed(1)) : null
+                    setServerDelivery({
+                        distanceKm: dist,
+                        feeLabel: null,
+                        isFreeDelivery: false,
+                        outOfRadius: true,
                     })
                 }
             }).catch(() => { })
@@ -1525,8 +1537,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             distanceKm = serverDelivery.distanceKm
         }
 
-        const maxDeliveryKmRaw = settings?.max_delivery_km ?? settings?.maxDeliveryKm
-        const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+        const maxDeliveryKm = getEffectiveMaxDeliveryKm(settings)
         const outOfRadius = isDeliveryEnabled
             && (
                 serverDelivery?.outOfRadius ??

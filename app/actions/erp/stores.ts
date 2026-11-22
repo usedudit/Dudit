@@ -381,7 +381,30 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.is_active !== undefined) updateData.is_active = input.is_active
         if (input.is_headquarters !== undefined) updateData.is_headquarters = input.is_headquarters
         // F5.4a: Showcase fields
-        if (input.is_showcase_active !== undefined) updateData.is_showcase_active = input.is_showcase_active
+        if (input.is_showcase_active !== undefined) {
+            if (input.is_showcase_active === true) {
+                const { isShowcaseAdminSuspended } = await import("@/lib/commerce/store-showcase")
+                const [{ data: storeShowcaseRow }, { data: partnerShowcaseRow }] = await Promise.all([
+                    admin
+                        .from("stores")
+                        .select("showcase_suspended_at, showcase_suspended_until")
+                        .eq("id", input.storeId)
+                        .maybeSingle(),
+                    admin
+                        .from("partners")
+                        .select("showcase_suspended_at, showcase_suspended_until")
+                        .eq("id", input.partnerId)
+                        .maybeSingle(),
+                ])
+                if (isShowcaseAdminSuspended(storeShowcaseRow) || isShowcaseAdminSuspended(partnerShowcaseRow)) {
+                    return {
+                        success: false,
+                        error: "A vitrine online desta loja está desativada pela administração e não pode ser reativada manualmente.",
+                    }
+                }
+            }
+            updateData.is_showcase_active = input.is_showcase_active
+        }
         if (input.accept_orders_when_closed !== undefined) updateData.accept_orders_when_closed = input.accept_orders_when_closed
         // F5.4b: Business data fields
         if (input.business_info !== undefined) {

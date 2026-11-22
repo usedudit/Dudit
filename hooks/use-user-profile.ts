@@ -1,8 +1,7 @@
 "use client"
 
-import useSWR from "swr"
-import { useCallback } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
+import { useUserSession } from "@/hooks/use-user-session"
 
 interface UserProfileData {
   full_name: string | null
@@ -17,7 +16,7 @@ interface UserProfileHookResult {
 }
 
 export function useUserProfile(fallbackData?: UserProfileData | null): UserProfileHookResult {
-  const { user, supabase, isLoading: isAuthLoading, sessionData } = useSupabase()
+  const { isLoading: isAuthLoading, sessionData } = useSupabase()
 
   // Use sessionData from context if available as higher priority fallback
   const contextProfile = sessionData?.profile ? {
@@ -26,83 +25,34 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
     avatar_url: null
   } : null
 
-  const effectiveFallback = fallbackData || contextProfile
+  const effectiveFallback = fallbackData !== undefined ? fallbackData : contextProfile
 
-  const fetcher = useCallback(async () => {
-    if (!user) return null
-
-    const fetchWithRetry = async (attempt = 0): Promise<{ full_name: string | null; address: string | null; avatar_url: string | null } | null> => {
-      try {
-        const [profileRes, addressRes] = await Promise.all([
-          supabase.from("user_profiles").select("full_name, avatar_url").eq("user_id", user.id).maybeSingle(),
-          supabase.from("addresses").select("city, state")
-            .eq("user_id", user.id)
-            .eq("is_default", true)
-            .maybeSingle()
-        ])
-
-        if (profileRes.error || addressRes.error) {
-          throw profileRes.error || addressRes.error
-        }
-        
-        let addressStr: string | null = null
-        if (profileRes.data && addressRes.data) {
-          addressStr = `${addressRes.data.city} - ${addressRes.data.state}`
-        }
-
-        return {
-          full_name: profileRes.data?.full_name || null,
-          address: addressStr,
-          avatar_url: profileRes.data?.avatar_url || null
-        }
-      } catch (err) {
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 800 * (attempt + 1)))
-          return fetchWithRetry(attempt + 1)
-        }
-        throw err
-      }
-    }
-
-    return fetchWithRetry()
-  }, [user, supabase])
-
-  const key = user ? `user-profile-${user.id}` : null
-  const shouldSkipFetch = effectiveFallback !== undefined
-
-  const { data, isLoading: isDataLoading, mutate } = useSWR(
-    shouldSkipFetch ? null : key,
-    fetcher,
-    {
-      fallbackData: effectiveFallback || null,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateOnMount: false,
-      dedupingInterval: 60000,
-      keepPreviousData: true,
-      errorRetryCount: 2,
-      errorRetryInterval: 1500,
-      onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
-        // Only retry on network/transient errors, not on auth errors
-        if (retryCount >= 2) return
-        if (error?.message?.includes("unexpected response") || error?.message?.includes("Failed to fetch") || error?.message?.includes("NetworkError")) {
-          setTimeout(() => revalidate({ retryCount }), 1500 * (retryCount + 1))
-        }
-      },
-    }
+  // Reuse the shared `user-session-${user.id}` SWR cache from `useUserSession`
+  // instead of maintaining a second SWR key (`user-profile-${user.id}`) that
+  // queries the same `user_profiles` and `addresses` tables.
+  const session = useUserSession(
+    effectiveFallback !== undefined
+      ? { profile: effectiveFallback, cartCount: 0 }
+      : undefined
   )
 
   if (effectiveFallback) {
     return {
       profile: effectiveFallback,
       isLoading: false,
-      mutate
+      mutate: session.mutate,
     }
   }
 
   return {
-    profile: data || null,
-    isLoading: isAuthLoading || isDataLoading,
-    mutate
+    profile: session.profile
+      ? {
+          full_name: session.profile.full_name,
+          address: session.profile.address,
+          avatar_url: session.profile.avatar_url,
+        }
+      : null,
+    isLoading: isAuthLoading || session.isLoading,
+    mutate: session.mutate,
   }
 }

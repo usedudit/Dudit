@@ -2,14 +2,13 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ChevronLeftIcon } from "@/lib/icons"
-import { Badge, Button, IconPlaceholder } from "@/components/reusable"
+import { Button, IconPlaceholder } from "@/components/reusable"
 import { BLOG_CATEGORIES } from "@/lib/blog/categories"
 import { getPublishedBlogPostsByCategory } from "@/lib/blog/queries"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import BlogCard from "@/components/blog/BlogCard"
-import { BLOG_ACCENT_CLASSES } from "@/components/blog/category-styles"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 const BASE_URL = "https://dudit.com.br"
 
@@ -67,7 +66,6 @@ export default async function BlogCategoryPage({ params }: Props) {
     if (!category) notFound()
 
     const posts = await getPublishedBlogPostsByCategory(category.id)
-    const accent = BLOG_ACCENT_CLASSES[category.accent]
     const canonical = `${BASE_URL}/blog/categoria/${category.id}`
 
     const jsonLd = {
@@ -109,32 +107,31 @@ export default async function BlogCategoryPage({ params }: Props) {
             />
 
             <section className="border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
-                <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
-                    <Button variant="filled" asChild className="mb-6 h-10 w-10 shrink-0 p-0">
-                        <Link href="/blog" prefetch={false} aria-label="Voltar para o blog">
-                            <ChevronLeftIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
-                        </Link>
-                    </Button>
-
-                    <Badge variant={accent.badge} icon={null}>
-                        Blog do Dino
-                    </Badge>
-
-                    <h1 className="mt-4 max-w-4xl text-3xl font-bold leading-tight tracking-tight text-brand-dark dark:text-dark-heading md:text-4xl lg:text-5xl">
-                        {category.label}
-                    </h1>
-                    <p className="mt-4 max-w-2xl text-base leading-relaxed text-brand-inactive-text dark:text-dark-body lg:text-lg">
-                        {category.description}
-                    </p>
-                    <p className="mt-3 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                        {posts.length} {posts.length === 1 ? "artigo publicado" : "artigos publicados"}
-                    </p>
+                <div className="mx-auto w-full max-w-[1400px] px-4 py-10 lg:py-14">
+                    <div className="flex items-start gap-3">
+                        <Button variant="filled" asChild className="mt-0.5 h-10 w-10 shrink-0 p-0">
+                            <Link href="/blog" prefetch={false} aria-label="Voltar para o blog">
+                                <ChevronLeftIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
+                            </Link>
+                        </Button>
+                        <div className="min-w-0">
+                            <h1 className="text-2xl font-bold leading-tight tracking-tight text-brand-dark dark:text-dark-heading md:text-3xl lg:text-4xl">
+                                {category.label}
+                            </h1>
+                            <p className="mt-3 max-w-2xl text-base leading-relaxed text-brand-inactive-text dark:text-dark-body">
+                                {category.description}
+                            </p>
+                            <p className="mt-2 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                {posts.length} {posts.length === 1 ? "artigo publicado" : "artigos publicados"}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
                 {posts.length > 0 ? (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                         {posts.map((post) => (
                             <BlogCard key={post.id} post={post} />
                         ))}

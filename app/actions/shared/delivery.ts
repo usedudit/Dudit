@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
-import { calculateDeliveryFee, hasDeliveryRatesConfigured, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
+import { calculateDeliveryFee, getEffectiveMaxDeliveryKm, hasDeliveryRatesConfigured, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
 import { calculateDistance, geocodeAddress } from "@/lib/services/location.service"
 import { findSuperFreteIntegration } from "@/lib/services/shipping/superfrete-integration"
@@ -145,9 +145,7 @@ async function resolveDeliveryContext(
   ])
 
   const settings = mapSettingsRow(settingsRow)
-  const effectiveMaxKm = (settings.maxDeliveryKm != null && settings.maxDeliveryKm > 0)
-    ? settings.maxDeliveryKm
-    : null
+  const effectiveMaxKm = getEffectiveMaxDeliveryKm(settings)
   const shouldCalculateDistance = (
     effectiveMaxKm != null ||
     settings.extraKmPrice > 0 ||

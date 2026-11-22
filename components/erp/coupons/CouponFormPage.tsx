@@ -440,10 +440,10 @@ export default function CouponFormPage({
                                                             </div>
                                                         </label>
                                                         <label className="flex items-start gap-3">
-                                                            <Checkbox checked={form.isAutomatic} onChange={(value) => setForm((prev) => ({ ...prev, isAutomatic: Boolean(value) }))} />
+                                                            <Checkbox checked={form.showInMarketplace} onChange={(value) => setForm((prev) => ({ ...prev, showInMarketplace: Boolean(value) }))} />
                                                             <div>
-                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Cupom automático</p>
-                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Pode ser selecionado automaticamente no fluxo de venda.</p>
+                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Disponível na vitrine online</p>
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Define se esse cupom fica disponível para os clientes na sua vitrine online.</p>
                                                             </div>
                                                         </label>
                                                     </div>

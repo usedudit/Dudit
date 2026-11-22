@@ -51,11 +51,11 @@ import {
     extractCSRFTokenFromObject,
 } from "@/lib/security/csrf-action-wrapper"
 import { sendMarketplaceReport, sendContentReported } from "@/lib/services/discord-marketplace-webhook.service"
-import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
+import { getPlanUrl, getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type ReportTargetType = "product" | "partner" | "review" | "service" | "return_request"
+export type ReportTargetType = "product" | "partner" | "review" | "service" | "return_request" | "recurring_plan" | "community_video"
 export type ReportStatus = "pending" | "validated" | "dismissed" | "spam"
 
 export interface Report {
@@ -198,7 +198,7 @@ export async function createReport(data: {
     if (!targetId) {
         return { success: false, error: "Identificador inválido" }
     }
-    if (!["product", "partner", "review", "service", "return_request"].includes(data.targetType)) {
+    if (!["product", "partner", "review", "service", "return_request", "recurring_plan", "community_video"].includes(data.targetType)) {
         return { success: false, error: "Tipo de alvo inválido" }
     }
 
@@ -216,6 +216,8 @@ export async function createReport(data: {
         partner: "partners",
         review: "reviews",
         return_request: "return_requests",
+        recurring_plan: "recurring_plans",
+        community_video: "community_videos",
     }
     const tableName = targetTable[data.targetType]
 
@@ -377,12 +379,72 @@ export async function createReport(data: {
                 partnerId = r.partner_id
                 partnerName = ((r.partners as any)?.stores?.[0]?.name) || null
             }
+        } else if (data.targetType === "recurring_plan") {
+            const { data: rp } = await adminClient
+                .from("recurring_plans")
+                .select("id, name, short_id, partner_id, store_id")
+                .eq("id", finalTargetId)
+                .maybeSingle()
+            entityName = rp?.name || ""
+            if (rp?.partner_id) {
+                partnerId = rp.partner_id
+                const storeQuery = rp.store_id
+                    ? adminClient
+                        .from("stores")
+                        .select("id, name, slug, short_id, addresses(city, state), partner_id")
+                        .eq("id", rp.store_id)
+                        .maybeSingle()
+                    : adminClient
+                        .from("stores")
+                        .select("id, name, slug, short_id, addresses(city, state), partner_id")
+                        .eq("partner_id", rp.partner_id)
+                        .order("is_headquarters", { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+                const { data: st } = await storeQuery
+                if (st) {
+                    partnerName = st.name || null
+                    partnerUrl = getStoreUrl(st)
+                    entityUrl = getPlanUrl(rp, st)
+                } else {
+                    entityUrl = getPlanUrl(rp)
+                }
+            }
+        } else if (data.targetType === "community_video") {
+            const { data: cv } = await adminClient
+                .from("community_videos")
+                .select("id, title, partner_id, store_id")
+                .eq("id", finalTargetId)
+                .maybeSingle()
+            entityName = cv?.title || `Vídeo #${finalTargetId.slice(0, 8)}`
+            entityUrl = `/ddt-admin/videos/${finalTargetId}`
+            if (cv?.partner_id) {
+                partnerId = cv.partner_id
+                const storeQuery = cv.store_id
+                    ? adminClient
+                        .from("stores")
+                        .select("id, name, slug, short_id, addresses(city, state), partner_id")
+                        .eq("id", cv.store_id)
+                        .maybeSingle()
+                    : adminClient
+                        .from("stores")
+                        .select("id, name, slug, short_id, addresses(city, state), partner_id")
+                        .eq("partner_id", cv.partner_id)
+                        .order("is_headquarters", { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+                const { data: st } = await storeQuery
+                if (st) {
+                    partnerName = st.name || null
+                    partnerUrl = getStoreUrl(st)
+                }
+            }
         }
 
         const reporterName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0]
 
         sendContentReported({
-            entityType: data.targetType as "product" | "service" | "partner" | "review",
+            entityType: data.targetType,
             entityId: finalTargetId,
             entityName,
             reasonCode: data.reasonCode,
@@ -500,6 +562,8 @@ export async function getReports(
     const partnerIds = items.filter((r: any) => r.target_type === "partner" || r.target_type === "store").map((r: any) => r.target_id)
     const reviewIds = items.filter((r: any) => r.target_type === "review").map((r: any) => r.target_id)
     const returnRequestIds = items.filter((r: any) => r.target_type === "return_request").map((r: any) => r.target_id)
+    const recurringPlanIds = items.filter((r: any) => r.target_type === "recurring_plan").map((r: any) => r.target_id)
+    const communityVideoIds = items.filter((r: any) => r.target_type === "community_video").map((r: any) => r.target_id)
 
     const targetNames = new Map<string, string>()
 
@@ -511,7 +575,7 @@ export async function getReports(
                 .select("id, name")
                 .in("id", productIds)
                 .then(({ data }: any) => {
-                    ;(data || []).forEach((p: any) => {
+                    ; (data || []).forEach((p: any) => {
                         targetNames.set(`product:${p.id}`, p.name)
                     })
                 })
@@ -524,7 +588,7 @@ export async function getReports(
                 .select("id, name")
                 .in("id", serviceIds)
                 .then(({ data }: any) => {
-                    ;(data || []).forEach((s: any) => {
+                    ; (data || []).forEach((s: any) => {
                         targetNames.set(`service:${s.id}`, s.name)
                     })
                 })
@@ -538,7 +602,7 @@ export async function getReports(
                 .select("id, partner_id, name")
                 .or(`partner_id.in.(${idListStr}),id.in.(${idListStr})`)
                 .then(({ data }: any) => {
-                    ;(data || []).forEach((s: any) => {
+                    ; (data || []).forEach((s: any) => {
                         if (s.partner_id) {
                             targetNames.set(`partner:${s.partner_id}`, s.name)
                             targetNames.set(`store:${s.partner_id}`, s.name)
@@ -556,7 +620,7 @@ export async function getReports(
                 .select("id, stores(name)")
                 .in("id", partnerIds)
                 .then(({ data }: any) => {
-                    ;(data || []).forEach((p: any) => {
+                    ; (data || []).forEach((p: any) => {
                         if (!targetNames.has(`partner:${p.id}`)) {
                             targetNames.set(`partner:${p.id}`, p.stores?.[0]?.name || null)
                         }
@@ -571,7 +635,7 @@ export async function getReports(
                 .select("id, comment, partner_id")
                 .in("id", reviewIds)
                 .then(({ data }: any) => {
-                    ;(data || []).forEach((rv: any) => {
+                    ; (data || []).forEach((rv: any) => {
                         const snippet = rv.comment ? `Avaliação: "${rv.comment.slice(0, 50)}"` : `Avaliação #${rv.id.slice(0, 8)}`
                         targetNames.set(`review:${rv.id}`, snippet)
                     })
@@ -585,8 +649,34 @@ export async function getReports(
                 .select("id, order_id, reason")
                 .in("id", returnRequestIds)
                 .then(({ data }: any) => {
-                    ;(data || []).forEach((rr: any) => {
+                    ; (data || []).forEach((rr: any) => {
                         targetNames.set(`return_request:${rr.id}`, `Devolução #${rr.id.slice(0, 8)}${rr.reason ? ` - ${rr.reason}` : ""}`)
+                    })
+                })
+        )
+    }
+    if (recurringPlanIds.length > 0) {
+        fetches.push(
+            adminClient
+                .from("recurring_plans")
+                .select("id, name")
+                .in("id", recurringPlanIds)
+                .then(({ data }: any) => {
+                    ; (data || []).forEach((rp: any) => {
+                        targetNames.set(`recurring_plan:${rp.id}`, rp.name)
+                    })
+                })
+        )
+    }
+    if (communityVideoIds.length > 0) {
+        fetches.push(
+            adminClient
+                .from("community_videos")
+                .select("id, title")
+                .in("id", communityVideoIds)
+                .then(({ data }: any) => {
+                    ; (data || []).forEach((cv: any) => {
+                        targetNames.set(`community_video:${cv.id}`, cv.title || `Vídeo #${cv.id.slice(0, 8)}`)
                     })
                 })
         )
@@ -601,9 +691,9 @@ export async function getReports(
             .from("user_profiles")
             .select("user_id, full_name")
             .in("user_id", reporterIds)
-        ;(reporters || []).forEach((p: any) => {
-            if (p.full_name) reporterNames.set(p.user_id, p.full_name)
-        })
+            ; (reporters || []).forEach((p: any) => {
+                if (p.full_name) reporterNames.set(p.user_id, p.full_name)
+            })
     }
 
     const mapped: Report[] = items.map((r: any) => {
@@ -618,11 +708,13 @@ export async function getReports(
             target_id: r.target_id,
             target_name: tname || (
                 r.target_type === "product" ? `Produto #${r.target_id.slice(0, 8)}` :
-                r.target_type === "service" ? `Serviço #${r.target_id.slice(0, 8)}` :
-                r.target_type === "partner" || r.target_type === "store" ? `Loja #${r.target_id.slice(0, 8)}` :
-                r.target_type === "review" ? `Avaliação #${r.target_id.slice(0, 8)}` :
-                r.target_type === "return_request" ? `Devolução #${r.target_id.slice(0, 8)}` :
-                r.target_id
+                    r.target_type === "service" ? `Serviço #${r.target_id.slice(0, 8)}` :
+                        r.target_type === "partner" || r.target_type === "store" ? `Loja #${r.target_id.slice(0, 8)}` :
+                            r.target_type === "review" ? `Avaliação #${r.target_id.slice(0, 8)}` :
+                                r.target_type === "return_request" ? `Devolução #${r.target_id.slice(0, 8)}` :
+                                    r.target_type === "recurring_plan" ? `Assinatura #${r.target_id.slice(0, 8)}` :
+                                        r.target_type === "community_video" ? `Vídeo #${r.target_id.slice(0, 8)}` :
+                                            r.target_id
             ),
             reason: r.reason,
             reason_code: r.reason_code,
@@ -763,6 +855,7 @@ export async function resolveReport(
         const targetTypeLabel: Record<string, string> = {
             product: "produto", service: "serviço", partner: "loja",
             store: "loja", review: "avaliação", return_request: "devolução",
+            recurring_plan: "assinatura", community_video: "vídeo da comunidade",
         }
         const itemLabel = targetTypeLabel[reportData?.target_type || (r.target_type as string)] || "item"
         const reportSnippet = reportData?.reason ? `"${reportData.reason.slice(0, 80)}"` : ""
@@ -874,6 +967,7 @@ export async function dismissReport(
         const targetTypeLabel: Record<string, string> = {
             product: "produto", service: "serviço", partner: "loja",
             store: "loja", review: "avaliação", return_request: "devolução",
+            recurring_plan: "assinatura", community_video: "vídeo da comunidade",
         }
         const itemLabel = targetTypeLabel[reportData?.target_type || (r.target_type as string)] || "item"
         const reportSnippet = reportData?.reason ? `"${reportData.reason.slice(0, 80)}"` : ""
@@ -1249,6 +1343,75 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         return {
             ...returnReq,
             name: `Devolução #${returnReq.id.slice(0, 8)}${returnReq.reason ? ` - ${returnReq.reason}` : ""}`,
+            store,
+        }
+    }
+
+    if (targetType === "recurring_plan") {
+        const { data: plan } = await adminClient
+            .from("recurring_plans")
+            .select("*")
+            .eq("id", targetId)
+            .maybeSingle()
+
+        if (!plan) return null
+
+        let store = null
+        if (plan.store_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score, slug, short_id, addresses(city, state)")
+                .eq("id", plan.store_id)
+                .maybeSingle()
+            store = storeData
+        } else if (plan.partner_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score, slug, short_id, addresses(city, state)")
+                .eq("partner_id", plan.partner_id)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeData
+        }
+
+        return {
+            ...plan,
+            store,
+        }
+    }
+
+    if (targetType === "community_video") {
+        const { data: video } = await adminClient
+            .from("community_videos")
+            .select("*")
+            .eq("id", targetId)
+            .maybeSingle()
+
+        if (!video) return null
+
+        let store = null
+        if (video.store_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score, slug, short_id, addresses(city, state)")
+                .eq("id", video.store_id)
+                .maybeSingle()
+            store = storeData
+        } else if (video.partner_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score, slug, short_id, addresses(city, state)")
+                .eq("partner_id", video.partner_id)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeData
+        }
+
+        return {
+            ...video,
+            name: video.title || `Vídeo #${video.id.slice(0, 8)}`,
             store,
         }
     }

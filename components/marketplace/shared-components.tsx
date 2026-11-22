@@ -18,6 +18,7 @@ import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, normalizeStateUf, type LocationContext } from "@/lib/utils/location-label"
 import { calculateDistance, formatDistanceLabel, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
+import { getEffectiveMaxDeliveryKm } from "@/lib/delivery/fee"
 import Button from "../reusable/Button"
 import { FormSection } from "../reusable"
 
@@ -125,8 +126,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const showDeliveryTime = isDeliveryEnabled && hasProducts
 
     // Check if seller is outside the delivery radius
-    const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
-    const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+    const maxDeliveryKm = getEffectiveMaxDeliveryKm(deliverySettings)
     const outOfRadius = isDeliveryEnabled
         && hasProducts
         && distanceKm != null
@@ -322,6 +322,7 @@ interface ItemCardProps {
         name: string
         price: number
         images?: string[]
+        video_thumbnail?: string | null
         originalPrice?: number
         slug?: string
         rating?: number
@@ -497,8 +498,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const showDeliveryTime = !isBroadScope && itemType === "produto" && isDeliveryEnabled
 
     // Check if seller is outside the delivery radius
-    const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
-    const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+    const maxDeliveryKm = getEffectiveMaxDeliveryKm(deliverySettings)
     const outOfRadius = isDeliveryEnabled
         && itemType === "produto"
         && distanceKm != null

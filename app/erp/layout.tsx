@@ -70,7 +70,7 @@ export default async function ERPLayout({
         (res: any) => res,
         () => ({ data: null, error: null })
       ),
-    getAllUserPartnerAccess(user),
+    getAllUserPartnerAccess(),
   ])
 
   const userProfile = {

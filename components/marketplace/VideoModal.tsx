@@ -6,11 +6,12 @@ import { motion, AnimatePresence } from "framer-motion"
 import { recordVideoClick } from "@/app/actions/marketplace/community-videos"
 import { getLinkedItemData, type LinkedItemData } from "@/app/actions/marketplace/video-linked-item"
 import Link from "next/link"
-import { XIcon, ChevronDownIcon } from "@/lib/icons"
+import { XIcon, ChevronDownIcon, FlagIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getStoreUrl } from "@/lib/utils/url-generator"
 import { useModalLayer } from "@/lib/modal-stack"
+import { ReportModal } from "./ReportModal"
 
 interface VideoData {
   id: string
@@ -40,6 +41,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   const [linkedItem, setLinkedItem] = useState<LinkedItemData | null>(null)
   const [linkedItemLoading, setLinkedItemLoading] = useState(false)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
   const zIndex = useModalLayer(isOpen)
@@ -47,6 +49,12 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowReportModal(false)
+    }
+  }, [isOpen, video?.id])
 
   useEffect(() => {
     if (isOpen) {
@@ -61,13 +69,13 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
+      if (e.key === "Escape" && !showReportModal) onClose()
     }
     if (isOpen) {
       window.addEventListener("keydown", handleKeyDown)
     }
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, showReportModal])
 
   useEffect(() => {
     if (isOpen && videoRef.current) {
@@ -106,6 +114,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   if (!mounted) return null
 
   return createPortal(
+    <>
     <AnimatePresence>
       {isOpen && video && (
         <motion.div
@@ -117,17 +126,30 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
           style={{ zIndex }}
           onClick={onClose}
         >
-          {/* Close Button (Top Right) */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose()
-            }}
-            className="absolute top-3 right-3 sm:top-5 sm:right-5 z-30 w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
-            aria-label="Fechar vídeo"
+          {/* Top Right Actions (Report + Close) */}
+          <div
+            className="absolute top-3 right-3 sm:top-5 sm:right-5 z-30 flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
           >
-            <XIcon size={20} />
-          </button>
+            <button
+              onClick={() => {
+                videoRef.current?.pause()
+                setShowReportModal(true)
+              }}
+              className="w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-red-500/80 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
+              aria-label="Denunciar vídeo"
+              title="Denunciar vídeo"
+            >
+              <FlagIcon size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
+              aria-label="Fechar vídeo"
+            >
+              <XIcon size={20} />
+            </button>
+          </div>
 
           {/* Fullscreen Video Player */}
           <div
@@ -286,7 +308,17 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
           </div>
         </motion.div>
       )}
-    </AnimatePresence>,
+    </AnimatePresence>
+    {video && (
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="community_video"
+        targetId={video.id}
+        targetName={video.title || "Vídeo da comunidade"}
+      />
+    )}
+    </>,
     document.body
   )
 }

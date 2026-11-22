@@ -723,18 +723,19 @@ async function importProductBatch(
     }
 
     const fiscal = {
-      ncm: row["ncm"] || null,
-      cest: row["cest"] || null,
+      store_id: storeId || null,
+      ncm: row["ncm"]?.trim() || null,
+      cest: row["cest"]?.trim() || null,
       origin: row["origin"] ? parseInt(row["origin"].replace(/\D/g, "")) || 0 : 0,
-      item_type: "00",
-      cfop_internal: "5102",
-      cfop_external: "6102",
-      csosn: "102",
-      pis_cst: "99",
-      pis_rate: 0.0,
-      cofins_cst: "99",
-      cofins_rate: 0.0,
-      ipi_cst: "99",
+      item_type: row["item_type"]?.trim() || "00",
+      cfop_internal: row["cfop_internal"]?.trim() || "5102",
+      cfop_external: row["cfop_external"]?.trim() || "6102",
+      csosn: row["csosn"]?.trim() || "102",
+      pis_cst: row["pis_cst"]?.trim() || "99",
+      pis_rate: parseNumber(row["pis_rate"]) ?? 0.0,
+      cofins_cst: row["cofins_cst"]?.trim() || "99",
+      cofins_rate: parseNumber(row["cofins_rate"]) ?? 0.0,
+      ipi_cst: row["ipi_cst"]?.trim() || "99",
     }
     const logistics = {
       weight_gross: parseNumber(row["weight_gross"]) ?? 0,
@@ -828,10 +829,20 @@ async function importProductBatch(
       }
 
       if (fiscalToInsert.length > 0) {
-        await supabase.from("product_fiscal_profiles").insert(fiscalToInsert)
+        const { error: fiscalInsertError } = await supabase
+          .from("product_fiscal_profiles")
+          .upsert(fiscalToInsert, { onConflict: "product_id" })
+        if (fiscalInsertError) {
+          console.error("[BatchImport] Erro ao inserir perfis fiscais:", fiscalInsertError)
+        }
       }
       if (logisticsToInsert.length > 0) {
-        await supabase.from("product_logistics").insert(logisticsToInsert)
+        const { error: logisticsInsertError } = await supabase
+          .from("product_logistics")
+          .upsert(logisticsToInsert, { onConflict: "product_id" })
+        if (logisticsInsertError) {
+          console.error("[BatchImport] Erro ao inserir perfis logísticos:", logisticsInsertError)
+        }
       }
 
       // Insert product variants if any

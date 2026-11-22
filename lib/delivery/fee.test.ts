@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   calculateDeliveryFee,
+  getEffectiveMaxDeliveryKm,
   hasDeliveryRatesConfigured,
   type DeliverySettings,
   type DeliveryFeeRule,
@@ -183,6 +184,62 @@ describe("Delivery Fee Calculation & Configuration", () => {
       expect(result.fee).toBe(0)
       expect(result.breakdown.freeDeliveryReason).toBe("coupon")
       expect(result.breakdown.hasRatesConfigured).toBe(true)
+    })
+
+    it("should throw outside radius when distance exceeds includedKm and maxDeliveryKm is null", () => {
+      expect(() =>
+        calculateDeliveryFee({
+          distanceKm: 600,
+          currentTime: new Date(),
+          settings: {
+            ...defaultSettings,
+            baseFee: 5,
+            includedKm: 5,
+            maxDeliveryKm: null,
+          },
+          rules: [],
+        })
+      ).toThrow("Endereço fora do raio de entrega.")
+    })
+
+    it("should allow delivery when distance is within includedKm and maxDeliveryKm is null", () => {
+      const result = calculateDeliveryFee({
+        distanceKm: 4.5,
+        currentTime: new Date(),
+        settings: {
+          ...defaultSettings,
+          baseFee: 5,
+          includedKm: 5,
+          maxDeliveryKm: null,
+        },
+        rules: [],
+      })
+
+      expect(result.fee).toBe(5)
+      expect(result.breakdown.isOutsideRadius).toBe(false)
+      expect(result.breakdown.maxDeliveryKm).toBe(5)
+    })
+
+    it("should prefer maxDeliveryKm over includedKm when both are set", () => {
+      expect(getEffectiveMaxDeliveryKm({ includedKm: 5, maxDeliveryKm: 15 })).toBe(15)
+      expect(getEffectiveMaxDeliveryKm({ includedKm: 5, maxDeliveryKm: null })).toBe(5)
+      expect(getEffectiveMaxDeliveryKm({ included_km: 8, max_delivery_km: 0 })).toBe(8)
+      expect(getEffectiveMaxDeliveryKm({ includedKm: 0, maxDeliveryKm: null })).toBeNull()
+
+      expect(() =>
+        calculateDeliveryFee({
+          distanceKm: 16,
+          currentTime: new Date(),
+          settings: {
+            ...defaultSettings,
+            baseFee: 5,
+            includedKm: 5,
+            extraKmPrice: 2,
+            maxDeliveryKm: 15,
+          },
+          rules: [],
+        })
+      ).toThrow("Endereço fora do raio de entrega.")
     })
   })
 })

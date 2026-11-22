@@ -8,6 +8,7 @@ import { getCurrentUser, requireMinimumPlan } from "@/lib/auth/authorization"
 import { encrypt } from "@/lib/cryptoService"
 import { MERCADOPAGO_PROVIDER, findMercadoPagoIntegration } from "@/lib/services/payments/mercadopago-integration"
 import { validateOAuthState } from "@/lib/security/oauth-state"
+import { recordIntegrationConnected } from "@/lib/services/compliance/integration-history"
 
 function normalizeBaseUrl(rawUrl: string): string {
   return rawUrl.endsWith("/") ? rawUrl.slice(0, -1) : rawUrl
@@ -190,6 +191,36 @@ export async function GET(request: NextRequest) {
     const connectedAt = new Date().toISOString()
     const mpUserId = tokenData.user_id?.toString() ?? null
 
+    // Best-effort lookup of MP account email & nickname for compliance/KYC traceability
+    let mpAccountEmail: string | null = null
+    let mpAccountNickname: string | null = null
+    try {
+      const meController = new AbortController()
+      const meTimeout = setTimeout(() => meController.abort(), 3000)
+      try {
+        const meRes = await fetch("https://api.mercadopago.com/users/me", {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            Accept: "application/json",
+          },
+          signal: meController.signal,
+        })
+        if (meRes.ok) {
+          const meData = await meRes.json().catch(() => null)
+          if (typeof meData?.email === "string" && meData.email.trim()) {
+            mpAccountEmail = meData.email.trim().toLowerCase()
+          }
+          if (typeof meData?.nickname === "string" && meData.nickname.trim()) {
+            mpAccountNickname = meData.nickname.trim()
+          }
+        }
+      } finally {
+        clearTimeout(meTimeout)
+      }
+    } catch {
+      // Non-blocking: mpUserId alone is already sufficient for Mercado Pago KYC lookup
+    }
+
     // Secrets and connection state live in partner_integrations. That table has
     // no write policy for authenticated users, so it needs the service-role client.
     const admin = getAdminClient()
@@ -219,6 +250,7 @@ export async function GET(request: NextRequest) {
         provider_slug: MERCADOPAGO_PROVIDER,
         status: "connected",
         account_id: mpUserId,
+        account_email: mpAccountEmail,
         access_token_encrypted: encrypt(tokenData.access_token, MERCADOPAGO_PROVIDER),
         credentials: integrationCredentials,
         config: integrationConfig,
@@ -236,6 +268,15 @@ export async function GET(request: NextRequest) {
         `${appUrl}/erp/configuracoes?mp_error=save_failed`
       )
     }
+
+    await recordIntegrationConnected(admin, {
+      partnerId,
+      providerSlug: MERCADOPAGO_PROVIDER,
+      externalAccountId: mpUserId,
+      externalAccountEmail: mpAccountEmail,
+      externalAccountLabel: mpAccountNickname,
+      connectedAt,
+    })
 
     // Status fields (mp_user_id, mp_public_key, mp_live_mode, mp_connected_at,
     // mp_token_expires_at) now live only in partner_integrations: status,

@@ -2,7 +2,7 @@ import "server-only"
 
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { checkLimit, getPartnerPlan } from "@/lib/services/subscription.service"
+import { getUsageCounters, getPartnerPlan, type Plan, type UsageCounters } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { resolveActiveResources, type SystemResourceId } from "@/lib/system-resources"
@@ -58,7 +58,7 @@ interface CacheEntry<T> {
   expiresAt: number
 }
 
-const CAPABILITIES_CACHE_TTL_MS = 30_000 // 30 seconds
+const CAPABILITIES_CACHE_TTL_MS = 60_000 // 60 seconds (invalidated on plan/settings changes)
 const capabilitiesCache = new Map<string, CacheEntry<MarketplaceCapabilities>>()
 
 export function invalidateMarketplaceCapabilitiesCache(partnerId?: string): void {
@@ -90,21 +90,31 @@ function normalizePhone(value: unknown): string | null {
 }
 
 /**
- * A cota mensal do plano já foi consumida?
+ * Avalia se a cota mensal do plano já foi consumida a partir de um único
+ * snapshot de `plan` + `usage_counters` (evita 3 chamadas separadas a checkLimit).
  *
- * Fail-open de propósito: se a leitura das cotas falhar, a vitrine continua
- * aberta e o `checkoutCartAction` (fonte autoritativa) ainda bloqueia no
- * momento de fechar o pedido. Falhar fechado aqui derrubaria vendas por um
- * erro transitório de leitura.
+ * Fail-open de propósito: se a leitura do plano ou das cotas falhar, a vitrine
+ * continua aberta e o `checkoutCartAction` (fonte autoritativa) ainda bloqueia
+ * no momento de fechar o pedido.
  */
-async function isMonthlyLimitReached(partnerId: string, limitName: string): Promise<boolean> {
-  try {
-    const result = await checkLimit(partnerId, limitName)
-    return !result.allowed
-  } catch (error: any) {
-    console.warn(`[MARKETPLACE_CAPS] checkLimit(${limitName}) failed:`, error?.message)
-    return false
-  }
+function evaluateMonthlyLimitReached(
+  plan: Plan | null,
+  counters: UsageCounters | null,
+  countersFailed: boolean,
+  limitName: "monthly_orders" | "monthly_quotes" | "monthly_appointments",
+  counterField: "orders_month_count" | "quotes_month_count" | "appointments_month_count",
+): boolean {
+  if (!plan || countersFailed) return false
+  const rawLimit = plan.limits_json?.[limitName]
+  if (rawLimit === "unlimited") return false
+  const limit =
+    rawLimit === undefined || rawLimit === null
+      ? 0
+      : typeof rawLimit === "number"
+        ? rawLimit
+        : parseInt(String(rawLimit), 10) || 0
+  const current = counters ? Number(counters[counterField] ?? 0) : 0
+  return current >= limit
 }
 
 /**
@@ -137,13 +147,32 @@ export const resolveMarketplaceCapabilities = cache(
 
     const admin = getAdminClient()
 
-    const [{ data: partner }, plan] = await Promise.all([
+    const storeQuery = (storeId
+      ? admin.from("stores").select("phone").eq("id", storeId).eq("partner_id", partnerId)
+      : admin
+          .from("stores")
+          .select("phone")
+          .eq("partner_id", partnerId)
+          .order("is_headquarters", { ascending: false })
+          .order("created_at", { ascending: true })
+    ).limit(1).maybeSingle()
+
+    let countersFailed = false
+    const [{ data: partner }, plan, storePhone, usageCounters] = await Promise.all([
       admin
         .from("partners")
         .select("id, order_flow, business_info")
         .eq("id", partnerId)
         .maybeSingle(),
       getPartnerPlan(partnerId).catch(() => null),
+      Promise.resolve(storeQuery)
+        .then((res: any) => normalizePhone(res?.data?.phone))
+        .catch(() => null),
+      getUsageCounters(partnerId).catch((error: any) => {
+        countersFailed = true
+        console.warn("[MARKETPLACE_CAPS] getUsageCounters failed:", error?.message)
+        return null
+      }),
     ])
 
     const businessInfo = normalizeBusinessInfo((partner as any)?.business_info)
@@ -157,21 +186,6 @@ export const resolveMarketplaceCapabilities = cache(
       Array.isArray(plan?.features_json) ? plan!.features_json : [],
     )
     const planHasFeature = (feature: string) => planFeatures.has(feature)
-
-    let storePhone: string | null = null
-    try {
-      let storeQuery = admin.from("stores").select("phone")
-      storeQuery = storeId
-        ? storeQuery.eq("id", storeId).eq("partner_id", partnerId)
-        : storeQuery
-            .eq("partner_id", partnerId)
-            .order("is_headquarters", { ascending: false })
-            .order("created_at", { ascending: true })
-      const { data: store } = await storeQuery.limit(1).maybeSingle()
-      storePhone = normalizePhone((store as any)?.phone)
-    } catch {
-      storePhone = null
-    }
 
     const whatsappPhone = storePhone || null
 
@@ -202,11 +216,27 @@ export const resolveMarketplaceCapabilities = cache(
     // A vitrine precisa saber ANTES de o comprador montar o carrinho se a loja
     // ainda aceita pedido/orçamento/agendamento. Sem isso, o limite só aparecia
     // no fim do checkout (ou virava erro seco), depois de tudo preenchido.
-    const [ordersLimitReached, quotesLimitReached, appointmentsLimitReached] = await Promise.all([
-      isMonthlyLimitReached(partnerId, "monthly_orders"),
-      isMonthlyLimitReached(partnerId, "monthly_quotes"),
-      isMonthlyLimitReached(partnerId, "monthly_appointments"),
-    ])
+    const ordersLimitReached = evaluateMonthlyLimitReached(
+      plan,
+      usageCounters,
+      countersFailed,
+      "monthly_orders",
+      "orders_month_count",
+    )
+    const quotesLimitReached = evaluateMonthlyLimitReached(
+      plan,
+      usageCounters,
+      countersFailed,
+      "monthly_quotes",
+      "quotes_month_count",
+    )
+    const appointmentsLimitReached = evaluateMonthlyLimitReached(
+      plan,
+      usageCounters,
+      countersFailed,
+      "monthly_appointments",
+      "appointments_month_count",
+    )
 
     if (ordersLimitReached) reasons.push("orders_limit_reached")
     if (quotesLimitReached) reasons.push("quotes_limit_reached")

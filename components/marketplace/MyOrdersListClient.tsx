@@ -431,9 +431,9 @@ export function MyOrdersListClient({
                             </div>
 
                             {/* Tabs */}
-                            <div className="mb-6">
+                            <div>
                                 <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setCurrentPage(1); }} className="w-full">
-                                    <TabsList className="mb-6">
+                                    <TabsList className="mb-6 px-0">
                                         <TabsTrigger value="todos">
                                             Todos <span className="ml-1.5 text-xs font-normal">({tabCounts.todos})</span>
                                         </TabsTrigger>

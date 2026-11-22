@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { DefaultModal, Button, FormTextarea, InfoCard, IconPlaceholder } from "@/components/reusable"
 import {
   checkERPOnboardingFeedbackPromptAction,
@@ -66,38 +67,52 @@ export function ERPOnboardingFeedbackModal({
     }
   }, [propIsOpen])
 
+  const roleLower = String(userRole || "").toLowerCase()
+  const isPrivileged = roleLower === "owner" || roleLower === "admin" || roleLower === "manager"
+  const sessionKey = `dudit_onboarding_feedback_checked_${partnerId}`
+  const alreadyCheckedInSession = (() => {
+    if (typeof window === "undefined" || !partnerId) return false
+    try {
+      return window.sessionStorage.getItem(sessionKey) === "1"
+    } catch {
+      return false
+    }
+  })()
+  const shownRecordedRef = useRef(false)
+
+  const { data: promptData } = useQuery({
+    queryKey: ["erp", "onboarding-feedback-prompt", partnerId, roleLower],
+    queryFn: () => checkERPOnboardingFeedbackPromptAction(partnerId),
+    enabled: !isControlled && isPrivileged && Boolean(partnerId) && !alreadyCheckedInSession,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  })
+
   useEffect(() => {
-    if (isControlled) return
+    if (isControlled || !promptData) return
 
-    // Only verify for management / owners / admins
-    const roleLower = String(userRole || "").toLowerCase()
-    const isPrivileged = roleLower === "owner" || roleLower === "admin" || roleLower === "manager"
-    if (!isPrivileged) return
-
-    let isMounted = true
-
-    async function checkPrompt() {
-      try {
-        const res = await checkERPOnboardingFeedbackPromptAction(partnerId)
-        if (isMounted && res.shouldShow) {
-          setInternalIsOpen(true)
-          if (res.partnerName) setPartnerStoreName(res.partnerName)
-          // Record shown
-          recordFeedbackPromptShownAction(partnerId, "erp_onboarding")
-        }
-      } catch (err) {
-        console.warn("[ERPOnboardingFeedbackModal] Failed to check onboarding prompt:", err)
+    if (promptData.shouldShow) {
+      setInternalIsOpen(true)
+      if (promptData.partnerName) setPartnerStoreName(promptData.partnerName)
+      if (!shownRecordedRef.current) {
+        shownRecordedRef.current = true
+        void recordFeedbackPromptShownAction(partnerId, "erp_onboarding")
       }
+    } else if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(sessionKey, "1")
+      } catch { }
     }
-
-    checkPrompt()
-
-    return () => {
-      isMounted = false
-    }
-  }, [partnerId, userRole, isControlled])
+  }, [isControlled, promptData, partnerId, sessionKey])
 
   const handleClose = async () => {
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(sessionKey, "1")
+      } catch { }
+    }
     if (propOnClose) {
       propOnClose()
     } else {

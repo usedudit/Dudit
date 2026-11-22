@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -19,6 +19,7 @@ import type {
     BlogPostStatus,
 } from "@/lib/blog/types"
 import { getPostDisplayStatus } from "@/lib/blog/utils"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 const LIST_COLUMNS = `
     id, slug, title, subtitle, excerpt, cover_image_url, cover_image_alt,
@@ -89,6 +90,13 @@ async function ensureUniqueSlug(baseSlug: string, ignoreId?: string): Promise<st
 }
 
 async function revalidateBlogPaths(slug: string, category: string, previousSlug?: string, previousCategory?: string) {
+    // Drop the cross-request data cache used by the public blog queries.
+    try {
+        revalidateTag(TAGS.blogPosts, "max")
+    } catch {
+        // Ignore if called during a render pass; the path revalidation below still applies.
+    }
+
     revalidatePath("/blog")
     revalidatePath(`/blog/${slug}`)
     revalidatePath(`/blog/categoria/${category}`)

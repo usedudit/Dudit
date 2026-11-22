@@ -15,6 +15,8 @@ export interface ExpireAllEnforcementsResult {
     expiredPartners: number
     expiredErpDisables: number
     expiredStores: number
+    expiredPartnerShowcases?: number
+    expiredStoreShowcases?: number
     totalCleared: number
 }
 
@@ -416,9 +418,11 @@ export async function expireAllExpiredEnforcements(
     let expiredPartners = 0
     let expiredErpDisables = 0
     let expiredStores = 0
+    let expiredPartnerShowcases = 0
+    let expiredStoreShowcases = 0
 
     try {
-        const [usersRes, partnersRes, storesRes] = await Promise.all([
+        const [usersRes, partnersRes, storesRes, partnerShowcasesRes, storeShowcasesRes] = await Promise.all([
             admin
                 .from("user_profiles")
                 .update({
@@ -450,6 +454,32 @@ export async function expireAllExpiredEnforcements(
                 .not("suspended_at", "is", null)
                 .not("suspended_until", "is", null)
                 .lte("suspended_until", nowIso)
+                .select("id, partner_id"),
+            admin
+                .from("partners")
+                .update({
+                    showcase_suspended_at: null,
+                    showcase_suspended_until: null,
+                    showcase_suspended_reason: null,
+                    showcase_suspended_by: null,
+                    showcase_suspended_case_id: null,
+                })
+                .not("showcase_suspended_at", "is", null)
+                .not("showcase_suspended_until", "is", null)
+                .lte("showcase_suspended_until", nowIso)
+                .select("id, user_id"),
+            admin
+                .from("stores")
+                .update({
+                    showcase_suspended_at: null,
+                    showcase_suspended_until: null,
+                    showcase_suspended_reason: null,
+                    showcase_suspended_by: null,
+                    showcase_suspended_case_id: null,
+                })
+                .not("showcase_suspended_at", "is", null)
+                .not("showcase_suspended_until", "is", null)
+                .lte("showcase_suspended_until", nowIso)
                 .select("id, partner_id"),
         ])
 
@@ -517,8 +547,36 @@ export async function expireAllExpiredEnforcements(
             }
         }
 
+        if (partnerShowcasesRes?.error) {
+            console.error("[ENFORCEMENT_EXPIRATION] Failed sweeping expired partner showcase suspensions:", partnerShowcasesRes.error.message)
+        } else if (Array.isArray(partnerShowcasesRes?.data)) {
+            expiredPartnerShowcases = partnerShowcasesRes.data.length
+            for (const row of partnerShowcasesRes.data) {
+                if (row?.id) affectedPartnerIds.add(row.id)
+                if (row?.user_id) affectedUserIds.add(row.user_id)
+            }
+        }
+
+        if (storeShowcasesRes?.error) {
+            console.error("[ENFORCEMENT_EXPIRATION] Failed sweeping expired store showcase suspensions:", storeShowcasesRes.error.message)
+        } else if (Array.isArray(storeShowcasesRes?.data)) {
+            expiredStoreShowcases = storeShowcasesRes.data.length
+            for (const row of storeShowcasesRes.data) {
+                if (row?.partner_id) affectedPartnerIds.add(row.partner_id)
+            }
+        }
+
         if (affectedUserIds.size > 0 || affectedPartnerIds.size > 0) {
             await revalidateUsersAndPartners(affectedUserIds, affectedPartnerIds, admin)
+        }
+
+        if (expiredPartnerShowcases > 0 || expiredStoreShowcases > 0) {
+            try {
+                const { revalidateExploreSearch, revalidateMarketplace } = await import("@/lib/utils/revalidation")
+                await Promise.allSettled([revalidateExploreSearch({ silent: true }), revalidateMarketplace()])
+            } catch (err) {
+                console.error("[ENFORCEMENT_EXPIRATION] Marketplace revalidation failed:", err)
+            }
         }
     } catch (err) {
         console.error("[ENFORCEMENT_EXPIRATION] Unexpected sweep error:", err)
@@ -529,6 +587,14 @@ export async function expireAllExpiredEnforcements(
         expiredPartners,
         expiredErpDisables,
         expiredStores,
-        totalCleared: expiredUsers + expiredPartners + expiredErpDisables + expiredStores,
+        expiredPartnerShowcases,
+        expiredStoreShowcases,
+        totalCleared:
+            expiredUsers +
+            expiredPartners +
+            expiredErpDisables +
+            expiredStores +
+            expiredPartnerShowcases +
+            expiredStoreShowcases,
     }
 }

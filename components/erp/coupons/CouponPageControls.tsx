@@ -18,6 +18,7 @@ import {
     CheckCircleIcon,
     CancelCircleIcon,
     SparklesIcon,
+    StoreIcon,
     Settings2Icon,
     ExportFileIcon,
 } from "@/lib/icons"
@@ -26,12 +27,12 @@ type FilterState = {
     discountType: string[]
     applyScope: string[]
     customerScope: string[]
-    automaticOnly: boolean
+    marketplaceOnly: boolean
 }
 
 interface CouponPageControlsProps {
-    activeTab: "Todos" | "Ativos" | "Inativos" | "Automaticos"
-    setActiveTab: (tab: "Todos" | "Ativos" | "Inativos" | "Automaticos") => void
+    activeTab: "Todos" | "Ativos" | "Inativos" | "Vitrine"
+    setActiveTab: (tab: "Todos" | "Ativos" | "Inativos" | "Vitrine") => void
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
@@ -42,7 +43,7 @@ interface CouponPageControlsProps {
     hasActiveFilters: boolean
     onAddCoupon?: () => void
     onExport?: () => void
-    tabCounts?: { Todos: number; Ativos: number; Inativos: number; Automaticos: number }
+    tabCounts?: { Todos: number; Ativos: number; Inativos: number; Vitrine: number }
 }
 
 const CouponPageControls: React.FC<CouponPageControlsProps> = ({
@@ -104,11 +105,12 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
                     onRemove={() => setFilters((prev) => ({ ...prev, customerScope: [] }))}
                 />
             )}
-            {filters.automaticOnly && (
+            {filters.marketplaceOnly && (
                 <FilterChip
-                    label="Automacao"
-                    value="Apenas automaticos"
-                    onRemove={() => setFilters((prev) => ({ ...prev, automaticOnly: false }))}
+                    label="Vitrine online"
+                    value="Disponíveis na vitrine"
+                    icon={<StoreIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, marketplaceOnly: false }))}
                 />
             )}
         </AnimatePresence>
@@ -128,8 +130,8 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
                         <TabsTrigger value="Inativos" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Inativos} variant="gray" />}>
                             Inativos
                         </TabsTrigger>
-                        <TabsTrigger value="Automaticos" icon={SparklesIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Automaticos} variant="blue" />}>
-                            Automaticos
+                        <TabsTrigger value="Vitrine" icon={StoreIcon} badge={tabCounts && <TabCountBadge count={tabCounts.Vitrine} variant="blue" />}>
+                            Vitrine online
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

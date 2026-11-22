@@ -2,7 +2,7 @@
 
 import React from "react"
 import { ActionsDropdown, Badge, Checkbox, Tooltip } from "@/components/reusable"
-import { SparklesIcon, TagIcon, Users } from "@/lib/icons"
+import { StoreIcon, TagIcon, Users } from "@/lib/icons"
 import {
     CouponRow,
     getCouponApplyScopeLabel,
@@ -45,9 +45,9 @@ const CouponGridCard = React.memo(
                                 <Tooltip text={`Status: ${getCouponStatusLabel(coupon)}`}>
                                     <Badge variant={getCouponStatusVariant(coupon)} className="whitespace-nowrap scale-90 shrink-0" />
                                 </Tooltip>
-                                {coupon.is_automatic && (
-                                    <Tooltip text="Tipo: Automático">
-                                        <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                {coupon.show_in_marketplace !== false && (
+                                    <Tooltip text="Disponível na vitrine online">
+                                        <Badge variant="blue" icon={<StoreIcon />} className="whitespace-nowrap scale-90 shrink-0" />
                                     </Tooltip>
                                 )}
                                 {coupon.customer_scope === "specific" && (

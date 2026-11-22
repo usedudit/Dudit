@@ -43,7 +43,7 @@ import {
 } from "@/lib/cache/invalidation"
 import { revalidateServices } from "@/lib/utils/revalidation"
 import {
-    buildSoftDeletePayload,
+    buildCatalogSoftDeletePayload,
     buildArchivePayload,
     buildRestorePayload,
 } from "@/lib/supabase/query-helpers"
@@ -1108,7 +1108,7 @@ export async function deleteAdminCatalogProduct(
             .single()
         if (error || !product) return errorResponse("Produto não encontrado")
 
-        const payload = buildSoftDeletePayload(adminUser.userId, cleanReason)
+        const payload = buildCatalogSoftDeletePayload(adminUser.userId, cleanReason)
         const { error: delError } = await admin.from("products").update(payload).eq("id", id)
         if (delError) return errorResponse(delError.message)
 
@@ -1170,7 +1170,7 @@ export async function deleteAdminCatalogService(
             .single()
         if (error || !existing) return errorResponse("Serviço não encontrado")
 
-        const payload = buildSoftDeletePayload(adminUser.userId, cleanReason)
+        const payload = buildCatalogSoftDeletePayload(adminUser.userId, cleanReason)
         const { error: delError } = await admin.from("services").update(payload).eq("id", id)
         if (delError) return errorResponse(delError.message)
 

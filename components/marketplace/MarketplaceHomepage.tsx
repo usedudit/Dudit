@@ -621,17 +621,37 @@ export default function MarketplaceHome({
                     </div>
 
                     <Button
-                        onClick={handleIpLocation}
+                        onClick={requestLocation}
                         disabled={isIpLoading || isLocationLoading}
                         variant="outline"
-                        className="w-full"
+                        className="w-full mt-4"
                     >
                         <MapPinIcon className="w-4 h-4" />
-                        <span>Usar minha localização</span>
+                        <span>{isLocationLoading ? "Localizando..." : "Usar minha localização"}</span>
                     </Button>
 
-                    {/* Only show login link when user is NOT logged in */}
-                    {!user && (
+                    {locationError && (
+                        <p className="text-xs text-red-500 text-center mt-2">{locationError}</p>
+                    )}
+
+                    {/* Account / saved addresses footer */}
+                    {user ? (
+                        <div className="text-center mt-6 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Para cálculo de frete e entrega, use seus endereços salvos ou informe um CEP no produto.
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    setIsVisitorModalOpen(false)
+                                    router.push("/perfil?tab=enderecos")
+                                }}
+                                variant="link"
+                                className="text-sm mt-1 inline-block"
+                            >
+                                Gerenciar meus endereços
+                            </Button>
+                        </div>
+                    ) : (
                         <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                                 Já tem uma conta cadastrada com endereço salvo?

@@ -333,16 +333,14 @@ export default async function ExplorarPage({
 
         const cartCount = sessionData?.cartCount || 0
 
-        // Resolve city for category links (profile → cookie → brasil)
+        // Resolve city for category links (cookie → profile → brasil)
         let landingCitySlug = "brasil"
-        if (userProfile?.city && userProfile?.state) {
+        const cookieStore = await cookies()
+        const savedCity = cookieStore.get("dudit_city")?.value
+        if (savedCity) {
+            landingCitySlug = savedCity
+        } else if (userProfile?.city && userProfile?.state) {
             landingCitySlug = normalizeCityToSlug(userProfile.city, userProfile.state)
-        } else if (!userProfile) {
-            const cookieStore = await cookies()
-            const savedCity = cookieStore.get("dudit_city")?.value
-            if (savedCity && savedCity !== "brasil" && !savedCity.startsWith("estado-")) {
-                landingCitySlug = savedCity
-            }
         }
 
         return (
@@ -464,15 +462,15 @@ export default async function ExplorarPage({
 
     if (!firstSlug) {
         let scopeSlug: string | null = null
-        const { userProfile } = await initialUserProfilePromise
+        const cookieStore = await cookies()
+        const savedCity = cookieStore.get("dudit_city")?.value
 
-        if (userProfile?.city && userProfile?.state) {
-            scopeSlug = normalizeCityToSlug(userProfile.city, userProfile.state)
-        } else if (!userProfile) {
-            const cookieStore = await cookies()
-            const savedCity = cookieStore.get("dudit_city")?.value
-            if (savedCity && savedCity !== "brasil" && !savedCity.startsWith("estado-")) {
-                scopeSlug = savedCity
+        if (savedCity) {
+            scopeSlug = savedCity
+        } else {
+            const { userProfile } = await initialUserProfilePromise
+            if (userProfile?.city && userProfile?.state) {
+                scopeSlug = normalizeCityToSlug(userProfile.city, userProfile.state)
             }
         }
 

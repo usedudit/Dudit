@@ -930,6 +930,36 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         return null;
     };
 
+    const isStoreCreditMethodString = (raw?: string | null) => {
+        const m = String(raw || "").toLowerCase().trim();
+        return (
+            m === "store_credit" ||
+            m === "vale-compra" ||
+            m === "vale_compra" ||
+            m === "vale compra" ||
+            m.includes("store_credit") ||
+            m.includes("vale-compra") ||
+            m.includes("vale_compra") ||
+            m.includes("crédito em loja") ||
+            m.includes("credito em loja") ||
+            m.includes("crédito do cliente") ||
+            m.includes("credito do cliente")
+        );
+    };
+
+    const storeCreditUsed = (() => {
+        const colVal = Number(order.store_credit_amount || 0);
+        if (colVal > 0.009) return colVal;
+        const bd = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+        const fromBreakdown = bd.reduce((sum: number, e: any) => {
+            if (isStoreCreditMethodString(e?.method)) {
+                return sum + Number(e?.amountReceived ?? e?.effectiveAmount ?? e?.amount ?? 0);
+            }
+            return sum;
+        }, 0);
+        return fromBreakdown > 0.009 ? fromBreakdown : 0;
+    })();
+
     const getPaymentTypeLabel = () => {
         if (order.payment_method === "Assinatura (Créditos)") {
             return "Assinatura (Créditos)";
@@ -944,16 +974,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         if (hasMultiplePaidMethods) {
             baseLabel = "Múltiplos meios";
         } else if (paidMethodEntries.length === 1 || methodEntries.length === 1) {
-            const m = (paidMethodEntries[0] || methodEntries[0]).method.toLowerCase();
-            if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
+            const rawMethod = (paidMethodEntries[0] || methodEntries[0]).method;
+            const m = String(rawMethod || "").toLowerCase();
+            if (isStoreCreditMethodString(m)) baseLabel = "Crédito em loja";
+            else if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
             else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
             else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
             else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
             else if (m.includes("boleto") || m.includes("bolbradesco") || m === "ticket") baseLabel = "Boleto";
-            else baseLabel = (paidMethodEntries[0] || methodEntries[0]).method;
+            else baseLabel = rawMethod;
         } else {
             const pm = String(order.payment_method || "").toLowerCase();
-            if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
+            if (isStoreCreditMethodString(pm)) baseLabel = "Crédito em loja";
+            else if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
             else if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) baseLabel = "Cartão de Crédito";
             else if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) baseLabel = "Cartão de Débito";
             else if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) baseLabel = "Dinheiro";
@@ -1009,17 +1042,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         !isPendingExchangeShortfall &&
         !isPaymentExpired &&
         (isPixPayment || isBoletoPayment || hasUnspecifiedMpCharge || order.situation === "payment_failed");
+    const isStoreCreditPaymentOrder = isStoreCreditMethodString(paymentMethodName) || (storeCreditUsed > 0.009 && storeCreditUsed >= Number(order.total_amount || 0) - 0.009);
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
-        const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
+        const isStoreCredit = isStoreCreditPaymentOrder || isStoreCreditMethodString(order.payment_method);
         const isSubscriptionCredits = order.payment_method === "Assinatura (Créditos)";
         if (isSubscriptionCredits) {
             return <div className="flex items-center gap-1.5"><RepeatIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" /></div>;
         }
         if (isStoreCredit) {
             icons.push(
-                <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain shrink-0" />
+                <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Crédito em loja" className="w-5 h-5 object-contain shrink-0" />
             );
+            if (isStoreCreditMethodString(paymentMethodName)) {
+                return <div className="flex items-center gap-1.5">{icons}</div>;
+            }
         } else if (isMercadoPago) {
             icons.push(
                 <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
@@ -1030,13 +1067,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         const nameLower = paymentMethodName.toLowerCase();
         if (nameLower.includes("pix") || isExchangeOrder) {
             icons.push(<img key="pix" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />);
-        } else if (nameLower.includes("crédito") || nameLower.includes("credito") || nameLower.includes("credit") || nameLower.includes("débito") || nameLower.includes("debito") || nameLower.includes("debit")) {
+        } else if (!isStoreCreditMethodString(nameLower) && (nameLower.includes("crédito") || nameLower.includes("credito") || nameLower.includes("credit") || nameLower.includes("débito") || nameLower.includes("debito") || nameLower.includes("debit"))) {
             icons.push(<img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />);
         } else if (nameLower.includes("dinheiro") || nameLower.includes("cash") || nameLower.includes("money")) {
             icons.push(<MoneyIcon key="money" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />);
         } else if (nameLower.includes("boleto")) {
             icons.push(<img key="boleto" src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-5 h-5 object-contain shrink-0" />);
-        } else if (!isMercadoPago) {
+        } else if (!isMercadoPago && !isStoreCredit) {
             icons.push(<CreditCardIcon key="default" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />);
         }
         return <div className="flex items-center gap-1.5">{icons}</div>;
@@ -1235,6 +1272,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <span className="font-medium">-{formatCurrency(paymentMethodDiscountVal)}</span>
                     </div>
                 )}
+                {storeCreditUsed > 0.009 && (
+                    <div className="flex justify-between text-sm text-brand-green">
+                        <span>Crédito em loja</span>
+                        <span className="font-medium">-{formatCurrency(storeCreditUsed)}</span>
+                    </div>
+                )}
                 {paymentMethodInterestVal > 0 && (
                     <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                         <span>Juros do pagamento</span>
@@ -1261,7 +1304,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 )}
                 <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
                     <span className="text-md font-bold text-brand-dark dark:text-dark-heading">Total</span>
-                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">{formatCurrency(totalVal)}</span>
+                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">{formatCurrency(Math.max(0, totalVal - storeCreditUsed))}</span>
                 </div>
             </div>
         );
@@ -2151,7 +2194,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     }
                                                     description={
                                                         <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
-                                                            {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
+                                                            {isStoreCreditPaymentOrder
+                                                                ? "Saldo em loja utilizado"
+                                                                : order.payment_provider === "Mercado Pago"
+                                                                    ? "Mercado Pago"
+                                                                    : "Pagamento direto"}
                                                         </span>
                                                     }
                                                     className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"

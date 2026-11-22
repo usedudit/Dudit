@@ -287,42 +287,54 @@ export async function syncTinyProductsToDudit(params: {
             }
           }
 
-          // Se tiver dados fiscais (NCM), grava na tabela product_fiscal_profiles
-          if (targetProductId && detail.ncm) {
-            try {
-              await supabase
-                .from("product_fiscal_profiles")
-                .upsert(
-                  {
-                    product_id: targetProductId,
-                    store_id: effectiveStoreId,
-                    ncm: detail.ncm.trim(),
-                    origin: Number(detail.origem || 0),
-                    updated_at: now,
-                  },
-                  { onConflict: "product_id" }
-                )
-            } catch (fErr: any) {
-              console.warn(`[TINY] Aviso fiscal produto ${targetProductId}:`, fErr?.message)
+          // Se tiver dados fiscais (NCM, CEST ou origem), grava na tabela product_fiscal_profiles
+          const tinyNcm = detail.ncm?.trim() || null
+          const tinyCest = detail.cest?.trim() || null
+          const hasTinyOrigin = detail.origem !== undefined && detail.origem !== null && String(detail.origem).trim() !== ""
+          if (targetProductId && (tinyNcm || tinyCest || hasTinyOrigin)) {
+            const fiscalUpsertPayload: Record<string, any> = {
+              product_id: targetProductId,
+              store_id: effectiveStoreId,
+              origin: hasTinyOrigin ? (parseInt(String(detail.origem).replace(/\D/g, ""), 10) || 0) : 0,
+              updated_at: now,
+            }
+            if (tinyNcm) fiscalUpsertPayload.ncm = tinyNcm
+            if (tinyCest) fiscalUpsertPayload.cest = tinyCest
+
+            const { error: fErr } = await supabase
+              .from("product_fiscal_profiles")
+              .upsert(fiscalUpsertPayload, { onConflict: "product_id" })
+
+            if (fErr) {
+              console.warn(`[TINY] Aviso fiscal produto ${targetProductId}:`, fErr.message)
             }
           }
 
           // Se tiver peso/dimensões, grava na tabela product_logistics
-          if (targetProductId && (detail.peso_bruto || detail.peso_liquido)) {
-            try {
-              await supabase
-                .from("product_logistics")
-                .upsert(
-                  {
-                    product_id: targetProductId,
-                    weight_gross: Number(detail.peso_bruto || 0),
-                    weight_net: Number(detail.peso_liquido || 0),
-                    updated_at: now,
-                  },
-                  { onConflict: "product_id" }
-                )
-            } catch (lErr: any) {
-              console.warn(`[TINY] Aviso logística produto ${targetProductId}:`, lErr?.message)
+          const hasLogistics = Boolean(
+            detail.peso_bruto ||
+            detail.peso_liquido ||
+            detail.larguraEmbalagem ||
+            detail.alturaEmbalagem ||
+            detail.comprimentoEmbalagem
+          )
+          if (targetProductId && hasLogistics) {
+            const logisticsUpsertPayload: Record<string, any> = {
+              product_id: targetProductId,
+              weight_gross: Number(detail.peso_bruto || 0),
+              weight_net: Number(detail.peso_liquido || 0),
+              updated_at: now,
+            }
+            if (detail.larguraEmbalagem !== undefined) logisticsUpsertPayload.width = Number(detail.larguraEmbalagem || 0)
+            if (detail.alturaEmbalagem !== undefined) logisticsUpsertPayload.height = Number(detail.alturaEmbalagem || 0)
+            if (detail.comprimentoEmbalagem !== undefined) logisticsUpsertPayload.length = Number(detail.comprimentoEmbalagem || 0)
+
+            const { error: lErr } = await supabase
+              .from("product_logistics")
+              .upsert(logisticsUpsertPayload, { onConflict: "product_id" })
+
+            if (lErr) {
+              console.warn(`[TINY] Aviso logística produto ${targetProductId}:`, lErr.message)
             }
           }
 

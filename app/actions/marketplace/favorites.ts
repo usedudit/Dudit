@@ -215,7 +215,7 @@ export async function getUserFavoritesAction(params?: {
                     let q = admin
                         .from("products")
                         .select(`
-                            id, short_id, name, price, promotional_price, images, rating, is_active, show_in_marketplace,
+                            id, short_id, name, price, promotional_price, images, video_thumbnail, rating, is_active, show_in_marketplace,
                             stock_available, stock_quantity,
                             category_id, category:product_categories!category_id(name),
                             partners(id),
@@ -233,7 +233,7 @@ export async function getUserFavoritesAction(params?: {
                     let q = admin
                         .from("services")
                         .select(`
-                            id, short_id, name, price, images, rating, is_active, billing_unit, price_type,
+                            id, short_id, name, price, images, video_thumbnail, rating, is_active, billing_unit, price_type,
                             partners(id),
                             stores!inner(id, short_id, name, slug, description, logo_url, banner_url, phone, is_showcase_active, addresses!store_id!left(city, state, neighborhood)),
                             show_price_in_store

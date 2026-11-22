@@ -100,7 +100,12 @@ export async function invalidateStoreCache(
     safeRevalidateTag(TAGS.storeProfile(storeId))
     safeRevalidateTag("store-profile")
     safeRevalidateTag("store-products")
-    safeRevalidateTag(TAGS.partner(partnerId))
+    // Expira imediatamente o cache do parceiro (read-your-own-writes no checklist/dashboard do ERP)
+    try {
+      (revalidateTag as any)(TAGS.partner(partnerId), { expire: 0 })
+    } catch {
+      safeRevalidateTag(TAGS.partner(partnerId))
+    }
     safeRevalidateTag(TAGS.products(partnerId))
     safeRevalidateTag(TAGS.storeProducts(partnerId, storeId))
 
@@ -114,6 +119,7 @@ export async function invalidateStoreCache(
     try {
       revalidatePath("/sacola")
       revalidatePath("/erp/lojas")
+      revalidatePath("/erp/inicio")
     } catch { }
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar store cache:`, error)

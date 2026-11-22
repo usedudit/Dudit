@@ -28,7 +28,7 @@ type CouponItem = {
   discount_type: string
   discount_value: number | null
   is_active: boolean
-  is_automatic?: boolean
+  show_in_marketplace?: boolean
   min_cart_value?: number | null
   apply_scope?: "all" | "categories" | "products" | "services" | string | null
   customer_scope?: "all" | "specific" | string | null
@@ -180,11 +180,6 @@ const SelectCouponSheet = ({
                       <h4 className="truncate text-[15px] font-bold leading-tight text-brand-dark transition-colors group-hover:text-brand-primary dark:text-dark-heading">
                         {coupon.code}
                       </h4>
-                      {coupon.is_automatic && (
-                        <span className="shrink-0 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-1.5 py-0.5 rounded-full">
-                          AUTO
-                        </span>
-                      )}
                       {coupon.apply_scope && coupon.apply_scope !== "all" && (
                         <span className="shrink-0 text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase">
                           {coupon.apply_scope === "products" ? "PRODUTOS" : coupon.apply_scope === "categories" ? "CATEGORIAS" : coupon.apply_scope === "services" ? "SERVIÇOS" : coupon.apply_scope}

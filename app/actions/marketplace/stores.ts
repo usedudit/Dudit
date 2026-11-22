@@ -8,12 +8,19 @@ import { listStoreServices } from "@/lib/store-services"
 import { isUuid } from "@/lib/utils/short-id"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import { isShowcaseAdminSuspended } from "@/lib/commerce/store-showcase"
 
 // partners.mp_* status fields are sourced from partner_integrations.
 function withPartnerMpFields<T>(store: T): T {
     const target = store as any
     if (target?.partners) target.partners = withMpPartnerFields(target.partners)
     return store
+}
+
+function isStoreHiddenByAdminShowcase(store: any): boolean {
+    if (!store) return false
+    const partner = Array.isArray(store.partners) ? store.partners[0] : store.partners
+    return isShowcaseAdminSuspended(store) || isShowcaseAdminSuspended(partner)
 }
 
 const storeBySlugCacheMap = new Map<string, any>()
@@ -35,11 +42,12 @@ export const getCachedStoreBySlug = async (slug: string) => {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!inner(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
+                        partners!inner(id, is_showcase_active, showcase_suspended_at, showcase_suspended_until, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
                     .maybeSingle()
+                if (isStoreHiddenByAdminShowcase(data)) return null
                 return withPartnerMpFields(data)
             },
             [`store-slug-${slug}`],
@@ -58,11 +66,12 @@ export async function getStoreBySlug(slug: string) {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!inner(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
+                        partners!inner(id, is_showcase_active, showcase_suspended_at, showcase_suspended_until, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
         `)
         .eq("slug", slug)
         .eq("is_active", true)
         .maybeSingle()
+    if (isStoreHiddenByAdminShowcase(data)) return null
     return withPartnerMpFields(data)
 }
 
@@ -80,7 +89,7 @@ export const getCachedStoreById = async (storeId: string) => {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!left(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
+                        partners!left(id, is_showcase_active, showcase_suspended_at, showcase_suspended_until, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                     `)
 
                 if (isIdentifierUuid) {
@@ -99,7 +108,7 @@ export const getCachedStoreById = async (storeId: string) => {
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                                 delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                                partners!left(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
+                                partners!left(id, is_showcase_active, showcase_suspended_at, showcase_suspended_until, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                             `)
                             .eq("partner_id", storeId)
                             .maybeSingle()
@@ -111,7 +120,7 @@ export const getCachedStoreById = async (storeId: string) => {
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                                 delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                                partners!left(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
+                                partners!left(id, is_showcase_active, showcase_suspended_at, showcase_suspended_until, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                             `)
                             .eq("slug", storeId)
                             .maybeSingle()
@@ -121,6 +130,7 @@ export const getCachedStoreById = async (storeId: string) => {
 
                 if (error) console.error("[getCachedStoreById] Erro na query:", error.message, { storeId })
                 if (!data) console.error("[getCachedStoreById] Store nao encontrada:", { storeId })
+                if (isStoreHiddenByAdminShowcase(data)) return null
                 return withPartnerMpFields(data)
             },
             [`store-profile-${storeId}`],
@@ -169,11 +179,13 @@ export const getCachedStoreReviews = async (storeId: string) => {
                 const { data: reviewsData } = await supabase
                     .from("reviews")
                     .select(`
-                        id, rating, comment, created_at, user_id, product_id, service_id, store_id, order_id,
+                        id, rating, comment, created_at, updated_at, user_id, product_id, service_id, store_id, order_id,
                         products:product_id(id, short_id, name, images, unit, partners:partner_id(user_id, addresses(city, state))),
                         services:service_id(id, short_id, name, images, unit, partners:partner_id(user_id, addresses(city, state)))
                     `)
                     .eq("store_id", storeId)
+                    .is("deleted_at", null)
+                    .not("is_hidden", "is", true)
                     .order("created_at", { ascending: false })
                     .limit(50)
 
@@ -251,6 +263,7 @@ export const getCachedStoreReviews = async (storeId: string) => {
                         rating: r.rating,
                         comment: r.comment,
                         created_at: r.created_at,
+                        updated_at: r.updated_at || null,
                         product_name: product?.name || null,
                         service_name: service?.name || null,
                         quantity: orderItem?.quantity || null,
@@ -279,7 +292,7 @@ export const getCachedStoreStats = async (storeId: string) => {
             async () => {
                 const supabase = createAdminClient()
                 const [reviews] = await Promise.all([
-                    supabase.from("reviews").select("*", { count: "exact", head: true }).eq("store_id", storeId),
+                    supabase.from("reviews").select("*", { count: "exact", head: true }).eq("store_id", storeId).is("deleted_at", null).not("is_hidden", "is", true),
                 ])
                 return { reviewsCount: reviews.count || 0 }
             },

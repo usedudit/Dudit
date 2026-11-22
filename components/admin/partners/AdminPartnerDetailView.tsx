@@ -48,6 +48,7 @@ import {
     suspendStore,
     unsuspendStore,
     toggleStoreShowcase,
+    togglePartnerShowcase,
     disableTenantAccess,
     enableTenantAccess,
     updateStoreRiskScore,
@@ -131,6 +132,8 @@ export function AdminPartnerDetailView({
     const [unsuspendStoreModalOpen, setUnsuspendStoreModalOpen] = useState(false)
     const [disableShowcaseModalOpen, setDisableShowcaseModalOpen] = useState(false)
     const [enableShowcaseModalOpen, setEnableShowcaseModalOpen] = useState(false)
+    const [disablePartnerShowcaseModalOpen, setDisablePartnerShowcaseModalOpen] = useState(false)
+    const [enablePartnerShowcaseModalOpen, setEnablePartnerShowcaseModalOpen] = useState(false)
     const [disableErpModalOpen, setDisableErpModalOpen] = useState(false)
     const [enableErpModalOpen, setEnableErpModalOpen] = useState(false)
     const [suspendPartnerModalOpen, setSuspendPartnerModalOpen] = useState(false)
@@ -239,15 +242,18 @@ export function AdminPartnerDetailView({
     } = detail
 
     const isStoreSuspended = !!store.suspended_at || !store.is_active
-    const isShowcaseActive = store.is_showcase_active !== false
+    const isStoreShowcaseAdminSuspended = !!store.showcase_suspended_at
+    const isPartnerShowcaseAdminSuspended = !!partner?.showcase_suspended_at
+    const isAnyShowcaseAdminSuspended = isStoreShowcaseAdminSuspended || isPartnerShowcaseAdminSuspended
+    const isShowcaseMerchantPaused = store.is_showcase_active === false
     const isErpDisabled = !!partner?.erp_disabled
     const isPartnerSuspended = partner ? (!!partner.suspended_at || !partner.is_active) : false
 
-    const handleConfirmDisableShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmDisableShowcase = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         try {
-            const res = await toggleStoreShowcase(store.id, false, reason, stepUpToken, riskScore, notifyOwner)
+            const res = await toggleStoreShowcase(store.id, false, reason, stepUpToken, riskScore, notifyOwner, durationDays)
             if (res.success) {
-                toast.success("Vitrine online desativada com sucesso!")
+                toast.success(`Vitrine online desativada com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setDisableShowcaseModalOpen(false)
                 loadDetail()
                 onPartnerUpdated?.()
@@ -268,12 +274,58 @@ export function AdminPartnerDetailView({
         try {
             const res = await toggleStoreShowcase(store.id, true, reason, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
-                toast.success("Vitrine online ativada com sucesso!")
+                toast.success("Vitrine online reativada com sucesso!")
                 setEnableShowcaseModalOpen(false)
                 loadDetail()
                 onPartnerUpdated?.()
             } else {
-                toast.error(res.error || "Erro ao ativar vitrine online")
+                toast.error(res.error || "Erro ao reativar vitrine online")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmDisablePartnerShowcase = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        try {
+            const res = await togglePartnerShowcase(partnerId, false, reason, stepUpToken, riskScore, notifyOwner, durationDays)
+            if (res.success) {
+                toast.success(`Vitrines online do ERP desativadas! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setDisablePartnerShowcaseModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao desativar vitrines online do ERP")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmEnablePartnerShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        try {
+            const res = await togglePartnerShowcase(partnerId, true, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Vitrines online do ERP reativadas com sucesso!")
+                setEnablePartnerShowcaseModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao reativar vitrines online do ERP")
             }
             return res
         } catch (err: any) {
@@ -502,11 +554,19 @@ export function AdminPartnerDetailView({
                                                 <Badge variant={isStoreSuspended ? "red" : "green"}>
                                                     {isStoreSuspended ? "Loja Suspensa" : "Loja Ativa"}
                                                 </Badge>
-                                                {!isShowcaseActive && (
+                                                {isPartnerShowcaseAdminSuspended ? (
                                                     <Badge variant="orange">
-                                                        Vitrine Desativada
+                                                        Vitrine ERP Off (Admin)
                                                     </Badge>
-                                                )}
+                                                ) : isStoreShowcaseAdminSuspended ? (
+                                                    <Badge variant="orange">
+                                                        Vitrine Off (Admin)
+                                                    </Badge>
+                                                ) : isShowcaseMerchantPaused ? (
+                                                    <Badge variant="gray">
+                                                        Vitrine Pausada (Lojista)
+                                                    </Badge>
+                                                ) : null}
                                                 {isErpDisabled && (
                                                     <Badge variant="red">
                                                         ERP Desativado
@@ -560,18 +620,33 @@ export function AdminPartnerDetailView({
 
                                             {/* Dropdown de Ações Administrativas (Vitrine / ERP / Parceiro) */}
                                             <ActionsDropdown>
-                                                {isShowcaseActive ? (
+                                                {isStoreShowcaseAdminSuspended ? (
+                                                    <DropdownItem
+                                                        onClick={() => setEnableShowcaseModalOpen(true)}
+                                                    >
+                                                        <StoreIcon size={16} className="text-brand-green" /> Reativar Vitrine desta Loja
+                                                    </DropdownItem>
+                                                ) : (
                                                     <DropdownItem
                                                         onClick={() => setDisableShowcaseModalOpen(true)}
                                                         className="text-brand-orange"
                                                     >
-                                                        <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine Online
+                                                        <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine desta Loja
+                                                    </DropdownItem>
+                                                )}
+
+                                                {isPartnerShowcaseAdminSuspended ? (
+                                                    <DropdownItem
+                                                        onClick={() => setEnablePartnerShowcaseModalOpen(true)}
+                                                    >
+                                                        <StoreIcon size={16} className="text-brand-green" /> Reativar Vitrine (ERP Inteiro)
                                                     </DropdownItem>
                                                 ) : (
                                                     <DropdownItem
-                                                        onClick={() => setEnableShowcaseModalOpen(true)}
+                                                        onClick={() => setDisablePartnerShowcaseModalOpen(true)}
+                                                        className="text-brand-orange"
                                                     >
-                                                        <StoreIcon size={16} className="text-brand-green" /> Ativar Vitrine Online
+                                                        <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine (ERP Inteiro)
                                                     </DropdownItem>
                                                 )}
 
@@ -627,21 +702,46 @@ export function AdminPartnerDetailView({
                                 {/* Aba 1: Dados da Loja */}
                                 <TabsContent value="general" className="mt-0">
                                     <FadeIn key="general">
-                                        {/* Banner: Vitrine Online Desativada */}
-                                        {!isShowcaseActive && (
+                                        {/* Banner: Vitrine Online Desativada pelo Admin */}
+                                        {isAnyShowcaseAdminSuspended && (
                                             <InfoCard
-                                                title="Vitrine Online Desativada"
-                                                message="Esta loja está oculta no marketplace e não recebe pedidos online. O acesso ao painel ERP continua funcionando normalmente."
+                                                title={isPartnerShowcaseAdminSuspended
+                                                    ? "Vitrine Online Desativada (Todas as Lojas do ERP)"
+                                                    : "Vitrine Online Desativada pela Administração"}
+                                                message={`Motivo: ${store.showcase_suspended_reason || partner?.showcase_suspended_reason || "Sem motivo informado."}${(store.showcase_suspended_until || partner?.showcase_suspended_until) ? ` • Vigência até: ${formatDate(store.showcase_suspended_until || partner?.showcase_suspended_until)}` : " • Permanente"} • Oculta 100% no marketplace; ERP continua liberado.`}
                                                 color="orange"
                                                 bottomElement={
-                                                    <Button
-                                                        variant="link"
-                                                        onClick={() => setEnableShowcaseModalOpen(true)}
-                                                    >
-                                                        <span className="text-sm uppercase font-semibold">
-                                                            Reativar Vitrine Online
-                                                        </span>
-                                                    </Button>
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        {(store.showcase_suspended_case_id || partner?.showcase_suspended_case_id) && (
+                                                            <Button
+                                                                variant="link"
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(
+                                                                        store.showcase_suspended_case_id || partner?.showcase_suspended_case_id
+                                                                    )
+                                                                    toast.success("Protocolo do caso copiado!")
+                                                                }}
+                                                            >
+                                                                <span>
+                                                                    Caso: {store.showcase_suspended_case_id || partner?.showcase_suspended_case_id}
+                                                                </span>
+                                                                <span className="text-sm uppercase font-semibold">
+                                                                    Copiar
+                                                                </span>
+                                                            </Button>
+                                                        )}
+                                                        <Button
+                                                            variant="link"
+                                                            onClick={() => isPartnerShowcaseAdminSuspended
+                                                                ? setEnablePartnerShowcaseModalOpen(true)
+                                                                : setEnableShowcaseModalOpen(true)
+                                                            }
+                                                        >
+                                                            <span className="text-sm uppercase font-semibold">
+                                                                {isPartnerShowcaseAdminSuspended ? "Reativar Vitrine (ERP Inteiro)" : "Reativar Vitrine Online"}
+                                                            </span>
+                                                        </Button>
+                                                    </div>
                                                 }
                                             />
                                         )}
@@ -1245,13 +1345,22 @@ export function AdminPartnerDetailView({
                         <ThreeDotsIcon size={20} />
                     </Button>
                 }>
-                    {isShowcaseActive ? (
-                        <DropdownItem onClick={() => setDisableShowcaseModalOpen(true)} className="text-brand-orange">
-                            <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine Online
+                    {isStoreShowcaseAdminSuspended ? (
+                        <DropdownItem onClick={() => setEnableShowcaseModalOpen(true)}>
+                            <StoreIcon size={16} className="text-brand-green" /> Reativar Vitrine desta Loja
                         </DropdownItem>
                     ) : (
-                        <DropdownItem onClick={() => setEnableShowcaseModalOpen(true)}>
-                            <StoreIcon size={16} className="text-brand-green" /> Ativar Vitrine Online
+                        <DropdownItem onClick={() => setDisableShowcaseModalOpen(true)} className="text-brand-orange">
+                            <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine desta Loja
+                        </DropdownItem>
+                    )}
+                    {isPartnerShowcaseAdminSuspended ? (
+                        <DropdownItem onClick={() => setEnablePartnerShowcaseModalOpen(true)}>
+                            <StoreIcon size={16} className="text-brand-green" /> Reativar Vitrine (ERP Inteiro)
+                        </DropdownItem>
+                    ) : (
+                        <DropdownItem onClick={() => setDisablePartnerShowcaseModalOpen(true)} className="text-brand-orange">
+                            <StoreIcon size={16} className="text-brand-orange" /> Desativar Vitrine (ERP Inteiro)
                         </DropdownItem>
                     )}
                     {isErpDisabled ? (
@@ -1373,7 +1482,7 @@ export function AdminPartnerDetailView({
                 currentRiskScore={store.risk_score}
             />
 
-            {/* 2c. Modal: Ativar Vitrine Online */}
+            {/* 2c. Modal: Reativar Vitrine Online */}
             < AdminEnforcementModal
                 isOpen={enableShowcaseModalOpen}
                 onClose={() => setEnableShowcaseModalOpen(false)}
@@ -1382,6 +1491,30 @@ export function AdminPartnerDetailView({
                 scope="showcase"
                 entityId={store.id}
                 entityName={store.name}
+                currentRiskScore={store.risk_score}
+            />
+
+            {/* 2d. Modal: Desativar Vitrine Online (ERP Inteiro) */}
+            < AdminEnforcementModal
+                isOpen={disablePartnerShowcaseModalOpen}
+                onClose={() => setDisablePartnerShowcaseModalOpen(false)}
+                onConfirm={handleConfirmDisablePartnerShowcase}
+                actionType="suspend"
+                scope="partner_showcase"
+                entityId={partner?.id || store.partner_id}
+                entityName={partner?.store_name || store.name}
+                currentRiskScore={store.risk_score}
+            />
+
+            {/* 2e. Modal: Reativar Vitrine Online (ERP Inteiro) */}
+            < AdminEnforcementModal
+                isOpen={enablePartnerShowcaseModalOpen}
+                onClose={() => setEnablePartnerShowcaseModalOpen(false)}
+                onConfirm={handleConfirmEnablePartnerShowcase}
+                actionType="unsuspend"
+                scope="partner_showcase"
+                entityId={partner?.id || store.partner_id}
+                entityName={partner?.store_name || store.name}
                 currentRiskScore={store.risk_score}
             />
 

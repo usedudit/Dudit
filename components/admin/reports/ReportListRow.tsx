@@ -49,6 +49,8 @@ const ReportListRow = React.memo(({
         store: "Loja",
         review: "Avaliação",
         return_request: "Devolução",
+        recurring_plan: "Assinatura",
+        community_video: "Vídeo da comunidade",
         order: "Pedido",
         user: "Usuário",
     }
@@ -60,6 +62,8 @@ const ReportListRow = React.memo(({
         store: "orange",
         review: "purple",
         return_request: "orange",
+        recurring_plan: "cyan",
+        community_video: "purple",
         order: "blue",
         user: "gray",
     }
@@ -86,6 +90,10 @@ const ReportListRow = React.memo(({
                                 ? `Loja #${report.target_id.slice(0, 8)}`
                                 : report.target_type === "return_request"
                                 ? `Devolução #${report.target_id.slice(0, 8)}`
+                                : report.target_type === "recurring_plan"
+                                ? `Assinatura #${report.target_id.slice(0, 8)}`
+                                : report.target_type === "community_video"
+                                ? `Vídeo #${report.target_id.slice(0, 8)}`
                                 : report.target_id
                         )}
                     </span>

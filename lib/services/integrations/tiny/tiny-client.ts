@@ -19,12 +19,17 @@ export interface TinyProductDetail {
   preco: number | string
   preco_promocional?: number | string
   ncm?: string
+  cest?: string
   gtin?: string
   origem?: string
   situacao?: string
   tipo?: string
+  marca?: string
   peso_liquido?: number | string
   peso_bruto?: number | string
+  larguraEmbalagem?: number | string
+  alturaEmbalagem?: number | string
+  comprimentoEmbalagem?: number | string
   estoque_minimo?: number | string
   estoque_maximo?: number | string
   saldo?: number | string

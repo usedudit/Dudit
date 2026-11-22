@@ -10,6 +10,7 @@ import {
   getMpRefreshTokenEncrypted,
   mapToMpPartnerFields,
 } from "@/lib/services/payments/mercadopago-integration"
+import { recordIntegrationDisconnected } from "@/lib/services/compliance/integration-history"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -81,11 +82,23 @@ export async function disconnectMercadoPagoAction() {
     console.error({ event: "mercadopago_token_revoke_error", partnerId: ctx.partnerId, error: err })
   }
 
+  const disconnectedAt = new Date().toISOString()
+
+  await recordIntegrationDisconnected(admin, {
+    partnerId: ctx.partnerId,
+    providerSlug: MERCADOPAGO_PROVIDER,
+    disconnectedAt,
+    fallbackAccountId: integration?.account_id ?? null,
+    fallbackAccountEmail: (integration as any)?.account_email ?? null,
+    fallbackConnectedAt: integration?.connected_at ?? null,
+  })
+
   const { error } = await admin
     .from("partner_integrations")
     .update({
       status: "disconnected",
       account_id: null,
+      account_email: null,
       access_token_encrypted: null,
       credentials: {},
       metadata: {},
@@ -93,7 +106,7 @@ export async function disconnectMercadoPagoAction() {
       // methods are preferences and stay.
       config: { ...(integration?.config || {}), public_key: null, live_mode: null },
       connected_at: null,
-      disconnected_at: new Date().toISOString(),
+      disconnected_at: disconnectedAt,
     })
     .eq("partner_id", ctx.partnerId)
     .eq("provider_slug", MERCADOPAGO_PROVIDER)

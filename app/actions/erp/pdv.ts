@@ -23,7 +23,6 @@ import { sanitizeNotes } from "@/lib/input-validator";
 import { logAuditEvent } from "@/lib/services/timeline.service";
 import {
   validateCoupon,
-  findBestAutomaticCoupon,
 } from "@/lib/services/coupons";
 import {
   calculateOrderPricing,
@@ -2610,38 +2609,4 @@ export async function removeCouponFromPreSaleAction(input: {
 
   if (error) return { success: false as const, error: error.message };
   return { success: true as const };
-}
-
-export async function findAutomaticCouponForPOSAction(input: {
-  partnerId: string;
-  customerId?: string | null;
-  subtotal: number;
-  shippingCost?: number;
-  items?: Array<{ productId?: string | null; serviceId?: string | null }>;
-}) {
-  await requireUser();
-  await requirePermission(input.partnerId, "pdv", "can_apply_discount");
-
-  const result = await findBestAutomaticCoupon({
-    partnerId: input.partnerId,
-    customerId: input.customerId,
-    subtotal: input.subtotal,
-    shippingCost: input.shippingCost,
-    items: input.items,
-  });
-
-  if (!result.valid) {
-    return { success: false as const };
-  }
-
-  return {
-    success: true as const,
-    data: {
-      couponId: result.couponId || null,
-      couponCode: result.couponCode || null,
-      discountAmount: result.discountAmount,
-      pricingCoupon: result.pricingCoupon || null,
-      freeShipping: result.freeShipping || false,
-    },
-  };
 }

@@ -11,6 +11,8 @@ vi.mock("@/lib/utils/revalidation", () => ({
     revalidateUserAccess: vi.fn().mockResolvedValue(undefined),
     safeRevalidateTag: vi.fn().mockResolvedValue(undefined),
     safeRevalidatePath: vi.fn().mockResolvedValue(undefined),
+    revalidateExploreSearch: vi.fn().mockResolvedValue(undefined),
+    revalidateMarketplace: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe("enforcement-expiration.service", () => {
@@ -368,8 +370,9 @@ describe("enforcement-expiration.service", () => {
     })
 
     describe("expireAllExpiredEnforcements", () => {
-        it("sweeps users, partners, erp_disables, and stores in one pass", async () => {
+        it("sweeps users, partners, erp_disables, stores, and showcase suspensions in one pass", async () => {
             const partnerUpdates: Array<{ id: string; payload: any }> = []
+            let storeUpdateCall = 0
 
             const mockSupabase = {
                 from: vi.fn((table: string) => {
@@ -408,23 +411,39 @@ describe("enforcement-expiration.service", () => {
                                     partnerUpdates.push({ id, payload })
                                     return Promise.resolve({ error: null })
                                 }),
-                            })),
-                        }
-                    }
-                    if (table === "stores") {
-                        return {
-                            update: vi.fn(() => ({
                                 not: vi.fn().mockReturnValue({
                                     not: vi.fn().mockReturnValue({
                                         lte: vi.fn().mockReturnValue({
                                             select: vi.fn().mockResolvedValue({
-                                                data: [{ id: "s1", partner_id: "p1" }],
+                                                data: [{ id: "p3", user_id: "o3" }],
                                                 error: null,
                                             }),
                                         }),
                                     }),
                                 }),
                             })),
+                        }
+                    }
+                    if (table === "stores") {
+                        return {
+                            update: vi.fn(() => {
+                                storeUpdateCall++
+                                const rows = storeUpdateCall === 1
+                                    ? [{ id: "s1", partner_id: "p1" }]
+                                    : [{ id: "s2", partner_id: "p3" }]
+                                return {
+                                    not: vi.fn().mockReturnValue({
+                                        not: vi.fn().mockReturnValue({
+                                            lte: vi.fn().mockReturnValue({
+                                                select: vi.fn().mockResolvedValue({
+                                                    data: rows,
+                                                    error: null,
+                                                }),
+                                            }),
+                                        }),
+                                    }),
+                                }
+                            }),
                         }
                     }
                     if (table === "partner_users") {
@@ -445,7 +464,9 @@ describe("enforcement-expiration.service", () => {
                 expiredPartners: 1,
                 expiredErpDisables: 1,
                 expiredStores: 1,
-                totalCleared: 5,
+                expiredPartnerShowcases: 1,
+                expiredStoreShowcases: 1,
+                totalCleared: 7,
             })
             expect(partnerUpdates).toHaveLength(2)
             expect(partnerUpdates[0]).toEqual({

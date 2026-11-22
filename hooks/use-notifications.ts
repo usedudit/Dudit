@@ -152,7 +152,7 @@ export function useNotifications() {
       if ("error" in result) throw new Error(result.error)
       return result.stores ?? []
     },
-    enabled: Boolean(user?.id),
+    enabled: Boolean(user?.id) && panelOpen,
     staleTime: 300_000,
     refetchOnWindowFocus: false,
   })

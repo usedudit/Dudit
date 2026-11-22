@@ -18,6 +18,7 @@ import {
     Input,
     SidebarCard,
     NumberInputWithCheckbox,
+    InfoCard,
 } from "@/components/reusable"
 import { motion } from "framer-motion"
 import { updateStoreAction } from "@/app/actions/erp/stores"
@@ -87,14 +88,54 @@ export const ShowcaseSubPage = ({
         longitude: initialStoreAddr.longitude ?? null,
     })
 
+    const [adminShowcaseSuspension, setAdminShowcaseSuspension] = useState<{
+        suspended: boolean
+        reason?: string | null
+        until?: string | null
+        caseId?: string | null
+    }>(() => {
+        const at = store?.showcase_suspended_at
+        const until = store?.showcase_suspended_until
+        const active = !!at && (!until || Date.parse(until) > Date.now())
+        return {
+            suspended: active,
+            reason: store?.showcase_suspended_reason || null,
+            until: until || null,
+            caseId: store?.showcase_suspended_case_id || null,
+        }
+    })
+
     useEffect(() => {
         if (!store?.id) return
         const fetchAddress = async () => {
             const { data: storeData } = await supabase
                 .from("stores")
-                .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default, municipio_codigo_ibge, latitude, longitude)")
+                .select("*, partners(showcase_suspended_at, showcase_suspended_until, showcase_suspended_reason, showcase_suspended_case_id), addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default, municipio_codigo_ibge, latitude, longitude)")
                 .eq("id", store.id)
                 .single()
+            if (storeData) {
+                const st: any = storeData
+                const pt: any = Array.isArray(st.partners) ? st.partners[0] : st.partners
+                const isActiveSuspension = (rec: any) =>
+                    !!rec?.showcase_suspended_at && (!rec.showcase_suspended_until || Date.parse(rec.showcase_suspended_until) > Date.now())
+                if (isActiveSuspension(st)) {
+                    setAdminShowcaseSuspension({
+                        suspended: true,
+                        reason: st.showcase_suspended_reason || null,
+                        until: st.showcase_suspended_until || null,
+                        caseId: st.showcase_suspended_case_id || null,
+                    })
+                } else if (isActiveSuspension(pt)) {
+                    setAdminShowcaseSuspension({
+                        suspended: true,
+                        reason: pt.showcase_suspended_reason || null,
+                        until: pt.showcase_suspended_until || null,
+                        caseId: pt.showcase_suspended_case_id || null,
+                    })
+                } else {
+                    setAdminShowcaseSuspension({ suspended: false })
+                }
+            }
             if (storeData?.addresses?.[0]) {
                 const addr = storeData.addresses[0] as any
                 const newAddress = {
@@ -295,7 +336,7 @@ export const ShowcaseSubPage = ({
                     partnerId,
                     logo_url: finalLogoUrl || null,
                     banner_url: finalBannerUrl || null,
-                    is_showcase_active: generalInfo.isShowcaseActive,
+                    is_showcase_active: adminShowcaseSuspension.suspended ? undefined : generalInfo.isShowcaseActive,
                     accept_orders_when_closed: generalInfo.acceptOrdersWhenClosed,
                     gallery: finalGalleryUrls,
                     zip_code: address.zipCode || undefined,
@@ -461,21 +502,30 @@ export const ShowcaseSubPage = ({
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-8">
                                             {/* Status da Vitrine */}
                                             <FormSection title="Status da Vitrine">
-                                                <div className="grid gap-3">
+                                                {adminShowcaseSuspension.suspended && (
+                                                    <div className="mb-3">
+                                                        <InfoCard
+                                                            color="orange"
+                                                            title="Vitrine Online Desativada pela Administração"
+                                                            message={`Sua vitrine está temporariamente oculta no marketplace${adminShowcaseSuspension.reason ? ` • Motivo: ${adminShowcaseSuspension.reason}` : ""}${adminShowcaseSuspension.until ? ` • Vigência até: ${new Date(adminShowcaseSuspension.until).toLocaleDateString("pt-BR")}` : ""}${adminShowcaseSuspension.caseId ? ` • Protocolo: ${adminShowcaseSuspension.caseId}` : ""}. O uso do ERP continua liberado normalmente.`}
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className={`grid gap-3 ${adminShowcaseSuspension.suspended ? "opacity-60 pointer-events-none" : ""}`}>
                                                     <ListItem
                                                         title="Vitrine Ativa"
                                                         description="Seus anúncios estão visíveis e disponíveis"
                                                         icon={<Store className="text-brand-green" />}
-                                                        onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
-                                                        right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
+                                                        onClick={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
+                                                        right={<RadioButton name="isShowcaseActive" value="active" checked={!adminShowcaseSuspension.suspended && generalInfo.isShowcaseActive} onChange={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
                                                         className="py-4 px-6 gap-4 cursor-pointer"
                                                     />
                                                     <ListItem
                                                         title="Vitrine Inativa"
                                                         description="Seus anúncios ficam ocultos temporariamente"
                                                         icon={<Store className="text-brand-inactive-text" />}
-                                                        onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
-                                                        right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
+                                                        onClick={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
+                                                        right={<RadioButton name="isShowcaseActive" value="inactive" checked={adminShowcaseSuspension.suspended || !generalInfo.isShowcaseActive} onChange={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
                                                         className="py-4 px-6 gap-4 cursor-pointer"
                                                     />
                                                 </div>
@@ -709,21 +759,30 @@ export const ShowcaseSubPage = ({
                                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
                                     {/* Status da Vitrine */}
                                     <FormSection title="Status da Vitrine">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {adminShowcaseSuspension.suspended && (
+                                            <div className="mb-3">
+                                                <InfoCard
+                                                    color="orange"
+                                                    title="Vitrine Online Desativada pela Administração"
+                                                    message={`Sua vitrine está temporariamente oculta no marketplace${adminShowcaseSuspension.reason ? ` • Motivo: ${adminShowcaseSuspension.reason}` : ""}${adminShowcaseSuspension.until ? ` • Vigência até: ${new Date(adminShowcaseSuspension.until).toLocaleDateString("pt-BR")}` : ""}${adminShowcaseSuspension.caseId ? ` • Protocolo: ${adminShowcaseSuspension.caseId}` : ""}. O uso do ERP continua liberado normalmente.`}
+                                                />
+                                            </div>
+                                        )}
+                                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 ${adminShowcaseSuspension.suspended ? "opacity-60 pointer-events-none" : ""}`}>
                                             <ListItem
                                                 title="Vitrine Ativa"
                                                 description="Seu negócio está visível e apto a receber novos pedidos online."
                                                 icon={<Store className="text-brand-green" />}
-                                                onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
-                                                right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
+                                                onClick={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
+                                                right={<RadioButton name="isShowcaseActive" value="active" checked={!adminShowcaseSuspension.suspended && generalInfo.isShowcaseActive} onChange={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
                                                 className="py-4 px-6 gap-4 cursor-pointer"
                                             />
                                             <ListItem
                                                 title="Vitrine Inativa"
                                                 description="Sua vitrine continua visível, mas não poderá receber pedidos temporariamente."
                                                 icon={<Store className="text-brand-inactive-text" />}
-                                                onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
-                                                right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
+                                                onClick={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
+                                                right={<RadioButton name="isShowcaseActive" value="inactive" checked={adminShowcaseSuspension.suspended || !generalInfo.isShowcaseActive} onChange={() => !adminShowcaseSuspension.suspended && setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
                                                 className="py-4 px-6 gap-4 cursor-pointer"
                                             />
                                         </div>

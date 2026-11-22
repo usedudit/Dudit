@@ -14,12 +14,11 @@ import {
     UserIcon,
     WhatsappIcon,
 } from "@/lib/icons"
-import { Badge, Button } from "@/components/reusable"
+import { Button } from "@/components/reusable"
 import { getBlogCategory, BLOG_RELATED_LINKS } from "@/lib/blog/categories"
 import type { BlogPost, BlogPostSummary } from "@/lib/blog/types"
 import type { BlogTocItem } from "@/lib/blog/content"
 import { formatBlogDate, getBlogCategoryUrl, getBlogPostUrl } from "@/lib/blog/utils"
-import { BLOG_ACCENT_CLASSES } from "./category-styles"
 import BlogCard from "./BlogCard"
 
 interface BlogArticleProps {
@@ -33,7 +32,6 @@ interface BlogArticleProps {
 
 export default function BlogArticle({ post, html, toc, related, previous, next }: BlogArticleProps) {
     const category = getBlogCategory(post.category)
-    const accent = BLOG_ACCENT_CLASSES[category.accent]
     const relatedLinks = BLOG_RELATED_LINKS[post.category] ?? BLOG_RELATED_LINKS.geral
 
     const [copied, setCopied] = useState(false)
@@ -76,23 +74,40 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
         window.open(url, "_blank", "noopener,noreferrer,width=720,height=640")
     }
 
+    const coverFigure = post.cover_image_url ? (
+        <figure className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
+            <img
+                src={post.cover_image_url}
+                alt={post.cover_image_alt || post.title}
+                className="h-auto w-full object-cover"
+                loading="lazy"
+                decoding="async"
+            />
+            {post.cover_image_alt && (
+                <figcaption className="border-t border-brand-border bg-brand-gray/60 px-4 py-2.5 text-center text-[11px] text-brand-inactive-text dark:border-dark-border dark:bg-dark-border/20 dark:text-dark-body">
+                    {post.cover_image_alt}
+                </figcaption>
+            )}
+        </figure>
+    ) : null
+
     return (
         <div className="w-full bg-white dark:bg-dark-surface">
             <article className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-8 lg:pt-12">
-                <div className="mb-8 flex items-center gap-3">
-                    <Button variant="filled" asChild className="h-10 w-10 shrink-0 p-0">
+                <div className="mb-8 flex items-start gap-3">
+                    <Button variant="filled" asChild className="mt-0.5 h-10 w-10 shrink-0 p-0">
                         <Link href="/blog" prefetch={false} aria-label="Voltar para o blog">
                             <ChevronLeftIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
                         </Link>
                     </Button>
                     <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                            Blog do Dino
-                        </p>
+                        <h1 className="text-xl font-bold leading-snug tracking-tight text-brand-dark dark:text-dark-heading md:text-2xl lg:text-3xl">
+                            {post.title}
+                        </h1>
                         <Link
                             href={getBlogCategoryUrl(category.id)}
                             prefetch={false}
-                            className="text-sm font-semibold text-brand-dark hover:text-brand-green dark:text-dark-heading"
+                            className="mt-1 inline-block text-xs font-semibold uppercase tracking-wider text-brand-green hover:underline"
                         >
                             {category.label}
                         </Link>
@@ -100,19 +115,8 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                 </div>
 
                 <header className="max-w-4xl">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={accent.badge} icon={null}>
-                            {category.label}
-                        </Badge>
-                        {post.is_featured && <Badge variant="green" icon={null}>Destaque</Badge>}
-                    </div>
-
-                    <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-brand-dark dark:text-dark-heading md:text-4xl lg:text-5xl">
-                        {post.title}
-                    </h1>
-
                     {post.subtitle && (
-                        <p className="mt-4 text-lg leading-relaxed text-brand-inactive-text dark:text-dark-body">
+                        <p className="text-lg leading-relaxed text-brand-inactive-text dark:text-dark-body">
                             {post.subtitle}
                         </p>
                     )}
@@ -164,32 +168,19 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                     </div>
                 </header>
 
-                {post.cover_image_url && (
-                    <figure className="mt-8 max-w-5xl overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
-                        <img
-                            src={post.cover_image_url}
-                            alt={post.cover_image_alt || post.title}
-                            className="h-auto max-h-[520px] w-full object-cover"
-                        />
-                        {post.cover_image_alt && (
-                            <figcaption className="border-t border-brand-border bg-brand-gray/60 px-5 py-3 text-center text-xs text-brand-inactive-text dark:border-dark-border dark:bg-dark-border/20 dark:text-dark-body">
-                                {post.cover_image_alt}
-                            </figcaption>
-                        )}
-                    </figure>
-                )}
+                {coverFigure && <div className="mt-8 max-w-2xl lg:hidden">{coverFigure}</div>}
 
-                <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="min-w-0">
                         {post.key_takeaways.length > 0 && (
-                            <div className={`mb-10 rounded-2xl border ${accent.border} ${accent.softBg} p-6`}>
+                            <div className="mb-10 rounded-2xl border border-brand-border p-6 dark:border-dark-border">
                                 <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
                                     O que você vai aprender
                                 </h2>
                                 <ul className="mt-4 space-y-2.5">
                                     {post.key_takeaways.map((item, index) => (
                                         <li key={index} className="flex items-start gap-2.5 text-sm leading-relaxed text-brand-dark/80 dark:text-dark-body">
-                                            <CheckCircleIcon size={16} className={`mt-0.5 shrink-0 ${accent.text}`} />
+                                            <CheckCircleIcon size={16} className="mt-0.5 shrink-0 text-brand-green" />
                                             <span>{item}</span>
                                         </li>
                                     ))}
@@ -275,6 +266,8 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
 
                     <aside className="hidden lg:block">
                         <div className="sticky top-24 space-y-6">
+                            {coverFigure}
+
                             {toc.length > 0 && (
                                 <nav className="rounded-xl border border-brand-border p-5 dark:border-dark-border">
                                     <p className="mb-3 text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
@@ -322,7 +315,7 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                                 Ver todas as dicas
                             </Link>
                         </div>
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {related.map((item) => (
                                 <BlogCard key={item.id} post={item} />
                             ))}

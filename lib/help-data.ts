@@ -6219,12 +6219,12 @@ Se o desconto fixo for menor que o teto, o teto não muda nada. O teto protege p
                 content: `
 ## Visão geral
 
-O cupom pode ser usado de três formas: o **cliente digita o código** (PDV, venda ou vitrine), você **seleciona o cupom** no PDV, ou o sistema aplica **automaticamente** um cupom configurado como automático. Entender esses caminhos evita dúvidas na hora de vender.
+O cupom pode ser usado de duas formas: o **cliente digita ou seleciona o código** (na vitrine online, venda ou PDV) ou você **seleciona o cupom** diretamente no PDV. Você também pode controlar se o cupom fica disponível na vitrine online ou apenas para uso interno no ERP/PDV.
 
 ## Quando utilizar
 
 - Para aplicar desconto no balcão sem o cliente ter o código
-- Para campanhas em que todo cliente ganha o desconto (cupom automático)
+- Para disponibilizar campanhas exclusivas na vitrine online ou apenas no atendimento presencial (PDV/ERP)
 - Para garantir que o desconto seja validado corretamente nas vendas
 
 ## Como funciona
@@ -6235,7 +6235,6 @@ Na tela do PDV, você pode:
 
 - **Digitar o código** - o sistema valida e aplica o desconto.
 - **Selecionar o cupom** - abre uma lista de cupons ativos com o formato do benefício (ex: "10% off", "R$ 20 off", "Entrega grátis"). Cupons com restrições aparecem com aviso "Possui restrições".
-- **Aplicar automático** - se houver cupom automático válido, o PDV aplica o maior desconto sozinho.
 
 ### Nas Vendas (pedidos)
 
@@ -6243,14 +6242,14 @@ Ao criar ou editar um pedido no módulo Vendas, existe a opção **"Utiliza um c
 
 ### Na vitrine online
 
-O cliente escolhe o cupom na tela de **Cupom de Desconto** do checkout ou digita o código. O sistema mostra:
+Apenas cupons marcados com a opção **Disponível na vitrine online** (ativa por padrão) aparecem e podem ser utilizados no checkout online. O cliente escolhe o cupom na tela de **Cupom de Desconto** do checkout ou digita o código. O sistema mostra:
 
 - O desconto aplicado no resumo ("Desconto do cupom").
 - Aviso **"Desconto aplicado a X de Y itens"** quando o cupom vale só para parte da sacola.
 
-### Cupons automáticos
+### Cupons exclusivos do ERP / PDV
 
-São cupons marcados com a opção **Cupom automático**. O sistema busca os cupons automáticos ativos e **aplica o de maior desconto**, sem o cliente digitar nada. Eles aparecem marcados como **Automático** na lista.
+Se você desmarcar a opção **Disponível na vitrine online**, o cupom não aparecerá na sua loja online e não poderá ser aplicado no checkout online, ficando disponível apenas para uso interno no PDV e nos pedidos do ERP.
 
 ### Combinação com promoções
 
@@ -6259,7 +6258,7 @@ São cupons marcados com a opção **Cupom automático**. O sistema busca os cup
 
 ## Dicas importantes
 
-- **Configure apenas cupons automáticos que você quer que valham sempre** - eles aplicam sozinhos em todas as vendas elegíveis.
+- **Use a opção "Disponível na vitrine online"** para separar cupons públicos de descontos exclusivos do balcão/atendimento interno.
 - **Verifique a validação** - o sistema recalcula o preço com o cupom no momento do pedido, então o total é sempre o correto.
 - **No PDV, desconfie de "Possui restrições"** - confira o motivo antes de aplicar.
 
@@ -6267,14 +6266,15 @@ São cupons marcados com a opção **Cupom automático**. O sistema busca os cup
 
 | Problema | Causa | Solução |
 |----------|-------|---------|
+| Cupom não aparece na vitrine online | Opção "Disponível na vitrine online" desmarcada | Edite o cupom e marque a opção "Disponível na vitrine online" |
 | Cupom não aplica no PDV | Cupom com escopo/condição não atendida | Veja o motivo na lista de cupons do PDV |
 | Desconto menor que o esperado | Cupom não é combinável com promoção | Ajuste "Permitir combinação" no cupom |
 | Dois descontos parecem somados | Cupom combinável + promoção ativa | Confirme a opção de combinação |
 
 ## Perguntas frequentes
 
-**O cupom automático exige código?**
-Não. O sistema aplica automaticamente o maior desconto entre os cupons automáticos válidos.
+**Se eu desmarcar "Disponível na vitrine online", o cupom ainda funciona no PDV?**
+Sim. Ele deixa de ficar disponível na vitrine online e no checkout da loja, mas continua funcionando normalmente no PDV e nos pedidos do ERP.
 
 **Cupom e promoção podem ser usados juntos?**
 Depende da configuração. Se o cupom permite **combinação** e a promoção também, sim. Caso contrário, vale o melhor benefício.

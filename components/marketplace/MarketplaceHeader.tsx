@@ -213,6 +213,40 @@ const Header: React.FC<HeaderProps> = ({
     useEffect(() => {
         if (typeof window === "undefined") return
 
+        // 1. Explicit cookie has highest priority (respects "Usar minha localização" and manual city/state/Brasil picks)
+        let stored: string | null = null
+        const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+        if (match && match[1]) {
+            stored = decodeURIComponent(match[1])
+        }
+
+        // 2. Fallback to localStorage
+        if (!stored) {
+            try {
+                stored = localStorage.getItem("dudit_city")
+            } catch { }
+        }
+
+        // 3. Fallback to current URL path
+        if (!stored && pathname) {
+            const parts = pathname.split('/').filter(Boolean)
+            if (parts[0] === 'explorar' && parts[1]) {
+                stored = parts[1]
+            } else if (
+                parts.length >= 1 &&
+                !['auth', 'erp', 'ddt-admin', 'pedidos', 'perfil', 'checkout', 'quote', 'print', 'entregadores', 'sacola', 'favoritos', 'colecoes', 'assinaturas', 'mapa', 'invite', 'institucional', 'ajuda', 'banned', 'brasil'].includes(parts[0]) &&
+                /^[a-z0-9-]+-[a-z]{2}$/.test(parts[0])
+            ) {
+                stored = parts[0]
+            }
+        }
+
+        if (stored) {
+            setCitySlug(stored)
+            return
+        }
+
+        // 4. Fallback to saved profile address only when no explicit browsing location is set
         if (profile?.citySlug && profile.citySlug !== "brasil" && !profile.citySlug.startsWith("estado-")) {
             setCitySlug(profile.citySlug)
             return
@@ -228,37 +262,7 @@ const Header: React.FC<HeaderProps> = ({
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/(^-|-$)/g, "")
                 setCitySlug(`${normCity}-${stateUf.trim().toLowerCase()}`)
-                return
             }
-        }
-
-        let stored = localStorage.getItem("dudit_city")
-        if (stored === "brasil" || stored?.startsWith("estado-")) {
-            stored = null
-        }
-
-        if (!stored) {
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match && match[1] !== "brasil" && !match[1].startsWith("estado-")) {
-                stored = match[1]
-            }
-        }
-
-        if (!stored && pathname) {
-            const parts = pathname.split('/').filter(Boolean)
-            if (parts[0] === 'explorar' && parts[1] && parts[1] !== "brasil" && !parts[1].startsWith("estado-")) {
-                stored = parts[1]
-            } else if (
-                parts.length >= 1 &&
-                !['auth', 'erp', 'ddt-admin', 'pedidos', 'perfil', 'checkout', 'quote', 'print', 'entregadores', 'sacola', 'favoritos', 'colecoes', 'assinaturas', 'mapa', 'invite', 'institucional', 'ajuda', 'banned', 'brasil'].includes(parts[0]) &&
-                /^[a-z0-9-]+-[a-z]{2}$/.test(parts[0])
-            ) {
-                stored = parts[0]
-            }
-        }
-
-        if (stored) {
-            setCitySlug(stored)
         }
     }, [pathname, profile])
 
@@ -522,17 +526,37 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
                     <Button
-                        onClick={handleIpLocation}
+                        onClick={requestLocation}
                         disabled={isIpLoading || isLocationLoading}
                         variant="outline"
-                        className="w-full"
+                        className="w-full mt-4"
                     >
                         <MapPinIcon className="w-4 h-4" />
-                        <span>Usar minha localização</span>
+                        <span>{isLocationLoading ? "Localizando..." : "Usar minha localização"}</span>
                     </Button>
 
-                    {/* Only show login link when user is NOT logged in */}
-                    {!user && (
+                    {locationError && (
+                        <p className="text-xs text-red-500 text-center mt-2">{locationError}</p>
+                    )}
+
+                    {/* Account / saved addresses footer */}
+                    {user ? (
+                        <div className="text-center mt-6 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Para cálculo de frete e entrega, use seus endereços salvos ou informe um CEP no produto.
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    setIsVisitorModalOpen(false)
+                                    router.push("/perfil?tab=enderecos")
+                                }}
+                                variant="link"
+                                className="text-sm mt-1 inline-block"
+                            >
+                                Gerenciar meus endereços
+                            </Button>
+                        </div>
+                    ) : (
                         <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                                 Já tem uma conta cadastrada com endereço salvo?
@@ -568,10 +592,10 @@ const Header: React.FC<HeaderProps> = ({
     }, [user, profile?.full_name])
 
     const userLocation = useMemo(() => {
-        if (profile?.address) return profile.address
         if (citySlug) return formatCitySlugForDisplay(citySlug)
+        if (profile?.address) return profile.address
         return null
-    }, [profile?.address, citySlug])
+    }, [citySlug, profile?.address])
 
     const searchContainerRef = useRef<HTMLDivElement>(null)
     const closeMenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1003,30 +1027,17 @@ const Header: React.FC<HeaderProps> = ({
                     {/* Delivery Info */}
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
                         <div className="flex items-center justify-between mt-2.5 gap-2 min-w-0">
-                            {user && userLocation ? (
-                                <IntentPrefetchLink
-                                    href="/perfil?tab=enderecos"
-                                    className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
-                                >
-                                    <MapPinIcon size={14} className="shrink-0 text-white" />
-                                    <span className="text-[12px] font-normal truncate text-white">
-                                        Você está em {userLocation}
-                                    </span>
-                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 text-white" />
-                                </IntentPrefetchLink>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsVisitorModalOpen(true)}
-                                    className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1 text-left"
-                                >
-                                    <MapPinIcon size={14} className="shrink-0 text-white" />
-                                    <span className="text-[12px] font-normal truncate text-white">
-                                        {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
-                                    </span>
-                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 text-white" />
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                onClick={() => setIsVisitorModalOpen(true)}
+                                className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1 text-left"
+                            >
+                                <MapPinIcon size={14} className="shrink-0 text-white" />
+                                <span className="text-[12px] font-normal truncate text-white">
+                                    {userLocation ? `Você está em ${userLocation}` : "Escolher localização"}
+                                </span>
+                                <ChevronRightIcon size={14} className="opacity-60 shrink-0 text-white" />
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleOpenAnnounceModal}
@@ -1290,40 +1301,23 @@ const Header: React.FC<HeaderProps> = ({
                         />
                     </IntentPrefetchLink>
 
-                    {user && userLocation ? (
-                        <IntentPrefetchLink
-                            href="/perfil?tab=enderecos"
-                            className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
-                        >
+                    <button
+                        type="button"
+                        onClick={() => setIsVisitorModalOpen(true)}
+                        className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
+                    >
+                        {userLocation ? (
                             <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
                                 Você está em
                             </span>
-                            <div className="flex items-center gap-1">
-                                <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
-                                <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
-                                    {userLocation}
-                                </span>
-                            </div>
-                        </IntentPrefetchLink>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setIsVisitorModalOpen(true)}
-                            className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
-                        >
-                            {userLocation ? (
-                                <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
-                                    Você está em
-                                </span>
-                            ) : null}
-                            <div className="flex items-center gap-1">
-                                <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
-                                <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
-                                    {userLocation || "Cadastrar endereço"}
-                                </span>
-                            </div>
-                        </button>
-                    )}
+                        ) : null}
+                        <div className="flex items-center gap-1">
+                            <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
+                            <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
+                                {userLocation || "Escolher localização"}
+                            </span>
+                        </div>
+                    </button>
 
                     <div className="flex-1 relative z-[110] mx-4 h-[42px]" ref={searchContainerRef}>
                         <form

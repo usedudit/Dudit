@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSupabase } from "@/providers/supabase-provider"
 import {
   getPendingLegalConsents,
@@ -26,37 +27,33 @@ const DOCUMENT_LABELS: Record<string, string> = {
 export function LegalConsentBanner() {
   const pathname = usePathname()
   const { user, isLoading: isAuthLoading } = useSupabase()
-  const [pending, setPending] = useState<PendingLegalConsent[] | null>(null)
+  const queryClient = useQueryClient()
   const [accepting, setAccepting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Não mostrar banner em páginas institucionais e central de ajuda
-  const isExcludedPath = pathname?.startsWith("/institucional/") || pathname?.startsWith("/ajuda/")
+  const isExcludedPath =
+    pathname?.startsWith("/institucional/") ||
+    pathname?.startsWith("/ajuda/") ||
+    pathname?.startsWith("/print")
 
-  useEffect(() => {
-    if (pathname?.startsWith("/print")) return
-    if (isExcludedPath) {
-      setPending(null)
-      return
-    }
-    if (!user) {
-      setPending(null)
-      return
-    }
+  const queryKey = ["legal", "pending-consents", user?.id] as const
 
-    let cancelled = false
-    getPendingLegalConsents()
-      .then((result) => {
-        if (!cancelled) setPending(result)
-      })
-      .catch(() => {
-        if (!cancelled) setPending([])
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [user?.id, isExcludedPath]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: pending = null } = useQuery<PendingLegalConsent[]>({
+    queryKey,
+    queryFn: async () => {
+      try {
+        return await getPendingLegalConsents()
+      } catch {
+        return []
+      }
+    },
+    enabled: Boolean(user?.id && !isExcludedPath),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  })
 
   const isOpen = Boolean(!isAuthLoading && user && pending && pending.length > 0 && !isExcludedPath)
 
@@ -84,7 +81,7 @@ export function LegalConsentBanner() {
         setError("Não foi possível registrar o aceite. Tente novamente.")
         return
       }
-      setPending([])
+      queryClient.setQueryData<PendingLegalConsent[]>(queryKey, [])
     } catch {
       setError("Não foi possível registrar o aceite. Tente novamente.")
     } finally {

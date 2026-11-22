@@ -75,56 +75,28 @@ export function MarketplaceBottomMenu() {
     }, []))
 
     // Detect city slug on client side for the Home and Explorar tabs
+    // Priority: explicit cookie/localStorage → current URL → saved profile address
     useEffect(() => {
         if (typeof window === "undefined") return
 
-        // 1. From profile if available
-        if (profile?.citySlug && profile.citySlug !== "brasil" && !profile.citySlug.startsWith("estado-")) {
-            setCitySlug(profile.citySlug)
-            try {
-                localStorage.setItem("dudit_city", profile.citySlug)
-                document.cookie = `dudit_city=${profile.citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
-            } catch { }
-            return
-        }
-
-        if (profile?.address && profile.address.includes(" - ") && profile.address !== "Brasil" && profile.address !== "Estado de São Paulo") {
-            const [cityName, stateUf] = profile.address.split(" - ")
-            if (cityName && stateUf && stateUf.trim().length === 2) {
-                const normCity = cityName.trim()
-                    .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/(^-|-$)/g, "")
-                const slug = `${normCity}-${stateUf.trim().toLowerCase()}`
-                setCitySlug(slug)
-                try {
-                    localStorage.setItem("dudit_city", slug)
-                    document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
-                } catch { }
-                return
-            }
+        // 1. From explicit cookie (highest priority — respects user's active browsing location)
+        let stored: string | null = null
+        const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+        if (match && match[1]) {
+            stored = decodeURIComponent(match[1])
         }
 
         // 2. From localStorage
-        let stored = localStorage.getItem("dudit_city")
-        if (stored === "brasil" || stored?.startsWith("estado-")) {
-            stored = null
-        }
-
-        // 3. From cookie
         if (!stored) {
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match && match[1] !== "brasil" && !match[1].startsWith("estado-")) {
-                stored = match[1]
-            }
+            try {
+                stored = localStorage.getItem("dudit_city")
+            } catch { }
         }
 
-        // 4. From current URL path
+        // 3. From current URL path
         if (!stored && pathname) {
             const parts = pathname.split('/').filter(Boolean)
-            if (parts[0] === 'explorar' && parts[1] && parts[1] !== "brasil" && !parts[1].startsWith("estado-")) {
+            if (parts[0] === 'explorar' && parts[1]) {
                 stored = parts[1]
             } else if (
                 parts.length >= 1 &&
@@ -137,13 +109,25 @@ export function MarketplaceBottomMenu() {
 
         if (stored) {
             setCitySlug(stored)
-            // Only persist to cookie/localStorage for logged-in users
-            // Logged-out users: just use the city for the current session
-            if (user) {
-                try {
-                    localStorage.setItem("dudit_city", stored)
-                    document.cookie = `dudit_city=${stored}; path=/; max-age=${60 * 60 * 24 * 30}`
-                } catch { }
+            return
+        }
+
+        // 4. Fallback to saved profile address ONLY when no explicit browsing location is set
+        if (profile?.citySlug && profile.citySlug !== "brasil" && !profile.citySlug.startsWith("estado-")) {
+            setCitySlug(profile.citySlug)
+            return
+        }
+
+        if (profile?.address && profile.address.includes(" - ") && profile.address !== "Brasil" && profile.address !== "Estado de São Paulo") {
+            const [cityName, stateUf] = profile.address.split(" - ")
+            if (cityName && stateUf && stateUf.trim().length === 2) {
+                const normCity = cityName.trim()
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/(^-|-$)/g, "")
+                setCitySlug(`${normCity}-${stateUf.trim().toLowerCase()}`)
             }
         }
     }, [pathname, profile, user])
@@ -160,7 +144,7 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/entregadores")
 
     const homePath = "/"
-    const explorePath = citySlug && citySlug !== "brasil" ? `/explorar/${citySlug}` : "/explorar/brasil"
+    const explorePath = citySlug ? `/explorar/${citySlug}` : "/explorar/brasil"
 
     const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")
 
@@ -322,8 +306,8 @@ export function MarketplaceBottomMenu() {
                                     onClose={() => setIsMenuOpen(false)}
                                 />
                                 <MenuItem
-                                    label="Minhas opiniões"
-                                    href={user ? "/perfil" : "/auth/login"}
+                                    label="Minhas avaliações"
+                                    href={user ? "perfil?tab=avaliacoes" : "/auth/login"}
                                     icon={StarIcon}
                                     onClose={() => setIsMenuOpen(false)}
                                 />

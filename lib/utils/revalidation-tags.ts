@@ -68,6 +68,9 @@ export const TAGS = {
   communityVideos: 'community-videos',
   communityVideo: (id: string) => `community-video-${id}`,
 
+  // Blog
+  blogPosts: 'blog-posts',
+
   // Reports
   report: (partnerId: string, category: string) => `report-${category}:${partnerId}`,
   reportGeneral: (partnerId: string) => `report-visao-geral:${partnerId}`,

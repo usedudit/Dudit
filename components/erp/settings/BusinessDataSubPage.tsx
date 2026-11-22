@@ -133,8 +133,8 @@ export const BusinessDataSubPage = ({
         mode: ((store?.business_info?.mode || partnerBusinessInfo?.mode || "erp")) as BusinessMode,
         phone: store?.phone ? formatE164ToDisplay(store.phone) : (partner.phone ? formatE164ToDisplay(partner.phone) : ""),
         category: partner.category || "",
-        categoryId: store?.category_id || null,
-        subcategoryId: store?.subcategory_id || null,
+        categoryId: store?.category_id || partner?.category_id || null,
+        subcategoryId: store?.subcategory_id || partner?.subcategory_id || null,
     })
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)

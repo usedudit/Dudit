@@ -38,6 +38,9 @@ const PartnersPageControls = ({
                         <TabsTrigger value="suspended" icon={AlertTriangleIcon}>
                             Suspensos
                         </TabsTrigger>
+                        <TabsTrigger value="showcase_suspended" icon={StoreIcon}>
+                            Vitrine Off
+                        </TabsTrigger>
                         <TabsTrigger value="high_risk" icon={BlockedIcon}>
                             Alto Risco
                         </TabsTrigger>

@@ -3,7 +3,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
+import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing, type PricingInput } from "@/lib/services/pricing-engine"
 import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import {
@@ -262,6 +262,7 @@ export async function priceMarketplaceCartCheckout(
         subtotal,
         shippingCost: deliveryFee,
         items: couponItems,
+        marketplaceOnly: true,
       },
       adminClient,
     )
@@ -270,23 +271,6 @@ export async function priceMarketplaceCartCheckout(
       couponDiscountAmount = couponResult.discountAmount
       couponPricingData = couponResult.pricingCoupon || null
       partialCouponWarning = Boolean(couponResult.partialApplicabilityWarning)
-    }
-  } else if (couponsEnabled) {
-    const autoResult = await findBestAutomaticCoupon(
-      {
-        partnerId,
-        customerId: params.userId,
-        subtotal,
-        shippingCost: deliveryFee,
-        items: couponItems,
-      },
-      adminClient,
-    )
-    if (autoResult.valid) {
-      couponId = autoResult.couponId || null
-      couponDiscountAmount = autoResult.discountAmount
-      couponPricingData = autoResult.pricingCoupon || null
-      partialCouponWarning = Boolean(autoResult.partialApplicabilityWarning)
     }
   }
 

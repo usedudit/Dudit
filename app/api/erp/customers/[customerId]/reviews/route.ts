@@ -108,6 +108,7 @@ export async function GET(
       services(name, images, unit)
     `)
     .eq("partner_id", customer.partner_id)
+    .is("deleted_at", null)
     .or(orConditions.join(","))
     .order("created_at", { ascending: false })
     .limit(50)

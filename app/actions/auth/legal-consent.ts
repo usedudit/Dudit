@@ -144,33 +144,33 @@ export async function getPendingLegalConsents(): Promise<PendingLegalConsent[]> 
   const admin = getAdminClient()
   const now = new Date().toISOString()
 
-  const { data: documents } = (await admin
-    .from("legal_documents")
-    .select("id, tipo, versao, url, publicado_em, vigente_em")
-    .lte("vigente_em", now)
-    .order("vigente_em", { ascending: false })) as {
-    data: LegalDocumentRow[] | null
-    error: unknown
-  }
+  const [{ data: documents }, { data: partner }, { data: consents }] = await Promise.all([
+    admin
+      .from("legal_documents")
+      .select("id, tipo, versao, url, publicado_em, vigente_em")
+      .lte("vigente_em", now)
+      .order("vigente_em", { ascending: false }) as unknown as Promise<{
+        data: LegalDocumentRow[] | null
+        error: unknown
+      }>,
+    admin
+      .from("partners")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    admin
+      .from("user_legal_consents")
+      .select("tipo, documento_id, versao, aceito_em")
+      .eq("user_id", user.id)
+      .order("aceito_em", { ascending: false }) as unknown as Promise<{
+        data: UserConsentRow[] | null
+        error: unknown
+      }>,
+  ])
 
   if (!documents || documents.length === 0) return []
 
-  const { data: partner } = await admin
-    .from("partners")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
   const applicableDocs = partner ? documents : documents.filter((d) => d.tipo !== "dpa")
-
-  const { data: consents } = (await admin
-    .from("user_legal_consents")
-    .select("tipo, documento_id, versao, aceito_em")
-    .eq("user_id", user.id)
-    .order("aceito_em", { ascending: false })) as {
-    data: UserConsentRow[] | null
-    error: unknown
-  }
 
   return computePendingLegalConsents(applicableDocs, consents ?? [])
 }

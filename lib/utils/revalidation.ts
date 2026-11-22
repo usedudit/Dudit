@@ -259,7 +259,14 @@ export async function revalidateAddresses(entityType: string, entityId: string) 
 export async function revalidatePartnerProfile(partnerId: string) {
     await safeRevalidateTag(TAGS.partnerProfile(partnerId))
     await safeRevalidateTag("partner-profile")
-    await safeRevalidateTag(TAGS.partner(partnerId))
+    try {
+        // Expira imediatamente o cache do parceiro para que o dashboard/checklist
+        // reflita na hora os dados recém-salvos em Dados do Negócio.
+        revalidateTag(TAGS.partner(partnerId), { expire: 0 })
+    } catch {
+        await safeRevalidateTag(TAGS.partner(partnerId))
+    }
+    await safeRevalidatePath("/erp/inicio")
 
     try {
         const { invalidateMarketplaceCapabilitiesCache } = await import("@/lib/marketplace-capabilities")

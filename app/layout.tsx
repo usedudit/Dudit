@@ -18,7 +18,7 @@ import { RouteAwareGlobalFeatures } from "@/providers/route-aware-global-feature
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner"
 import { getGlobalAnnouncementConfig } from "@/lib/services/system-settings.service"
 import { PostHogProvider } from "@/providers/posthog-provider"
-import { getBannedUserProfile } from "@/lib/auth/ban-check"
+import { getBannedUserProfile, getCachedBanStatus } from "@/lib/auth/ban-check"
 import BannedView from "@/components/admin/BannedView"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -309,8 +309,16 @@ export default async function RootLayout({
     // Skip the server-side auth round-trip on public pages (institucional, ajuda,
     // auth, manutencao). The client-side SupabaseProvider will fetch the user
     // lazily if needed, saving ~50-150ms on these routes.
-    const user = isPublicPage ? null : await getCurrentUser()
-    const bannedProfile = user ? await getBannedUserProfile(user.id) : null
+    // Run global announcement lookup in parallel with auth to avoid a waterfall.
+    const [user, initialAnnouncement] = await Promise.all([
+        isPublicPage ? Promise.resolve(null) : getCurrentUser(),
+        getGlobalAnnouncementConfig(),
+    ])
+    // Use the tag-invalidated ban status cache (60s TTL, invalidated immediately
+    // on admin ban/unban via `user-ban-${userId}`) so non-banned users skip a
+    // direct `user_profiles` query on every layout render.
+    const isBanned = user ? await getCachedBanStatus(user.id)() : false
+    const bannedProfile = user && isBanned ? await getBannedUserProfile(user.id) : null
 
     if (bannedProfile && user) {
         return (
@@ -335,8 +343,6 @@ export default async function RootLayout({
             </html>
         )
     }
-
-    const initialAnnouncement = await getGlobalAnnouncementConfig()
 
     return (
         <html lang="pt-BR" suppressHydrationWarning className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>

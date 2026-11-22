@@ -42,10 +42,21 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
 
   describe("Checklist Onboarding Rules", () => {
     it("should return completed = false for profile if category or phone is missing", () => {
-      const ctx = createBaseContext({ hasPhone: false });
+      const ctx = createBaseContext({ hasPhone: false, hasCategory: false });
       const checklist = getChecklistItems(ctx);
       const businessDataItem = checklist.find((item) => item.id === "business-data");
       expect(businessDataItem?.completed).toBe(false);
+      expect(businessDataItem?.description).toContain("WhatsApp");
+      expect(businessDataItem?.description).toContain("categoria");
+      expect(businessDataItem?.description).not.toContain("já foram configurados");
+    });
+
+    it("should return completed = true and configured description when phone, category and address exist", () => {
+      const ctx = createBaseContext({ hasPhone: true, hasCategory: true, hasAddress: true });
+      const checklist = getChecklistItems(ctx);
+      const businessDataItem = checklist.find((item) => item.id === "business-data");
+      expect(businessDataItem?.completed).toBe(true);
+      expect(businessDataItem?.description).toContain("já foram configurados");
     });
 
     it("should return completed = false for items if catalogue is empty", () => {

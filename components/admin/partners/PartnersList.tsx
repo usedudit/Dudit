@@ -18,6 +18,7 @@ import {
     suspendStore,
     unsuspendStore,
     toggleStoreShowcase,
+    togglePartnerShowcase,
     disableTenantAccess,
     enableTenantAccess,
     getAdminPartnerStats,
@@ -58,6 +59,8 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
     const [unsuspendStoreTarget, setUnsuspendStoreTarget] = useState<EnforcementPartner | null>(null)
     const [disableShowcaseTarget, setDisableShowcaseTarget] = useState<EnforcementPartner | null>(null)
     const [enableShowcaseTarget, setEnableShowcaseTarget] = useState<EnforcementPartner | null>(null)
+    const [disablePartnerShowcaseTarget, setDisablePartnerShowcaseTarget] = useState<EnforcementPartner | null>(null)
+    const [enablePartnerShowcaseTarget, setEnablePartnerShowcaseTarget] = useState<EnforcementPartner | null>(null)
     const [disableERPTarget, setDisableERPTarget] = useState<EnforcementPartner | null>(null)
     const [enableERPTarget, setEnableERPTarget] = useState<EnforcementPartner | null>(null)
     const [suspendPartnerTarget, setSuspendPartnerTarget] = useState<EnforcementPartner | null>(null)
@@ -192,12 +195,12 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         }
     }
 
-    const handleConfirmDisableShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmDisableShowcase = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!disableShowcaseTarget) return
         try {
-            const res = await toggleStoreShowcase(disableShowcaseTarget.id, false, reason, stepUpToken, riskScore, notifyOwner)
+            const res = await toggleStoreShowcase(disableShowcaseTarget.id, false, reason, stepUpToken, riskScore, notifyOwner, durationDays)
             if (res.success) {
-                toast.success("Vitrine online desativada com sucesso!")
+                toast.success(`Vitrine online desativada com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setDisableShowcaseTarget(null)
                 handleMutation()
             } else {
@@ -218,11 +221,55 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
         try {
             const res = await toggleStoreShowcase(enableShowcaseTarget.id, true, reason, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
-                toast.success("Vitrine online ativada com sucesso!")
+                toast.success("Vitrine online reativada com sucesso!")
                 setEnableShowcaseTarget(null)
                 handleMutation()
             } else {
-                toast.error(res.error || "Erro ao ativar vitrine online")
+                toast.error(res.error || "Erro ao reativar vitrine online")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmDisablePartnerShowcase = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        if (!disablePartnerShowcaseTarget) return
+        const targetPartnerId = disablePartnerShowcaseTarget.partner_id || disablePartnerShowcaseTarget.id
+        try {
+            const res = await togglePartnerShowcase(targetPartnerId, false, reason, stepUpToken, riskScore, notifyOwner, durationDays)
+            if (res.success) {
+                toast.success(`Vitrines online do ERP desativadas! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setDisablePartnerShowcaseTarget(null)
+                handleMutation()
+            } else {
+                toast.error(res.error || "Erro ao desativar vitrines online do ERP")
+            }
+            return res
+        } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    const handleConfirmEnablePartnerShowcase = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        if (!enablePartnerShowcaseTarget) return
+        const targetPartnerId = enablePartnerShowcaseTarget.partner_id || enablePartnerShowcaseTarget.id
+        try {
+            const res = await togglePartnerShowcase(targetPartnerId, true, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Vitrines online do ERP reativadas com sucesso!")
+                setEnablePartnerShowcaseTarget(null)
+                handleMutation()
+            } else {
+                toast.error(res.error || "Erro ao reativar vitrines online do ERP")
             }
             return res
         } catch (err: any) {
@@ -505,9 +552,11 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                                                         <Badge variant={isSuspended ? "red" : "green"}>
                                                             {isSuspended ? "Suspensa" : "Ativa"}
                                                         </Badge>
-                                                        {partner.is_showcase_active === false && (
+                                                        {(partner.showcase_suspended_at || partner.partner_showcase_suspended_at) ? (
                                                             <Badge variant="orange">Vitrine Off</Badge>
-                                                        )}
+                                                        ) : partner.is_showcase_active === false ? (
+                                                            <Badge variant="gray">Vitrine Pausada</Badge>
+                                                        ) : null}
                                                     </div>
                                                 </div>
 
@@ -565,6 +614,8 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                                                         onUnsuspendStore={() => setUnsuspendStoreTarget(partner)}
                                                         onDisableShowcase={() => setDisableShowcaseTarget(partner)}
                                                         onEnableShowcase={() => setEnableShowcaseTarget(partner)}
+                                                        onDisablePartnerShowcase={() => setDisablePartnerShowcaseTarget(partner)}
+                                                        onEnablePartnerShowcase={() => setEnablePartnerShowcaseTarget(partner)}
                                                         onDisableERP={() => setDisableERPTarget(partner)}
                                                         onEnableERP={() => setEnableERPTarget(partner)}
                                                         onSuspendPartner={() => setSuspendPartnerTarget(partner)}
@@ -646,6 +697,34 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
                     entityId={enableShowcaseTarget.id}
                     entityName={enableShowcaseTarget.store_name}
                     currentRiskScore={enableShowcaseTarget.risk_score}
+                />
+            )}
+
+            {/* 2d. Modal: Desativar Vitrine Online (ERP Inteiro) */}
+            {disablePartnerShowcaseTarget && (
+                <AdminEnforcementModal
+                    isOpen={!!disablePartnerShowcaseTarget}
+                    onClose={() => setDisablePartnerShowcaseTarget(null)}
+                    onConfirm={handleConfirmDisablePartnerShowcase}
+                    actionType="suspend"
+                    scope="partner_showcase"
+                    entityId={disablePartnerShowcaseTarget.partner_id || disablePartnerShowcaseTarget.id}
+                    entityName={disablePartnerShowcaseTarget.store_name}
+                    currentRiskScore={disablePartnerShowcaseTarget.risk_score}
+                />
+            )}
+
+            {/* 2e. Modal: Reativar Vitrine Online (ERP Inteiro) */}
+            {enablePartnerShowcaseTarget && (
+                <AdminEnforcementModal
+                    isOpen={!!enablePartnerShowcaseTarget}
+                    onClose={() => setEnablePartnerShowcaseTarget(null)}
+                    onConfirm={handleConfirmEnablePartnerShowcase}
+                    actionType="unsuspend"
+                    scope="partner_showcase"
+                    entityId={enablePartnerShowcaseTarget.partner_id || enablePartnerShowcaseTarget.id}
+                    entityName={enablePartnerShowcaseTarget.store_name}
+                    currentRiskScore={enablePartnerShowcaseTarget.risk_score}
                 />
             )}
 

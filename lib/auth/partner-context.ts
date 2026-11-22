@@ -643,7 +643,9 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
     const user = resolvedUser || await getCurrentUser()
     if (!user) return null
 
-    const allAccess = await getAllUserPartnerAccess(user)
+    const allAccess = resolvedUser
+        ? await getAllUserPartnerAccess(user)
+        : await getAllUserPartnerAccess()
     if (allAccess.length === 0) return null
 
     const activePartnerId = await getActivePartnerId()

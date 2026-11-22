@@ -1844,7 +1844,7 @@ export function CheckoutPageClient() {
                         setCheckoutAmounts(null)
                         setDeliveryError(result.error)
                         setOwnDeliveryBlocked(true)
-                        if (result.error?.toLowerCase().includes("raio") && !destinationCep) {
+                        if (result.error?.toLowerCase().includes("raio") && (!destinationCep || !carrierAllowed || !mpAvailable)) {
                             setShowOutsideRadiusModal(true)
                         }
                         setDeliveryFee(0)
@@ -1905,7 +1905,7 @@ export function CheckoutPageClient() {
                     } else {
                         setDeliveryError(quote.error)
                         setOwnDeliveryBlocked(true)
-                        if (quote.error?.toLowerCase().includes("raio") && !destinationCep) {
+                        if (quote.error?.toLowerCase().includes("raio") && (!destinationCep || !carrierAllowed || !mpAvailable)) {
                             setShowOutsideRadiusModal(true)
                         }
                         setDeliveryFee(0)
@@ -1946,6 +1946,8 @@ export function CheckoutPageClient() {
         selectedAddressKey,
         selectedCarrierServiceId,
         carrierSectionVisible,
+        carrierAllowed,
+        mpAvailable,
         destinationCep,
     ])
 

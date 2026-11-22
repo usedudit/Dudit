@@ -387,7 +387,7 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
           let q = supabase
             .from("services")
             .select(`
-              id, short_id, name, price, images, rating, duration_minutes, created_at, billing_unit, price_type,
+              id, short_id, name, price, images, video_thumbnail, rating, duration_minutes, created_at, billing_unit, price_type,
               partners(id),
               stores!inner(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state)),
               show_price_in_store

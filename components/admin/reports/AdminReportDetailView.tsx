@@ -41,7 +41,7 @@ import {
     type Report,
 } from "@/app/actions/admin/reports"
 import Link from "next/link"
-import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
+import { getPlanUrl, getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
@@ -236,6 +236,8 @@ export function AdminReportDetailView({
         store: "Loja / Parceiro",
         review: "Avaliação",
         return_request: "Devolução",
+        recurring_plan: "Assinatura",
+        community_video: "Vídeo da comunidade",
         order: "Pedido",
         user: "Usuário",
     }
@@ -399,11 +401,19 @@ export function AdminReportDetailView({
                                                                     ? getProductUrl(target, target.store)
                                                                     : targetType === "service" && target
                                                                         ? getServiceUrl(target, target.store)
-                                                                        : (targetType === "partner" || targetType === "store") && target
-                                                                            ? getStoreUrl(target)
-                                                                            : null
+                                                                        : targetType === "recurring_plan" && target
+                                                                            ? getPlanUrl(target, target.store)
+                                                                            : targetType === "community_video" && target
+                                                                                ? `/ddt-admin/videos/${target.id}`
+                                                                                : (targetType === "partner" || targetType === "store") && target
+                                                                                    ? getStoreUrl(target)
+                                                                                    : null
 
                                                                 if (!marketplaceUrl) return null
+
+                                                                const linkLabel = targetType === "community_video"
+                                                                    ? "Ver vídeo no admin →"
+                                                                    : "Ver no marketplace →"
 
                                                                 return (
                                                                     <div className="pt-3 border-t border-brand-border dark:border-dark-border">
@@ -413,7 +423,7 @@ export function AdminReportDetailView({
                                                                             rel="noopener noreferrer"
                                                                             className="text-xs font-bold text-brand-green hover:underline flex items-center gap-1"
                                                                         >
-                                                                            Ver no marketplace →
+                                                                            {linkLabel}
                                                                         </Link>
                                                                     </div>
                                                                 )

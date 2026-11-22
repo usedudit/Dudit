@@ -12,6 +12,8 @@ import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 import { startOfDay } from "@/lib/date"
 import { isUuid } from "@/lib/utils/short-id"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import { isShowcaseAdminSuspended } from "@/lib/commerce/store-showcase"
+import { isExploreServicePublic } from "@/lib/redis-explore-serializer"
 
 // ─── Constants (mirrored from ERP appointments.ts) ─────────────────────────
 const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
@@ -33,7 +35,7 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
     .from("services")
     .select(`
       id, short_id, partner_id, store_id, name, description, price, duration_minutes,
-      images, is_active, status, moderation_status, moderation_reason, rating, category_id, subcategory_id, sku, unit,
+      images, is_active, status, deleted_at, moderation_status, moderation_reason, rating, category_id, subcategory_id, sku, unit,
       show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
       video_thumbnail, video_duration, video_provider_id, service_type,
       warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,
@@ -45,6 +47,8 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
         is_active,
         erp_disabled,
         is_showcase_active,
+        showcase_suspended_at,
+        showcase_suspended_until,
         partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
         order_flow,
         created_at,
@@ -56,7 +60,7 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
       stores!left(
         id, short_id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
-        is_showcase_active, accept_orders_when_closed, timezone, business_info,
+        is_showcase_active, showcase_suspended_at, showcase_suspended_until, accept_orders_when_closed, timezone, business_info,
         rating, vendas_totais,
         addresses!store_id!left(city, state, latitude, longitude)
       )
@@ -81,6 +85,18 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
   }
 
   if (!data) {
+    return null
+  }
+
+  // Hide deleted, archived, inactive, moderation-rejected or non-marketplace services
+  if (data.is_active === false || data.status === "archived" || !isExploreServicePublic(data)) {
+    return null
+  }
+
+  // Hide completely from marketplace if store or partner showcase is admin-suspended
+  const rawPartnerCheck = Array.isArray(data.partners) ? data.partners[0] : data.partners
+  const rawStoreCheck = Array.isArray(data.stores) ? data.stores[0] : data.stores
+  if (isShowcaseAdminSuspended(rawStoreCheck) || isShowcaseAdminSuspended(rawPartnerCheck)) {
     return null
   }
 
@@ -170,11 +186,13 @@ export async function getServiceReviews(serviceId: string, storeId?: string | nu
   let query = supabase
     .from("reviews")
     .select(`
-      id, rating, comment, created_at, user_id, order_id, product_id, service_id, store_id,
+      id, rating, comment, created_at, updated_at, user_id, order_id, product_id, service_id, store_id,
       products:product_id(name, images, unit),
       services:service_id(name, images, unit)
     `)
     .eq("service_id", resolvedId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
 
   if (storeId) {
     query = query.or(`store_id.eq.${storeId},store_id.is.null`)

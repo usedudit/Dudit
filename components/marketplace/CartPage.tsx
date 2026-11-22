@@ -44,9 +44,9 @@ interface CartPageClientProps {
 // instantâneo, sem novo roundtrip.
 const CART_DELIVERY_QUOTE_TTL_MS = 20 * 1000
 const CART_DELIVERY_QUOTE_CACHE_MAX = 30
-const cartDeliveryQuoteCache = new Map<string, { at: number; fee: number; distanceKm: number | null; breakdown: any; error: string | null }>()
+const cartDeliveryQuoteCache = new Map<string, { at: number; fee: number; distanceKm: number | null; breakdown: any; error: string | null; isOutsideRadius?: boolean }>()
 
-function rememberCartDeliveryQuote(key: string, value: { fee: number; distanceKm: number | null; breakdown: any; error: string | null }) {
+function rememberCartDeliveryQuote(key: string, value: { fee: number; distanceKm: number | null; breakdown: any; error: string | null; isOutsideRadius?: boolean }) {
     cartDeliveryQuoteCache.delete(key)
     cartDeliveryQuoteCache.set(key, { at: Date.now(), ...value })
     while (cartDeliveryQuoteCache.size > CART_DELIVERY_QUOTE_CACHE_MAX) {
@@ -970,7 +970,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 const shippingAvailability = getPartnerShippingAvailability(data)
                 if (destinationCep.length === 8 && data.partner?.mp_user_id && data.shippingEnabled && shippingAvailability.allAllowShipping) {
                     const productItems = (data.items || [])
-                        .filter((it: any) => (it.item_type || "product") === "product")
+                        .filter((it: any) => getItemSelected(it) && (it.item_type || "product") === "product")
                         .map((it: any) => ({
                             productId: it.product_id || it.productId || it.id,
                             quantity: Math.max(1, Number(it.quantity || 1)),
@@ -1025,6 +1025,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                             breakdown: cachedDeliveryQuote.breakdown,
                             loading: false,
                             error: cachedDeliveryQuote.error,
+                            isOutsideRadius: cachedDeliveryQuote.isOutsideRadius,
                         }
                     }))
                     return
@@ -1272,6 +1273,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         const carrierQuoteState = storeKey && isOwnQuoteRaio(storeKey) ? carrierQuotes[storeKey] : null
         if (carrierQuoteState?.loading) {
             return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando frete nacional...</span>
+        }
+        if (isOwnQuoteRaio(storeKey)) {
+            return <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">A combinar</span>
         }
         if (quote?.error && quote.error !== "Entrega não disponível no plano atual.") {
             const isTechnical = quote.error.includes("incompleto") || quote.error.includes("coordenadas") || quote.error.includes("plano")

@@ -132,11 +132,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     try {
         const [storesResponse, productsResponse, servicesResponse, citiesResponse] = await Promise.all([
-            // Active stores
+            // Active stores (excluding admin showcase-suspended stores)
             supabase
                 .from("stores")
-                .select("id, short_id, name, slug, updated_at, created_at, addresses(city, state)")
+                .select("id, short_id, name, slug, updated_at, created_at, showcase_suspended_at, showcase_suspended_until, partners!inner(showcase_suspended_at, showcase_suspended_until), addresses(city, state)")
                 .eq("is_active", true)
+                .is("showcase_suspended_at", null)
+                .is("partners.showcase_suspended_at", null)
                 .order("updated_at", { ascending: false, nullsFirst: false })
                 .limit(5000),
 

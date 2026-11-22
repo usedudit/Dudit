@@ -756,12 +756,71 @@ export function ServiceDetailsPageClient({
             (service as any).flagged_images,
         )
         const images = cleanImages.map((img: string) => getR2ImageUrl(img, "large"))
-        return images.length > 0 ? images : [PLACEHOLDER]
-    }, [service.images, service.moderation_status, (service as any).moderation_reason, (service as any).flagged_images])
+        if (images.length > 0) return images
+        if (service.video_type && service.video_url && service.moderation_status !== "flagged") return []
+        const videoThumb = service.video_thumbnail
+        if (videoThumb && String(videoThumb).trim() && service.moderation_status !== "flagged") {
+            const url = String(videoThumb)
+            return [url.startsWith("http") ? url : getR2ImageUrl(url, "large")]
+        }
+        return [PLACEHOLDER]
+    }, [service.images, service.moderation_status, (service as any).moderation_reason, (service as any).flagged_images, service.video_thumbnail, service.video_type, service.video_url])
 
     const galleryItems = useMemo(() => {
-        return serviceImages.map((src: any) => ({ type: "image" as const, src }))
-    }, [serviceImages])
+        const videoType = service.video_type
+        const hasVideo = videoType && service.video_url && service.moderation_status !== "flagged"
+        const videoItems = hasVideo ? [{
+            type: "video" as const,
+            src: String(service.video_url),
+            poster: service.video_thumbnail ? (String(service.video_thumbnail).startsWith("http") ? String(service.video_thumbnail) : getR2ImageUrl(String(service.video_thumbnail), "large")) : undefined,
+            provider: videoType,
+            providerId: service.video_provider_id || undefined,
+        }] : []
+
+        return [
+            ...videoItems,
+            ...serviceImages.map((src: string) => ({ type: "image" as const, src })),
+        ]
+    }, [service.video_type, service.video_url, service.video_thumbnail, service.video_provider_id, service.moderation_status, serviceImages])
+
+    const renderGalleryItem = (
+        item: (typeof galleryItems)[number] | undefined,
+        className: string,
+        alt: string,
+        layout: "inline" | "lightbox" = "inline",
+    ) => {
+        if (!item) {
+            return <motion.img key="placeholder" src={PLACEHOLDER} className={className} alt={alt} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} />
+        }
+        if (item.type === "video") {
+            const shellClass =
+                layout === "lightbox"
+                    ? "w-full h-full min-h-[50vh] max-h-[85vh] max-w-[min(96vw,1100px)] flex items-center justify-center"
+                    : "absolute inset-0 w-full h-full"
+            const mediaClass = layout === "lightbox" ? "w-full h-full min-h-[50vh] max-h-[85vh] aspect-video border-0" : "absolute inset-0 w-full h-full border-0"
+
+            if (item.provider === "youtube" && item.providerId) {
+                return (
+                    <motion.div key={item.src} className={shellClass} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+                        <iframe src={`https://www.youtube.com/embed/${item.providerId}`} title={alt} loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen className={mediaClass} />
+                    </motion.div>
+                )
+            }
+            if (item.provider === "vimeo" && item.providerId) {
+                return (
+                    <motion.div key={item.src} className={shellClass} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+                        <iframe src={`https://player.vimeo.com/video/${item.providerId}`} title={alt} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen className={mediaClass} />
+                    </motion.div>
+                )
+            }
+            return (
+                <motion.div key={item.src} className={shellClass} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+                    <video src={item.src} poster={item.poster} controls preload="metadata" playsInline className={mediaClass} />
+                </motion.div>
+            )
+        }
+        return <motion.img key={item.src} src={item.src} className={className} alt={alt} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} />
+    }
 
     const goToImage = useCallback((index: number) => {
         setSlideDirection(index > activeImgIndex ? 1 : -1)
@@ -2188,11 +2247,11 @@ export function ServiceDetailsPageClient({
                                 </button>
 
                                 <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
-                                    {galleryItems.map((item: { src: string | Blob | undefined }, i: number) => (
+                                    {galleryItems.map((item, i: number) => (
                                         <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
                                             className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
                             ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
-                                            <img src={item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`} />
+                                            <img src={item.type === "video" ? (item.poster || PLACEHOLDER) : item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`} />
                                         </div>
                                     ))}
                                 </div>
@@ -2200,18 +2259,7 @@ export function ServiceDetailsPageClient({
                                 <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
                                     <AnimatePresence mode="wait" custom={slideDirection}
                                         onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                        <motion.img
-                                            key={lightboxActiveImg}
-                                            src={galleryItems[lightboxActiveImg]?.src || PLACEHOLDER}
-                                            className="max-w-full max-h-full object-contain"
-                                            alt={`Foto principal de ${service.name} em ${partner.city} - ${partner.state}`}
-                                            custom={slideDirection}
-                                            variants={slideVariants}
-                                            initial="enter"
-                                            animate="center"
-                                            exit="exit"
-                                            transition={{ duration: 0.2 }}
-                                        />
+                                        {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain", `Foto principal de ${service.name} em ${partner.city} - ${partner.state}`, "lightbox")}
                                     </AnimatePresence>
                                     {galleryItems.length > 1 && (
                                         <>
@@ -2239,18 +2287,7 @@ export function ServiceDetailsPageClient({
                             >
                                 <AnimatePresence mode="wait" custom={slideDirection}
                                     onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                    <motion.img
-                                        key={lightboxActiveImg}
-                                        src={galleryItems[lightboxActiveImg]?.src || PLACEHOLDER}
-                                        className="max-w-full max-h-full object-contain px-4"
-                                        alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
-                                        custom={slideDirection}
-                                        variants={slideVariants}
-                                        initial="enter"
-                                        animate="center"
-                                        exit="exit"
-                                        transition={{ duration: 0.2 }}
-                                    />
+                                    {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain px-4", `Foto de ${service.name} em ${partner.city} - ${partner.state}`, "lightbox")}
                                 </AnimatePresence>
                             </div>
                         </motion.div>
@@ -2304,11 +2341,11 @@ export function ServiceDetailsPageClient({
                             {/* Gallery */}
                             <div className="flex gap-3 mb-6">
                                 <div className="hidden lg:flex flex-col gap-2 w-[70px] shrink-0">
-                                    {galleryItems.map((item: { src: string | Blob | undefined }, i: number) => (
+                                    {galleryItems.map((item, i: number) => (
                                         <div key={i} onClick={() => goToImage(i)}
                                             className={`w-full aspect-square rounded-md border cursor-pointer overflow-hidden transition-all
                         ${activeImgIndex === i ? "border-brand-green ring-1 ring-brand-green" : "border-brand-border hover:border-brand-border"}`}>
-                                            <img src={item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city}`} loading="lazy" decoding="async" />
+                                            <img src={item.type === "video" ? (item.poster || PLACEHOLDER) : item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city}`} loading="lazy" decoding="async" />
                                         </div>
                                     ))}
                                 </div>
@@ -2339,39 +2376,30 @@ export function ServiceDetailsPageClient({
                                                     onMouseLeave={() => zoomScale.set(1)}
                                                 >
                                                     <AnimatePresence mode="popLayout" custom={slideDirection}>
-                                                        <motion.img
-                                                            key={activeImgIndex}
-                                                            src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
-                                                            fetchPriority="high"
-                                                            decoding="async"
-                                                            className="absolute inset-0 w-full h-full object-contain cursor-pointer"
-                                                            alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
-                                                            custom={slideDirection}
-                                                            variants={slideVariants}
-                                                            initial="enter"
-                                                            animate="center"
-                                                            exit="exit"
-                                                            transition={{ duration: 0.2 }}
-                                                            style={{ transformOrigin, scale: smoothScale }}
-                                                        />
+                                                        {galleryItems[activeImgIndex]?.type === "image" ? (
+                                                            <motion.img
+                                                                key={activeImgIndex}
+                                                                src={galleryItems[activeImgIndex].src}
+                                                                fetchPriority="high"
+                                                                decoding="async"
+                                                                className="absolute inset-0 w-full h-full object-contain cursor-pointer"
+                                                                alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
+                                                                custom={slideDirection}
+                                                                variants={slideVariants}
+                                                                initial="enter"
+                                                                animate="center"
+                                                                exit="exit"
+                                                                transition={{ duration: 0.2 }}
+                                                                style={{ transformOrigin, scale: smoothScale }}
+                                                            />
+                                                        ) : renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Vídeo de ${service.name}`)}
                                                     </AnimatePresence>
                                                 </div>
                                             </div>
 
                                             <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
                                                 <AnimatePresence mode="wait" custom={slideDirection}>
-                                                    <motion.img
-                                                        key={activeImgIndex}
-                                                        src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
-                                                        className="absolute inset-0 w-full h-full object-contain"
-                                                        alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
-                                                        custom={slideDirection}
-                                                        variants={slideVariants}
-                                                        initial="enter"
-                                                        animate="center"
-                                                        exit="exit"
-                                                        transition={{ duration: 0.2 }}
-                                                    />
+                                                    {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${service.name} em ${partner.city} - ${partner.state}`)}
                                                 </AnimatePresence>
                                             </div>
                                         </div>

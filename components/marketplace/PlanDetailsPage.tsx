@@ -951,9 +951,9 @@ export function PlanDetailsPageClient({
             <ReportModal
                 isOpen={showReportModal}
                 onClose={() => setShowReportModal(false)}
-                targetType="partner"
-                targetId={partner.partner_id || partner.id}
-                targetName={partner.store_name}
+                targetType="recurring_plan"
+                targetId={plan.id}
+                targetName={plan.name || "Assinatura"}
             />
 
             <DefaultModal

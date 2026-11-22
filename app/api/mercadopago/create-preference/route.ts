@@ -556,6 +556,7 @@ async function handler(request: NextRequest) {
           subtotal: itemsSubtotal,
           shippingCost: deliveryFee,
           items: couponItems,
+          marketplaceOnly: true,
         }, adminClient)
 
         if (couponResult.valid) {

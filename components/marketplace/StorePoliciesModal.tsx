@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { DefaultModal, Spinner } from "@/components/reusable"
+import { DefaultModal, Spinner, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { getPartnerReturnPolicyPublicAction } from "@/app/actions/marketplace/store-policies"
 import { getShippingPayerLabel } from "@/lib/returns/policy"
 import type { PartnerReturnPolicy } from "@/lib/returns/policy"
@@ -45,7 +45,7 @@ export function StorePoliciesModal({ isOpen, onClose, partnerId, storeName }: St
       title={`Políticas de ${storeName}`}
       maxWidth="3xl"
     >
-      <div className="py-2 space-y-6">
+      <div className="py-2 space-y-5">
         {loading ? (
           <div className="flex items-center justify-center py-10">
             <Spinner />
@@ -58,43 +58,58 @@ export function StorePoliciesModal({ isOpen, onClose, partnerId, storeName }: St
               As políticas abaixo são de responsabilidade exclusiva do vendedor. A Dudit apenas disponibiliza a plataforma. Consulte nossos Termos de Serviço para mais informações.
             </div>
 
-            {policy.fullPolicyText && (
-              <div>
-                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Política de Trocas e Devoluções</h4>
-                <div className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-relaxed">
-                  {policy.fullPolicyText}
+            <Tabs defaultValue="trocas" className="w-full">
+              <TabsList className="px-0">
+                <TabsTrigger value="trocas">Política de Trocas</TabsTrigger>
+                <TabsTrigger value="informacoes">Informações adicionais</TabsTrigger>
+                <TabsTrigger value="observacoes">Observações do vendedor</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="trocas" className="mt-4">
+                {policy.fullPolicyText ? (
+                  <div className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-relaxed">
+                    {policy.fullPolicyText}
+                  </div>
+                ) : (
+                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                    O vendedor não cadastrou uma política de trocas e devoluções.
+                  </p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="informacoes" className="mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <InfoItem label="Prazo de arrependimento (online)" value={`${policy.legalOnlineRegretDays} dias`} />
+                  <InfoItem label="Troca por tamanho" value={policy.acceptsSizeExchange ? "Aceita" : "Não aceita"} />
+                  <InfoItem label="Troca por cor" value={policy.acceptsColorExchange ? "Aceita" : "Não aceita"} />
+                  <InfoItem label="Vale-compra" value={policy.acceptsStoreCredit ? "Aceita" : "Não aceita"} />
+                  <InfoItem label="Devolução presencial" value={policy.acceptsInPersonReturn ? "Aceita" : "Não aceita"} />
+                  <InfoItem label="Devolução por envio" value={policy.acceptsShippingReturn ? "Aceita" : "Não aceita"} />
+                  <InfoItem label="Frete de devolução" value={getShippingPayerLabel(policy.shippingPayer)} />
+                  {policy.commercialDeadlineDays > 0 && (
+                    <InfoItem label="Prazo comercial" value={`${policy.commercialDeadlineDays} dias`} />
+                  )}
+                  {policy.additionalWarrantyDays > 0 && (
+                    <InfoItem label="Garantia adicional" value={`${policy.additionalWarrantyDays} dias`} />
+                  )}
+                  {policy.slaResponseDays > 0 && (
+                    <InfoItem label="Prazo de resposta (SLA)" value={`${policy.slaResponseDays} dias úteis`} />
+                  )}
                 </div>
-              </div>
-            )}
+              </TabsContent>
 
-            <div className="border-t border-brand-border pt-4">
-              <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Informações adicionais</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <InfoItem label="Prazo de arrependimento (online)" value={`${policy.legalOnlineRegretDays} dias`} />
-                <InfoItem label="Troca por tamanho" value={policy.acceptsSizeExchange ? "Aceita" : "Não aceita"} />
-                <InfoItem label="Troca por cor" value={policy.acceptsColorExchange ? "Aceita" : "Não aceita"} />
-                <InfoItem label="Vale-compra" value={policy.acceptsStoreCredit ? "Aceita" : "Não aceita"} />
-                <InfoItem label="Devolução presencial" value={policy.acceptsInPersonReturn ? "Aceita" : "Não aceita"} />
-                <InfoItem label="Devolução por envio" value={policy.acceptsShippingReturn ? "Aceita" : "Não aceita"} />
-                <InfoItem label="Frete de devolução" value={getShippingPayerLabel(policy.shippingPayer)} />
-                {policy.commercialDeadlineDays > 0 && (
-                  <InfoItem label="Prazo comercial" value={`${policy.commercialDeadlineDays} dias`} />
+              <TabsContent value="observacoes" className="mt-4">
+                {policy.commercialNotes ? (
+                  <div className="bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl p-4">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-line">{policy.commercialNotes}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                    O vendedor não adicionou observações.
+                  </p>
                 )}
-                {policy.additionalWarrantyDays > 0 && (
-                  <InfoItem label="Garantia adicional" value={`${policy.additionalWarrantyDays} dias`} />
-                )}
-                {policy.slaResponseDays > 0 && (
-                  <InfoItem label="Prazo de resposta (SLA)" value={`${policy.slaResponseDays} dias úteis`} />
-                )}
-              </div>
-            </div>
-
-            {policy.commercialNotes && (
-              <div className="bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl p-4">
-                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1">Observações do vendedor</h4>
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-line">{policy.commercialNotes}</p>
-              </div>
-            )}
+              </TabsContent>
+            </Tabs>
 
             <div className="border-t border-brand-border pt-4">
               <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">

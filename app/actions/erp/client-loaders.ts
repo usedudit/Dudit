@@ -187,7 +187,7 @@ export async function fetchPartnerCouponsBucket(): Promise<Array<{
   discount_type: string
   discount_value: number | null
   is_active: boolean
-  is_automatic?: boolean
+  show_in_marketplace?: boolean
 }>> {
   const user = await getCurrentUser()
   if (!user) throw new Error("Unauthorized")
@@ -203,7 +203,7 @@ export async function fetchPartnerCouponsBucket(): Promise<Array<{
 
   const { data, error } = await supabase
     .from("coupons")
-    .select("id, code, discount_type, discount_value, is_active, is_automatic")
+    .select("id, code, discount_type, discount_value, is_active, show_in_marketplace")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("code")
@@ -220,7 +220,7 @@ export async function fetchPartnerCouponsBucket(): Promise<Array<{
     discount_type: String(c.discount_type || ""),
     discount_value: c.discount_value == null ? null : Number(c.discount_value),
     is_active: Boolean(c.is_active),
-    is_automatic: Boolean(c.is_automatic),
+    show_in_marketplace: c.show_in_marketplace !== false,
   }))
 }
 
@@ -349,6 +349,7 @@ export type PartnerServiceBucketItem = {
   category: string | null
   billingUnit: string
   image?: string | null
+  video_thumbnail?: string | null
 }
 
 export async function fetchPartnerServicesBucket(storeIdOverride?: string | null): Promise<PartnerServiceBucketItem[]> {
@@ -368,7 +369,7 @@ export async function fetchPartnerServicesBucket(storeIdOverride?: string | null
 
       let query = supabase
         .from("services")
-        .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, images")
+        .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, images, video_thumbnail")
         .eq("partner_id", partnerId)
         .eq("is_active", true)
 
@@ -400,7 +401,8 @@ export async function fetchPartnerServicesBucket(storeIdOverride?: string | null
     bufferMinutes: Number(s.buffer_minutes || 0),
     category: null,
     billingUnit: String(s.billing_unit || "per_service"),
-    image: s.images && s.images.length > 0 ? s.images[0] : null,
+    image: s.images && s.images.length > 0 ? s.images[0] : (s.video_thumbnail || null),
+    video_thumbnail: s.video_thumbnail || null,
   }))
 }
 

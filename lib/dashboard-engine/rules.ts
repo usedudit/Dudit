@@ -19,14 +19,21 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
   const items: DashboardChecklistItem[] = [];
 
   // 1. Dados Básicos da Loja / Vitrine (Nome + WhatsApp + Categoria + Endereço)
-  const dadosNegocioCompleted = ctx.hasPhone && ctx.hasCategory && ctx.hasAddress;
+  const missingBusinessFields: string[] = [];
+  if (!ctx.hasPhone) missingBusinessFields.push("WhatsApp");
+  if (!ctx.hasCategory) missingBusinessFields.push("categoria");
+  if (!ctx.hasAddress) missingBusinessFields.push("endereço comercial");
+
+  const dadosNegocioCompleted = missingBusinessFields.length === 0;
   items.push({
     id: "business-data",
     title: ctx.isQuickMode ? "Dados da sua Vitrine" : "Dados da sua Loja",
-    description: "Nome, WhatsApp, categoria e endereço comercial já foram configurados.",
+    description: dadosNegocioCompleted
+      ? "Nome, WhatsApp, categoria e endereço comercial já foram configurados."
+      : `Falta configurar: ${missingBusinessFields.join(", ")}.`,
     completed: dadosNegocioCompleted,
-    actionText: "Revisar Dados",
-    badgeText: "Concluído no cadastro",
+    actionText: dadosNegocioCompleted ? "Revisar Dados" : "Completar Dados",
+    badgeText: dadosNegocioCompleted ? "Concluído no cadastro" : undefined,
     tabTarget: "dados-do-negocio"
   });
 

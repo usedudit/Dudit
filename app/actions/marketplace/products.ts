@@ -8,6 +8,8 @@ import { resolveProduct } from "@/lib/store-products"
 import { filterMarketplaceVisibleProducts } from "@/lib/resolve-marketplace-visibility"
 import { isUuid } from "@/lib/utils/short-id"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import { isShowcaseAdminSuspended } from "@/lib/commerce/store-showcase"
+import { isExploreProductPublic } from "@/lib/redis-explore-serializer"
 
 // --- 1. PRODUTOS DA HOME (LISTAGEM) ---
 // NO unstable_cache - Redis is the single source of truth.
@@ -30,7 +32,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     .from("products")
     .select(`
       id, short_id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
-      is_active, status, moderation_status, moderation_reason,
+      is_active, status, deleted_at, moderation_status, moderation_reason,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
       brand, brand_id, brand_entity:brands!brand_id(name),
@@ -43,7 +45,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, user_id, created_at, is_showcase_active,
+        id, user_id, created_at, is_showcase_active, showcase_suspended_at, showcase_suspended_until,
         partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
         addresses(city, state),
         payment_methods(*)
@@ -51,7 +53,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       stores!left(
         id, short_id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
-        is_showcase_active, accept_orders_when_closed, timezone, business_info,
+        is_showcase_active, showcase_suspended_at, showcase_suspended_until, accept_orders_when_closed, timezone, business_info,
         rating, vendas_totais,
         addresses!store_id!left(city, state, latitude, longitude)
       )
@@ -79,6 +81,18 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(`[MarketplaceTrace] produto:${id} ausente na query PDP`)
     }
+    return null
+  }
+
+  // Hide deleted, archived, inactive, moderation-rejected or non-marketplace products
+  if (!isExploreProductPublic(data)) {
+    return null
+  }
+
+  // Hide completely from marketplace if store or partner showcase is admin-suspended
+  const rawPartnerCheck = Array.isArray(data.partners) ? data.partners[0] : data.partners
+  const rawStoreCheck = Array.isArray(data.stores) ? data.stores[0] : data.stores
+  if (isShowcaseAdminSuspended(rawStoreCheck) || isShowcaseAdminSuspended(rawPartnerCheck)) {
     return null
   }
 
@@ -219,8 +233,10 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
   }
   let query = supabase
     .from("reviews")
-    .select("id, rating, comment, created_at, user_id, order_id, product_id, store_id")
+    .select("id, rating, comment, created_at, updated_at, user_id, order_id, product_id, store_id")
     .eq("product_id", resolvedId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
 
   if (storeId) {
     query = query.or(`store_id.eq.${storeId},store_id.is.null`)
@@ -345,8 +361,8 @@ export const getProductSoldCount = cache(_getProductSoldCount)
 export const getCachedMarketplaceProduct = async (id: string, storeId?: string | null) => {
   const fn = unstable_cache(
     async () => _getMarketplaceProductBase(id, storeId),
-    [`product-details-${id}-v13`],
-    { tags: ["marketplace-product", `product-${id}`] }
+    [`product-details-${id}-v14`],
+    { tags: ["marketplace-product", "products", `product-${id}`], revalidate: 300 }
   )
   return fn()
 }
@@ -377,8 +393,10 @@ export const getCachedReviews = async (productId: string) => {
       const supabase = getAdminClient()
       const { data: reviewsData, error } = await supabase
         .from("reviews")
-        .select("id, rating, comment, created_at, user_id, product_id")
+        .select("id, rating, comment, created_at, updated_at, user_id, product_id")
         .eq("product_id", productId)
+        .is("deleted_at", null)
+        .not("is_hidden", "is", true)
         .order("created_at", { ascending: false })
         .limit(20)
 
@@ -684,7 +702,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     const productsRes = await supabase
       .from("products")
       .select(`
-        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+        id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
         marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
         category_id, category:product_categories!category_id(name), created_at,
         partners!inner(id, is_showcase_active),
@@ -714,8 +732,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
         stores(id, name, description, logo_url, banner_url, phone, opening_hours, addresses!store_id!left(city, state)),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
-          products:product_id(id, name, price, images),
-          services:service_id(id, name, price, duration_minutes, images)
+          products:product_id(id, name, price, images, video_thumbnail),
+          services:service_id(id, name, price, duration_minutes, images, video_thumbnail)
         )
       `)
       .eq("status", "active")

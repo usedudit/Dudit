@@ -253,7 +253,7 @@ export type CouponBucketItem = {
   discount_type: string
   discount_value: number | null
   is_active: boolean
-  is_automatic?: boolean
+  show_in_marketplace?: boolean
 }
 
 export function useCouponBucket(loadFn: () => Promise<CouponBucketItem[]>) {

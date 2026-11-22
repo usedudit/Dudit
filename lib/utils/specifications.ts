@@ -85,7 +85,98 @@ const IGNORED_SPEC_KEYS = new Set([
   "packaging_type",
   "preparation_days",
   "vendas_totais",
+  "technical_specs",
+  "technical_details",
+  "attributes",
+  "specs",
+  "fts",
+  "product_id",
+  "external_id",
+  "external_provider",
+  "last_external_sync_at",
+  "marketplace_score",
+  "total_sales",
+  "sales_last_30_days",
+  "sales_last_7_days",
+  "views_count",
+  "views_last_30_days",
+  "favorites_count",
+  "last_sale_at",
+  "mp_store_name",
+  "is_on_promotion",
+  "primary_image_index",
+  "allow_sell_without_stock",
+  "ncm",
+  "cest",
+  "origin",
+  "item_type",
+  "cfop_internal",
+  "cfop_external",
+  "csosn",
+  "tax_percentage",
+  "pis_cst",
+  "pis_rate",
+  "cofins_cst",
+  "cofins_rate",
+  "ipi_cst",
+  "ipi_code",
+  "product_situation",
+  "c_benef",
+  "inf_ad_prod",
+  "fci_code",
+  "cst_ibs_cbs",
+  "c_class_trib",
+  "unit",
+  "unidade",
+  "costPrice",
+  "stock",
+  "minStock",
+  "maxStock",
+  "productType",
+  "localizacao",
+  "digital_format",
+  "delivery_format",
+  "is_featured",
+  "has_variants",
+  "deleted_at",
+  "deleted_by",
+  "deleted_reason",
+  "supplier_id",
+  "fiscal_profile_id",
+  "brand_rel",
+  "location_rel",
+  "product_fiscal_profiles",
 ])
+
+/**
+ * Chaves que indicam que o objeto passado é um registro completo de produto/serviço
+ * (e não um dicionário avulso de especificações chave-valor).
+ */
+const ENTITY_RECORD_KEYS = [
+  "technical_specs",
+  "technical_details",
+  "attributes",
+  "specs",
+  "partner_id",
+  "store_id",
+  "short_id",
+  "sku",
+  "price",
+  "cost_price",
+  "costPrice",
+  "stock_quantity",
+  "stock_available",
+  "stock",
+  "created_at",
+  "updated_at",
+  "product_type",
+  "productType",
+  "service_type",
+  "product_id",
+  "fts",
+  "external_id",
+  "ncm",
+]
 
 function parseJsonIfString(val: unknown): unknown {
   if (typeof val === "string") {
@@ -173,12 +264,17 @@ function parseSpecCollection(source: unknown): NormalizedSpecification[] {
 
   // Caso 2: Objeto contendo uma propriedade conhecida com lista de atributos
   const subKeys = ["attributes", "technical_details", "technical_specs", "specs"]
+  let hasExplicitSubKey = false
   for (const key of subKeys) {
-    if (obj[key] !== undefined && obj[key] !== null) {
+    if (key in obj && obj[key] !== undefined && obj[key] !== null) {
+      hasExplicitSubKey = true
       const subResults = parseSpecCollection(obj[key])
       if (subResults.length > 0) return subResults
     }
   }
+  // Se o objeto é um wrapper explícito (ex: { attributes: [], addon_groups: [] }),
+  // não percorrer chaves irmãs como se fossem especificações.
+  if (hasExplicitSubKey) return []
 
   // Caso 3: Objeto mapa chave-valor (ex: { "Material": "Algodão", "Origem": "Nacional" })
   const results: NormalizedSpecification[] = []
@@ -200,9 +296,9 @@ function parseSpecCollection(source: unknown): NormalizedSpecification[] {
  * - Formatos com strings JSON, listas diretas, objetos chave/valor, technical_specs, technical_details, attributes ou specs.
  */
 export function extractSpecifications(entity: any): NormalizedSpecification[] {
-  if (!entity || typeof entity !== "object") return []
+  if (!entity) return []
 
-  // Se o próprio entity já for um array ou uma coleção de specs
+  // Se o próprio entity já for um array
   if (Array.isArray(entity)) {
     return parseSpecCollection(entity)
   }
@@ -211,6 +307,8 @@ export function extractSpecifications(entity: any): NormalizedSpecification[] {
   if (typeof entity === "string") {
     return parseSpecCollection(entity)
   }
+
+  if (typeof entity !== "object") return []
 
   // Checar campos candidatos no objeto de produto ou serviço
   const candidates = [
@@ -227,8 +325,12 @@ export function extractSpecifications(entity: any): NormalizedSpecification[] {
     }
   }
 
-  // Se não encontrou em nenhum dos campos específicos, checar se há outras propriedades
-  // que não sejam reservadas no próprio objeto (fallback para dicionário de atributos)
+  // Nunca usar fallback chave-valor em registros de produto/serviço para evitar
+  // vazar colunas do banco (costPrice, stock, ncm, fts, total_sales, etc.) como especificações.
+  const isEntityRecord = ENTITY_RECORD_KEYS.some((key) => key in entity)
+  if (isEntityRecord) return []
+
+  // Fallback apenas para dicionários avulsos de atributos (ex: { "Material": "Algodão" })
   const fallback = parseSpecCollection(entity)
   if (fallback.length > 0) return fallback
 

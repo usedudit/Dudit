@@ -45,6 +45,7 @@ const CONTEXT_INFO = {
   delivery_otp: "delivery-otp-encryption",
   tiny: "tiny-token-encryption",
   bling: "bling-token-encryption",
+  compliance: "compliance-pii-encryption",
 } as const
 
 type CryptoContext = keyof typeof CONTEXT_INFO

@@ -945,6 +945,7 @@ async function handler(request: NextRequest) {
           subtotal: totalAmount,
           shippingCost: deliveryFee,
           items: validatedItems.map(i => ({ productId: i.product_id, serviceId: i.service_id ?? null })),
+          marketplaceOnly: true,
         }, adminClient)
 
         if (couponResult.valid) {

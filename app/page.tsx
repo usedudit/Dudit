@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     ],
 }
 
-async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName }: any) {
+async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName, savedCitySlug }: any) {
     let sections: HomeSection[] = []
     let homeAds: SponsoredAd[] = []
     let displayCityName: string | null = cityName
@@ -65,7 +65,9 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         const isCountryScope = citySlug === "brasil" || cityName === "Brasil" || isDefaultSP
         const isStateScope = citySlug.startsWith("estado-")
 
-        const coords = userProfile?.latitude && userProfile?.longitude
+        const matchesSavedAddress = Boolean(savedCitySlug && savedCitySlug === citySlug)
+
+        const coords = matchesSavedAddress && userProfile?.latitude && userProfile?.longitude
             ? { lat: userProfile.latitude, lng: userProfile.longitude }
             : null
 
@@ -175,15 +177,18 @@ export default async function HomePage() {
         }
     }
 
-    if ((!citySlug || !cityName) && dbProfile?.city && dbProfile?.state) {
-        cityName = dbProfile.city
-        const normalizedCity = dbProfile.city
+    const savedCitySlug = dbProfile?.city && dbProfile?.state
+        ? `${dbProfile.city
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
             .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "")
-        citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
+            .replace(/(^-|-$)/g, "")}-${dbProfile.state.toLowerCase()}`
+        : null
+
+    if ((!citySlug || !cityName) && dbProfile?.city && dbProfile?.state && savedCitySlug) {
+        cityName = dbProfile.city
+        citySlug = savedCitySlug
     }
 
     let isDefaultStateSP = false
@@ -193,34 +198,37 @@ export default async function HomePage() {
         isDefaultStateSP = true
     }
 
+    const resolvedHeaderAddress = cityName && citySlug
+        ? (isDefaultStateSP || citySlug === "brasil"
+            ? "Brasil"
+            : (citySlug.startsWith("estado-")
+                ? cityName
+                : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`))
+        : (dbProfile?.city ? `${dbProfile.city} - ${dbProfile.state}` : null)
+
+    const resolvedHeaderState = citySlug === "brasil" || isDefaultStateSP
+        ? "BR"
+        : (citySlug?.startsWith("estado-")
+            ? citySlug.replace("estado-", "").toUpperCase()
+            : (citySlug ? citySlug.split("-").pop()?.toUpperCase() : dbProfile?.state) || null)
+
     let userProfile = dbProfile
         ? {
             full_name: dbProfile.full_name,
             latitude: dbProfile.latitude,
             longitude: dbProfile.longitude,
-            address: cityName && citySlug
-                ? `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`
-                : (dbProfile.city ? `${dbProfile.city} - ${dbProfile.state}` : null),
-            city: cityName || dbProfile.city || null,
-            state: (citySlug ? citySlug.split("-").pop()?.toUpperCase() : dbProfile.state) || null,
+            address: resolvedHeaderAddress,
+            city: (isDefaultStateSP || citySlug === "brasil") ? "Brasil" : (cityName || dbProfile.city || null),
+            state: resolvedHeaderState,
         }
         : (cityName && citySlug ? {
             full_name: null,
             latitude: null,
             longitude: null,
-            address: isDefaultStateSP
-                ? "Estado de São Paulo"
-                : (citySlug === "brasil"
-                    ? "Brasil"
-                    : (citySlug.startsWith("estado-") ? cityName : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`)),
-            city: cityName,
-            state: citySlug === "brasil" ? "BR" : (citySlug.startsWith("estado-") ? citySlug.replace("estado-", "").toUpperCase() : citySlug.split("-").pop()?.toUpperCase()),
+            address: resolvedHeaderAddress,
+            city: (isDefaultStateSP || citySlug === "brasil") ? "Brasil" : cityName,
+            state: resolvedHeaderState,
         } : null)
-
-    // Country scope (no real location context): override header to show "Brasil"
-    if ((isDefaultStateSP || citySlug === "brasil") && userProfile) {
-        userProfile = { ...userProfile, address: "Brasil", city: "Brasil", state: "BR" }
-    }
 
     const cartCount = sessionData?.cartCount || 0
 
@@ -258,6 +266,7 @@ export default async function HomePage() {
                     cartCount={cartCount}
                     citySlug={citySlug}
                     cityName={cityName}
+                    savedCitySlug={savedCitySlug}
                 />
             </Suspense>
 

@@ -43,6 +43,28 @@ export type DeliveryBreakdown = {
   hasRatesConfigured?: boolean
 }
 
+export function getEffectiveMaxDeliveryKm(
+  settings?: {
+    maxDeliveryKm?: number | null
+    max_delivery_km?: number | null
+    includedKm?: number | null
+    included_km?: number | null
+  } | null,
+): number | null {
+  if (!settings) return null
+  const rawMax = settings.maxDeliveryKm ?? settings.max_delivery_km
+  const maxKm = rawMax != null && !Number.isNaN(Number(rawMax)) && Number(rawMax) > 0
+    ? Number(rawMax)
+    : null
+  if (maxKm != null) return maxKm
+
+  const rawIncluded = settings.includedKm ?? settings.included_km
+  const includedKm = rawIncluded != null && !Number.isNaN(Number(rawIncluded)) && Number(rawIncluded) > 0
+    ? Number(rawIncluded)
+    : null
+  return includedKm
+}
+
 export function hasDeliveryRatesConfigured(
   settings?: any | null,
   rules?: any[] | null,
@@ -110,9 +132,12 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
     ? null
     : Math.max(0, Number(input.settings.maxDeliveryKm))
 
-  // Only maxDeliveryKm defines the maximum delivery radius.
-  // includedKm is the distance covered by the base fee before extraKmPrice applies.
-  const effectiveMaxKm = maxDeliveryKmSetting
+  // maxDeliveryKm defines the maximum delivery radius when configured;
+  // otherwise includedKm acts as the seller's delivery radius limit.
+  const effectiveMaxKm = getEffectiveMaxDeliveryKm({
+    maxDeliveryKm: maxDeliveryKmSetting,
+    includedKm,
+  })
 
   const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
   if (isOutsideRadius && !input.allowOutsideRadius) {

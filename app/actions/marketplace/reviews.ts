@@ -10,6 +10,10 @@ import { sendSuspiciousReview } from "@/lib/services/discord-marketplace-webhook
 import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 import { moderateReviewContent } from "@/lib/moderation/product-moderation"
 
+const MAX_REVIEW_EDITS = 2
+const REVIEW_EDIT_WINDOW_DAYS = 90
+const REVIEW_EDIT_WINDOW_MS = REVIEW_EDIT_WINDOW_DAYS * 24 * 60 * 60 * 1000
+
 async function checkFraudulentReview(
   adminSupabase: any,
   userId: string,
@@ -17,6 +21,7 @@ async function checkFraudulentReview(
   productId: string | null,
   serviceId: string | null = null,
   storeId?: string | null,
+  orderId?: string | null,
 ): Promise<{ isSuspicious: boolean; reason?: string }> {
   console.log(`[REVIEW CHECK] User: ${userId}, Partner: ${partnerId}, Product: ${productId}, Service: ${serviceId}`)
 
@@ -78,28 +83,43 @@ async function checkFraudulentReview(
     return { isSuspicious: true, reason: productId ? "Você precisa comprar este produto antes de avaliá-lo" : "Você precisa comprar este serviço antes de avaliá-lo" }
   }
 
-  // 3. Verificar se já avaliou este produto antes
+  // 2b. Garantir que o orderId informado realmente pertence a um pedido pago do usuário para este item
+  if (orderId && !orders.some((o: any) => o.id === orderId)) {
+    return { isSuspicious: true, reason: "Pedido inválido para esta avaliação" }
+  }
+
+  // 3. Verificar se já avaliou este produto/serviço antes (inclui soft-deleted para impedir burlar limites)
   if (productId) {
     const { data: existingReview } = await adminSupabase
       .from("reviews")
-      .select("id")
+      .select("id, deleted_at")
       .eq("user_id", userId)
       .eq("product_id", productId)
       .maybeSingle()
 
     if (existingReview) {
-      return { isSuspicious: true, reason: "Você já avaliou este produto" }
+      return {
+        isSuspicious: true,
+        reason: existingReview.deleted_at
+          ? "Você já excluiu sua avaliação para este produto e não pode avaliá-lo novamente"
+          : "Você já avaliou este produto",
+      }
     }
   } else if (serviceId) {
     const { data: existingReview } = await adminSupabase
       .from("reviews")
-      .select("id")
+      .select("id, deleted_at")
       .eq("user_id", userId)
       .eq("service_id", serviceId)
       .maybeSingle()
 
     if (existingReview) {
-      return { isSuspicious: true, reason: "Você já avaliou este serviço" }
+      return {
+        isSuspicious: true,
+        reason: existingReview.deleted_at
+          ? "Você já excluiu sua avaliação para este serviço e não pode avaliá-lo novamente"
+          : "Você já avaliou este serviço",
+      }
     }
   }
 
@@ -109,6 +129,7 @@ async function checkFraudulentReview(
     .select("rating")
     .eq("user_id", userId)
     .eq("partner_id", partnerId)
+    .is("deleted_at", null)
 
   if (userReviews && userReviews.length >= 3) {
     const allHighRatings = userReviews.every((r: any) => r.rating >= 4)
@@ -156,6 +177,8 @@ async function updateProductRating(adminSupabase: any, productId: string) {
     .from("reviews")
     .select("rating")
     .eq("product_id", productId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length === 0) {
@@ -173,6 +196,8 @@ async function updateServiceRating(adminSupabase: any, serviceId: string) {
     .from("reviews")
     .select("rating")
     .eq("service_id", serviceId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length === 0) {
@@ -190,6 +215,8 @@ async function updateStoreRating(adminSupabase: any, storeId: string) {
     .from("reviews")
     .select("rating")
     .eq("store_id", storeId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length < 3) {
@@ -202,11 +229,13 @@ async function updateStoreRating(adminSupabase: any, storeId: string) {
 }
 
 async function updatePartnerRating(adminSupabase: any, partnerId: string) {
-  // Get all reviews directly for this partner (both product and service reviews)
+  // Get all active reviews directly for this partner (both product and service reviews)
   const { data: reviews, error } = await adminSupabase
     .from("reviews")
     .select("rating")
     .eq("partner_id", partnerId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .not("rating", "is", null)
 
   if (error) {
@@ -255,7 +284,7 @@ export async function createReviewAction(data: {
 
   const adminSupabase = createAdminClient()
 
-  const fraudCheck = await checkFraudulentReview(adminSupabase, userId, data.partnerId, data.productId, data.serviceId, data.storeId)
+  const fraudCheck = await checkFraudulentReview(adminSupabase, userId, data.partnerId, data.productId, data.serviceId, data.storeId, data.orderId)
 
   if (fraudCheck.isSuspicious) {
     // Webhook Discord: notificar tentativa de review suspeita (fail-open)
@@ -418,10 +447,10 @@ export async function updateReviewAction(reviewId: string, data: {
     return { error: "Avaliação deve ter nota entre 1 e 5" }
   }
 
-  // Verify user owns this review
+  // Verify user owns this review and fetch edit/moderation metadata
   const { data: review } = await adminSupabase
     .from("reviews")
-    .select("user_id, partner_id, store_id, product_id, service_id")
+    .select("user_id, partner_id, store_id, product_id, service_id, rating, comment, created_at, edit_count, deleted_at, is_hidden, edit_history")
     .eq("id", reviewId)
     .single()
 
@@ -429,29 +458,77 @@ export async function updateReviewAction(reviewId: string, data: {
     return { error: "Você não tem permissão para editar esta avaliação" }
   }
 
+  if (review.deleted_at) {
+    return { error: "Esta avaliação foi excluída e não pode ser editada" }
+  }
+
+  if (review.is_hidden) {
+    return { error: "Esta avaliação está oculta pela moderação e não pode ser editada" }
+  }
+
+  const currentEditCount = typeof review.edit_count === "number" ? review.edit_count : 0
+  if (currentEditCount >= MAX_REVIEW_EDITS) {
+    return { error: `Você já atingiu o limite de ${MAX_REVIEW_EDITS} edições para esta avaliação` }
+  }
+
+  const createdAtMs = new Date(review.created_at).getTime()
+  if (Number.isFinite(createdAtMs) && Date.now() - createdAtMs > REVIEW_EDIT_WINDOW_MS) {
+    return { error: `O prazo de ${REVIEW_EDIT_WINDOW_DAYS} dias para editar esta avaliação expirou` }
+  }
+
+  const normalizedComment = data.comment?.trim() ? data.comment.trim() : null
+  const currentComment = review.comment?.trim() ? review.comment.trim() : null
+  if (data.rating === review.rating && normalizedComment === currentComment) {
+    return { error: "Nenhuma alteração foi feita na avaliação" }
+  }
+
   // Moderação do comentário antes de atualizar
-  if (data.comment && data.comment.trim()) {
-    if (data.comment.length > 2000) {
+  if (normalizedComment) {
+    if (normalizedComment.length > 2000) {
       return { error: "O comentário deve ter no máximo 2000 caracteres" }
     }
-    const moderation = await moderateReviewContent({ comment: data.comment, userId: user.id })
+    const moderation = await moderateReviewContent({ comment: normalizedComment, userId: user.id })
     if (!moderation.valid) {
       return { error: moderation.error || "Comentário não aprovado pela moderação" }
     }
   }
 
-  const { error } = await adminSupabase
+  const nowIso = new Date().toISOString()
+  const existingHistory = Array.isArray(review.edit_history) ? review.edit_history : []
+  const nextHistory = [
+    ...existingHistory,
+    {
+      rating: review.rating,
+      comment: review.comment ?? null,
+      edited_at: nowIso,
+    },
+  ]
+
+  // Atomic update with optimistic concurrency guard on edit_count + active status
+  const { data: updatedRow, error } = await adminSupabase
     .from("reviews")
     .update({
       rating: data.rating,
-      comment: data.comment || null,
-      updated_at: new Date().toISOString(),
+      comment: normalizedComment,
+      updated_at: nowIso,
+      edit_count: currentEditCount + 1,
+      edit_history: nextHistory,
     })
     .eq("id", reviewId)
     .eq("user_id", user.id)
+    .eq("edit_count", currentEditCount)
+    .lt("edit_count", MAX_REVIEW_EDITS)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
+    .select("id")
+    .maybeSingle()
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (!updatedRow) {
+    return { error: "Não foi possível atualizar a avaliação. Verifique o limite de edições e tente novamente." }
   }
 
   if (review.product_id) {
@@ -507,7 +584,7 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
   // Verify user owns this review
   const { data: review } = await adminSupabase
     .from("reviews")
-    .select("user_id, partner_id, store_id, product_id, service_id")
+    .select("user_id, partner_id, store_id, product_id, service_id, deleted_at")
     .eq("id", reviewId)
     .single()
 
@@ -515,14 +592,30 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
     return { error: "Você não tem permissão para deletar esta avaliação" }
   }
 
-  const { error } = await adminSupabase
+  if (review.deleted_at) {
+    return { error: "Esta avaliação já foi excluída" }
+  }
+
+  // Soft delete to prevent deleting and re-reviewing the same item to bypass edit limits
+  const nowIso = new Date().toISOString()
+  const { data: deletedRow, error } = await adminSupabase
     .from("reviews")
-    .delete()
+    .update({
+      deleted_at: nowIso,
+      updated_at: nowIso,
+    })
     .eq("id", reviewId)
     .eq("user_id", user.id)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle()
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (!deletedRow) {
+    return { error: "Esta avaliação já foi excluída" }
   }
 
   if (review.product_id) {
@@ -602,6 +695,8 @@ export async function getProductReviews(productId: string) {
     .from("reviews")
     .select("*")
     .eq("product_id", productId)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .order("created_at", { ascending: false })
 
   if (error || !reviewsData) {
@@ -643,6 +738,8 @@ export async function getPartnerReviews(partnerId: string, storeId?: string | nu
       products(name, images, unit),
       services(name, images, unit)
     `)
+    .is("deleted_at", null)
+    .not("is_hidden", "is", true)
     .order("created_at", { ascending: false })
 
   if (storeId) {
@@ -730,6 +827,7 @@ export async function getBuyerReviewsAction() {
       stores(id, short_id, slug, name, logo_url, addresses!store_id!left(city, state))
     `)
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
   if (error || !reviewsData) {
@@ -757,12 +855,14 @@ export async function getBuyerReviewsPaginatedAction(page: number = 1, limit: nu
         stores(id, short_id, slug, name, logo_url, addresses!store_id!left(city, state))
       `)
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1),
     adminSupabase
       .from("reviews")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id),
+      .eq("user_id", user.id)
+      .is("deleted_at", null),
   ])
 
   const { data: reviewsData, error } = reviewsResult

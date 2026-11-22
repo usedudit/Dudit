@@ -165,7 +165,7 @@ export function MarketplaceLandingView({
                                         <span className="text-brand-green">{effectiveCityName}</span>!
                                     </h1>
                                     <p className="text-brand-inactive-text dark:text-dark-body text-base md:text-lg lg:text-xl mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0">
-                                        Ainda não há lojas cadastradas por aqui, mas você já pode explorar vitrines e produtos de todo o Brasil — ou buscar em outra cidade.
+                                        Ainda não há lojas cadastradas por aqui, mas você já pode explorar vitrines e produtos de todo o Brasil - ou buscar em outra cidade.
                                     </p>
                                 </>
                             ) : (
@@ -187,6 +187,7 @@ export function MarketplaceLandingView({
                                     id="landingCitySearchInput"
                                     name="landingCitySearchInput"
                                     placeholder="Digite sua cidade (ex: Londrina, Curitiba...)"
+                                    variant="full-rounded"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => setIsInputFocused(true)}
@@ -301,7 +302,6 @@ export function MarketplaceLandingView({
                                     <HorizontalCarousel
                                         key={brasilTodoSection.id}
                                         title="Melhores produtos"
-                                        subtitle="Os produtos mais populares e bem avaliados da Dudit"
                                         items={brasilTodoSection.items}
                                         onSeeAll={
                                             brasilTodoSection.seeMoreLink

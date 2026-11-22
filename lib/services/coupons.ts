@@ -19,6 +19,8 @@ export type CouponValidationInput = {
     quantity?: number | null
   }>
   manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
+  /** When true (online storefront / marketplace checkout), rejects coupons not available in the storefront */
+  marketplaceOnly?: boolean
 }
 
 export type CouponValidationResult = {
@@ -45,7 +47,7 @@ const safeMoney = (value: number) => {
 }
 
 // ---------------------------------------------------------------------------
-// Internal: Core validation logic (used by both validateCoupon and findBestAutomaticCoupon)
+// Internal: Core validation logic
 // ---------------------------------------------------------------------------
 
 export async function validateCouponRow(
@@ -58,8 +60,13 @@ export async function validateCouponRow(
     shippingCost?: number
     items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null; price?: number | null; quantity?: number | null }>
     manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
+    marketplaceOnly?: boolean
   }
 ): Promise<CouponValidationResult> {
+  if (input.marketplaceOnly && coupon.show_in_marketplace === false) {
+    return { valid: false, discountAmount: 0, errorMessage: "Este cupom não está disponível na vitrine online." }
+  }
+
   let resolvedCustomerId = input.customerId
   if (input.customerId && input.partnerId) {
     const { data: customerMapping } = await supabase
@@ -349,52 +356,4 @@ export async function validateCouponById(
   }
 
   return validateCouponRow(supabase, coupon, input)
-}
-
-// ---------------------------------------------------------------------------
-// Public: Find the best automatic coupon for a given context
-// ---------------------------------------------------------------------------
-
-export type AutoCouponInput = {
-  partnerId: string
-  customerId?: string | null
-  subtotal: number
-  shippingCost?: number
-  items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
-}
-
-export async function findBestAutomaticCoupon(input: AutoCouponInput, supabaseOverride?: any): Promise<CouponValidationResult> {
-  const supabase = supabaseOverride || await getSupabaseServerClient()
-
-  // Fetch all active automatic coupons for this partner
-  const { data: autoCoupons, error } = await supabase
-    .from("coupons")
-    .select("*")
-    .eq("partner_id", input.partnerId)
-    .eq("is_active", true)
-    .eq("is_automatic", true)
-    .order("discount_value", { ascending: false })
-    .limit(20)
-
-  if (error || !autoCoupons || autoCoupons.length === 0) {
-    return { valid: false, discountAmount: 0 }
-  }
-
-  // Validate each and pick the one with the highest discount
-  let bestResult: CouponValidationResult = { valid: false, discountAmount: 0 }
-
-  const results = await Promise.all(
-    autoCoupons.map(async (coupon: any) => {
-      const result = await validateCouponRow(supabase, coupon, input)
-      return { coupon, result }
-    })
-  )
-
-  for (const { result } of results) {
-    if (result.valid && result.discountAmount > bestResult.discountAmount) {
-      bestResult = result
-    }
-  }
-
-  return bestResult
 }

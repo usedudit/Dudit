@@ -479,9 +479,9 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
           {activePage === "business-data" && (
             <BusinessDataSubPage
-              key={`business-data-${selectedStore?.id || 'default'}`}
+              key={`business-data-${(selectedStore || partner.store)?.id || 'default'}`}
               partner={partner}
-              store={selectedStore}
+              store={selectedStore || partner.store}
               paymentMethods={paymentMethods}
               initialTab={searchParams.get("fiscal") === "1" ? "fiscal" : undefined}
               onBack={() => navigateToSubpage("home")}

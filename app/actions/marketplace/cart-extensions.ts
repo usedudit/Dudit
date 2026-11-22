@@ -111,7 +111,7 @@ export async function addServiceBookingToCartAction(
   const admin = getAdminClient()
   const { data: service, error: serviceError } = await admin
     .from("services")
-    .select("id, is_active, status, deleted_at, partner_id, store_id, price")
+    .select("id, is_active, status, deleted_at, show_in_marketplace, partner_id, store_id, price")
     .eq("id", input.serviceId)
     .maybeSingle()
 
@@ -179,9 +179,12 @@ export async function addServiceBookingToCartAction(
 
   if (
     service.deleted_at ||
+    service.status === "deleted" ||
+    service.status === "arquivado" ||
     service.status === "archived" ||
     service.status === "inativo" ||
-    service.is_active === false
+    service.is_active === false ||
+    service.show_in_marketplace === false
   ) {
     console.warn("[addServiceBookingToCartAction] Service inactive or archived:", {
       id: service.id,
@@ -569,7 +572,7 @@ export async function addPurchasableServiceToCartAction(
   const admin = getAdminClient()
   const { data: service, error: serviceError } = await admin
     .from("services")
-    .select("id, name, price, is_active, status, deleted_at, partner_id, store_id")
+    .select("id, name, price, is_active, status, deleted_at, show_in_marketplace, partner_id, store_id")
     .eq("id", input.serviceId)
     .maybeSingle()
 
@@ -601,9 +604,12 @@ export async function addPurchasableServiceToCartAction(
 
   if (
     service.deleted_at ||
+    service.status === "deleted" ||
+    service.status === "arquivado" ||
     service.status === "archived" ||
     service.status === "inativo" ||
-    service.is_active === false
+    service.is_active === false ||
+    service.show_in_marketplace === false
   ) {
     return { error: "Este serviço está temporariamente indisponível." }
   }

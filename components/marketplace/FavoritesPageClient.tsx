@@ -204,7 +204,7 @@ export function FavoritesPageClient({
                 </div>
 
                 {/* Tabs */}
-                <div className="mb-6">
+                <div>
                     <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as TabType); setCurrentPage(1) }} className="w-full">
                         <TabsList className="mb-6">
                             {TAB_OPTIONS.map((tab) => (

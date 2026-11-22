@@ -500,6 +500,30 @@ export default function OrderDetailView({
     order.situation !== "cancelled" &&
     remainingPaymentAmount > 0.009;
 
+  const storeCreditUsed = (() => {
+    const colVal = Number((order as any).store_credit_amount || 0);
+    if (colVal > 0.009) return colVal;
+    const bd = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+    const fromBreakdown = bd.reduce((sum: number, e: any) => {
+      const m = String(e?.method || "").toLowerCase().trim();
+      if (
+        m === "store_credit" ||
+        m === "vale-compra" ||
+        m === "vale_compra" ||
+        m.includes("store_credit") ||
+        m.includes("crédito do cliente") ||
+        m.includes("credito do cliente") ||
+        m.includes("crédito em loja") ||
+        m.includes("credito em loja")
+      ) {
+        return sum + Number(e?.amountReceived ?? e?.effectiveAmount ?? e?.amount ?? 0);
+      }
+      return sum;
+    }, 0);
+    return fromBreakdown > 0.009 ? fromBreakdown : 0;
+  })();
+  const displayedOrderTotal = Math.max(0, effectiveOrderTotal - storeCreditUsed);
+
   const breakdown = Array.isArray(order.payment_breakdown)
     ? order.payment_breakdown
     : [];
@@ -1529,6 +1553,16 @@ export default function OrderDetailView({
           }
         />
       )}
+      {storeCreditUsed > 0.009 && !(paymentMethodDiscountAmount > 0 && order.payment_method === "store_credit") && (
+        <PaymentRow
+          label="Crédito do cliente"
+          value={
+            <span className="text-brand-green font-bold">
+              - {formatCurrency(storeCreditUsed)}
+            </span>
+          }
+        />
+      )}
       {paymentMethodDiscountAmount > 0 && (
         <PaymentRow
           label={
@@ -1623,7 +1657,7 @@ export default function OrderDetailView({
           Total do Pedido
         </span>
         <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading">
-          {formatCurrency(effectiveOrderTotal)}
+          {formatCurrency(displayedOrderTotal)}
         </span>
       </div>
     </div>

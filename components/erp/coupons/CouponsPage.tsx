@@ -56,12 +56,12 @@ type FilterState = {
     discountType: string[]
     applyScope: string[]
     customerScope: string[]
-    automaticOnly: boolean
+    marketplaceOnly: boolean
 }
 
 type SortKey = "coupon" | "scope" | "usage" | "validity" | "status"
 type SortDirection = "asc" | "desc"
-type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Automaticos"
+type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Vitrine"
 type WrapperMode = "list" | "create" | "edit" | "view"
 
 const ITEMS_PER_PAGE = 8
@@ -70,7 +70,7 @@ const INITIAL_FILTERS: FilterState = {
     discountType: [],
     applyScope: [],
     customerScope: [],
-    automaticOnly: false,
+    marketplaceOnly: false,
 }
 
 const COLUMNS: { id: SortKey | "actions"; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -162,7 +162,7 @@ export default function CouponsPage({
         const availableTypes = new Set<string>()
         const availableScopes = new Set<string>()
         const availableCustomerScopes = new Set<string>()
-        let hasAutomatic = false
+        let hasMarketplace = false
 
         coupons.forEach((coupon) => {
             if (coupon.discount_type === "percentage") {
@@ -189,8 +189,8 @@ export default function CouponsPage({
                 availableCustomerScopes.add("Todos os clientes")
             }
 
-            if (coupon.is_automatic) {
-                hasAutomatic = true
+            if (coupon.show_in_marketplace !== false) {
+                hasMarketplace = true
             }
         })
 
@@ -232,12 +232,12 @@ export default function CouponsPage({
             })
         }
 
-        if (hasAutomatic) {
+        if (hasMarketplace) {
             sections.push({
-                id: "automaticOnly",
-                title: "Automação",
+                id: "marketplaceOnly",
+                title: "Vitrine online",
                 type: "switch",
-                switchLabel: "Mostrar apenas cupons automáticos",
+                switchLabel: "Mostrar apenas disponíveis na vitrine online",
             })
         }
 
@@ -613,7 +613,7 @@ export default function CouponsPage({
             endsAt: form.unlimitedDate || !form.endsAt ? null : new Date(form.endsAt).toISOString(),
             isActive: Boolean(form.isActive),
             customerScope: form.customerScope,
-            isAutomatic: Boolean(form.isAutomatic),
+            showInMarketplace: Boolean(form.showInMarketplace),
             productIds: form.applyScope === "products" ? relations.productIds : [],
             categoryIds: form.applyScope === "categories" ? relations.categoryIds : [],
             serviceIds: form.applyScope === "services" ? relations.serviceIds : [],
@@ -715,7 +715,7 @@ export default function CouponsPage({
                 activeTab === "Todos" ||
                 (activeTab === "Ativos" && coupon.is_active) ||
                 (activeTab === "Inativos" && !coupon.is_active) ||
-                (activeTab === "Automaticos" && coupon.is_automatic)
+                (activeTab === "Vitrine" && coupon.show_in_marketplace !== false)
 
             const typeLabel = coupon.discount_type === "percentage"
                 ? "Percentual"
@@ -729,9 +729,9 @@ export default function CouponsPage({
             const typeMatch = filters.discountType.length === 0 || filters.discountType.includes(typeLabel)
             const scopeMatch = filters.applyScope.length === 0 || filters.applyScope.includes(scopeLabel)
             const customerScopeMatch = filters.customerScope.length === 0 || filters.customerScope.includes(customerLabel)
-            const automaticMatch = !filters.automaticOnly || coupon.is_automatic
+            const marketplaceMatch = !filters.marketplaceOnly || coupon.show_in_marketplace !== false
 
-            return searchMatch && tabMatch && typeMatch && scopeMatch && customerScopeMatch && automaticMatch
+            return searchMatch && tabMatch && typeMatch && scopeMatch && customerScopeMatch && marketplaceMatch
         })
 
         if (!sortConfig) return mapped
@@ -776,18 +776,18 @@ export default function CouponsPage({
         filters.discountType.length > 0 ||
         filters.applyScope.length > 0 ||
         filters.customerScope.length > 0 ||
-        filters.automaticOnly ||
+        filters.marketplaceOnly ||
         debouncedSearch.length > 0
 
     const tabCounts = useMemo(() => {
-        if (!coupons) return { Todos: 0, Ativos: 0, Inativos: 0, Automaticos: 0 }
-        let Todos = coupons.length, Ativos = 0, Inativos = 0, Automaticos = 0
+        if (!coupons) return { Todos: 0, Ativos: 0, Inativos: 0, Vitrine: 0 }
+        let Todos = coupons.length, Ativos = 0, Inativos = 0, Vitrine = 0
         for (const c of coupons) {
             if (c.is_active) Ativos++
             else Inativos++
-            if (c.is_automatic) Automaticos++
+            if (c.show_in_marketplace !== false) Vitrine++
         }
-        return { Todos, Ativos, Inativos, Automaticos }
+        return { Todos, Ativos, Inativos, Vitrine }
     }, [coupons])
 
     return (

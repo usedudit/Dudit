@@ -26,7 +26,7 @@ export interface CouponRow {
   ends_at: string | null
   is_active: boolean | null
   customer_scope: CouponCustomerScope | null
-  is_automatic: boolean | null
+  show_in_marketplace: boolean | null
   created_at?: string | null
   coupon_usages?: CouponUsageCounter[] | null
 }
@@ -76,7 +76,7 @@ export type CouponFormState = {
   endsAt: string
   isActive: boolean
   customerScope: CouponCustomerScope
-  isAutomatic: boolean
+  showInMarketplace: boolean
 }
 
 export type ScopeStore = {
@@ -125,7 +125,7 @@ export const DEFAULT_COUPON_FORM: CouponFormState = {
   endsAt: "",
   isActive: true,
   customerScope: "all",
-  isAutomatic: false,
+  showInMarketplace: true,
 }
 
 export const EMPTY_SCOPE_DATA: CouponScopeData = {
@@ -169,7 +169,7 @@ export function mapCouponToForm(coupon: CouponRow): CouponFormState {
     endsAt: toDateTimeInputValue(coupon.ends_at),
     isActive: Boolean(coupon.is_active),
     customerScope: coupon.customer_scope || "all",
-    isAutomatic: Boolean(coupon.is_automatic),
+    showInMarketplace: coupon.show_in_marketplace !== false,
   }
 }
 

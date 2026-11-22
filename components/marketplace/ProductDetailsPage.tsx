@@ -765,6 +765,7 @@ export function ProductDetailsPageClient({
                     setDeliveryOutsideRadius(false)
                 } else {
                     setDeliveryFee(null)
+                    setDeliveryBreakdown(null)
                     setDeliveryError(quote.error || "Não realizamos entrega para este endereço.")
                     setDeliveryOutsideRadius(Boolean(quote.isOutsideRadius))
                 }
@@ -838,6 +839,7 @@ export function ProductDetailsPageClient({
                     setDeliveryOutsideRadius(false)
                 } else {
                     setDeliveryFee(null)
+                    setDeliveryBreakdown(null)
                     setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
                     setDeliveryOutsideRadius(Boolean(quote.isOutsideRadius))
                 }
@@ -943,7 +945,7 @@ export function ProductDetailsPageClient({
             toPostalCode: carrierDestinationCep,
         })
         setDeliveryError(null)
-    }, [carrierOptions, deliveryError, carrierDestinationCep])
+    }, [carrierOptions, deliveryOutsideRadius, productAllowsShipping, deliveryError, carrierDestinationCep])
 
     const galleryContainerRef = useRef<HTMLDivElement>(null)
     const reviewsRef = useRef<HTMLDivElement>(null)
@@ -2004,6 +2006,54 @@ export function ProductDetailsPageClient({
                                             deliveryError.includes("incompleto") ||
                                             deliveryError.includes("coordenadas")
                                         )
+                                        const isCarrierMode = !deliveryLoading &&
+                                            (deliveryOutsideRadius || deliveryBreakdown?.source === "superfrete") &&
+                                            productAllowsShipping &&
+                                            (carrierOptions.length > 0 || carrierQuoteLoading)
+
+                                        if (isCarrierMode) {
+                                            return (
+                                                <div className="py-4 space-y-3">
+                                                    <div>
+                                                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega por transportadora</p>
+                                                        {calculatedAddress && (
+                                                            <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
+                                                        )}
+                                                    </div>
+                                                    {carrierQuoteLoading ? (
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {carrierOptions.map((opt) => (
+                                                                <div
+                                                                    key={opt.serviceId}
+                                                                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3 text-left bg-transparent"
+                                                                >
+                                                                    <span className="flex flex-col">
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                            {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
+                                                                        </span>
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                            {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
+                                                                        </span>
+                                                                    </span>
+                                                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                        {isFreeByThreshold ? (
+                                                                            <span className="flex items-center gap-1.5 justify-end">
+                                                                                <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(opt.price))}</span>
+                                                                                <span className="text-brand-green font-bold">Grátis</span>
+                                                                            </span>
+                                                                        ) : (
+                                                                            formatCurrency(Number(opt.price))
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        }
 
                                         return (
                                             <div className="flex justify-between items-start py-4">
@@ -2011,6 +2061,8 @@ export function ProductDetailsPageClient({
                                                     <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega pelo vendedor</p>
                                                     {deliveryLoading ? (
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</p>
+                                                    ) : deliveryOutsideRadius ? (
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Fora do raio de entrega — consulte o vendedor</p>
                                                     ) : (deliveryError && !isTechnicalError) ? (
                                                         <p className="text-xs text-red-500">{deliveryError}</p>
                                                     ) : calculatedAddress ? (
@@ -2031,6 +2083,8 @@ export function ProductDetailsPageClient({
                                                 <div className="text-right">
                                                     {deliveryLoading ? (
                                                         <Spinner />
+                                                    ) : deliveryOutsideRadius ? (
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller" || isFreeByThreshold || deliveryBreakdown?.isFreeByThreshold) ? (
                                                         <div className="flex items-end">
                                                             {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
@@ -2061,41 +2115,6 @@ export function ProductDetailsPageClient({
                                             </div>
                                         )
                                     })()}
-
-                                    {/* Transportadora: só quando o frete próprio falhou por raio
-                                        (ou já foi aplicada como fonte do frete) e o produto oferece envio nacional */}
-                                    {!deliveryLoading &&
-                                        (deliveryOutsideRadius ||
-                                            deliveryBreakdown?.source === "superfrete") &&
-                                        productAllowsShipping &&
-                                        (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
-                                            <div className="pb-2 space-y-2">
-                                                {carrierOptions.map((opt) => (
-                                                    <div
-                                                        key={opt.serviceId}
-                                                        className="w-full flex items-center justify-between gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3 text-left bg-transparent"
-                                                    >
-                                                        <span className="flex flex-col">
-                                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                                {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
-                                                            </span>
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
-                                                            </span>
-                                                        </span>
-                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(Number(opt.price))}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                                {carrierQuoteLoading && (
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>
-                                                )}
-                                                {carrierError && !carrierQuoteLoading && (
-                                                    <p className="text-xs text-red-500">{carrierError}</p>
-                                                )}
-                                            </div>
-                                        )}
 
                                     {(deliveryConfig?.settings?.isPickupEnabled !== false) && <Separator className="opacity-60" />}
                                 </>

@@ -189,6 +189,8 @@ export default function ReportsList({
                 const typeMap: Record<string, string[]> = {
                     "Produto": ["product"],
                     "Serviço": ["service"],
+                    "Assinatura": ["recurring_plan"],
+                    "Vídeo da comunidade": ["community_video"],
                     "Loja / Parceiro": ["partner", "store"],
                     "Parceiro": ["partner", "store"],
                     "Loja": ["partner", "store"],
@@ -285,7 +287,7 @@ export default function ReportsList({
             id: "targetType",
             title: "Tipo de Alvo",
             type: "checkbox-list",
-            options: ["Produto", "Serviço", "Loja / Parceiro", "Avaliação", "Devolução"],
+            options: ["Produto", "Serviço", "Assinatura", "Vídeo da comunidade", "Loja / Parceiro", "Avaliação", "Devolução"],
         },
     ]
 
@@ -311,7 +313,7 @@ export default function ReportsList({
                             Denúncias
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie, investigue e valide denúncias contra produtos, serviços, lojas e avaliações.
+                            Gerencie, investigue e valide denúncias contra produtos, serviços, assinaturas, vídeos, lojas e avaliações.
                         </p>
                     </div>
                 </div>
@@ -387,6 +389,8 @@ export default function ReportsList({
                                                 store: "Loja",
                                                 review: "Avaliação",
                                                 return_request: "Devolução",
+                                                recurring_plan: "Assinatura",
+                                                community_video: "Vídeo da comunidade",
                                                 order: "Pedido",
                                                 user: "Usuário",
                                             }

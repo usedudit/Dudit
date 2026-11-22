@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { SearchIcon, XIcon } from "@/lib/icons"
+import { SearchIcon, XIcon, SparklesIcon } from "@/lib/icons"
 import { Badge, Button, IconPlaceholder, Input } from "@/components/reusable"
 import { BLOG_CATEGORIES, getBlogCategory } from "@/lib/blog/categories"
 import type { BlogPostSummary } from "@/lib/blog/types"
@@ -22,13 +22,14 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
     const [query, setQuery] = useState(initialQuery)
     const [selectedCategory, setSelectedCategory] = useState<string>("all")
 
-    const featured = useMemo(() => posts.find((post) => post.is_featured) ?? posts[0] ?? null, [posts])
+    const featuredPosts = useMemo(() => posts.filter((post) => post.is_featured), [posts])
+    const latestFeatured = featuredPosts[0] ?? null
 
     const filtered = useMemo(() => {
         const normalizedQuery = normalize(query.trim())
         const isFilteringNow = normalizedQuery.length > 0 || selectedCategory !== "all"
         return posts.filter((post) => {
-            if (!isFilteringNow && featured && post.id === featured.id) return false
+            if (!isFilteringNow && latestFeatured && post.id === latestFeatured.id) return false
             const matchesCategory = selectedCategory === "all" || post.category === selectedCategory
             if (!matchesCategory) return false
             if (!normalizedQuery) return true
@@ -44,27 +45,40 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
 
             return haystack.includes(normalizedQuery)
         })
-    }, [posts, query, selectedCategory, featured])
+    }, [posts, query, selectedCategory, latestFeatured])
 
     const isFiltering = query.trim().length > 0 || selectedCategory !== "all"
-    const showFeatured = !isFiltering && featured
+    const showFeatured = !isFiltering && latestFeatured
 
     return (
         <div className="w-full">
             <section className="border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
                 <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
-                    <div className="max-w-3xl">
-                        <Badge variant="green" icon={null}>
-                            Blog do Dino
-                        </Badge>
+                    <div className="flex items-start gap-8 lg:gap-12">
+                        <div className="flex-1 max-w-2xl">
+                            <Badge variant="green" icon={null}>
+                                Blog do Dino
+                            </Badge>
 
-                        <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-brand-dark dark:text-dark-heading md:text-4xl lg:text-5xl">
-                            Dicas para vender melhor, cuidar do caixa e crescer
-                        </h1>
+                            <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-brand-dark dark:text-dark-heading md:text-4xl lg:text-5xl">
+                                Dicas para vender melhor, cuidar do caixa e crescer
+                            </h1>
 
-                        <p className="mt-4 text-base leading-relaxed text-brand-inactive-text dark:text-dark-body lg:text-lg">
-                            Conteúdo prático para quem toca um pequeno negócio no Brasil: segurança, finanças, fotos, atendimento, marketing e rotinas de gestão. Sem enrolação e sem termo difícil.
-                        </p>
+                            <p className="mt-4 text-base leading-relaxed text-brand-inactive-text dark:text-dark-body lg:text-lg">
+                                Conteúdo prático para quem toca um pequeno negócio no Brasil: segurança, finanças, fotos, atendimento, marketing e rotinas de gestão. Sem enrolação e sem termo difícil.
+                            </p>
+                        </div>
+
+                        {/* Dino mascot */}
+                        <div className="hidden lg:block w-[200px] shrink-0 flex items-center justify-center">
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/Artigos.png"
+                                alt="Dino do Blog"
+                                className="w-full h-auto object-contain select-none opacity-90"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                        </div>
                     </div>
 
                     <form onSubmit={(event) => event.preventDefault()} className="mt-8 max-w-xl">
@@ -139,17 +153,26 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                     <>
                         {showFeatured && (
                             <div className="mb-12">
-                                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Dica em destaque</h2>
-                                    <Link
-                                        href={`/blog/categoria/${featured.category}`}
-                                        prefetch={false}
-                                        className="text-sm font-semibold text-brand-green hover:underline"
-                                    >
-                                        Ver mais de {getBlogCategory(featured.category).shortLabel}
-                                    </Link>
+                                <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <SparklesIcon size={20} className="text-brand-green" />
+                                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Dica em destaque</h2>
+                                    </div>
+                                    {featuredPosts.length > 1 && (
+                                        <Link
+                                            href={`/blog/categoria/${latestFeatured.category}`}
+                                            prefetch={false}
+                                            className="text-sm font-semibold text-brand-green hover:underline"
+                                        >
+                                            Ver todas as {featuredPosts.length} dicas de {getBlogCategory(latestFeatured.category).shortLabel}
+                                        </Link>
+                                    )}
                                 </div>
-                                <BlogCard post={featured} featured />
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                    {featuredPosts.slice(0, 3).map((post) => (
+                                        <BlogCard key={post.id} post={post} featured />
+                                    ))}
+                                </div>
                             </div>
                         )}
 

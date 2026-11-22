@@ -47,6 +47,7 @@ export const ACTION_TYPE_LABELS: Record<string, string> = {
     "delivery_driver.update": "Atualização de Entregador",
     "delivery_driver.deactivate": "Desativação de Entregador",
     "delivery_driver.activate": "Ativação de Entregador",
+    "compliance.reveal_pii": "Compliance: Dados Sensíveis Revelados",
 }
 
 export const TARGET_TYPE_LABELS: Record<string, string> = {
@@ -62,6 +63,7 @@ export const TARGET_TYPE_LABELS: Record<string, string> = {
     order: "Pedido",
     advertisement: "Anúncio",
     delivery_driver: "Entregador",
+    compliance_log: "Compliance (Exclusão)",
     system: "Sistema",
 }
 

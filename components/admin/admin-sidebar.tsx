@@ -173,6 +173,11 @@ const navSections: NavSection[] = [
                 href: "/ddt-admin/users",
             },
             {
+                icon: ShieldIcon,
+                label: "Contas Excluídas",
+                href: "/ddt-admin/compliance",
+            },
+            {
                 icon: FileIcon,
                 label: "Logs de Auditoria",
                 href: "/ddt-admin/audit",

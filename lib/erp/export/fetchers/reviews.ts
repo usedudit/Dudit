@@ -102,6 +102,7 @@ export async function fetchReviewsExport(
         .from("reviews")
         .select(REVIEW_SELECT)
         .eq("partner_id", partnerId)
+        .is("deleted_at", null)
 
       if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
 

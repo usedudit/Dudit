@@ -74,6 +74,7 @@ function isPushEnabledSurface(pathname: string | null): boolean {
 export function RouteAwareGlobalFeatures({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const marketplaceSurface = isMarketplaceSurface(pathname)
+  const pushEnabledSurface = isPushEnabledSurface(pathname)
 
   const content = marketplaceSurface ? (
     <FavoritesProvider>{children}</FavoritesProvider>
@@ -85,7 +86,7 @@ export function RouteAwareGlobalFeatures({ children }: { children: ReactNode }) 
     <>
       {content}
       {marketplaceSurface && <MarketplaceBottomMenu />}
-      <PushNotificationManager />
+      {pushEnabledSurface && <PushNotificationManager />}
     </>
   )
 }
