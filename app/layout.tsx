@@ -50,7 +50,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
     metadataBase: new URL("https://dudit.com.br"),
     title: {
-        default: "Dudit | Descubra. Anuncie. Organize.",
+        default: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
         template: "%s | Dudit",
     },
     description:
@@ -94,7 +94,7 @@ export const metadata: Metadata = {
         locale: "pt_BR",
         url: "https://dudit.com.br",
         siteName: "Dudit",
-        title: "Dudit | Descubra. Anuncie. Organize.",
+        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
         description:
             "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão físico (PDV), online na sua região ou envie para todo o Brasil via transportadoras e Correios.",
         images: [
@@ -108,18 +108,12 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        site: "@dudit",
-        creator: "@dudit",
-        title: "Dudit | Descubra. Anuncie. Organize.",
+        site: "@usedudit",
+        creator: "@usedudit",
+        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
         description:
             "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão físico (PDV), online na sua região ou envie para todo o Brasil via transportadoras e Correios.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
-    },
-    alternates: {
-        canonical: "https://dudit.com.br",
-        languages: {
-            "pt-BR": "https://dudit.com.br",
-        },
     },
     verification: {
         google: "hXFfOouvlwKXKhn4_MYJofV6FPW6",
@@ -156,6 +150,7 @@ const jsonLd = {
             "@type": "Organization",
             "@id": "https://dudit.com.br/#organization",
             name: "Dudit",
+            alternateName: ["Dudit Plataforma", "Dudit Brasil"],
             url: "https://dudit.com.br",
             logo: "https://img.dudit.com.br/static/Icon.png",
             description:
@@ -196,6 +191,7 @@ const jsonLd = {
             "@id": "https://dudit.com.br/#website",
             url: "https://dudit.com.br",
             name: "Dudit",
+            alternateName: ["Dudit Plataforma", "Dudit Brasil"],
             description:
                 "Sistema de gestão comercial, catálogo digital e plataforma de vendas locais e nacionais com 0% de comissão.",
             publisher: {

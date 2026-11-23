@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase/request-client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidateOrders, revalidateOrderHistory } from "@/lib/utils/revalidation";
@@ -22,6 +23,7 @@ import {
   getDeliveryStatusLabel,
   getPaymentStatusLabel,
 } from "@/lib/orders/status";
+import { resolveEffectiveDeliveryStatus } from "@/lib/delivery/status-resolver";
 import { getOrderHistoryEntries } from "@/lib/services/order-history.service";
 import { logAuditEvent } from "@/lib/services/timeline.service";
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation";
@@ -5221,6 +5223,40 @@ export async function updateERPOrderAction(
         .update({ inventory_deducted: true })
         .eq("id", orderId)
         .eq("partner_id", data.partnerId);
+
+      // Atualiza situação e estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling)
+      import("@/lib/services/integrations/erp-sync")
+        .then(async ({ updateOrderStatusOnConnectedErps, syncStockToConnectedErps }) => {
+          const erpSit = data.deliveryStatus === "delivered" ? "entregue" : "enviado";
+          await updateOrderStatusOnConnectedErps({ orderId, situacao: erpSit });
+          for (const it of stockItems) {
+            if (!it.product_id) continue;
+            let newStock = 0;
+            if (it.variant_id) {
+              const { data: vRow } = await supabase
+                .from("product_variants")
+                .select("stock_quantity")
+                .eq("id", it.variant_id)
+                .maybeSingle();
+              newStock = Number(vRow?.stock_quantity || 0);
+            } else {
+              const { data: pRow } = await supabase
+                .from("products")
+                .select("stock_quantity")
+                .eq("id", it.product_id)
+                .maybeSingle();
+              newStock = Number(pRow?.stock_quantity || 0);
+            }
+            await syncStockToConnectedErps({
+              partnerId: data.partnerId,
+              productId: it.product_id,
+              variantId: it.variant_id || undefined,
+              newStock,
+              reason: `Baixa entrega pedido #${currentOrder.order_number || orderId}`,
+            });
+          }
+        })
+        .catch(() => {});
     }
   }
 
@@ -5585,15 +5621,17 @@ async function syncOrderDeliveryStatusToDeliveries(
     for (const deliveryId of deliveryIds) {
       const { data: deliveryLinks } = await supabase
         .from("delivery_orders")
-        .select("status")
+        .select("status, orders(delivery_status, situation)")
         .eq("delivery_id", deliveryId);
 
       if (deliveryLinks && deliveryLinks.length > 0) {
-        const statuses = new Set(deliveryLinks.map((l: any) => l.status));
-        let targetDeliveryStatus = nextStatus;
-        if (statuses.size === 1) {
-          targetDeliveryStatus = Array.from(statuses)[0] as string;
-        }
+        const resolvedStatus = resolveEffectiveDeliveryStatus(nextStatus, deliveryLinks as any);
+        const targetDeliveryStatus =
+          resolvedStatus === "partially_delivered"
+            ? "sent"
+            : resolvedStatus === "not_sent"
+              ? "pending"
+              : resolvedStatus;
 
         const deliveryPatch: Record<string, unknown> = {
           status: targetDeliveryStatus,
@@ -5612,8 +5650,15 @@ async function syncOrderDeliveryStatusToDeliveries(
           .update(deliveryPatch)
           .eq("id", deliveryId)
           .eq("partner_id", partnerId);
+
+        // @ts-ignore - Next 15 accepts profile as the second argument.
+        revalidateTag(`delivery-${deliveryId}`, "max");
       }
     }
+
+    // @ts-ignore - Next 15 accepts profile as the second argument.
+    revalidateTag(TAGS.deliveries(partnerId), "max");
+    revalidatePath("/erp/entregas");
   } catch (err) {
     console.warn("[syncOrderDeliveryStatusToDeliveries] error:", err);
   }
@@ -6962,6 +7007,40 @@ export async function updateOrdersStatusInBatchAction(payload: {
       if (error) return { error: error.message };
       successfullyUpdatedOrderIds.add(String(order.id));
       deliveryProcessedCount += 1;
+
+      // Atualiza situação (enviado/entregue) e sincroniza estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling)
+      import("@/lib/services/integrations/erp-sync")
+        .then(async ({ updateOrderStatusOnConnectedErps, syncStockToConnectedErps }) => {
+          const erpSit = payload.statusValue === "delivered" ? "entregue" : "enviado";
+          await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit });
+          for (const it of order.order_items || []) {
+            if (!it.product_id) continue;
+            let newStock = 0;
+            if (it.variant_id) {
+              const { data: vRow } = await supabase
+                .from("product_variants")
+                .select("stock_quantity")
+                .eq("id", it.variant_id)
+                .maybeSingle();
+              newStock = Number(vRow?.stock_quantity || 0);
+            } else {
+              const { data: pRow } = await supabase
+                .from("products")
+                .select("stock_quantity")
+                .eq("id", it.product_id)
+                .maybeSingle();
+              newStock = Number(pRow?.stock_quantity || 0);
+            }
+            await syncStockToConnectedErps({
+              partnerId: payload.partnerId,
+              productId: it.product_id,
+              variantId: it.variant_id || undefined,
+              newStock,
+              reason: `Baixa entrega pedido #${order.order_number || order.id}`,
+            });
+          }
+        })
+        .catch(() => {});
     }
 
     // Pedidos simples (mesmo valor de status, sem efeito colateral): um único UPDATE em massa.
@@ -7462,6 +7541,7 @@ export async function getERPOrdersPageAction(
                         delivery_status, delivery_type, order_source, created_at, updated_at, store_id,
                         stores(name),
                         customers(id, name, email, phone),
+                        delivery_orders(delivery_id, status, deliveries(id, delivery_number, status)),
                         order_shipments(id, status, tracking_number, tracking_url, provider_slug, kind, created_at, carrier),
                         return_requests!order_id(id, status, approved_resolution, desired_resolution, resolution_type, refund_amount, store_credit_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                         order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price),

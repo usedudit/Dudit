@@ -115,6 +115,121 @@ export function isServiceOrderOriginSale(sale?: { origin_type?: string | null } 
   return String(sale?.origin_type || "").trim().toLowerCase() === "service_order"
 }
 
+// ── Assinaturas: cobrança do ciclo vs resgate de créditos ────────────────────
+// No modelo de créditos da Dudit:
+// 1. O pedido gerado pelo ciclo (`recurring_execution_id`) é a COBRANÇA da
+//    mensalidade -> reconhece Receita Recorrente, mas NÃO baixa CMV (o estoque
+//    não sai nesse pedido).
+// 2. O pedido de resgate ("Assinatura (Créditos)" / `subscription_credits`) é a
+//    ENTREGA/CONSUMO dos créditos já pagos -> Receita R$ 0 (evita duplicação),
+//    mas baixa CMV/CSP real dos itens entregues.
+
+function isSubscriptionCreditLabel(value?: string | null): boolean {
+  const norm = String(value || "").trim().toLowerCase()
+  if (!norm) return false
+  return norm.includes("assinatura") || norm.includes("subscription")
+}
+
+export function isSubscriptionCreditOrder(
+  order?: {
+    payment_method?: string | null
+    payment_breakdown?: Array<{ method?: string | null; paymentType?: string | null }> | null
+  } | null,
+): boolean {
+  if (!order) return false
+  if (isSubscriptionCreditLabel(order.payment_method)) return true
+  if (Array.isArray(order.payment_breakdown)) {
+    for (const entry of order.payment_breakdown) {
+      if (String(entry?.paymentType || "").trim().toLowerCase() === "subscription_credits") return true
+      if (isSubscriptionCreditLabel(entry?.method)) return true
+    }
+  }
+  return false
+}
+
+export function isSubscriptionCycleBillingOrder(
+  order?: {
+    recurring_execution_id?: string | null
+    payment_method?: string | null
+    payment_breakdown?: Array<{ method?: string | null; paymentType?: string | null }> | null
+  } | null,
+): boolean {
+  if (!order) return false
+  if (!order.recurring_execution_id) return false
+  return !isSubscriptionCreditOrder(order)
+}
+
+// ── Devoluções (return_requests): reembolso + crédito em loja (vale-compra) ─
+// Crédito em loja / vale-compra é forma de pagamento na nova compra (receita
+// normal). Para o DRE fechar sem duplicar receita, a devolução que originou o
+// crédito (ou reembolso) entra em Deduções da Receita Bruta — desde que o
+// pedido original não tenha sido cancelado/estornado na própria receita bruta.
+
+export interface ReturnRequestDreImpact {
+  deductionAmount: number
+  cogsProductsReversal: number
+  cogsServicesReversal: number
+}
+
+export function computeReturnRequestDreImpact(
+  rr?: {
+    status?: string | null
+    approved_resolution?: string | null
+    refund_amount?: number | string | null
+    store_credit_amount?: number | string | null
+    inventory_movement_id?: string | null
+    orders?: { situation?: string | null } | Array<{ situation?: string | null }> | null
+    return_items?: Array<{
+      quantity?: number | string | null
+      order_items?:
+        | { unit_cost?: number | string | null; service_id?: string | null; line_type?: string | null }
+        | Array<{ unit_cost?: number | string | null; service_id?: string | null; line_type?: string | null }>
+        | null
+    }> | null
+  } | null,
+): ReturnRequestDreImpact {
+  const zero: ReturnRequestDreImpact = { deductionAmount: 0, cogsProductsReversal: 0, cogsServicesReversal: 0 }
+  if (!rr) return zero
+
+  const status = String(rr.status || "").trim().toUpperCase()
+  if (status !== "RESOLVED") return zero
+
+  const resolution = String(rr.approved_resolution || "").trim().toLowerCase()
+  if (resolution === "rejected" || resolution === "none") return zero
+
+  const linkedOrder = Array.isArray(rr.orders) ? rr.orders[0] : rr.orders
+  if (linkedOrder?.situation && !isOrderRevenueRecognized(linkedOrder.situation)) {
+    // Pedido original já foi excluído da Receita Bruta (ex.: cancelled/refunded)
+    return zero
+  }
+
+  const refundVal = Math.max(0, Number(rr.refund_amount || 0))
+  const storeCreditVal = Math.max(0, Number(rr.store_credit_amount || 0))
+  const deductionAmount = refundVal + storeCreditVal
+
+  let cogsProductsReversal = 0
+  let cogsServicesReversal = 0
+
+  // Estorna CMV somente se houve retorno físico ao estoque
+  if (rr.inventory_movement_id && Array.isArray(rr.return_items)) {
+    for (const ri of rr.return_items) {
+      const qty = Math.max(0, Number(ri?.quantity || 0))
+      if (qty <= 0) continue
+      const oi = Array.isArray(ri.order_items) ? ri.order_items[0] : ri.order_items
+      const unitCost = Math.max(0, Number(oi?.unit_cost || 0))
+      if (unitCost <= 0) continue
+      const isServiceLine = Boolean(oi?.service_id) || oi?.line_type === "service_booking"
+      if (isServiceLine) {
+        cogsServicesReversal += qty * unitCost
+      } else {
+        cogsProductsReversal += qty * unitCost
+      }
+    }
+  }
+
+  return { deductionAmount, cogsProductsReversal, cogsServicesReversal }
+}
+
 export function isPaidAmountSettled(paymentStatus?: string | null, paidAmount?: number | string | null): boolean {
   const normalized = String(paymentStatus || "").trim().toLowerCase()
   if (normalized === "paid" || normalized === "partially_paid") return true

@@ -4,11 +4,13 @@ import React, { useState, useEffect, useTransition, useRef, useCallback } from "
 import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton, Checkbox, Dropdown, FormDropdown, SavingStatusModal } from "@/components/reusable"
 import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon, CopyIcon, ThreeDotsIcon, TrashIcon, StoreIcon, ChartIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { getTeamMembers, getTeamMemberStatsAction, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
-import type { TeamMember, TeamMemberStats } from "@/app/actions/erp/team"
+import { getTeamMembers, getTeamMemberStatsAction, getTeamHistoryAction, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
+import type { TeamMember, TeamMemberStats, TeamHistoryEntry } from "@/app/actions/erp/team"
+import { TeamHistoryTab } from "@/components/erp/settings/team/TeamHistoryTab"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
@@ -95,16 +97,58 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     const [isLoadingMembers, setIsLoadingMembers] = useState(true)
     const [errorMembers, setErrorMembers] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
-    const [activeTab, setActiveTab] = useState<"members" | "invites" | "store">("members")
+    const [activeTab, setActiveTab] = useState<"members" | "invites" | "history">("members")
     const [inviteFilter, setInviteFilter] = useState<"pending" | "accepted" | "all">("all")
+    const [teamHistory, setTeamHistory] = useState<TeamHistoryEntry[]>([])
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+    const [historyLoaded, setHistoryLoaded] = useState(false)
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [inviteToDelete, setInviteToDelete] = useState<string | null>(null)
     const [inviteToShare, setInviteToShare] = useState<any | null>(null)
     const [showInviteLinkModal, setShowInviteLinkModal] = useState(false)
     const [inviteLinkCopied, setInviteLinkCopied] = useState(false)
     const { toast } = useToast()
+    const [statsModalMember, setStatsModalMember] = useState<TeamMember | null>(null)
     const [selectedMemberStats, setSelectedMemberStats] = useState<TeamMemberStats | null>(null)
     const [isLoadingStats, setIsLoadingStats] = useState(false)
+    const statsCacheRef = useRef<Map<string, { data: TeamMemberStats; fetchedAt: number }>>(new Map())
+    const statsRequestIdRef = useRef(0)
+
+    const renderStoreAvatar = (store: { name: string; logo_url?: string | null; image_url?: string | null }) => {
+        const logoUrl = getR2ImageUrl(store.logo_url || store.image_url)
+        return (
+            <div className="w-9 h-9 rounded-lg bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
+                {logoUrl ? (
+                    <img
+                        src={logoUrl}
+                        alt={store.name}
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <StoreIcon size={18} className="text-brand-primary" />
+                )}
+            </div>
+        )
+    }
+
+    const fetchTeamHistory = useCallback(async () => {
+        setIsLoadingHistory(true)
+        try {
+            const res = await getTeamHistoryAction()
+            if (!res.error) {
+                setTeamHistory(res.entries || [])
+                setHistoryLoaded(true)
+            }
+        } finally {
+            setIsLoadingHistory(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (activeTab === "history" && !historyLoaded) {
+            fetchTeamHistory()
+        }
+    }, [activeTab, historyLoaded, fetchTeamHistory])
 
     // Store access modal state (2 tabs: access / all)
     const [selectedStoreMember, setSelectedStoreMember] = useState<TeamMember | null>(null)
@@ -155,6 +199,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                 toast({ title: "Sucesso", description: "Acessos às lojas salvos com sucesso!", variant: "success" })
                 setSelectedStoreMember(null)
                 fetchMembers()
+                if (historyLoaded) fetchTeamHistory()
             } else {
                 toast({ title: "Erro", description: res.error || "Erro ao salvar acessos.", variant: "destructive" })
             }
@@ -217,6 +262,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
             if (result.success && result.inviteUrl) {
                 setInviteUrl(result.inviteUrl)
                 fetchMembers()
+                if (historyLoaded) fetchTeamHistory()
             } else {
                 setInviteError(result.error || "Erro ao criar convite")
             }
@@ -237,6 +283,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
             } else {
                 toast({ title: "Sucesso", description: "Membro removido da equipe.", variant: "success" })
                 fetchMembers()
+                if (historyLoaded) fetchTeamHistory()
             }
             setMemberToDelete(null)
         })
@@ -250,6 +297,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
             } else {
                 toast({ title: "Sucesso", description: "Função atualizada com sucesso.", variant: "success" })
                 fetchMembers()
+                if (historyLoaded) fetchTeamHistory()
             }
         })
     }
@@ -263,6 +311,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                 if (result.success) {
                     toast({ title: "Sucesso", description: "Convite revogado com sucesso." })
                     fetchMembers()
+                    if (historyLoaded) fetchTeamHistory()
                 } else {
                     toast({ title: "Erro", description: result.error || "Erro ao revogar convite.", variant: "destructive" })
                 }
@@ -290,13 +339,29 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
     }
 
     const handleShowMemberStats = useCallback(async (member: TeamMember) => {
+        const requestId = ++statsRequestIdRef.current
+        setStatsModalMember(member)
+
+        const cached = statsCacheRef.current.get(member.id)
+        if (cached && Date.now() - cached.fetchedAt < 60_000) {
+            setSelectedMemberStats(cached.data)
+            setIsLoadingStats(false)
+            return
+        }
+
         setIsLoadingStats(true)
         setSelectedMemberStats(null)
         const { stats } = await getTeamMemberStatsAction(member.id)
-        if (stats && stats.length > 0) {
-            setSelectedMemberStats(stats[0])
-        } else {
-            setSelectedMemberStats({
+
+        if (statsRequestIdRef.current !== requestId) return
+
+        const resolvedStats: TeamMemberStats = stats && stats.length > 0
+            ? {
+                ...stats[0],
+                fullName: stats[0].fullName || member.fullName,
+                avatarUrl: stats[0].avatarUrl || member.avatarUrl,
+            }
+            : {
                 partnerUserId: member.id,
                 fullName: member.fullName,
                 avatarUrl: member.avatarUrl,
@@ -304,8 +369,10 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                 totalSalesValue: 0,
                 totalCommissionValue: 0,
                 lastSaleDate: null,
-            })
-        }
+            }
+
+        statsCacheRef.current.set(member.id, { data: resolvedStats, fetchedAt: Date.now() })
+        setSelectedMemberStats(resolvedStats)
         setIsLoadingStats(false)
     }, [])
 
@@ -366,6 +433,9 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                         </TabsTrigger>
                                         <TabsTrigger value="invites">
                                             Convites ({invitations.filter(i => !i.used_at && !i.revoked_at).length})
+                                        </TabsTrigger>
+                                        <TabsTrigger value="history">
+                                            Histórico
                                         </TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -780,6 +850,13 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                             )}
                                         </FadeIn>
                                     </TabsContent>
+
+                                    <TabsContent value="history" className="mt-6">
+                                        <TeamHistoryTab
+                                            entries={teamHistory}
+                                            loading={isLoadingHistory}
+                                        />
+                                    </TabsContent>
                                 </div>
                             )}
                         </div>
@@ -872,7 +949,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                 return (
                                                     <ListItem
                                                         key={store.id}
-                                                        icon={StoreIcon as any}
+                                                        left={renderStoreAvatar(store)}
                                                         title={store.name}
                                                         description={
                                                             <div className="flex flex-col">
@@ -1004,11 +1081,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                         return (
                                                             <ListItem
                                                                 key={store.id}
-                                                                left={
-                                                                    <div className="w-9 h-9 rounded-lg bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-sm shrink-0">
-                                                                        {store.name.charAt(0).toUpperCase()}
-                                                                    </div>
-                                                                }
+                                                                left={renderStoreAvatar(store)}
                                                                 title={store.name}
                                                                 description={ROLE_LABELS[state.role] || state.role}
                                                                 right={
@@ -1039,13 +1112,16 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                     <ListItem
                                                         key={store.id}
                                                         left={
-                                                            <Checkbox
-                                                                checked={state.enabled}
-                                                                onChange={() => setStoreAccessState(prev => ({
-                                                                    ...prev,
-                                                                    [store.id]: { ...prev[store.id], enabled: !prev[store.id]?.enabled }
-                                                                }))}
-                                                            />
+                                                            <div className="flex items-center gap-3">
+                                                                <Checkbox
+                                                                    checked={state.enabled}
+                                                                    onChange={() => setStoreAccessState(prev => ({
+                                                                        ...prev,
+                                                                        [store.id]: { ...prev[store.id], enabled: !prev[store.id]?.enabled }
+                                                                    }))}
+                                                                />
+                                                                {renderStoreAvatar(store)}
+                                                            </div>
                                                         }
                                                         title={store.name}
                                                         description="Loja da empresa"
@@ -1133,13 +1209,25 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
 
                     {/* Member Stats Modal */}
                     <DefaultModal
-                        isOpen={!!selectedMemberStats}
-                        onClose={() => setSelectedMemberStats(null)}
-                        title={selectedMemberStats?.fullName || "Membro"}
+                        isOpen={!!statsModalMember}
+                        onClose={() => {
+                            statsRequestIdRef.current++
+                            setStatsModalMember(null)
+                            setSelectedMemberStats(null)
+                            setIsLoadingStats(false)
+                        }}
+                        title={statsModalMember?.fullName || selectedMemberStats?.fullName || "Membro"}
                     >
                         {isLoadingStats ? (
-                            <div className="flex justify-center py-12">
-                                <ThreeDotsLoader />
+                            <div className="space-y-4 py-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                    {["Vendas", "Total vendido", "Comissões", "Última venda"].map((label) => (
+                                        <div key={label} className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4">
+                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-2">{label}</p>
+                                            <div className="h-7 w-24 rounded-md bg-gray-200 dark:bg-dark-border animate-pulse" />
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         ) : selectedMemberStats && (
                             <div className="space-y-4 py-2">

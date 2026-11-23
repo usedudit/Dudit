@@ -16,7 +16,8 @@ function hashInviteToken(token: string) {
 
 function normalizeError(error: any, fallback: string) {
   const message = String(error?.message || error?.hint || error?.details || "")
-  if (message.includes("delivery_driver_busy")) return "Você já possui 2 entregas em andamento. Conclua uma para aceitar novas."
+  if (message.includes("delivery_driver_in_cooldown")) return "Você está em pausa temporária após recusas consecutivas. Aguarde alguns minutos para aceitar novas entregas."
+  if (message.includes("delivery_driver_busy")) return "Você já atingiu seu limite de entregas simultâneas em andamento. Conclua uma para aceitar novas."
   if (message.includes("delivery_driver_different_partner_busy")) return "Você já possui entregas em andamento em outro estabelecimento. Conclua-as para aceitar entregas de outra loja."
   if (message.includes("delivery_offer_expired")) return "Esta oferta de entrega expirou (tempo limite de 15 minutos)."
   if (message.includes("delivery_assignment_already_accepted")) return "Esta entrega acabou de ser aceita por outro entregador."
@@ -238,7 +239,6 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
         )
       `)
       .in("status", ["available", "requested"])
-      .gte("assigned_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
       .order("assigned_at", { ascending: false })
       .limit(limit)
 
@@ -342,11 +342,30 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
         ...row,
         id: row.id || row.assignment_id,
         assignment_id: row.assignment_id || row.id,
+        offer_id: row.offer_id || null,
+        offer_tier: row.offer_tier != null ? Number(row.offer_tier) : null,
+        offer_mode: (row.offer_mode as "board" | "directed") || "board",
+        offer_expires_at: row.offer_expires_at || null,
+        dispatch_tier: row.dispatch_tier != null ? Number(row.dispatch_tier) : 0,
         order_count: Number(row.order_count || ordersArr.length || 1),
         delivery_fee: Number(row.delivery_fee || 0),
+        bonus_amount: Number(row.bonus_amount || 0),
         total_amount: Number(row.total_amount || 0),
+        pickup_km: row.pickup_km != null ? Number(row.pickup_km) : (row.pickup_distance_km != null ? Number(row.pickup_distance_km) : null),
         pickup_distance_km: row.pickup_distance_km != null ? Number(row.pickup_distance_km) : null,
         distance_km: row.distance_km != null ? Number(row.distance_km) : (row.pickup_distance_km != null ? Number(row.pickup_distance_km) : null),
+        pickup_minutes: row.pickup_minutes != null ? Number(row.pickup_minutes) : null,
+        delivery_km: row.delivery_km != null ? Number(row.delivery_km) : (row.delivery_distance_km != null ? Number(row.delivery_distance_km) : null),
+        delivery_distance_km: row.delivery_distance_km != null ? Number(row.delivery_distance_km) : null,
+        delivery_minutes: row.delivery_minutes != null ? Number(row.delivery_minutes) : null,
+        eta_total_minutes: row.eta_total_minutes != null ? Number(row.eta_total_minutes) : null,
+        vehicle_compatible: row.vehicle_compatible !== undefined ? Boolean(row.vehicle_compatible) : true,
+        position_quality: (row.position_quality as "live" | "address" | "unknown") || "unknown",
+        route_km: row.route_km != null ? Number(row.route_km) : null,
+        rs_per_km: row.rs_per_km != null ? Number(row.rs_per_km) : null,
+        dimensions_unknown: Boolean(row.dimensions_unknown),
+        package_weight_kg: row.package_weight_kg != null ? Number(row.package_weight_kg) : null,
+        package_volume_l: row.package_volume_l != null ? Number(row.package_volume_l) : null,
         items: Array.isArray(row.items) ? [...row.items] : [],
         orders: ordersArr,
       })
@@ -569,6 +588,34 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
   return { success: true as const, data }
 }
 
+export async function declineDeliveryOfferAction(assignmentId: string, offerId?: string | null) {
+  await requireDeliveryDriver()
+  if (!assignmentId) return { success: false as const, error: "Oferta inválida." }
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase.rpc("decline_delivery_offer", {
+    p_assignment_id: assignmentId,
+    p_offer_id: offerId || null,
+  })
+
+  if (error) {
+    return { success: false as const, error: normalizeError(error, "Não foi possível recusar a oferta.") }
+  }
+
+  revalidatePath("/entregadores")
+  revalidatePath("/entregadores/entregas-disponiveis")
+
+  return {
+    success: true as const,
+    data: data as {
+      success: boolean
+      offer_id: string
+      reject_streak: number
+      cooldown_until: string | null
+      cooldown_applied: boolean
+    },
+  }
+}
+
 export async function transitionMyDeliveryAssignmentAction(params: {
   assignmentId: string
   status: "accepted" | "picked_up" | "out_for_delivery" | "delivered" | "failed"
@@ -713,6 +760,41 @@ export async function setMyDeliveryAvailabilityAction(status: "available" | "off
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível atualizar sua disponibilidade.") }
   revalidatePath("/entregadores")
   return { success: true as const, data }
+}
+
+export async function upsertMyDriverLocationAction(input: {
+  lat?: number | null
+  lng?: number | null
+  accuracy?: number | null
+  heading?: number | null
+  speed?: number | null
+  source?: "gps" | "network" | "address_fallback"
+}) {
+  await requireDeliveryDriver()
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase.rpc("upsert_my_driver_location", {
+    p_lat: input.lat ?? null,
+    p_lng: input.lng ?? null,
+    p_accuracy: input.accuracy ?? null,
+    p_heading: input.heading ?? null,
+    p_speed: input.speed ?? null,
+    p_source: input.source || "gps",
+  })
+  if (error) {
+    return {
+      success: false as const,
+      error: normalizeError(error, "Não foi possível atualizar sua localização."),
+    }
+  }
+  return {
+    success: true as const,
+    data: data as {
+      success: boolean
+      position_quality: "live" | "address" | "unknown"
+      source: string
+      updated_at: string
+    },
+  }
 }
 
 export async function confirmDeliveryPaymentReceivedAction(assignmentId: string, note?: string) {

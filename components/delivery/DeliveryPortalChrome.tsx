@@ -15,6 +15,7 @@ import { Switch } from "../reusable/Switch"
 import { setMyDeliveryAvailabilityAction } from "@/app/actions/delivery-drivers"
 import { toast } from "@/hooks/use-notification"
 import { logLogoutAction } from "@/app/actions/auth/audit"
+import DriverLocationBeacon, { DRIVER_AVAILABILITY_EVENT } from "./DriverLocationBeacon"
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -69,6 +70,17 @@ export function DeliveryPortalHeader({
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const { setIsMobileOpen, headerOverride } = useSidebar()
     const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent<{ status: string }>).detail
+            if (detail?.status) {
+                setIsOnline(detail.status === "available" || detail.status === "occupied")
+            }
+        }
+        window.addEventListener(DRIVER_AVAILABILITY_EVENT, handler)
+        return () => window.removeEventListener(DRIVER_AVAILABILITY_EVENT, handler)
+    }, [])
 
     const handleThemeButtonClick = (newTheme: string) => {
         if (isTransitioning) return
@@ -127,6 +139,7 @@ export function DeliveryPortalHeader({
             const res = await setMyDeliveryAvailabilityAction(nextStatus)
             if (res.success) {
                 setIsOnline(!isOnline)
+                window.dispatchEvent(new CustomEvent(DRIVER_AVAILABILITY_EVENT, { detail: { status: nextStatus } }))
                 toast.success(isOnline ? "Você está offline agora." : "Você está online e pronto para receber entregas!")
             } else {
                 toast.error(res.error || "Não foi possível alterar status.")
@@ -206,6 +219,7 @@ export function DeliveryPortalHeader({
                     </div>
 
                     <div className="flex items-center gap-3">
+                        <DriverLocationBeacon isOnline={isOnline} />
                         <div className="hidden md:flex items-center gap-3">
                             <NotificationBell variant="erp" />
                             <div className="h-6 w-px bg-brand-border dark:border-dark-border" />

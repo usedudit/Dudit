@@ -69,7 +69,7 @@ const VISUALS_BY_MODE: Record<string, Record<number, StepVisualData>> = {
       image: "https://img.dudit.com.br/static/mascots/Servicos.png",
     },
     3: {
-      title: "Seu ERP está configurado!",
+      title: "Que ótimo, seu sistema está configurado!",
       subtitle: "Tudo pronto para operar o balcão, acompanhar relatórios e gerenciar seu negócio.",
       image: "https://img.dudit.com.br/static/mascots/HappyDino.png",
     },

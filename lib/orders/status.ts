@@ -44,6 +44,7 @@ const DELIVERY_STATUS_ICONS: Record<string, React.ElementType> = {
   accepted: DeliveryPickupIcon,
   picked_up: DeliveryPickupIcon,
   sent: DeliverySentIcon,
+  partially_delivered: DeliverySentIcon,
   in_transit: DeliverySentIcon,
   out_for_delivery: DeliverySentIcon,
   delivered: CheckCircleIcon,
@@ -92,6 +93,7 @@ const DELIVERY_STATUS_META: Record<string, { label: string; variant: BadgeVarian
   pending: { label: "Não enviado", variant: "gray" },
   preparing: { label: "Em preparação", variant: "orange" },
   sent: { label: "Enviado", variant: "blue" },
+  partially_delivered: { label: "Parcialmente entregue", variant: "cyan" },
   delivered: { label: "Entregue", variant: "green" },
   cancelled: { label: "Cancelada", variant: "red" },
 

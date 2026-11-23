@@ -9,11 +9,16 @@ export function useUnsavedChanges(isDirty: boolean) {
   const [pendingNavigation, setPendingNavigation] = useState<string | (() => void) | null>(null)
   const isNavigatingRef = useRef(false)
 
-  // Use a ref for isDirty to avoid resetting listeners when isDirty changes
+  // Use a ref for isDirty to avoid resetting listeners when isDirty changes.
+  // Sync synchronously during render so immediate navigation/unloads after saving
+  // never observe a stale true value before effects run.
   const isDirtyRef = useRef(isDirty)
-  useEffect(() => {
-    isDirtyRef.current = isDirty
-  }, [isDirty])
+  isDirtyRef.current = isDirty
+
+  const allowNavigation = useCallback(() => {
+    isNavigatingRef.current = true
+    isDirtyRef.current = false
+  }, [])
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -112,6 +117,7 @@ export function useUnsavedChanges(isDirty: boolean) {
     confirmNavigation,
     cancelNavigation,
     handleNavigation,
+    allowNavigation,
   }
 }
 

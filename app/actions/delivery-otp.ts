@@ -8,6 +8,7 @@ import {
   getOrderDeliveryOtpStatus,
   type DeliveryOtpResult,
 } from "@/lib/services/delivery-otp.service"
+import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
 /**
  * Returns the active OTP delivery confirmation code for the authenticated customer/buyer.
@@ -62,6 +63,71 @@ export async function checkOrderDeliveryOtpRequirementAction(params: {
       success: false,
       requiresOtp: false,
       isConfirmed: false,
+      error: err?.message || "Erro ao consultar regras de entrega.",
+    }
+  }
+}
+
+/**
+ * Checks whether any order linked to a delivery requires an unconfirmed OTP code.
+ */
+export async function checkDeliveryOtpRequirementAction(params: {
+  deliveryId: string
+}): Promise<{
+  success: boolean
+  requiresOtp: boolean
+  otpOrderCount: number
+  orderNumber?: string | null
+  customerName?: string | null
+  error?: string
+}> {
+  try {
+    await requireUser()
+    const supabase = await getSupabaseServerClient()
+    const { data: links, error } = await supabase
+      .from("delivery_orders")
+      .select("order_id, orders(id, order_number, customer_name)")
+      .eq("delivery_id", params.deliveryId)
+
+    if (error || !links || links.length === 0) {
+      return { success: true, requiresOtp: false, otpOrderCount: 0 }
+    }
+
+    const checks = await Promise.all(
+      links.map(async (link: any) => {
+        const orderId = String(link?.order_id || "")
+        if (!orderId) return null
+        const status = await getOrderDeliveryOtpStatus(orderId)
+        if (status.requiresOtp && !status.isConfirmed) {
+          const order = Array.isArray(link.orders) ? link.orders[0] : link.orders
+          return {
+            orderId,
+            orderNumber: order?.order_number || null,
+            customerName: order?.customer_name || null,
+          }
+        }
+        return null
+      }),
+    )
+
+    const pendingOtpOrders = checks.filter(Boolean) as Array<{
+      orderId: string
+      orderNumber: string | null
+      customerName: string | null
+    }>
+
+    return {
+      success: true,
+      requiresOtp: pendingOtpOrders.length > 0,
+      otpOrderCount: pendingOtpOrders.length,
+      orderNumber: pendingOtpOrders[0]?.orderNumber || null,
+      customerName: pendingOtpOrders[0]?.customerName || null,
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      requiresOtp: false,
+      otpOrderCount: 0,
       error: err?.message || "Erro ao consultar regras de entrega.",
     }
   }

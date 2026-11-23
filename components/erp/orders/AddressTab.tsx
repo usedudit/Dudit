@@ -105,7 +105,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     const { canRbac } = usePermissions()
     const selectedStatusMeta = getDeliveryStatusMeta(deliveryStatus)
     const showDispatchFields = deliveryMethod === "pickup"
-        || ["sent", "delivered", "delivery_failed"].includes(deliveryStatus)
+        || ["sent", "delivered", "delivery_failed", "cancelled"].includes(deliveryStatus)
     const carrier = (deliveryBreakdown || {}) as Record<string, any>
     const carrierName = [carrier.companyName, carrier.serviceName].filter(Boolean).join(" - ")
         || carrier.carrier
@@ -290,7 +290,16 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                             label="Data de saída"
                                             dataField="deliveryDate"
                                             value={deliveryDate}
-                                            onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
+                                            onChange={(value) => {
+                                                if (value instanceof Date && !Number.isNaN(value.getTime())) {
+                                                    const y = value.getFullYear()
+                                                    const m = String(value.getMonth() + 1).padStart(2, "0")
+                                                    const d = String(value.getDate()).padStart(2, "0")
+                                                    setDeliveryDate(`${y}-${m}-${d}`)
+                                                } else {
+                                                    setDeliveryDate(String(value || ""))
+                                                }
+                                            }}
                                             placeholder="Selecione a data"
                                             disabled={isDeliveryLocked}
                                         />

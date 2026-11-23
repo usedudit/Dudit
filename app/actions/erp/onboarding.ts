@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { toBusinessInfoRecord } from "@/lib/business-info"
 import { createServiceAction } from "@/app/actions/erp/servicos"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
+import { updateTag } from "next/cache"
 import { safeRevalidateTag, safeRevalidatePath } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 
@@ -159,15 +160,19 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             }
         }
 
-        // 4. Invalidação de cache
+        // 4. Invalidação de cache (expiração imediata para read-your-own-writes)
         try {
+            updateTag(TAGS.partner(partnerId))
+            updateTag(TAGS.products(partnerId))
+            updateTag(TAGS.services(partnerId))
+            updateTag(TAGS.userAccess(user.id))
+        } catch {
             await safeRevalidateTag(TAGS.partner(partnerId))
             await safeRevalidateTag(TAGS.products(partnerId))
             await safeRevalidateTag(TAGS.services(partnerId))
-            await safeRevalidatePath("/erp/inicio")
-        } catch {
-            // Ignorar erros de revalidação em ambiente de teste/SSR
         }
+        await safeRevalidatePath("/erp", "layout")
+        await safeRevalidatePath("/erp/inicio")
 
         return {
             success: true,

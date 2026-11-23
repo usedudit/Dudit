@@ -21,6 +21,7 @@ import {
   ChartIcon,
 } from "@/lib/icons"
 import { ListItem } from "@/components/reusable/ListItem"
+import { Checkbox } from "@/components/reusable/Checkbox"
 import { RadioButton } from "@/components/reusable/RadioButton"
 import { Button } from "@/components/reusable/Button"
 import Input from "@/components/reusable/Input"
@@ -76,31 +77,128 @@ export function ERPOnboardingWizard({
   // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
   const zIndex = useModalLayer(isOpen)
 
-  // Objetivos principais derivados das props (para envio na ação)
-  const goals = React.useMemo(() => {
-    const g: string[] = []
+  // Opções de objetivos por modo de negócio
+  const availableGoalOptions = React.useMemo(() => {
     if (isDesapego) {
+      return [
+        {
+          id: "products",
+          icon: Package,
+          title: "Anunciar produtos ou desapegos",
+          description: "Venda itens novos, usados, eletrônicos, roupas ou produtos da sua loja",
+        },
+        {
+          id: "services",
+          icon: WrenchIcon,
+          title: "Anunciar serviço ou atendimento",
+          description: "Divulgue seus serviços, agendamentos, consultoria, manutenções ou procedimentos",
+        },
+      ]
+    }
+    if (isERP) {
+      const opts = [
+        {
+          id: "pos",
+          icon: CashierIcon,
+          title: "Frente de Caixa (PDV) e vendas no balcão",
+          description: "Registrar vendas rápidas no computador e imprimir recibos na hora.",
+        },
+      ]
+      if (sellsProducts) {
+        opts.push({
+          id: "stock_control",
+          icon: PackageIcon,
+          title: "Controle de estoque e reposição",
+          description: "Acompanhar entradas, saídas e estoque mínimo para evitar falta de mercadorias.",
+        })
+      }
+      opts.push({
+        id: "financial_control",
+        icon: MoneyIcon,
+        title: "Fluxo de caixa e gestão financeira",
+        description: "Controlar entradas, despesas, faturamento do mês e demonstrativo (DRE).",
+      })
+      if (sellsServices) {
+        opts.push({
+          id: "appointments_team",
+          icon: CalendarIcon,
+          title: "Agenda da equipe e profissionais",
+          description: "Gerenciar horários dos profissionais, comissões e fila de atendimento.",
+        })
+      }
+      opts.push({
+        id: "performance_reports",
+        icon: ChartIcon,
+        title: "Desempenho e relatórios",
+        description: "Acompanhar visão geral, metas, comissões e estatísticas da equipe.",
+      })
+      return opts
+    }
+    // Vitrine (quick / showcase)
+    const opts = [
+      {
+        id: "dudit_orders",
+        icon: ShoppingBagIcon,
+        title: "Receber pedidos pela Dudit",
+        description: "Ativar fluxo de pedidos direto pela plataforma, sem precisar repassar no WhatsApp.",
+      },
+      {
+        id: "payment_methods",
+        icon: MoneyIcon,
+        title: "Configurar formas de pagamento",
+        description: "Mostrar aos clientes seus meios de pagamento aceitos (Pix, cartão, dinheiro).",
+      },
+      {
+        id: "coupons_promotions",
+        icon: MegaphoneIcon,
+        title: "Gerenciar cupons e promoções",
+        description: "Criar cupons de desconto e campanhas para atrair mais clientes.",
+      },
+      {
+        id: "customers_management",
+        icon: Users,
+        title: "Gerenciar clientes",
+        description: "Acompanhar cadastros, histórico de compras e fidelizar seu público.",
+      },
+    ]
+    if (sellsServices) {
+      opts.push({
+        id: "appointments",
+        icon: CalendarIcon,
+        title: "Organizar agendamentos e horários",
+        description: "Clientes escolhem data e hora pelo link, evitando desencontros no WhatsApp.",
+      })
+    }
+    return opts
+  }, [isDesapego, isERP, sellsProducts, sellsServices])
+
+  const defaultGoalIds = React.useMemo(() => {
+    if (isDesapego) {
+      const g: string[] = []
       if (sellsProducts) g.push("products")
       if (sellsServices) g.push("services")
       return g.length > 0 ? g : ["products"]
     }
-    if (isERP) {
-      g.push("pos")
-      if (sellsProducts) g.push("stock_control")
-      g.push("financial_control")
-      if (sellsServices) g.push("appointments_team")
-      g.push("performance_reports")
-      return g
+    return availableGoalOptions.map((o) => o.id)
+  }, [isDesapego, sellsProducts, sellsServices, availableGoalOptions])
+
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(defaultGoalIds)
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedGoals(defaultGoalIds)
     }
-    // Vitrine (quick / showcase)
-    g.push("dudit_orders", "payment_methods", "coupons_promotions", "customers_management")
-    if (sellsServices) g.push("appointments")
-    return g
-  }, [isDesapego, isERP, sellsProducts, sellsServices])
+  }, [isOpen, defaultGoalIds])
+
+  const toggleGoal = (goalId: string) => {
+    setSelectedGoals((prev) =>
+      prev.includes(goalId) ? prev.filter((id) => id !== goalId) : [...prev, goalId]
+    )
+  }
 
   // Step 2: Primeiro item (adaptado)
-  const hasProducts = isDesapego ? sellsProducts : sellsProducts
-  const hasServices = isDesapego ? sellsServices : sellsServices
+  const hasProducts = isDesapego ? selectedGoals.includes("products") : sellsProducts
+  const hasServices = isDesapego ? selectedGoals.includes("services") : sellsServices
   const isHybrid = hasProducts && hasServices
 
   const [itemType, setItemType] = useState<"service" | "product">(() => {
@@ -141,6 +239,23 @@ export function ERPOnboardingWizard({
   }
 
   const handleNextFromGoals = () => {
+    if (selectedGoals.length === 0) {
+      toast({
+        title: "Selecione ao menos uma opção",
+        description: "Escolha pelo menos um objetivo para continuar.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (isDesapego) {
+      const pickedProducts = selectedGoals.includes("products")
+      const pickedServices = selectedGoals.includes("services")
+      if (pickedServices && !pickedProducts) {
+        setItemType("service")
+      } else if (pickedProducts && !pickedServices) {
+        setItemType("product")
+      }
+    }
     setDirection(1)
     setStep(2)
   }
@@ -152,7 +267,7 @@ export function ERPOnboardingWizard({
 
       const res = await completeERPOnboardingWizardAction({
         partnerId,
-        goals,
+        goals: selectedGoals,
         firstItem: hasValidItem
           ? {
             name: itemName.trim(),
@@ -322,118 +437,40 @@ export function ERPOnboardingWizard({
                         </p>
                       </div>
 
-                      {/* STEP 1: OBJETIVOS PRINCIPAIS INFORMATIVOS (sem interação) */}
+                      {/* STEP 1: OBJETIVOS PRINCIPAIS SELECIONÁVEIS */}
                       {step === 1 && (
                         <div className="space-y-3">
-                          {/* MODO DESAPEGO */}
-                          {isDesapego && (
-                            <>
+                          {availableGoalOptions.map((option) => {
+                            const isChecked = selectedGoals.includes(option.id)
+                            return (
                               <ListItem
-                                icon={Package}
-                                title="Anunciar produtos ou desapegos"
-                                description="Venda itens novos, usados, eletrônicos, roupas ou produtos da sua loja"
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
+                                key={option.id}
+                                icon={option.icon}
+                                title={option.title}
+                                description={option.description}
+                                onClick={() => toggleGoal(option.id)}
+                                right={
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      id={`onboarding-goal-${option.id}`}
+                                      checked={isChecked}
+                                      onChange={() => toggleGoal(option.id)}
+                                    />
+                                  </div>
+                                }
+                                className={cn(
+                                  "px-4 py-3 cursor-pointer transition-colors",
+                                  isChecked && "border-brand-green bg-brand-green/5"
+                                )}
                               />
-
-                              <ListItem
-                                icon={WrenchIcon}
-                                title="Anunciar serviço ou atendimento"
-                                description="Divulgue seus serviços, agendamentos, consultoria, manutenções ou procedimentos"
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-                            </>
-                          )}
-
-                          {/* MODO VITRINE (QUICK / SHOWCASE) */}
-                          {!isDesapego && !isERP && (
-                            <>
-                              <ListItem
-                                icon={ShoppingBagIcon}
-                                title="Receber pedidos pela Dudit"
-                                description="Ativar fluxo de pedidos direto pela plataforma, sem precisar repassar no WhatsApp."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-
-                              <ListItem
-                                icon={MoneyIcon}
-                                title="Configurar formas de pagamento"
-                                description="Mostrar aos clientes seus meios de pagamento aceitos (Pix, cartão, dinheiro)."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-
-                              <ListItem
-                                icon={MegaphoneIcon}
-                                title="Gerenciar cupons e promoções"
-                                description="Criar cupons de desconto e campanhas para atrair mais clientes."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-
-                              <ListItem
-                                icon={Users}
-                                title="Gerenciar clientes"
-                                description="Acompanhar cadastros, histórico de compras e fidelizar seu público."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-
-                              {sellsServices && (
-                                <ListItem
-                                  icon={CalendarIcon}
-                                  title="Organizar agendamentos e horários"
-                                  description="Clientes escolhem data e hora pelo link, evitando desencontros no WhatsApp."
-                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                                />
-                              )}
-                            </>
-                          )}
-
-                          {/* MODO ERP (GESTÃO COMPLETA) */}
-                          {isERP && (
-                            <>
-                              <ListItem
-                                icon={CashierIcon}
-                                title="Frente de Caixa (PDV) e vendas no balcão"
-                                description="Registrar vendas rápidas no computador e imprimir recibos na hora."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-
-                              {sellsProducts && (
-                                <ListItem
-                                  icon={PackageIcon}
-                                  title="Controle de estoque e reposição"
-                                  description="Acompanhar entradas, saídas e estoque mínimo para evitar falta de mercadorias."
-                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                                />
-                              )}
-
-                              <ListItem
-                                icon={MoneyIcon}
-                                title="Fluxo de caixa e gestão financeira"
-                                description="Controlar entradas, despesas, faturamento do mês e demonstrativo (DRE)."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-
-                              {sellsServices && (
-                                <ListItem
-                                  icon={CalendarIcon}
-                                  title="Agenda da equipe e profissionais"
-                                  description="Gerenciar horários dos profissionais, comissões e fila de atendimento."
-                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                                />
-                              )}
-
-                              <ListItem
-                                icon={ChartIcon}
-                                title="Desempenho e relatórios"
-                                description="Acompanhar visão geral, metas, comissões e estatísticas da equipe."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
-                              />
-                            </>
-                          )}
+                            )
+                          })}
 
                           <div className="pt-4 flex gap-3">
                             <Button
                               type="button"
                               onClick={handleNextFromGoals}
+                              disabled={selectedGoals.length === 0}
                               className="w-full"
                             >
                               Continuar
@@ -454,9 +491,9 @@ export function ERPOnboardingWizard({
                                 <ListItem
                                   icon={Package}
                                   title={isDesapego ? "Produto / Desapego" : "Produto"}
-                                  className="px-3 py-2.5 gap-3 border rounded-xl cursor-pointer"
+                                  className="px-4 py-3"
                                   onClick={() => setItemType("product")}
-                                  left={
+                                  right={
                                     <RadioButton
                                       name="firstItemType"
                                       value="product"
@@ -468,9 +505,9 @@ export function ERPOnboardingWizard({
                                 <ListItem
                                   icon={WrenchIcon}
                                   title={isDesapego ? "Serviço / Atendimento" : "Serviço"}
-                                  className="px-3 py-2.5 gap-3 border rounded-xl cursor-pointer"
+                                  className="px-4 py-3"
                                   onClick={() => setItemType("service")}
-                                  left={
+                                  right={
                                     <RadioButton
                                       name="firstItemType"
                                       value="service"
@@ -550,7 +587,6 @@ export function ERPOnboardingWizard({
 
                           <div className="flex gap-3 pt-4">
                             <Button
-                              type="button"
                               variant="outline"
                               onClick={prevStep}
                               disabled={isSubmitting}
@@ -559,7 +595,6 @@ export function ERPOnboardingWizard({
                               Voltar
                             </Button>
                             <Button
-                              type="button"
                               onClick={() => handleFinish(false)}
                               disabled={isSubmitting}
                               className="flex-1"
@@ -584,7 +619,7 @@ export function ERPOnboardingWizard({
                       {/* STEP 3: CELEBRAÇÃO & SUCESSO */}
                       {step === 3 && (
                         <div className="space-y-5">
-                          <div className="p-4 bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-2xl space-y-3">
+                          <div className="space-y-3">
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
                                 Link da sua vitrine:
@@ -598,24 +633,25 @@ export function ERPOnboardingWizard({
                               </button>
                             </div>
 
-                            <div className="p-2.5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-xs font-mono text-brand-dark dark:text-dark-heading truncate">
-                              {publicStoreUrl}
-                            </div>
+                            <Input
+                              variant="full-rounded"
+                              readOnly
+                              value={publicStoreUrl}
+                              className="flex-1 h-10 truncate"
+                            />
 
                             <Button
-                              type="button"
-                              variant="outline"
                               onClick={handleShareWhatsApp}
-                              className="w-full gap-2 border-brand-green/30 text-brand-green hover:bg-brand-green/10"
+                              className="w-full"
+                              leftIcon={<WhatsappIcon size={16} />}
                             >
-                              <WhatsappIcon size={16} />
-                              Testar no WhatsApp
+                              Enviar no WhatsApp
                             </Button>
                           </div>
 
                           <div className="pt-2">
                             <Button
-                              type="button"
+                              variant="link"
                               onClick={handleCloseAndGoToDashboard}
                               className="w-full"
                             >

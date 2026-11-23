@@ -3,7 +3,9 @@ import { getInstitutionalFaqJsonLd } from "@/lib/constants/institutional-faq";
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 
 export const metadata: Metadata = {
-    title: "Sobre a Dudit | Sistema de Gestão e Vendas Locais e Nacionais",
+    title: {
+        absolute: "Sobre a Dudit | Sistema de Gestão e Vendas Locais e Nacionais",
+    },
     description: "Conheça a Dudit: plataforma brasileira de gestão comercial e vendas com 0% de taxa. Venda na sua região com entrega local ou para todo o Brasil via transportadoras e Correios.",
     openGraph: {
         title: "Sobre a Dudit | Sistema de Gestão e Vendas Locais e Nacionais",

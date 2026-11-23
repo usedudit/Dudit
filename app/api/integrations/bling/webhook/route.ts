@@ -12,17 +12,42 @@ export async function POST(req: Request) {
   }
 
   const url = new URL(req.url)
-  const partnerId = url.searchParams.get("partnerId") || req.headers.get("x-partner-id")
+  let partnerId = url.searchParams.get("partnerId") || req.headers.get("x-partner-id")
   const token = url.searchParams.get("token") || req.headers.get("x-webhook-token")
 
-  if (!partnerId) {
+  let payload: any = null
+  try {
+    payload = await req.json()
+  } catch (parseErr: any) {
     return NextResponse.json(
-      { error: "Identificador do parceiro (partnerId) não fornecido na URL." },
+      { error: `Payload JSON inválido: ${parseErr.message}` },
       { status: 400 }
     )
   }
 
   const supabase = getAdminClient()
+
+  // No Bling v3 (App Público), a URL de webhook é única no aplicativo e o Bling envia `companyId` no payload
+  if (!partnerId && payload?.companyId) {
+    const { data: byCompany } = await supabase
+      .from("partner_integrations")
+      .select("partner_id")
+      .eq("provider_slug", BLING_PROVIDER)
+      .eq("status", "connected")
+      .eq("account_id", String(payload.companyId))
+      .maybeSingle()
+    if (byCompany?.partner_id) {
+      partnerId = byCompany.partner_id
+    }
+  }
+
+  if (!partnerId) {
+    return NextResponse.json(
+      { error: "Identificador do parceiro (partnerId ou companyId) não resolvido." },
+      { status: 400 }
+    )
+  }
+
   const { data: integration, error: intErr } = await supabase
     .from("partner_integrations")
     .select("id, partner_id, provider_slug, status, config")
@@ -42,16 +67,6 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "Token de autorização do webhook inválido." },
       { status: 401 }
-    )
-  }
-
-  let payload: any = null
-  try {
-    payload = await req.json()
-  } catch (parseErr: any) {
-    return NextResponse.json(
-      { error: `Payload JSON inválido: ${parseErr.message}` },
-      { status: 400 }
     )
   }
 

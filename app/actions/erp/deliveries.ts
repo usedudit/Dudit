@@ -6,6 +6,7 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
+import { resolveEffectiveDeliveryStatus } from "@/lib/delivery/status-resolver"
 import {
   calculateDistance,
   estimateDeliveryTime,
@@ -53,7 +54,7 @@ export type ERPDeliveryListStatusGroup = "active" | "closed"
 // legacy statuses) stays on the "Delivery" tab.
 const ERP_DELIVERY_CLOSED_TAB_STATUSES = ["cancelled", "delivery_failed"] as const
 
-function revalidateDeliveryDashboard(partnerId: string) {
+function revalidateDeliveryDashboard(partnerId: string, deliveryId?: string) {
   // @ts-ignore - Next 15 accepts profile as the second argument.
   revalidateTag(DASHBOARD_TAGS.general(partnerId), "max")
   // @ts-ignore
@@ -62,9 +63,16 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
   // @ts-ignore
   revalidateTag(TAGS.deliveries(partnerId), "max")
+  // @ts-ignore
+  revalidateTag(TAGS.orders(partnerId), "max")
+  if (deliveryId) {
+    // @ts-ignore
+    revalidateTag(`delivery-${deliveryId}`, "max")
+  }
   revalidatePath("/erp/painel")
   revalidatePath("/erp/inicio")
   revalidatePath("/erp/entregas")
+  revalidatePath("/erp/pedidos")
   revalidatePath("/erp/logistica")
 }
 
@@ -519,6 +527,65 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
   }
 }
 
+async function computeDrivingRouteMetrics(
+  origin: { lat: number; lng: number } | null,
+  destinations: Array<{ lat: number; lng: number }>,
+): Promise<{ distanceKm: number; durationMinutes: number } | null> {
+  const waypoints: Array<{ lat: number; lng: number }> = []
+  if (origin && Number.isFinite(origin.lat) && Number.isFinite(origin.lng)) {
+    waypoints.push(origin)
+  }
+  for (const pt of destinations) {
+    if (pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) {
+      waypoints.push(pt)
+    }
+  }
+  if (waypoints.length < 2) return null
+
+  const rawToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+  const token = rawToken ? rawToken.replace(/['"]/g, "").trim() : ""
+
+  if (token) {
+    try {
+      const coordsString = waypoints.slice(0, 25).map((p) => `${p.lng},${p.lat}`).join(";")
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?overview=false&access_token=${token}`
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 1500)
+      try {
+        const res = await fetch(url, { signal: controller.signal })
+        if (res.ok) {
+          const data = await res.json()
+          const r = data?.routes?.[0]
+          if (data?.code === "Ok" && r && typeof r.distance === "number" && typeof r.duration === "number") {
+            const extraStopMins = Math.max(0, destinations.length - 1) * 3
+            return {
+              distanceKm: Number((r.distance / 1000).toFixed(1)),
+              durationMinutes: Math.max(1, Math.round(r.duration / 60) + extraStopMins),
+            }
+          }
+        }
+      } finally {
+        clearTimeout(timer)
+      }
+    } catch {
+      // Fallback to haversine approximation below
+    }
+  }
+
+  let straightKm = 0
+  for (let i = 1; i < waypoints.length; i++) {
+    straightKm += calculateDistance(waypoints[i - 1], waypoints[i])
+  }
+  // Approximate urban road factor (1.3x straight line) and ~25 km/h urban speed
+  const roadKm = Number((straightKm * 1.3).toFixed(1))
+  const travelMins = Math.max(1, Math.round((roadKm / 25) * 60))
+  const extraStopMins = Math.max(0, destinations.length - 1) * 3
+  return {
+    distanceKm: roadKm,
+    durationMinutes: travelMins + extraStopMins,
+  }
+}
+
 export async function getDeliveryRoutePointsAction(params: { partnerId: string; deliveryId: string }) {
   const user = await requireUser()
   const actor = await getDeliveryActorScope(params.partnerId)
@@ -647,18 +714,13 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
     return { success: false as const, error: "Nenhum ponto de rota disponível para exibir no mapa." }
   }
 
-  // Calculate cumulative multi-stop route distance and duration across all points
-  let totalDistanceKm = 0
-  let currentCoord = origin ? { lat: origin.lat, lng: origin.lng } : null
-  for (const pt of cleaned) {
-    if (currentCoord && pt.latitude != null && pt.longitude != null) {
-      totalDistanceKm += calculateDistance(currentCoord, { lat: pt.latitude, lng: pt.longitude })
-      currentCoord = { lat: pt.latitude, lng: pt.longitude }
-    }
-  }
-  totalDistanceKm = Number(totalDistanceKm.toFixed(2))
-  const baseMins = estimateDeliveryTime(totalDistanceKm) ?? Math.round(totalDistanceKm * 3)
-  const totalEstimatedDurationMinutes = baseMins + Math.max(0, cleaned.length - 1) * 5
+  // Calculate cumulative multi-stop route distance and duration across all points (Mapbox Directions with fallback)
+  const routeMetrics = await computeDrivingRouteMetrics(
+    origin ? { lat: origin.lat, lng: origin.lng } : null,
+    cleaned.map((pt) => ({ lat: pt.latitude, lng: pt.longitude })),
+  )
+  const totalDistanceKm = routeMetrics?.distanceKm ?? 0
+  const totalEstimatedDurationMinutes = routeMetrics?.durationMinutes ?? 0
 
   return {
     success: true as const,
@@ -1253,6 +1315,182 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
     }))
 }
 
+export async function fetchDeliveryOrdersByIdsAction(
+  partnerId: string,
+  orderIds: string[],
+  excludeDeliveryId?: string,
+) {
+  const uniqueIds = Array.from(new Set((orderIds || []).map((id) => String(id).trim()).filter(Boolean)))
+  if (uniqueIds.length === 0) return []
+
+  await requireUser()
+  await requireActivePartnerContext(partnerId)
+  const actor = await getDeliveryActorScope(partnerId)
+  if (actor.roleId === "delivery") return []
+  const orderListCheck = await checkPermission(partnerId, "orders", "list")
+  if (!orderListCheck.allowed) return []
+  const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
+  if (!planCheck.allowed) return []
+
+  const supabase = await getSupabaseServerClient()
+
+  let activeOrdersQuery = supabase
+    .from("delivery_orders")
+    .select("order_id, deliveries!inner(id,partner_id,status)")
+    .eq("deliveries.partner_id", partnerId)
+    .in("order_id", uniqueIds)
+    .in("deliveries.status", [...ACTIVE_DELIVERY_STATUSES])
+
+  if (excludeDeliveryId) {
+    activeOrdersQuery = activeOrdersQuery.neq("deliveries.id", excludeDeliveryId)
+  }
+
+  const ordersQuery = supabase
+    .from("orders")
+    .select(`
+      id,
+      order_number,
+      total_amount,
+      paid_amount,
+      delivery_fee,
+      distance_km,
+      delivery_breakdown,
+      customer_name,
+      buyer_id,
+      delivery_address,
+      situation,
+      payment_method,
+      payment_breakdown,
+      delivery_status,
+      created_at,
+      order_source,
+      delivery_type,
+      notes,
+      order_shipments(id, kind),
+      order_items(
+        id,
+        product_name,
+        product_price,
+        quantity,
+        subtotal,
+        product_id,
+        variant_id,
+        service_id,
+        products(id, name, sku, images, unit, product_type),
+        product_variants(id, variant_name, sku, variant_options),
+        services(id, name, images)
+      )
+    `)
+    .eq("partner_id", partnerId)
+    .in("id", uniqueIds)
+
+  const [{ data: activeDeliveryOrders }, { data, error }] = await Promise.all([
+    activeOrdersQuery,
+    ordersQuery,
+  ])
+
+  if (error || !data || data.length === 0) return []
+
+  const activeOrderIds = new Set((activeDeliveryOrders || []).map((row: any) => row.order_id))
+  const buyerIds = Array.from(new Set(data.map((order: any) => order.buyer_id).filter(Boolean)))
+
+  const customerMap = new Map<string, any>()
+  if (buyerIds.length > 0) {
+    const [{ data: customerRows }, { data: addressRows }] = await Promise.all([
+      getAdminClient()
+        .from("customers")
+        .select("id, name, email, phone, image_url")
+        .eq("partner_id", partnerId)
+        .in("id", buyerIds),
+      supabase
+        .from("addresses")
+        .select("customer_id, street, number, complement, neighborhood, city, state, zip_code")
+        .in("customer_id", buyerIds)
+        .eq("address_type", "primary"),
+    ])
+
+    const addressMap = new Map<string, any>()
+    for (const addr of addressRows || []) {
+      addressMap.set(String(addr.customer_id), addr)
+    }
+
+    for (const row of customerRows || []) {
+      const addr = addressMap.get(String(row.id))
+      customerMap.set(String(row.id), { ...row, ...addr })
+    }
+  }
+
+  return data.map((order: any) => ({
+    id: order.id,
+    displayId: order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`,
+    orderNumber: order.order_number || null,
+    status: order.situation || "pending",
+    paymentStatus: order.situation || "pending",
+    paymentMethod: order.payment_method || null,
+    payment_method: order.payment_method || null,
+    paymentBreakdown: order.payment_breakdown || null,
+    deliveryStatus: order.delivery_status || "not_sent",
+    deliveryType: order.delivery_type || "delivery",
+    totalAmount: Number(order.total_amount || 0),
+    shippingFee: Number(order.delivery_fee || 0),
+    deliveryFee: Number(order.delivery_fee || 0),
+    distanceKm: order.distance_km == null ? null : Number(order.distance_km),
+    deliveryBreakdown: order.delivery_breakdown || null,
+    orderDate: order.created_at || null,
+    notes: order.notes || null,
+    customer: (() => {
+      const cust = order.buyer_id ? customerMap.get(String(order.buyer_id)) : null
+      return {
+        id: order.buyer_id || null,
+        name: order.customer_name || cust?.name || "Consumidor final",
+        email: cust?.email || null,
+        phone: cust?.phone || null,
+        image_url: cust?.image_url || null,
+      }
+    })(),
+    customerAddress: (() => {
+      const cust = order.buyer_id ? customerMap.get(String(order.buyer_id)) : null
+      if (!cust) return null
+      if (!cust.street && !cust.city) return null
+      return {
+        street: cust.street || "",
+        number: cust.number || "",
+        complement: cust.complement || "",
+        neighborhood: cust.neighborhood || "",
+        city: cust.city || "",
+        state: cust.state || "",
+        zipCode: cust.zip_code || "",
+      }
+    })(),
+    address: formatAddress(order) || "",
+    orderSource: order.order_source || "Manual",
+    items: (order.order_items || []).map((item: any) => {
+      const sku = item.product_variants?.sku || item.products?.sku || "N/A"
+      const images = item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || null
+      const unit = item.products?.unit || "un"
+      const price = Number(item.product_price || 0)
+      const qty = Number(item.quantity || 1)
+      const subtotal = Number(item.subtotal || price * qty)
+      return {
+        ...item,
+        sku,
+        images,
+        unit,
+        product_price: price,
+        price,
+        subtotal,
+        products: {
+          sku,
+          images,
+          unit,
+          product_type: item.products?.product_type || (item.service_id ? "servico" : "produto"),
+        },
+      }
+    }),
+    alreadyInActiveDelivery: activeOrderIds.has(order.id),
+  }))
+}
+
 async function geocodeWithTimeout(address: string, timeoutMs = 600): Promise<{ lat: number; lng: number } | null> {
   if (!address || !address.trim()) return null
   return Promise.race([
@@ -1507,15 +1745,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         const validCoords = destCoordsList.filter(Boolean) as { lat: number; lng: number }[]
 
         if (originCoords && validCoords.length > 0) {
-          let totalDist = 0
-          let currentPt = originCoords
-          for (const pt of validCoords) {
-            totalDist += calculateDistance(currentPt, pt)
-            currentPt = pt
+          const metrics = await computeDrivingRouteMetrics(originCoords, validCoords)
+          if (metrics) {
+            distanceKm = metrics.distanceKm
+            estimatedDurationMinutes = metrics.durationMinutes
           }
-          distanceKm = Number(totalDist.toFixed(2))
-          const baseDuration = estimateDeliveryTime(distanceKm) ?? Math.round(distanceKm * 3)
-          estimatedDurationMinutes = baseDuration + Math.max(0, validCoords.length - 1) * 5
         }
       } catch (err) {
         console.warn("[createERPDeliveryAction] geocoding/route failed, proceeding without estimates:", err)
@@ -1647,7 +1881,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       delivery_id: finalDeliveryId,
       order_id: orderId,
       position: idx + 1,
-      status: status === "delivered" ? "delivered" : "pending",
+      status,
       delivered_at: status === "delivered" ? terminalAt : null,
     }))
 
@@ -1715,7 +1949,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       })
     }
 
-    revalidateDeliveryDashboard(payload.partnerId)
+    revalidateDeliveryDashboard(payload.partnerId, finalDeliveryId)
     return { success: true as const, deliveryId: finalDeliveryId }
   }
 
@@ -1795,6 +2029,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             distance_km,
             estimated_duration_minutes,
             started_at,
+            departure_time,
             delivered_at,
             completed_at,
             created_at,
@@ -1804,7 +2039,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
               position,
               status,
               delivered_at,
-              orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source, delivery_breakdown, order_shipments(id, kind))
+              orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source, delivery_status, situation, delivery_breakdown, order_shipments(id, kind))
             )
           `)
             .eq("partner_id", partnerId)
@@ -2001,6 +2236,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       distance_km,
       estimated_duration_minutes,
       started_at,
+      departure_time,
       delivered_at,
       completed_at,
       created_at,
@@ -2010,7 +2246,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         position,
         status,
         delivered_at,
-        orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source, delivery_breakdown, order_shipments(id, kind))
+        orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source, delivery_status, situation, delivery_breakdown, order_shipments(id, kind))
       )
     `)
       .eq("partner_id", partnerId)
@@ -2234,7 +2470,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     const { data, error } = await getCachedErpPage(
       ["erp-delivery-detail", partnerId, deliveryId],
-      [TAGS.orders(partnerId), TAGS.partner(partnerId), `delivery-${deliveryId}`],
+      [TAGS.deliveries(partnerId), TAGS.orders(partnerId), TAGS.partner(partnerId), `delivery-${deliveryId}`],
       async () => {
         const admin = getAdminClient()
         return admin
@@ -2264,6 +2500,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
               order_number,
               customer_name,
               total_amount,
+              created_at,
               updated_at,
 
               delivery_fee,
@@ -2888,7 +3125,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       })
     }
 
-    revalidateDeliveryDashboard(params.partnerId)
+    revalidateDeliveryDashboard(params.partnerId, params.deliveryId)
     return { success: true as const }
   }
 
@@ -3006,15 +3243,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         const validCoords = destCoordsList.filter(Boolean) as { lat: number; lng: number }[]
 
         if (originCoords && validCoords.length > 0) {
-          let totalDist = 0
-          let currentPt = originCoords
-          for (const pt of validCoords) {
-            totalDist += calculateDistance(currentPt, pt)
-            currentPt = pt
+          const metrics = await computeDrivingRouteMetrics(originCoords, validCoords)
+          if (metrics) {
+            distanceKm = metrics.distanceKm
+            estimatedDurationMinutes = metrics.durationMinutes
           }
-          distanceKm = Number(totalDist.toFixed(2))
-          const baseDuration = estimateDeliveryTime(distanceKm) ?? Math.round(distanceKm * 3)
-          estimatedDurationMinutes = baseDuration + Math.max(0, validCoords.length - 1) * 5
         }
       } catch (err) {
         console.warn("[updateERPDeliveryAction] geocoding failed:", err)
@@ -3103,7 +3336,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       delivery_id: payload.deliveryId,
       order_id: orderId,
       position: index + 1,
-      status: nextStatus === "delivered" ? "delivered" : "pending",
+      status: nextStatus,
       delivered_at: nextStatus === "delivered" ? (payload.startedAt || nowIso) : null,
     }))
     const { error: insertLinksError } = await getAdminClient().from("delivery_orders").insert(nextLinks)
@@ -3201,7 +3434,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     })
   }
 
-  revalidateDeliveryDashboard(payload.partnerId)
+  revalidateDeliveryDashboard(payload.partnerId, payload.deliveryId)
   return { success: true as const, deliveryId: payload.deliveryId }
 }
 
@@ -3356,59 +3589,62 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     }),
   ]).catch(() => {})
 
-  // Check if all delivery_orders are now completed
+  // Derive and sync parent delivery status from all linked orders
   const { data: allLinks } = await supabase
     .from("delivery_orders")
-    .select("status")
+    .select("status, orders(delivery_status, situation)")
     .eq("delivery_id", params.deliveryId)
 
-  const statuses = (allLinks || []).map((l: any) => l.status)
-  const allFinished = statuses.every((s: string) => ["delivered", "delivery_failed", "cancelled"].includes(s))
-  const anyDelivered = statuses.some((s: string) => s === "delivered")
-  let resultingDeliveryStatus = String(currentDelivery.status || "pending")
+  const resolvedParentStatus = resolveEffectiveDeliveryStatus(currentDelivery.status, (allLinks || []) as any)
+  const dbDeliveryStatus = resolvedParentStatus === "partially_delivered"
+    ? "sent"
+    : (resolvedParentStatus === "not_sent" ? "pending" : resolvedParentStatus)
+  let resultingDeliveryStatus = resolvedParentStatus
 
-  if (allFinished) {
-    const finalDeliveryStatus = anyDelivered ? "delivered" : "delivery_failed"
-    resultingDeliveryStatus = finalDeliveryStatus
-    const deliveryPatch: Record<string, unknown> = { status: finalDeliveryStatus }
-    if (finalDeliveryStatus === "delivered") {
-      deliveryPatch.departure_time = nowIso
-      deliveryPatch.started_at = nowIso
-      deliveryPatch.delivered_at = nowIso
-      deliveryPatch.completed_at = nowIso
-    }
-
-    await supabase
-      .from("deliveries")
-      .update(deliveryPatch)
-      .eq("id", params.deliveryId)
-
-    if (finalDeliveryStatus === "delivered" && currentDelivery.delivery_person_id) {
-      const { data: deliveryOrders } = await supabase
-        .from("delivery_orders")
-        .select("orders(delivery_fee, store_id)")
-        .eq("delivery_id", params.deliveryId)
-
-      const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
-        return sum + Number(row?.orders?.delivery_fee || 0)
-      }, 0)
-      const deliveryStoreId = (deliveryOrders?.[0] as any)?.orders?.store_id ?? null
-
-      await createCommissionExpenseForEntity({
-        supabase,
-        partnerId: params.partnerId,
-        storeId: deliveryStoreId,
-        partnerUserId: String(currentDelivery.delivery_person_id),
-        role: "delivery",
-        deliveryFee: deliveryFeeTotal,
-        entityType: "delivery",
-        entityId: params.deliveryId,
-        createdByUserId: user.id,
-      })
-    }
+  const deliveryPatch: Record<string, unknown> = { status: dbDeliveryStatus }
+  if (dbDeliveryStatus === "sent") {
+    deliveryPatch.departure_time = nowIso
+    deliveryPatch.started_at = nowIso
+  }
+  if (dbDeliveryStatus === "delivered") {
+    deliveryPatch.delivered_at = nowIso
+    deliveryPatch.completed_at = nowIso
+  } else if (["delivery_failed", "cancelled"].includes(dbDeliveryStatus)) {
+    deliveryPatch.completed_at = nowIso
+  } else {
+    deliveryPatch.completed_at = null
   }
 
-  revalidateDeliveryDashboard(params.partnerId)
+  await supabase
+    .from("deliveries")
+    .update(deliveryPatch)
+    .eq("id", params.deliveryId)
+
+  if (dbDeliveryStatus === "delivered" && currentDelivery.delivery_person_id) {
+    const { data: deliveryOrders } = await supabase
+      .from("delivery_orders")
+      .select("orders(delivery_fee, store_id)")
+      .eq("delivery_id", params.deliveryId)
+
+    const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
+      return sum + Number(row?.orders?.delivery_fee || 0)
+    }, 0)
+    const deliveryStoreId = (deliveryOrders?.[0] as any)?.orders?.store_id ?? null
+
+    await createCommissionExpenseForEntity({
+      supabase,
+      partnerId: params.partnerId,
+      storeId: deliveryStoreId,
+      partnerUserId: String(currentDelivery.delivery_person_id),
+      role: "delivery",
+      deliveryFee: deliveryFeeTotal,
+      entityType: "delivery",
+      entityId: params.deliveryId,
+      createdByUserId: user.id,
+    })
+  }
+
+  revalidateDeliveryDashboard(params.partnerId, params.deliveryId)
   return { success: true as const, deliveryStatus: resultingDeliveryStatus }
 }
 

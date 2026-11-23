@@ -20,7 +20,10 @@ import {
     getERPCarrierDeliveriesPageAction,
     type ERPCarrierDeliveryListCursor,
 } from "@/app/actions/erp/deliveries"
+import { checkDeliveryOtpRequirementAction } from "@/app/actions/delivery-otp"
+import ErpDeliveryOtpSection from "./ErpDeliveryOtpSection"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { resolveEffectiveDeliveryStatus } from "@/lib/delivery/status-resolver"
 import { getCarrierStatusLabel, getCarrierStatusVariant, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
@@ -90,6 +93,7 @@ export default function DeliveriesPage({
     userRole: initialUserRole,
     planSlug: initialPlanSlug,
     carrierEnabled: initialCarrierEnabled = false,
+    initialPrefillOrders = [],
 }: {
     partnerId: string
     deliveries?: any[]
@@ -99,6 +103,7 @@ export default function DeliveriesPage({
     userRole?: string
     planSlug?: string
     carrierEnabled?: boolean
+    initialPrefillOrders?: any[]
 }) {
     const router = useRouter()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -120,18 +125,24 @@ export default function DeliveriesPage({
     })
 
     const searchParams = useSearchParams()
+    const lastConsumedOrdersParamRef = useRef<string | null>(
+        typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("orders") : null
+    )
     useEffect(() => {
-        const ordersParam = searchParams?.get("orders")
-        if (ordersParam) {
-            const ids = ordersParam.split(",").map((id) => id.trim()).filter(Boolean)
-            if (ids.length > 0) {
-                setCreatePrefillOrderIds(ids)
-                if (!entityState.isOpen || entityState.action !== "create") {
-                    openEntity("create")
-                }
-            }
+        const liveOrdersParam = typeof window !== "undefined"
+            ? (new URLSearchParams(window.location.search).get("orders") || new URLSearchParams(window.location.search).get("order"))
+            : (searchParams?.get("orders") || searchParams?.get("order"))
+        if (!liveOrdersParam) {
+            return
         }
-    }, [searchParams, openEntity, entityState.isOpen, entityState.action])
+        if (liveOrdersParam === lastConsumedOrdersParamRef.current) return
+        lastConsumedOrdersParamRef.current = liveOrdersParam
+        const ids = liveOrdersParam.split(",").map((id) => id.trim()).filter(Boolean)
+        if (ids.length > 0) {
+            setCreatePrefillOrderIds(ids)
+            openEntity("create")
+        }
+    }, [searchParams, openEntity])
 
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -185,10 +196,16 @@ export default function DeliveriesPage({
         isOpen: boolean
         deliveryId: string
         nextStatus: string
+        checkingOtp?: boolean
+        requiresOtp?: boolean
+        otpOrderCount?: number
+        orderNumber?: string | null
+        customerName?: string | null
     } | null>(null)
     const [deliveryOtpInput, setDeliveryOtpInput] = useState("")
     const [bypassDeliveryOtp, setBypassDeliveryOtp] = useState(false)
     const [bypassReasonInput, setBypassReasonInput] = useState("")
+    const isOwnerOrAdmin = initialUserRole === "owner" || initialUserRole === "admin"
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const observerTarget = useRef<HTMLDivElement>(null)
@@ -200,6 +217,7 @@ export default function DeliveriesPage({
         isFetchingNextPage,
         hasNextPage,
         fetchNextPage,
+        refetch: refetchDeliveries,
     } = useInfiniteList<any, ERPDeliveryListCursor>({
         queryKey,
         initialPage: { items: initialDeliveries, nextCursor: initialNextCursor, hasMore: initialHasMore },
@@ -313,9 +331,9 @@ export default function DeliveriesPage({
 
     const carrierOptions = useMemo(() => {
         const set = new Set<string>()
-        ;(carrierShipments || []).forEach((s: any) => {
-            if (s.carrierName) set.add(s.carrierName)
-        })
+            ; (carrierShipments || []).forEach((s: any) => {
+                if (s.carrierName) set.add(s.carrierName)
+            })
         const list = Array.from(set)
         return list.length > 0 ? list : ["Correios", "Jadlog", "Loggi", "Total Express", "Latam Cargo"]
     }, [carrierShipments])
@@ -440,14 +458,18 @@ export default function DeliveriesPage({
             const firstLink = [...links].sort((a: any, b: any) => Number(a.position || 9999) - Number(b.position || 9999))[0]
             const order = firstLink?.orders || {}
             const deliveryPersonName = raw.partner_users?.user_profiles?.full_name || null
-            const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
+            const resolvedStatus = resolveEffectiveDeliveryStatus(raw.status, links)
+            const effectiveStatus = statusOverrides[raw.id] || resolvedStatus
+            const isDispatched = !["pending", "not_sent", "preparing"].includes(effectiveStatus)
+            const rawStartedAt = isDispatched ? (raw.departure_time || raw.started_at || null) : null
             const baseDuration = Number(raw.estimated_duration_minutes || 0)
-            const estimatedDuration = baseDuration > 0 ? baseDuration : (links.length * 20)
-            const estimatedArrivalAt = raw.started_at && estimatedDuration > 0
-                ? new Date(new Date(raw.started_at).getTime() + estimatedDuration * 60000).toISOString()
+            const estimatedDuration = baseDuration > 0 ? baseDuration : (links.length * 10)
+            const startedMs = rawStartedAt ? new Date(rawStartedAt).getTime() : NaN
+            const estimatedArrivalAt = rawStartedAt && Number.isFinite(startedMs) && estimatedDuration > 0
+                ? new Date(startedMs + estimatedDuration * 60000).toISOString()
                 : null
             const isClosed = ["cancelled", "delivery_failed"].includes(effectiveStatus)
-            const showTimingBadge = ["sent", "delivered"].includes(effectiveStatus)
+            const showTimingBadge = ["sent", "partially_delivered", "delivered"].includes(effectiveStatus)
             const isLate = !!estimatedArrivalAt && showTimingBadge && !isClosed && nowMs > new Date(estimatedArrivalAt).getTime()
             const remainingMs = estimatedArrivalAt ? Math.max(0, new Date(estimatedArrivalAt).getTime() - nowMs) : 0
             const remainingMinutes = Math.ceil(remainingMs / 60000)
@@ -476,7 +498,7 @@ export default function DeliveriesPage({
                 is_platform_driver: Boolean(raw.is_platform_driver || raw.platform_driver),
                 platformDriver: raw.platform_driver || null,
                 estimatedDurationMinutes: Number(raw.estimated_duration_minutes || 0),
-                startedAt: raw.started_at,
+                startedAt: rawStartedAt,
                 deliveredAt: raw.delivered_at,
                 completedAt: raw.completed_at || raw.delivered_at || null,
                 estimatedArrivalAt,
@@ -735,6 +757,17 @@ export default function DeliveriesPage({
         }
     }
 
+    const handleCloseCreate = useCallback(() => {
+        setCreatePrefillOrderIds(null)
+        closeEntity()
+    }, [closeEntity])
+
+    const handleCreateSuccess = useCallback(() => {
+        setCreatePrefillOrderIds(null)
+        closeEntity()
+        void refetchDeliveries()
+    }, [closeEntity, refetchDeliveries])
+
     const handleStatusTransition = (deliveryId: string, currentStatus: string, nextStatus: string) => {
         setStatusModal(null)
         if (currentStatus === nextStatus) return
@@ -748,11 +781,42 @@ export default function DeliveriesPage({
                 reasonDropdownValue: "",
                 customReasonText: "",
             })
+        } else if (nextStatus === "delivered") {
+            setDeliveryOtpInput("")
+            setBypassDeliveryOtp(false)
+            setBypassReasonInput("")
+            setSimpleConfirmModal({
+                isOpen: true,
+                deliveryId,
+                nextStatus,
+                checkingOtp: true,
+                requiresOtp: false,
+            })
+            void checkDeliveryOtpRequirementAction({ deliveryId }).then((res) => {
+                setSimpleConfirmModal((prev) => {
+                    if (!prev || prev.deliveryId !== deliveryId || prev.nextStatus !== "delivered") return prev
+                    return {
+                        ...prev,
+                        checkingOtp: false,
+                        requiresOtp: Boolean(res.success && res.requiresOtp),
+                        otpOrderCount: res.otpOrderCount ?? 0,
+                        orderNumber: res.orderNumber ?? null,
+                        customerName: res.customerName ?? null,
+                    }
+                })
+            }).catch(() => {
+                setSimpleConfirmModal((prev) => {
+                    if (!prev || prev.deliveryId !== deliveryId) return prev
+                    return { ...prev, checkingOtp: false, requiresOtp: false }
+                })
+            })
         } else {
             setSimpleConfirmModal({
                 isOpen: true,
                 deliveryId,
                 nextStatus,
+                checkingOtp: false,
+                requiresOtp: false,
             })
         }
     }
@@ -780,9 +844,10 @@ export default function DeliveriesPage({
                         <CreateDeliveryPage
                             partnerId={partnerId}
                             editDeliveryId={editDeliveryId || undefined}
-                            onBack={() => { setCreatePrefillOrderIds(null); closeEntity() }}
-                            onSuccess={() => { setCreatePrefillOrderIds(null); closeEntity() }}
+                            onBack={handleCloseCreate}
+                            onSuccess={handleCreateSuccess}
                             initialOrderIds={createPrefillOrderIds || undefined}
+                            initialPrefillOrders={initialPrefillOrders}
                         />
                     </FadeIn>
                 ) : wrapper === "detail" && selectedDeliveryId ? (
@@ -856,343 +921,343 @@ export default function DeliveriesPage({
                                 {mode === "carriers" ? (
                                     <>
                                         <AnimatePresence mode="wait">
-                                        {filteredCarrierShipments.length === 0 ? (
-                                            <FadeIn key="empty-carrier" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
-                                                <IconPlaceholder
-                                                    placeholderType="image"
-                                                    imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
-                                                    imageAlt="Sem envios"
-                                                    title={carrierLoading ? "Carregando envios..." : !carrierEnabled ? "Transportadora não configurada" : "Nenhum envio encontrado"}
-                                                    subtitle={
-                                                        carrierLoading
-                                                            ? "Buscando os pedidos atendidos por transportadora."
-                                                            : !carrierEnabled
-                                                                ? "Configure a integração com a transportadora para acompanhar os envios aqui."
-                                                                : "Nenhum envio corresponde aos filtros selecionados."
-                                                    }
-                                                />
-                                            </FadeIn>
-                                        ) : effectiveViewMode === "kanban" ? (
-                                            <FadeIn key="carrier-kanban" className="w-full">
-                                                <CarrierDeliveryBoard
-                                                    shipments={filteredCarrierShipments}
-                                                    isLoading={carrierLoading}
-                                                    integrationEnabled={carrierEnabled}
-                                                    onOpenOrder={(orderId) => {
-                                                        router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
+                                            {filteredCarrierShipments.length === 0 ? (
+                                                <FadeIn key="empty-carrier" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                                    <IconPlaceholder
+                                                        placeholderType="image"
+                                                        imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
+                                                        imageAlt="Sem envios"
+                                                        title={carrierLoading ? "Carregando envios..." : !carrierEnabled ? "Transportadora não configurada" : "Nenhum envio encontrado"}
+                                                        subtitle={
+                                                            carrierLoading
+                                                                ? "Buscando os pedidos atendidos por transportadora."
+                                                                : !carrierEnabled
+                                                                    ? "Configure a integração com a transportadora para acompanhar os envios aqui."
+                                                                    : "Nenhum envio corresponde aos filtros selecionados."
+                                                        }
+                                                    />
+                                                </FadeIn>
+                                            ) : effectiveViewMode === "kanban" ? (
+                                                <FadeIn key="carrier-kanban" className="w-full">
+                                                    <CarrierDeliveryBoard
+                                                        shipments={filteredCarrierShipments}
+                                                        isLoading={carrierLoading}
+                                                        integrationEnabled={carrierEnabled}
+                                                        onOpenOrder={(orderId) => {
+                                                            router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
+                                                        }}
+                                                    />
+                                                </FadeIn>
+                                            ) : effectiveViewMode === "grid" ? (
+                                                <FadeIn key="carrier-grid" className="w-full">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                        {paginatedCarriers.map((shipment: any) => (
+                                                            <CarrierDeliveryCard
+                                                                key={shipment.id}
+                                                                shipment={shipment}
+                                                                onOpenOrder={(orderId) => {
+                                                                    router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </FadeIn>
+                                            ) : (
+                                                <FadeIn key="carrier-list" className="w-full">
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg pl-4">
+                                                                            Pedido / Cliente
+                                                                        </th>
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                            Transportadora
+                                                                        </th>
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                            Rastreio
+                                                                        </th>
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                            Prazo / Previsão
+                                                                        </th>
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                            Frete
+                                                                        </th>
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                                                            Status
+                                                                        </th>
+                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg pr-4 text-center">
+                                                                            Ações
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginatedCarriers.map((shipment: any) => {
+                                                                        const isCancelled = shipment.situation === "cancelled" || shipment.carrierStatus === "cancelled"
+                                                                        const statusVariant = isCancelled ? "red" : getCarrierStatusVariant(shipment.carrierStatus)
+                                                                        const statusLabel = isCancelled ? "Cancelado" : getCarrierStatusLabel(shipment.carrierStatus)
+                                                                        const brandIcon = getCarrierBrandIcon(shipment.carrierName, shipment.serviceName)
+                                                                        const daysRange = formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays)
+                                                                        const estimatedDate = getEstimatedDeliveryDate(shipment.createdAt, shipment.deliveryMaxDays)
+
+                                                                        return (
+                                                                            <tr
+                                                                                key={shipment.id}
+                                                                                className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                                                                                onClick={() => router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)}
+                                                                            >
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border pl-4">
+                                                                                    <div className="flex flex-col min-w-0">
+                                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {shipment.orderNumber}
+                                                                                        </span>
+                                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                            {shipment.customerName}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                                        <img src={brandIcon} alt={shipment.carrierName} className="w-4 h-4 object-contain shrink-0" />
+                                                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {shipment.serviceName || shipment.carrierName}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                    {shipment.trackingNumber ? (
+                                                                                        shipment.trackingUrl ? (
+                                                                                            <a
+                                                                                                href={shipment.trackingUrl}
+                                                                                                target="_blank"
+                                                                                                rel="noreferrer"
+                                                                                                onClick={(e) => e.stopPropagation()}
+                                                                                                className="text-xs font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
+                                                                                            >
+                                                                                                {shipment.trackingNumber}
+                                                                                                <LinkIcon size={12} />
+                                                                                            </a>
+                                                                                        ) : (
+                                                                                            <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                                                                {shipment.trackingNumber}
+                                                                                            </span>
+                                                                                        )
+                                                                                    ) : (
+                                                                                        <span className="text-xs text-brand-inactive-text">—</span>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                    <div className="flex flex-col text-left">
+                                                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {daysRange || "—"}
+                                                                                        </span>
+                                                                                        {estimatedDate && (
+                                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                                Prev.: {estimatedDate}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                    <span className="text-[13px] font-bold text-brand-primary">
+                                                                                        {formatCurrency(shipment.deliveryFee != null ? shipment.deliveryFee : (shipment.price || 0))}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border">
+                                                                                    <Badge
+                                                                                        variant={statusVariant}
+                                                                                        icon={brandIcon ? <img src={brandIcon} alt="Transportadora" className="w-3.5 h-3.5 object-contain" /> : <TruckIcon size={12} />}
+                                                                                    >
+                                                                                        {statusLabel}
+                                                                                    </Badge>
+                                                                                </td>
+                                                                                <td className="p-3 border-b border-brand-border dark:border-dark-border pr-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                                    <div className="flex justify-center">
+                                                                                        <ActionsDropdown
+                                                                                            onView={() => router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)}
+                                                                                        >
+                                                                                            {shipment.trackingUrl && (
+                                                                                                <DropdownItem onClick={() => window.open(shipment.trackingUrl, "_blank")}>
+                                                                                                    <LinkIcon size={18} /> Rastrear envio
+                                                                                                </DropdownItem>
+                                                                                            )}
+                                                                                            {shipment.labelUrl && (
+                                                                                                <DropdownItem onClick={() => window.open(shipment.labelUrl, "_blank")}>
+                                                                                                    <PrinterIcon size={18} /> Imprimir etiqueta
+                                                                                                </DropdownItem>
+                                                                                            )}
+                                                                                        </ActionsDropdown>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </FadeIn>
+                                            )}
+                                        </AnimatePresence>
+                                        {effectiveViewMode !== "kanban" && filteredCarrierShipments.length > 0 && carrierTotalPages > 1 && (
+                                            <div className="mt-4 pb-2">
+                                                <Pagination
+                                                    currentPage={carrierPage}
+                                                    totalPages={carrierTotalPages}
+                                                    onPageChange={(p) => {
+                                                        setCarrierPage(p)
+                                                        if (p === carrierTotalPages && carrierHasNextPage && !carrierFetchingNextPage) {
+                                                            void fetchCarrierNextPage()
+                                                        }
                                                     }}
                                                 />
-                                            </FadeIn>
-                                        ) : effectiveViewMode === "grid" ? (
-                                            <FadeIn key="carrier-grid" className="w-full">
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                    {paginatedCarriers.map((shipment: any) => (
-                                                        <CarrierDeliveryCard
-                                                            key={shipment.id}
-                                                            shipment={shipment}
-                                                            onOpenOrder={(orderId) => {
-                                                                router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
-                                                            }}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </FadeIn>
-                                        ) : (
-                                            <FadeIn key="carrier-list" className="w-full">
-                                                <div className="w-full overflow-hidden rounded-xl relative">
-                                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
-                                                            <thead>
-                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg pl-4">
-                                                                        Pedido / Cliente
-                                                                    </th>
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Transportadora
-                                                                    </th>
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Rastreio
-                                                                    </th>
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Prazo / Previsão
-                                                                    </th>
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Frete
-                                                                    </th>
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
-                                                                        Status
-                                                                    </th>
-                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg pr-4 text-center">
-                                                                        Ações
-                                                                    </th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {paginatedCarriers.map((shipment: any) => {
-                                                                    const isCancelled = shipment.situation === "cancelled" || shipment.carrierStatus === "cancelled"
-                                                                    const statusVariant = isCancelled ? "red" : getCarrierStatusVariant(shipment.carrierStatus)
-                                                                    const statusLabel = isCancelled ? "Cancelado" : getCarrierStatusLabel(shipment.carrierStatus)
-                                                                    const brandIcon = getCarrierBrandIcon(shipment.carrierName, shipment.serviceName)
-                                                                    const daysRange = formatDeliveryDaysRange(shipment.deliveryMinDays, shipment.deliveryMaxDays)
-                                                                    const estimatedDate = getEstimatedDeliveryDate(shipment.createdAt, shipment.deliveryMaxDays)
-
-                                                                    return (
-                                                                        <tr
-                                                                            key={shipment.id}
-                                                                            className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-                                                                            onClick={() => router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)}
-                                                                        >
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border pl-4">
-                                                                                <div className="flex flex-col min-w-0">
-                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                        {shipment.orderNumber}
-                                                                                    </span>
-                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                        {shipment.customerName}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
-                                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                                    <img src={brandIcon} alt={shipment.carrierName} className="w-4 h-4 object-contain shrink-0" />
-                                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
-                                                                                        {shipment.serviceName || shipment.carrierName}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
-                                                                                {shipment.trackingNumber ? (
-                                                                                    shipment.trackingUrl ? (
-                                                                                        <a
-                                                                                            href={shipment.trackingUrl}
-                                                                                            target="_blank"
-                                                                                            rel="noreferrer"
-                                                                                            onClick={(e) => e.stopPropagation()}
-                                                                                            className="text-xs font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
-                                                                                        >
-                                                                                            {shipment.trackingNumber}
-                                                                                            <LinkIcon size={12} />
-                                                                                        </a>
-                                                                                    ) : (
-                                                                                        <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                                                                            {shipment.trackingNumber}
-                                                                                        </span>
-                                                                                    )
-                                                                                ) : (
-                                                                                    <span className="text-xs text-brand-inactive-text">—</span>
-                                                                                )}
-                                                                            </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
-                                                                                <div className="flex flex-col text-left">
-                                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
-                                                                                        {daysRange || "—"}
-                                                                                    </span>
-                                                                                    {estimatedDate && (
-                                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                            Prev.: {estimatedDate}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
-                                                                                <span className="text-[13px] font-bold text-brand-primary">
-                                                                                    {formatCurrency(shipment.deliveryFee != null ? shipment.deliveryFee : (shipment.price || 0))}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border">
-                                                                                <Badge
-                                                                                    variant={statusVariant}
-                                                                                    icon={brandIcon ? <img src={brandIcon} alt="Transportadora" className="w-3.5 h-3.5 object-contain" /> : <TruckIcon size={12} />}
-                                                                                >
-                                                                                    {statusLabel}
-                                                                                </Badge>
-                                                                            </td>
-                                                                            <td className="p-3 border-b border-brand-border dark:border-dark-border pr-4 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                                <div className="flex justify-center">
-                                                                                    <ActionsDropdown
-                                                                                        onView={() => router.push(`/erp/pedidos?view=${shipment.orderId}&tab=delivery`)}
-                                                                                    >
-                                                                                        {shipment.trackingUrl && (
-                                                                                            <DropdownItem onClick={() => window.open(shipment.trackingUrl, "_blank")}>
-                                                                                                <LinkIcon size={18} /> Rastrear envio
-                                                                                            </DropdownItem>
-                                                                                        )}
-                                                                                        {shipment.labelUrl && (
-                                                                                            <DropdownItem onClick={() => window.open(shipment.labelUrl, "_blank")}>
-                                                                                                <PrinterIcon size={18} /> Imprimir etiqueta
-                                                                                            </DropdownItem>
-                                                                                        )}
-                                                                                    </ActionsDropdown>
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    )
-                                                                })}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </FadeIn>
+                                            </div>
                                         )}
-                                    </AnimatePresence>
-                                    {effectiveViewMode !== "kanban" && filteredCarrierShipments.length > 0 && carrierTotalPages > 1 && (
-                                        <div className="mt-4 pb-2">
-                                            <Pagination
-                                                currentPage={carrierPage}
-                                                totalPages={carrierTotalPages}
-                                                onPageChange={(p) => {
-                                                    setCarrierPage(p)
-                                                    if (p === carrierTotalPages && carrierHasNextPage && !carrierFetchingNextPage) {
-                                                        void fetchCarrierNextPage()
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                    )}
                                     </>
                                 ) : (
                                     <>
                                         <AnimatePresence mode="wait">
-                                        {paginated.length === 0 ? (
-                                            <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
-                                                <IconPlaceholder
-                                                    placeholderType="image"
-                                                    imageSrc={
-                                                        planGate
-                                                            ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                                                            : "https://img.dudit.com.br/static/mascots/Entregas.png"
-                                                    }
-                                                    imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
-                                                    title={isListLoading ? "Carregando entregas..." : planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
-                                                    subtitle={
-                                                        isListLoading
-                                                            ? "Buscando as entregas mais recentes."
-                                                            : planGate
-                                                                ? planGate.message
-                                                                : isDelivery
-                                                                    ? "Nenhuma entrega atribuída a você no momento."
-                                                                    : "Nenhuma entrega corresponde aos filtros ou crie uma entrega para começar."
-                                                    }
-                                                    itemButton={
-                                                        isListLoading
-                                                            ? undefined
-                                                            : planGate
-                                                                ? {
-                                                                    text: "Ver Plano Escalar",
-                                                                    action: () => openPlanUpgrade("escalar"),
-                                                                }
-                                                                : isDelivery
-                                                                    ? undefined
-                                                                    : {
-                                                                        text: "Adicionar primeira entrega",
-                                                                        action: () => openEntity("create"),
+                                            {paginated.length === 0 ? (
+                                                <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                                    <IconPlaceholder
+                                                        placeholderType="image"
+                                                        imageSrc={
+                                                            planGate
+                                                                ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                                                : "https://img.dudit.com.br/static/mascots/Entregas.png"
+                                                        }
+                                                        imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
+                                                        title={isListLoading ? "Carregando entregas..." : planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
+                                                        subtitle={
+                                                            isListLoading
+                                                                ? "Buscando as entregas mais recentes."
+                                                                : planGate
+                                                                    ? planGate.message
+                                                                    : isDelivery
+                                                                        ? "Nenhuma entrega atribuída a você no momento."
+                                                                        : "Nenhuma entrega corresponde aos filtros ou crie uma entrega para começar."
+                                                        }
+                                                        itemButton={
+                                                            isListLoading
+                                                                ? undefined
+                                                                : planGate
+                                                                    ? {
+                                                                        text: "Ver Plano Escalar",
+                                                                        action: () => openPlanUpgrade("escalar"),
                                                                     }
-                                                    }
-                                                />
-                                            </FadeIn>
-                                        ) : effectiveViewMode === "kanban" ? (
-                                            <FadeIn key="kanban" className="w-full">
-                                                <DeliveryKanbanBoard
-                                                    deliveries={mapped}
-                                                    onDetails={(id) => openEntity("view", id)}
-                                                    onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
-                                                    onQuickStatusChange={handleQuickStatusChange}
-                                                />
-                                            </FadeIn>
-                                        ) : effectiveViewMode === "grid" ? (
-                                            <FadeIn key="grid" className="w-full">
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                    {paginated.map((delivery: any) => (
-                                                        <DeliveryGridCard
-                                                            key={delivery.id}
-                                                            delivery={delivery}
-                                                            onDetails={() => openEntity("view", delivery.id)}
-                                                            onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
-                                                            onQuickStatusChange={handleQuickStatusChange}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </FadeIn>
-                                        ) : (
-                                            <FadeIn key="list" className="w-full">
-                                                <div className="w-full overflow-hidden rounded-xl relative">
-                                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                            <thead>
-                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    {COLUMNS.map((col, idx) => {
-                                                                        const isSortable = col.id !== "actions"
-                                                                        const isSorted = sortConfig?.key === col.id
-                                                                        const isFirst = idx === 0
-                                                                        const isLast = idx === COLUMNS.length - 1
-
-                                                                        return (
-                                                                            <th
-                                                                                key={col.id}
-                                                                                className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-4" : ""} ${isLast ? "rounded-r-lg pr-4" : ""}`}
-                                                                                style={{ width: col.width }}
-                                                                                onClick={() => {
-                                                                                    if (!isSortable) return
-                                                                                    setSortConfig(prev => ({
-                                                                                        key: col.id as SortKey,
-                                                                                        direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                                    }))
-                                                                                }}
-                                                                            >
-                                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                                    <span>{col.label}</span>
-                                                                                    {isSortable && (
-                                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                                            <ArrowUpDownIcon
-                                                                                                size={14}
-                                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                                            />
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                            </th>
-                                                                        )
-                                                                    })}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {paginated.map((delivery: any) => (
-                                                                    <DeliveryListItem
-                                                                        key={delivery.id}
-                                                                        delivery={delivery}
-                                                                        columns={COLUMNS}
-                                                                        onDetails={() => openEntity("view", delivery.id)}
-                                                                        onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
-                                                                        onQuickStatusChange={handleQuickStatusChange}
-                                                                    />
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                                    : isDelivery
+                                                                        ? undefined
+                                                                        : {
+                                                                            text: "Adicionar primeira entrega",
+                                                                            action: () => openEntity("create"),
+                                                                        }
+                                                        }
+                                                    />
+                                                </FadeIn>
+                                            ) : effectiveViewMode === "kanban" ? (
+                                                <FadeIn key="kanban" className="w-full">
+                                                    <DeliveryKanbanBoard
+                                                        deliveries={mapped}
+                                                        onDetails={(id) => openEntity("view", id)}
+                                                        onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
+                                                        onQuickStatusChange={handleQuickStatusChange}
+                                                    />
+                                                </FadeIn>
+                                            ) : effectiveViewMode === "grid" ? (
+                                                <FadeIn key="grid" className="w-full">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                        {paginated.map((delivery: any) => (
+                                                            <DeliveryGridCard
+                                                                key={delivery.id}
+                                                                delivery={delivery}
+                                                                onDetails={() => openEntity("view", delivery.id)}
+                                                                onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
+                                                                onQuickStatusChange={handleQuickStatusChange}
+                                                            />
+                                                        ))}
                                                     </div>
-                                                </div>
-                                            </FadeIn>
+                                                </FadeIn>
+                                            ) : (
+                                                <FadeIn key="list" className="w-full">
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        {COLUMNS.map((col, idx) => {
+                                                                            const isSortable = col.id !== "actions"
+                                                                            const isSorted = sortConfig?.key === col.id
+                                                                            const isFirst = idx === 0
+                                                                            const isLast = idx === COLUMNS.length - 1
+
+                                                                            return (
+                                                                                <th
+                                                                                    key={col.id}
+                                                                                    className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-4" : ""} ${isLast ? "rounded-r-lg pr-4" : ""}`}
+                                                                                    style={{ width: col.width }}
+                                                                                    onClick={() => {
+                                                                                        if (!isSortable) return
+                                                                                        setSortConfig(prev => ({
+                                                                                            key: col.id as SortKey,
+                                                                                            direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                        }))
+                                                                                    }}
+                                                                                >
+                                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                        <span>{col.label}</span>
+                                                                                        {isSortable && (
+                                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                                <ArrowUpDownIcon
+                                                                                                    size={14}
+                                                                                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                                />
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </th>
+                                                                            )
+                                                                        })}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginated.map((delivery: any) => (
+                                                                        <DeliveryListItem
+                                                                            key={delivery.id}
+                                                                            delivery={delivery}
+                                                                            columns={COLUMNS}
+                                                                            onDetails={() => openEntity("view", delivery.id)}
+                                                                            onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
+                                                                            onQuickStatusChange={handleQuickStatusChange}
+                                                                        />
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </FadeIn>
+                                            )}
+                                        </AnimatePresence>
+                                        {effectiveViewMode !== "kanban" && mapped.length > 0 && totalPages > 1 && (
+                                            <div className="mt-4 pb-2">
+                                                <Pagination
+                                                    currentPage={page}
+                                                    totalPages={totalPages}
+                                                    onPageChange={(p) => {
+                                                        setPage(p)
+                                                        if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                                            void fetchNextPage()
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
                                         )}
-                                    </AnimatePresence>
-                                    {effectiveViewMode !== "kanban" && mapped.length > 0 && totalPages > 1 && (
-                                        <div className="mt-4 pb-2">
-                                            <Pagination
-                                                currentPage={page}
-                                                totalPages={totalPages}
-                                                onPageChange={(p) => {
-                                                    setPage(p)
-                                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                                                        void fetchNextPage()
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                    )}
                                     </>
                                 )}
 
@@ -1425,11 +1490,11 @@ export default function DeliveriesPage({
                     }
                 />
 
-                {simpleConfirmModal?.isOpen && simpleConfirmModal.nextStatus === "delivered" ? (
+                {simpleConfirmModal?.isOpen && simpleConfirmModal.nextStatus === "delivered" && simpleConfirmModal.requiresOtp ? (
                     <DefaultModal
                         isOpen={true}
-                        title="Confirmar Entrega"
-                        maxWidth="sm"
+                        title="Código de Entrega Obrigatório"
+                        maxWidth="md"
                         onClose={() => {
                             setSimpleConfirmModal(null)
                             setDeliveryOtpInput("")
@@ -1452,67 +1517,45 @@ export default function DeliveriesPage({
                                 <Button
                                     onClick={async () => {
                                         const { deliveryId, nextStatus } = simpleConfirmModal
+                                        const effectiveBypass = isOwnerOrAdmin && bypassDeliveryOtp
                                         setSimpleConfirmModal(null)
                                         await executeStatusChange(
                                             deliveryId,
                                             nextStatus,
                                             undefined,
-                                            bypassDeliveryOtp ? undefined : deliveryOtpInput.trim() || undefined,
-                                            bypassDeliveryOtp,
-                                            bypassReasonInput.trim() || undefined
+                                            effectiveBypass ? undefined : deliveryOtpInput.trim() || undefined,
+                                            effectiveBypass,
+                                            effectiveBypass ? bypassReasonInput.trim() || undefined : undefined
                                         )
                                     }}
-                                    disabled={!bypassDeliveryOtp && deliveryOtpInput.trim().length > 0 && deliveryOtpInput.trim().length !== 6}
+                                    disabled={
+                                        (isOwnerOrAdmin && bypassDeliveryOtp)
+                                            ? !bypassReasonInput.trim()
+                                            : ((simpleConfirmModal.otpOrderCount ?? 1) > 1 || deliveryOtpInput.trim().length !== 6)
+                                    }
                                 >
                                     Confirmar Entrega
                                 </Button>
                             </div>
                         }
                     >
-                        <div className="flex flex-col gap-4 p-4">
-                            <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
-                                    <ShieldIcon size={18} />
-                                    <span>Código de Confirmação (OTP)</span>
-                                </div>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                    Se este pedido exigir confirmação de entrega, informe o código de 6 dígitos informado pelo cliente ou selecione o bypass administrativo.
-                                </p>
-                                {!bypassDeliveryOtp ? (
-                                    <Input
-                                        label="Código de 6 dígitos"
-                                        placeholder="000000"
-                                        value={deliveryOtpInput}
-                                        onChange={(e) => setDeliveryOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                        maxLength={6}
-                                        className="tracking-widest font-mono text-center text-lg font-bold"
-                                    />
-                                ) : (
-                                    <Input
-                                        label="Motivo do Bypass Administrativo"
-                                        placeholder="Ex: Cliente sem celular / autorizado por telefone"
-                                        value={bypassReasonInput}
-                                        onChange={(e) => setBypassReasonInput(e.target.value)}
-                                    />
-                                )}
-                                <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
-                                    <input
-                                        type="checkbox"
-                                        id="erp-bypass-otp-page"
-                                        checked={bypassDeliveryOtp}
-                                        onChange={(e) => setBypassDeliveryOtp(e.target.checked)}
-                                        className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
-                                    />
-                                    <label htmlFor="erp-bypass-otp-page" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                        Bypassar código (Autorização de Administrador)
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
+                        <ErpDeliveryOtpSection
+                            code={deliveryOtpInput}
+                            onCodeChange={setDeliveryOtpInput}
+                            bypassOtp={bypassDeliveryOtp}
+                            onBypassOtpChange={setBypassDeliveryOtp}
+                            bypassReason={bypassReasonInput}
+                            onBypassReasonChange={setBypassReasonInput}
+                            canBypass={isOwnerOrAdmin}
+                            orderNumber={simpleConfirmModal.orderNumber}
+                            customerName={simpleConfirmModal.customerName}
+                            otpOrderCount={simpleConfirmModal.otpOrderCount ?? 1}
+                            checkboxId="erp-bypass-otp-page"
+                        />
                     </DefaultModal>
                 ) : (
                     <AlertModal
-                        isOpen={simpleConfirmModal?.isOpen ?? false}
+                        isOpen={Boolean(simpleConfirmModal?.isOpen && !simpleConfirmModal?.checkingOtp)}
                         title="Confirmar Alteração de Status"
                         description={`Tem certeza que deseja alterar o status desta entrega para ${getDeliveryStatusMeta(simpleConfirmModal?.nextStatus || "").label}?`}
                         confirmText="Confirmar"

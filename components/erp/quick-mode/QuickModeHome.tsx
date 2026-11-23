@@ -33,6 +33,7 @@ import { ERPOnboardingWizard } from "@/components/erp/onboarding/ERPOnboardingWi
 import { StorePlaqueModal } from "@/components/erp/shared/StorePlaqueModal";
 import { usePermissions } from "@/lib/permission-context";
 import { RevenueLimitCard } from "@/components/erp/dashboard/widgets/general/RevenueLimitCard";
+import { ModeUpgradeModal, type UpgradeTargetMode } from "@/components/erp/quick-mode/ModeUpgradeModal";
 import { MessageSquare } from "lucide-react";
 
 interface QuickModeHomeProps {
@@ -563,12 +564,13 @@ function ModeCard({
     isDesapego?: boolean;
     onSuccess: () => void;
 }) {
-    const [modalOpen, setModalOpen] = useState(false);
-    const [selectedMode, setSelectedMode] = useState<"quick" | "erp">("quick");
+    const [selectorOpen, setSelectorOpen] = useState(false);
+    const [selectedMode, setSelectedMode] = useState<UpgradeTargetMode>("quick");
+    const [knowMoreMode, setKnowMoreMode] = useState<UpgradeTargetMode | null>(null);
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
 
-    const handleUpgrade = async (modeToSet: "quick" | "erp") => {
+    const handleUpgrade = async (modeToSet: UpgradeTargetMode) => {
         setLoading(true);
         try {
             const { switchBusinessModeAction } = await import("@/app/actions/erp/quick-mode");
@@ -578,7 +580,8 @@ function ModeCard({
                     title: modeToSet === "erp" ? "Gestão completa ativada!" : "Vitrine Online ativada!",
                     description: modeToSet === "erp" ? "Bem-vindo ao modo Gestão completa." : "Sua vitrine online e catálogo comercial estão prontos."
                 });
-                setModalOpen(false);
+                setSelectorOpen(false);
+                setKnowMoreMode(null);
                 if (typeof window !== "undefined") {
                     window.location.reload();
                 } else {
@@ -597,13 +600,13 @@ function ModeCard({
         return (
             <>
                 <ListItem
-                    title=" Evoluir negócio"
+                    title="Evoluir negócio"
                     description="Ative a Vitrine Online ou o Gestor para desbloquear pedidos, financeiro e muito mais."
                     icon={<RocketIcon className="text-brand-green w-5 h-5 shrink-0" />}
                     className="px-4 py-3"
                     right={
                         <Button
-                            onClick={() => setModalOpen(true)}
+                            onClick={() => setSelectorOpen(true)}
                         >
                             Evoluir negócio
                         </Button>
@@ -611,10 +614,10 @@ function ModeCard({
                 />
 
                 <DefaultModal
-                    isOpen={modalOpen}
-                    onClose={() => setModalOpen(false)}
+                    isOpen={selectorOpen}
+                    onClose={() => setSelectorOpen(false)}
                     title="Escolha como deseja evoluir"
-                    description="Selecione o modo ideal para o seu negócio. Você poderá alternar quando quiser."
+                    description="Selecione o modo ideal para o seu negócio para ver o que muda antes de confirmar."
                     maxWidth="md"
                 >
                     <div className="space-y-4">
@@ -651,33 +654,60 @@ function ModeCard({
                         />
 
                         <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
-                            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={loading}>
+                            <Button variant="outline" onClick={() => setSelectorOpen(false)}>
                                 Cancelar
                             </Button>
-                            <Button onClick={() => handleUpgrade(selectedMode)} disabled={loading}>
-                                {loading ? "Ativando..." : "Confirmar e Ativar"}
+                            <Button
+                                onClick={() => {
+                                    setSelectorOpen(false);
+                                    setKnowMoreMode(selectedMode);
+                                }}
+                            >
+                                Continuar
                             </Button>
                         </div>
                     </div>
                 </DefaultModal>
+
+                <ModeUpgradeModal
+                    isOpen={knowMoreMode !== null}
+                    targetMode={knowMoreMode || selectedMode}
+                    loading={loading}
+                    onClose={() => setKnowMoreMode(null)}
+                    onBackToSelector={() => {
+                        setKnowMoreMode(null);
+                        setSelectorOpen(true);
+                    }}
+                    onConfirm={handleUpgrade}
+                />
             </>
         );
     }
 
     return (
-        <ListItem
-            title="Gestão completa"
-            description="Controle completo do seu negócio, financeiro, equipe e relatórios."
-            icon={<BriefcaseIcon className="text-brand-green w-5 h-5 shrink-0" />}
-            className="px-4 py-3"
-            right={
-                <Button
-                    onClick={() => handleUpgrade("erp")}
-                >
-                    {loading ? "Ativando..." : "Ativar"}
-                </Button>
-            }
-        />
+        <>
+            <ListItem
+                title="Gestão completa"
+                description="Controle completo do seu negócio, financeiro, equipe e relatórios."
+                icon={<BriefcaseIcon className="text-brand-green w-5 h-5 shrink-0" />}
+                className="px-4 py-3"
+                right={
+                    <Button
+                        onClick={() => setKnowMoreMode("erp")}
+                    >
+                        Ativar
+                    </Button>
+                }
+            />
+
+            <ModeUpgradeModal
+                isOpen={knowMoreMode === "erp"}
+                targetMode="erp"
+                loading={loading}
+                onClose={() => setKnowMoreMode(null)}
+                onConfirm={handleUpgrade}
+            />
+        </>
     );
 }
 

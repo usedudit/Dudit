@@ -83,7 +83,7 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
         return (
           <div className="flex flex-col text-left">
             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-              {delivery.startedAt ? formatDate(delivery.startedAt) : "-"}
+              {delivery.startedAt ? `${formatDate(delivery.startedAt)} ${formatTime(delivery.startedAt)}` : "-"}
             </span>
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
               Prev.: {delivery.estimatedArrivalAt ? `${formatDate(delivery.estimatedArrivalAt)} ${formatTime(delivery.estimatedArrivalAt)}` : "-"}

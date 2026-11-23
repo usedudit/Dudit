@@ -1,11 +1,17 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Button, Badge, IconPlaceholder } from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
 import { setMyDeliveryAvailabilityAction } from "@/app/actions/delivery-drivers"
+import {
+    DRIVER_AVAILABILITY_EVENT,
+    DRIVER_LOCATION_EVENT,
+    type DriverLocationBeaconState,
+    type DriverPositionQuality,
+} from "./DriverLocationBeacon"
 import {
     TruckIcon,
     CheckCircleIcon,
@@ -26,6 +32,9 @@ interface DeliveryDashboardProps {
         in_progress?: number
         completed?: number
         availability?: "available" | "offline" | "occupied" | string
+        position_quality?: DriverPositionQuality
+        location_source?: string | null
+        located_at?: string | null
     } | null
     deliveries: DeliveryAssignmentItem[]
 }
@@ -34,8 +43,32 @@ export default function DeliveryDashboard({ dashboard, deliveries = [] }: Delive
     const [availability, setAvailability] = useState<string>(
         String(dashboard?.availability || "offline")
     )
+    const [positionQuality, setPositionQuality] = useState<DriverPositionQuality>(
+        dashboard?.position_quality || "unknown"
+    )
     const [saving, setSaving] = useState(false)
     const [recentTab, setRecentTab] = useState<"all" | "pending" | "in_progress" | "completed">("all")
+
+    useEffect(() => {
+        const handleLoc = (event: Event) => {
+            const detail = (event as CustomEvent<DriverLocationBeaconState>).detail
+            if (detail?.quality) {
+                setPositionQuality(detail.quality)
+            }
+        }
+        const handleAvail = (event: Event) => {
+            const detail = (event as CustomEvent<{ status: string }>).detail
+            if (detail?.status) {
+                setAvailability(detail.status)
+            }
+        }
+        window.addEventListener(DRIVER_LOCATION_EVENT, handleLoc)
+        window.addEventListener(DRIVER_AVAILABILITY_EVENT, handleAvail)
+        return () => {
+            window.removeEventListener(DRIVER_LOCATION_EVENT, handleLoc)
+            window.removeEventListener(DRIVER_AVAILABILITY_EVENT, handleAvail)
+        }
+    }, [])
 
     const changeAvailability = async (value: "available" | "offline") => {
         setSaving(true)
@@ -46,6 +79,7 @@ export default function DeliveryDashboard({ dashboard, deliveries = [] }: Delive
             return
         }
         setAvailability(value)
+        window.dispatchEvent(new CustomEvent(DRIVER_AVAILABILITY_EVENT, { detail: { status: value } }))
         toast.success(value === "available" ? "Você está online para receber entregas!" : "Você está offline.")
     }
 
@@ -192,6 +226,23 @@ export default function DeliveryDashboard({ dashboard, deliveries = [] }: Delive
                                     ? "Realizando rota ativa"
                                     : "Indisponível para rotas"}
                             </p>
+                            <div className="mt-2">
+                                <Badge
+                                    variant={
+                                        positionQuality === "live"
+                                            ? "green"
+                                            : positionQuality === "address"
+                                            ? "orange"
+                                            : "gray"
+                                    }
+                                >
+                                    {positionQuality === "live"
+                                        ? "GPS ao vivo"
+                                        : positionQuality === "address"
+                                        ? "Posição por endereço"
+                                        : "Sem sinal de GPS"}
+                                </Badge>
+                            </div>
                         </div>
                     </div>
                 </div>

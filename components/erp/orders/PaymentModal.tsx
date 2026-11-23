@@ -101,7 +101,6 @@ import { PixQrDisplayModal } from '@/components/erp/payments/shared/PixQrDisplay
 import { getPaymentMethodDetailsAction, updatePaymentMethodAction } from '@/app/actions/erp/payment-methods';
 import { AlertModal, Input, CpfCnpjInput, EmailInput, PhoneInput } from '@/components/reusable';
 import QRCode from 'qrcode';
-import { text } from 'stream/consumers';
 const SuccessActionCard = React.memo(({ icon: Icon, label, onClick }: { icon: any, label: string, onClick?: () => void }) => (
     <div
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
@@ -3466,37 +3465,30 @@ const PaymentModal = ({
                                     className="h-full"
                                 >
                                     {isLockedMarketplace && (currentLockedMethod || originalPaymentMethod) && (
-                                        <div className="mb-6 flex items-center justify-between gap-3 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-slate/40 dark:bg-dark-border/20">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                    <MoneyIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">
-                                                        Método escolhido pelo cliente no checkout
-                                                    </span>
-                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate block">
-                                                        {formatPaymentMethodToFullLabel(currentLockedMethod || originalPaymentMethod || "")}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {canChangePaymentMethod && orderId && !isAlreadyFullyPaid ? (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setShowChangeMethodModal(true)}
-                                                    className="shrink-0 text-xs h-9"
-                                                >
-                                                    Alterar método
-                                                </Button>
-                                            ) : (
-                                                <Tooltip text="Apenas Proprietário, Administrador ou Gerente podem alterar o método mediante solicitação">
-                                                    <span className="text-xs text-brand-inactive-text cursor-not-allowed">
-                                                        Fixo pelo cliente
-                                                    </span>
-                                                </Tooltip>
-                                            )}
-                                        </div>
+                                        <ListItem
+                                            icon={<MoneyIcon />}
+                                            title="Método escolhido pelo cliente no checkout"
+                                            description={formatPaymentMethodToFullLabel(currentLockedMethod || originalPaymentMethod || "")}
+                                            className="px-4 py-3"
+                                            left={
+                                                canChangePaymentMethod && orderId && !isAlreadyFullyPaid ? (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setShowChangeMethodModal(true)}
+                                                        className="shrink-0 text-xs h-9"
+                                                    >
+                                                        Alterar método
+                                                    </Button>
+                                                ) : (
+                                                    <Tooltip text="Apenas Proprietário, Administrador ou Gerente podem alterar o método mediante solicitação">
+                                                        <span className="text-xs text-brand-inactive-text cursor-not-allowed">
+                                                            Fixo pelo cliente
+                                                        </span>
+                                                    </Tooltip>
+                                                )
+                                            }
+                                        />
                                     )}
                                     {view === 'methods' && (
                                         <motion.div key="methods" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col">

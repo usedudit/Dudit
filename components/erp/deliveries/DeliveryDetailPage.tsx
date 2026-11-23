@@ -11,10 +11,13 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon, ShieldIcon, CheckCircleIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
+import { checkDeliveryOtpRequirementAction, checkOrderDeliveryOtpRequirementAction } from "@/app/actions/delivery-otp"
+import ErpDeliveryOtpSection from "./ErpDeliveryOtpSection"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
+import { resolveLinkDeliveryStatus } from "@/lib/delivery/status-resolver"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import Portal from "@/components/Portal"
@@ -24,6 +27,7 @@ import { parseAddressString } from "../orders/CreateOrder"
 import PaymentStatusModal from "../orders/PaymentStatusModal"
 import DriverPaymentModal from "@/components/delivery/DriverPaymentModal"
 import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
+import DeliveryOrderDetailSheet from "./DeliveryOrderDetailSheet"
 import type { DuditPlatformDriver } from "./types"
 
 const CHANGE_STATUS_REASONS = [
@@ -76,6 +80,7 @@ export default function DeliveryDetailPage({
     const [delivery, setDelivery] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [route, setRoute] = useState<any | null>(null)
+    const [mapRouteStats, setMapRouteStats] = useState<{ distanceKm: number; durationMinutes: number } | null>(null)
     const [routeError, setRouteError] = useState<string | null>(null)
     const [routeLoading, setRouteLoading] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
@@ -105,6 +110,20 @@ export default function DeliveryDetailPage({
     const [deliveryOtp, setDeliveryOtp] = useState<string>("")
     const [bypassOtp, setBypassOtp] = useState<boolean>(false)
     const [bypassReason, setBypassReason] = useState<string>("")
+    const [deliveryOtpCheck, setDeliveryOtpCheck] = useState<{
+        loading: boolean
+        requiresOtp: boolean
+        otpOrderCount: number
+        orderNumber?: string | null
+        customerName?: string | null
+    }>({ loading: false, requiresOtp: false, otpOrderCount: 0 })
+    const [orderOtpCheck, setOrderOtpCheck] = useState<{
+        loading: boolean
+        requiresOtp: boolean
+        orderNumber?: string | null
+        customerName?: string | null
+    }>({ loading: false, requiresOtp: false })
+    const isOwnerOrAdmin = userRole === "owner" || userRole === "admin"
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
     const [orderStatusModal, setOrderStatusModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string } | null>(null)
     const [orderNewStatus, setOrderNewStatus] = useState<string>("")
@@ -117,18 +136,68 @@ export default function DeliveryDetailPage({
 
     const { setHeaderOverride } = useSidebar()
 
+    useEffect(() => {
+        if (!isStatusModalOpen || selectedNewStatus !== "delivered" || !delivery?.id) {
+            setDeliveryOtpCheck({ loading: false, requiresOtp: false, otpOrderCount: 0 })
+            return
+        }
+        let alive = true
+        setDeliveryOtpCheck({ loading: true, requiresOtp: false, otpOrderCount: 0 })
+        void checkDeliveryOtpRequirementAction({ deliveryId: delivery.id })
+            .then((res) => {
+                if (!alive) return
+                setDeliveryOtpCheck({
+                    loading: false,
+                    requiresOtp: Boolean(res.success && res.requiresOtp),
+                    otpOrderCount: res.otpOrderCount ?? 0,
+                    orderNumber: res.orderNumber ?? null,
+                    customerName: res.customerName ?? null,
+                })
+            })
+            .catch(() => {
+                if (alive) setDeliveryOtpCheck({ loading: false, requiresOtp: false, otpOrderCount: 0 })
+            })
+        return () => { alive = false }
+    }, [isStatusModalOpen, selectedNewStatus, delivery?.id])
+
+    useEffect(() => {
+        if (!orderStatusModal?.isOpen || orderNewStatus !== "delivered" || !orderStatusModal.orderId) {
+            setOrderOtpCheck({ loading: false, requiresOtp: false })
+            return
+        }
+        let alive = true
+        const targetLink = (delivery?.delivery_orders || []).find((l: any) => l?.orders?.id === orderStatusModal.orderId)
+        const targetOrder = targetLink?.orders
+        setOrderOtpCheck({ loading: true, requiresOtp: false })
+        void checkOrderDeliveryOtpRequirementAction({ orderId: orderStatusModal.orderId })
+            .then((res) => {
+                if (!alive) return
+                setOrderOtpCheck({
+                    loading: false,
+                    requiresOtp: Boolean(res.success && res.requiresOtp && !res.isConfirmed),
+                    orderNumber: targetOrder?.order_number || null,
+                    customerName: targetOrder?.customer_name || null,
+                })
+            })
+            .catch(() => {
+                if (alive) setOrderOtpCheck({ loading: false, requiresOtp: false })
+            })
+        return () => { alive = false }
+    }, [orderStatusModal?.isOpen, orderStatusModal?.orderId, orderNewStatus, delivery?.delivery_orders])
+
     const handleStatusChange = useCallback(async () => {
         if (!delivery || selectedNewStatus === delivery.status) return
         const prevDelivery = delivery
+        const effectiveBypass = isOwnerOrAdmin && bypassOtp
         setDelivery((current: any) => current ? { ...current, status: selectedNewStatus } : current)
         try {
             const res = await updateERPDeliveryStatusAction({
                 deliveryId: delivery.id,
                 partnerId,
                 status: selectedNewStatus as any,
-                deliveryOtp: bypassOtp ? undefined : deliveryOtp.trim() || undefined,
-                bypassOtp,
-                bypassReason: bypassReason.trim() || undefined,
+                deliveryOtp: deliveryOtpCheck.requiresOtp && !effectiveBypass ? deliveryOtp.trim() || undefined : undefined,
+                bypassOtp: deliveryOtpCheck.requiresOtp ? effectiveBypass : false,
+                bypassReason: deliveryOtpCheck.requiresOtp && effectiveBypass ? bypassReason.trim() || undefined : undefined,
             })
             if (res.success) {
                 toast.success("Status da entrega atualizado com sucesso!")
@@ -184,6 +253,7 @@ export default function DeliveryDetailPage({
 
     useEffect(() => {
         setRoute(null)
+        setMapRouteStats(null)
         setRouteError(null)
     }, [deliveryId])
 
@@ -284,15 +354,16 @@ export default function DeliveryDetailPage({
 
         setUpdatingOrderId(orderId)
         try {
+            const effectiveBypass = isOwnerOrAdmin && bypassOtp
             const res = await updateERPSingleOrderDeliveryStatusAction({
                 partnerId,
                 deliveryId,
                 orderId,
                 status: nextStatus as any,
                 changeReason: reason,
-                deliveryOtp: bypassOtp ? undefined : deliveryOtp.trim() || undefined,
-                bypassOtp,
-                bypassReason: bypassReason.trim() || undefined,
+                deliveryOtp: orderOtpCheck.requiresOtp && !effectiveBypass ? deliveryOtp.trim() || undefined : undefined,
+                bypassOtp: orderOtpCheck.requiresOtp ? effectiveBypass : false,
+                bypassReason: orderOtpCheck.requiresOtp && effectiveBypass ? bypassReason.trim() || undefined : undefined,
             })
             if (res.success) {
                 toast.success("Status do pedido atualizado com sucesso!")
@@ -420,7 +491,8 @@ export default function DeliveryDetailPage({
                         const order = link.orders
                         if (!order) return null
                         const paymentMeta = getPaymentStatusMeta(order.situation)
-                        const deliveryMeta = getDeliveryStatusMeta(link.status || order.delivery_status)
+                        const resolvedOrderDeliveryStatus = resolveLinkDeliveryStatus(link, delivery?.status)
+                        const deliveryMeta = getDeliveryStatusMeta(resolvedOrderDeliveryStatus)
                         const displayId = order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`
 
                         return (
@@ -439,23 +511,23 @@ export default function DeliveryDetailPage({
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <Tooltip text={paymentMeta.label}>
-                                        <span className="contents">
+                                        <span className="inline-flex">
                                             <span className="hidden lg:inline-flex">
                                                 <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>{paymentMeta.label}</Badge>
                                             </span>
-                                            <span className="lg:hidden">
+                                            <span className="lg:hidden inline-flex">
                                                 <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} />
                                             </span>
                                         </span>
                                     </Tooltip>
                                     <Tooltip text={deliveryMeta.label}>
-                                        <span className="contents">
+                                        <span className="inline-flex">
                                             <span className="hidden lg:inline-flex">
                                                 <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
                                                     {deliveryMeta.label}
                                                 </Badge>
                                             </span>
-                                            <span className="lg:hidden">
+                                            <span className="lg:hidden inline-flex">
                                                 <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />} />
                                             </span>
                                         </span>
@@ -496,20 +568,23 @@ export default function DeliveryDetailPage({
         </div>
     )
 
-    const displayDistance = route?.totalDistanceKm != null
-        ? `${Number(route.totalDistanceKm).toFixed(2)} km`
-        : `${Number(delivery.distance_km || 0).toFixed(2)} km`
+    const resolvedDistanceKm = mapRouteStats?.distanceKm ?? route?.totalDistanceKm ?? delivery.distance_km ?? 0
+    const displayDistance = `${Number(resolvedDistanceKm).toFixed(1)} km`
 
-    const displayDuration = route?.totalEstimatedDurationMinutes != null
-        ? `${route.totalEstimatedDurationMinutes} min`
-        : `${delivery.estimated_duration_minutes || 0} min`
+    const resolvedDurationMin = mapRouteStats?.durationMinutes ?? route?.totalEstimatedDurationMinutes ?? delivery.estimated_duration_minutes ?? 0
+    const displayDuration = resolvedDurationMin > 0 ? `~${resolvedDurationMin} min` : "-"
+
+    const showDepartureTime = !["pending", "not_sent", "preparing"].includes(String(delivery.status || ""))
+    const departureDisplay = showDepartureTime
+        ? (delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-"))
+        : "-"
 
     const deliveryInfoMetrics = (
         <FormSection title="Informações da Entrega" hasSeparator>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ListItem icon={RouteIcon} title="Distância" description={displayDistance} className="px-4 py-3 gap-4" />
                 <ListItem icon={EstimateTimeIcon} title="Duração Estimada" description={displayDuration} className="px-4 py-3 gap-4" />
-                <ListItem icon={ClockArrowUpIcon} title="Saída" description={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} className="px-4 py-3 gap-4" />
+                <ListItem icon={ClockArrowUpIcon} title="Saída" description={departureDisplay} className="px-4 py-3 gap-4" />
                 <ListItem icon={ClockCheckIcon} title="Conclusão" description={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} className="px-4 py-3 gap-4" />
             </div>
         </FormSection>
@@ -534,6 +609,7 @@ export default function DeliveryDetailPage({
             origin={route.origin}
             initialLat={route.origin?.lat ?? null}
             initialLng={route.origin?.lng ?? null}
+            onRouteStatsChange={setMapRouteStats}
         />
     ) : (
         <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface/50 px-4">
@@ -745,7 +821,20 @@ export default function DeliveryDetailPage({
                 footer={
                     <div className="flex justify-end gap-3 w-full">
                         <Button variant="outline" onClick={() => setIsStatusModalOpen(false)}>Cancelar</Button>
-                        <Button onClick={() => void handleStatusChange()} disabled={selectedNewStatus === delivery?.status}>Salvar</Button>
+                        <Button
+                            onClick={() => void handleStatusChange()}
+                            disabled={
+                                selectedNewStatus === delivery?.status ||
+                                (selectedNewStatus === "delivered" && deliveryOtpCheck.loading) ||
+                                (selectedNewStatus === "delivered" && deliveryOtpCheck.requiresOtp && (
+                                    (isOwnerOrAdmin && bypassOtp)
+                                        ? !bypassReason.trim()
+                                        : (deliveryOtpCheck.otpOrderCount > 1 || deliveryOtp.trim().length !== 6)
+                                ))
+                            }
+                        >
+                            Salvar
+                        </Button>
                     </div>
                 }
             >
@@ -765,45 +854,20 @@ export default function DeliveryDetailPage({
                         ]}
                     />
 
-                    {selectedNewStatus === "delivered" && (
-                        <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
-                                <ShieldIcon size={18} />
-                                <span>Código de Confirmação (OTP)</span>
-                            </div>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Se este pedido exigir confirmação de entrega, informe o código de 6 dígitos do cliente ou selecione o bypass administrativo.
-                            </p>
-                            {!bypassOtp ? (
-                                <Input
-                                    label="Código de 6 dígitos"
-                                    placeholder="000000"
-                                    value={deliveryOtp}
-                                    onChange={(e) => setDeliveryOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                    maxLength={6}
-                                    className="tracking-widest font-mono text-center text-lg font-bold"
-                                />
-                            ) : (
-                                <Input
-                                    label="Motivo do Bypass Administrativo"
-                                    placeholder="Ex: Cliente sem celular / autorizado por telefone"
-                                    value={bypassReason}
-                                    onChange={(e) => setBypassReason(e.target.value)}
-                                />
-                            )}
-                            <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
-                                <input
-                                    type="checkbox"
-                                    id="erp-bypass-otp-detail"
-                                    checked={bypassOtp}
-                                    onChange={(e) => setBypassOtp(e.target.checked)}
-                                    className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
-                                />
-                                <label htmlFor="erp-bypass-otp-detail" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                    Bypassar código (Autorização de Administrador)
-                                </label>
-                            </div>
-                        </div>
+                    {selectedNewStatus === "delivered" && deliveryOtpCheck.requiresOtp && (
+                        <ErpDeliveryOtpSection
+                            code={deliveryOtp}
+                            onCodeChange={setDeliveryOtp}
+                            bypassOtp={bypassOtp}
+                            onBypassOtpChange={setBypassOtp}
+                            bypassReason={bypassReason}
+                            onBypassReasonChange={setBypassReason}
+                            canBypass={isOwnerOrAdmin}
+                            orderNumber={deliveryOtpCheck.orderNumber}
+                            customerName={deliveryOtpCheck.customerName}
+                            otpOrderCount={deliveryOtpCheck.otpOrderCount}
+                            checkboxId="erp-bypass-otp-detail"
+                        />
                     )}
                 </div>
             </DefaultModal>
@@ -856,7 +920,16 @@ export default function DeliveryDetailPage({
                             <Button variant="outline" onClick={() => { setOrderStatusModal(null); setOrderNewStatus("") }}>Cancelar</Button>
                             <Button
                                 onClick={() => void handleOrderStatusChange()}
-                                disabled={!orderNewStatus || orderNewStatus === orderStatusModal.currentStatus}
+                                disabled={
+                                    !orderNewStatus ||
+                                    orderNewStatus === orderStatusModal.currentStatus ||
+                                    (orderNewStatus === "delivered" && orderOtpCheck.loading) ||
+                                    (orderNewStatus === "delivered" && orderOtpCheck.requiresOtp && (
+                                        (isOwnerOrAdmin && bypassOtp)
+                                            ? !bypassReason.trim()
+                                            : deliveryOtp.trim().length !== 6
+                                    ))
+                                }
                             >
                                 Salvar
                             </Button>
@@ -881,45 +954,20 @@ export default function DeliveryDetailPage({
                             ]}
                         />
 
-                        {orderNewStatus === "delivered" && (
-                            <div className="flex flex-col gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-lg border border-brand-primary/20">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
-                                    <ShieldIcon size={18} />
-                                    <span>Código de Confirmação (OTP)</span>
-                                </div>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                    Se este pedido exigir confirmação de entrega, informe o código de 6 dígitos do cliente ou selecione o bypass administrativo.
-                                </p>
-                                {!bypassOtp ? (
-                                    <Input
-                                        label="Código de 6 dígitos"
-                                        placeholder="000000"
-                                        value={deliveryOtp}
-                                        onChange={(e) => setDeliveryOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                        maxLength={6}
-                                        className="tracking-widest font-mono text-center text-lg font-bold"
-                                    />
-                                ) : (
-                                    <Input
-                                        label="Motivo do Bypass Administrativo"
-                                        placeholder="Ex: Cliente sem celular / autorizado por telefone"
-                                        value={bypassReason}
-                                        onChange={(e) => setBypassReason(e.target.value)}
-                                    />
-                                )}
-                                <div className="flex items-center gap-2 pt-1 border-t border-brand-border/40 dark:border-dark-border/40">
-                                    <input
-                                        type="checkbox"
-                                        id="erp-bypass-otp-single"
-                                        checked={bypassOtp}
-                                        onChange={(e) => setBypassOtp(e.target.checked)}
-                                        className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary h-4 w-4"
-                                    />
-                                    <label htmlFor="erp-bypass-otp-single" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                        Bypassar código (Autorização de Administrador)
-                                    </label>
-                                </div>
-                            </div>
+                        {orderNewStatus === "delivered" && orderOtpCheck.requiresOtp && (
+                            <ErpDeliveryOtpSection
+                                code={deliveryOtp}
+                                onCodeChange={setDeliveryOtp}
+                                bypassOtp={bypassOtp}
+                                onBypassOtpChange={setBypassOtp}
+                                bypassReason={bypassReason}
+                                onBypassReasonChange={setBypassReason}
+                                canBypass={isOwnerOrAdmin}
+                                orderNumber={orderOtpCheck.orderNumber}
+                                customerName={orderOtpCheck.customerName}
+                                otpOrderCount={1}
+                                checkboxId="erp-bypass-otp-single"
+                            />
                         )}
                     </div>
                 </DefaultModal>
@@ -934,7 +982,7 @@ export default function DeliveryDetailPage({
                         setSimpleConfirmModal(null)
                     }}
                     title="Confirmar alteração de status"
-                    message={`Tem certeza que deseja alterar o status deste pedido para "${simpleConfirmModal.nextStatus}"?`}
+                    message={`Tem certeza que deseja alterar o status deste pedido para "${getDeliveryStatusLabel(simpleConfirmModal.nextStatus)}"?`}
                     confirmText="Confirmar"
                     cancelText="Cancelar"
                     variant="warning"
@@ -942,350 +990,131 @@ export default function DeliveryDetailPage({
             )}
 
             {(() => {
-                const isOpen = !!selectedLink;
-                const handleClose = () => setSelectedLink(null);
+                const selectedOrder = selectedLink ? (selectedLink.orders || selectedLink) : null
+                const resolvedSelectedStatus = selectedLink
+                    ? (selectedLink.status && !["pending", "not_sent"].includes(selectedLink.status)
+                        ? selectedLink.status
+                        : (selectedOrder?.delivery_status || selectedLink.status || delivery?.status || "not_sent"))
+                    : null
+                const isDelivered = resolvedSelectedStatus === "delivered"
+                const isPaid = selectedOrder
+                    ? ["paid", "concluído", "concluido", "approved", "pago"].includes(String(selectedOrder.situation || "").toLowerCase())
+                    : false
+                const remaining = selectedOrder
+                    ? Math.max(0, Number(selectedOrder.total_amount || 0) - Number(selectedOrder.paid_amount || 0))
+                    : 0
 
-                if (!selectedLink) return null;
-                const order = selectedLink.orders || selectedLink;
-                const displayId = order.order_number || `#${String(order.id || "").slice(0, 8).toUpperCase()}`;
-                const paymentMeta = getPaymentStatusMeta(order.situation || order.status || (order as any).paymentStatus);
-                const deliveryMeta = getDeliveryStatusMeta(selectedLink.status || order.delivery_status);
-
-                const sheetContent = (
-                    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                        <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                            <div>
-                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
-                            </div>
-                            <Button variant="filled" onClick={handleClose} size="icon">
-                                <XIcon className="h-5 w-5" />
-                            </Button>
-                        </header>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-6 relative min-h-0">
-                            <Tabs defaultValue="dados_gerais" className="w-full h-full flex flex-col">
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6 shrink-0">
-                                    <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
-                                        Dados Gerais
-                                    </TabsTrigger>
-                                    <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
-                                        Itens do Pedido
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                <div className="flex-1 overflow-y-auto space-y-6 min-h-0">
-                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(order.total_amount || order.totalAmount || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(order.delivery_fee || order.shippingFee || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                    {(() => {
-                                                        if (Array.isArray(order.payment_breakdown || (order as any).paymentBreakdown) && (order.payment_breakdown || (order as any).paymentBreakdown).length > 0) {
-                                                            return (order.payment_breakdown || (order as any).paymentBreakdown)
-                                                                .map((e: any) => formatPaymentMethodLabel(e.method || e.payment_method || e.name, e.type || e.payment_type))
-                                                                .filter(Boolean)
-                                                                .join(", ") || formatPaymentMethodLabel(order.payment_method || (order as any).paymentMethod, null) || "Não informado"
-                                                        }
-                                                        return formatPaymentMethodLabel(order.payment_method || (order as any).paymentMethod, null) || "Não informado"
-                                                    })()}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Pagamento</span>
-                                                <Tooltip text={paymentMeta.label}>
-                                                    <span className="contents">
-                                                        <span className="hidden lg:inline-flex">
-                                                            <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>{paymentMeta.label}</Badge>
-                                                        </span>
-                                                        <span className="lg:hidden">
-                                                            <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} />
-                                                        </span>
-                                                    </span>
-                                                </Tooltip>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
-                                                <Tooltip text={deliveryMeta.label}>
-                                                    <span className="contents">
-                                                        <span className="hidden lg:inline-flex">
-                                                            <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
-                                                                {deliveryMeta.label}
-                                                            </Badge>
-                                                        </span>
-                                                        <span className="lg:hidden">
-                                                            <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />} />
-                                                        </span>
-                                                    </span>
-                                                </Tooltip>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {order.created_at ? formatDateTime(order.created_at) : (order.orderDate ? formatDateTime(order.orderDate) : "-")}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {(() => {
-                                            const isDelivered = (selectedLink?.status || order.delivery_status) === "delivered"
-                                            const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes(String(order.situation || "").toLowerCase())
-                                            const remaining = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
-
-                                            if (userRole === "delivery") {
-                                                if (!isPaid) {
-                                                    if (isDelivered) {
-                                                        return (
-                                                            <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                                    <MoneyIcon size={20} className="text-brand-primary shrink-0" />
-                                                                    <div>
-                                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento Pendente</p>
-                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Valor restante: {formatCurrency(remaining)}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        setDriverPaymentOrder(order)
-                                                                        setIsDriverPaymentModalOpen(true)
-                                                                    }}
-                                                                >
-                                                                    Receber Pagamento
-                                                                </Button>
-                                                            </div>
-                                                        )
-                                                    }
-                                                    return (
-                                                        <InfoCard
-                                                            color="blue"
-                                                            message="O recebimento do pagamento poderá ser processado após a confirmação da entrega deste pedido."
-                                                        />
-                                                    )
-                                                }
-                                            }
-                                            return null
-                                        })()}
-
-                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                        <CustomerCard
-                                            customer={{
-                                                ...(order.customer || {}),
-                                                name: order.customer?.name || order.customer_name || "Cliente",
-                                                email: order.customer?.email || "",
-                                                phone: order.customer?.phone || "",
-                                            }}
-                                            address={order.customerAddress || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
-                                            showMap={false}
-                                            chrome="minimal"
-                                        />
-
-                                        {order.notes && (
-                                            <div>
-                                                <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
-                                                <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
-                                                    {order.notes}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </TabsContent>
-
-                                    <TabsContent value="itens" className="mt-0">
-                                        {(() => {
-                                            const items = order.order_items || order.items || [];
-                                            const filteredItems = items.filter((item: any) => {
-                                                const pType = String(item.products?.product_type || "").toLowerCase()
-                                                return pType !== "serviço" && pType !== "servico" && pType !== "service"
-                                            })
-                                            if (filteredItems.length === 0) {
-                                                return (
-                                                    <div className="flex items-center justify-center py-8">
-                                                        <IconPlaceholder
-                                                            icon={BoxIcon}
-                                                            title="Sem itens por aqui"
-                                                            subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
-                                                        />
-                                                    </div>
-                                                )
-                                            }
-                                            return (
-                                                <div className="space-y-4">
-                                                    {filteredItems.map((item: any) => {
-                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
-                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
-                                                        const itemUnit = item.products?.unit || item.unit || "un"
-                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
-                                                        const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
-
-                                                        return (
-                                                            <div key={item.id} className="flex items-start gap-4">
-                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                    <img
-                                                                        src={itemImage}
-                                                                        className="w-full h-full object-cover rounded-full"
-                                                                        alt={item.product_name || "Produto sem nome"}
-                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            {item.product_name || "Produto sem nome"}
-                                                                        </h4>
-                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(itemSubtotal)}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                        SKU: {itemSku}
-                                                                    </div>
-                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                        {formatQuantityWithUnit(item.quantity, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )
-                                        })()}
-                                    </TabsContent>
+                const driverPaymentBanner = selectedOrder && userRole === "delivery" && !isPaid ? (
+                    isDelivered ? (
+                        <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <MoneyIcon size={20} className="text-brand-primary shrink-0" />
+                                <div>
+                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento Pendente</p>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Valor restante: {formatCurrency(remaining)}</p>
                                 </div>
-                            </Tabs>
+                            </div>
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    setDriverPaymentOrder(selectedOrder)
+                                    setIsDriverPaymentModalOpen(true)
+                                }}
+                            >
+                                Receber Pagamento
+                            </Button>
                         </div>
+                    ) : (
+                        <InfoCard
+                            color="blue"
+                            message="O recebimento do pagamento poderá ser processado após a confirmação da entrega deste pedido."
+                        />
+                    )
+                ) : null
 
-                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
-                            <div className="flex gap-3 w-full">
-                                {userRole === "delivery" ? (
-                                    (() => {
-                                        const isDelivered = (selectedLink?.status || order.delivery_status) === "delivered"
-                                        const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes(String(order.situation || "").toLowerCase())
-
-                                        if (isPaid) {
-                                            return (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="flex-1 h-12"
-                                                    onClick={() => {
-                                                        setDriverPaymentOrder(order)
-                                                        setIsDriverPaymentModalOpen(true)
-                                                    }}
-                                                >
-                                                    <CheckCircleIcon size={16} className="text-brand-green mr-1.5" />
-                                                    Pago (Ver Detalhes)
-                                                </Button>
-                                            )
-                                        }
-
-                                        if (isDelivered) {
-                                            return (
-                                                <Button
-                                                    type="button"
-                                                    variant="default"
-                                                    className="flex-1 h-12 font-bold"
-                                                    onClick={() => {
-                                                        setDriverPaymentOrder(order)
-                                                        setIsDriverPaymentModalOpen(true)
-                                                    }}
-                                                >
-                                                    <MoneyIcon size={18} className="mr-1.5" />
-                                                    Processar Pagamento
-                                                </Button>
-                                            )
-                                        }
-
-                                        return (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="flex-1 h-12"
-                                                onClick={() => {
-                                                    setDriverPaymentOrder(order)
-                                                    setIsDriverPaymentModalOpen(true)
-                                                }}
-                                            >
-                                                Status de Pagamento
-                                            </Button>
-                                        )
-                                    })()
-                                ) : (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="flex-1 h-12"
-                                        onClick={() => {
-                                            setActiveLink(selectedLink)
-                                            setIsOrderPaymentModalOpen(true)
-                                        }}
-                                    >
-                                        Status de Pagamento
-                                    </Button>
-                                )}
+                const sheetFooter = selectedOrder ? (
+                    <div className="flex gap-3 w-full">
+                        {userRole === "delivery" ? (
+                            isPaid ? (
                                 <Button
                                     type="button"
                                     variant="outline"
                                     className="flex-1 h-12"
                                     onClick={() => {
-                                        setOrderStatusModal({
-                                            isOpen: true,
-                                            orderId: order.id,
-                                            currentStatus: selectedLink?.status || order.delivery_status || "not_sent"
-                                        })
-                                        setOrderNewStatus("")
+                                        setDriverPaymentOrder(selectedOrder)
+                                        setIsDriverPaymentModalOpen(true)
                                     }}
                                 >
-                                    Status de Entrega
+                                    <CheckCircleIcon size={16} className="text-brand-green mr-1.5" />
+                                    Pago (Ver Detalhes)
                                 </Button>
-                            </div>
-                        </footer>
-                    </div>
-                );
-
-                return isMobile ? (
-                    <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                        {sheetContent}
-                    </BottomSheet>
-                ) : (
-                    <Portal>
-                        <AnimatePresence>
-                            {isOpen && (
-                                <motion.div
-                                    className="fixed inset-0 z-50"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
+                            ) : isDelivered ? (
+                                <Button
+                                    type="button"
+                                    variant="default"
+                                    className="flex-1 h-12 font-bold"
+                                    onClick={() => {
+                                        setDriverPaymentOrder(selectedOrder)
+                                        setIsDriverPaymentModalOpen(true)
+                                    }}
                                 >
-                                    <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
-                                    <motion.div
-                                        className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface flex flex-col"
-                                        initial={{ x: "100%", opacity: 0 }}
-                                        animate={{ x: 0, opacity: 1 }}
-                                        exit={{ x: "100%", opacity: 0 }}
-                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        {sheetContent}
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </Portal>
-                );
+                                    <MoneyIcon size={18} className="mr-1.5" />
+                                    Processar Pagamento
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="flex-1 h-12"
+                                    onClick={() => {
+                                        setDriverPaymentOrder(selectedOrder)
+                                        setIsDriverPaymentModalOpen(true)
+                                    }}
+                                >
+                                    Status de Pagamento
+                                </Button>
+                            )
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="flex-1 h-12"
+                                onClick={() => {
+                                    setActiveLink(selectedLink)
+                                    setIsOrderPaymentModalOpen(true)
+                                }}
+                            >
+                                Status de Pagamento
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="flex-1 h-12"
+                            onClick={() => {
+                                setOrderStatusModal({
+                                    isOpen: true,
+                                    orderId: selectedOrder.id,
+                                    currentStatus: resolvedSelectedStatus || "not_sent",
+                                })
+                                setOrderNewStatus("")
+                            }}
+                        >
+                            Status de Entrega
+                        </Button>
+                    </div>
+                ) : undefined
+
+                return (
+                    <DeliveryOrderDetailSheet
+                        isOpen={!!selectedLink}
+                        onClose={() => setSelectedLink(null)}
+                        order={selectedOrder}
+                        deliveryStatusOverride={resolvedSelectedStatus}
+                        extraGeneralContent={driverPaymentBanner}
+                        footer={sheetFooter}
+                    />
+                )
             })()}
         </FadeIn>
     )

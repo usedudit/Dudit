@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
@@ -128,6 +129,11 @@ interface Order {
     isCarrierDelivery?: boolean;
     carrier_status?: string | null;
     order_items?: any[];
+    linkedDelivery?: {
+        id: string;
+        deliveryNumber: number | null;
+        status: string;
+    } | null;
     customer_email?: string | null;
     customer_phone?: string | null;
 }
@@ -564,10 +570,30 @@ export default function OrdersPage({
                     failed: <DeliveryFailedIcon size={12} />,
                 }
 
+                const deliveryLinks = Array.isArray(o.delivery_orders) ? o.delivery_orders : []
+                const activeDeliveryLink = deliveryLinks.find((l: any) => {
+                    const del = Array.isArray(l?.deliveries) ? l.deliveries[0] : l?.deliveries
+                    return del?.id && del.status !== "cancelled"
+                }) || deliveryLinks.find((l: any) => {
+                    const del = Array.isArray(l?.deliveries) ? l.deliveries[0] : l?.deliveries
+                    return Boolean(del?.id)
+                }) || null
+                const linkedDeliveryObj = activeDeliveryLink
+                    ? (Array.isArray(activeDeliveryLink.deliveries) ? activeDeliveryLink.deliveries[0] : activeDeliveryLink.deliveries)
+                    : null
+                const linkedDelivery = linkedDeliveryObj?.id
+                    ? {
+                        id: String(linkedDeliveryObj.id),
+                        deliveryNumber: linkedDeliveryObj.delivery_number ?? null,
+                        status: String(linkedDeliveryObj.status || "pending"),
+                    }
+                    : null
+
                 return {
                     id: o.id,
                     originalId: o.id,
                     displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
+                    linkedDelivery,
                     customer_name: resolvedCustomerName,
                     customer_id: o.buyer_id || "-",
                     total_amount: Number(o.total_amount),
@@ -804,7 +830,8 @@ export default function OrdersPage({
 
         if (!isPickup && !isCarrier) {
             const currentStatus = order.delivery_status
-            if (currentStatus === "not_sent" || currentStatus === "preparing" || currentStatus === "pending" || !currentStatus) {
+            const hasLinkedDelivery = Boolean(order.linkedDelivery?.id && order.linkedDelivery.status !== "cancelled")
+            if (!hasLinkedDelivery && (currentStatus === "not_sent" || currentStatus === "preparing" || currentStatus === "pending" || !currentStatus)) {
                 router.push(`/erp/entregas?create=true&orders=${order.originalId}`)
                 return
             }
@@ -1922,6 +1949,21 @@ export default function OrdersPage({
                         message={deliveryStatusModal.order?.displayId || "-"}
                         color="gray"
                     />
+                    {deliveryStatusModal.order?.linkedDelivery?.id && (
+                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/30 px-3.5 py-2.5 text-xs text-brand-inactive-text dark:text-dark-body flex items-center justify-between gap-2">
+                            <span>
+                                Este pedido está vinculado à{" "}
+                                <Link
+                                    href={`/erp/entregas?view=${deliveryStatusModal.order.linkedDelivery.id}`}
+                                    onClick={() => setDeliveryStatusModal({ open: false, order: null })}
+                                    className="font-bold text-brand-dark dark:text-dark-heading underline hover:text-brand-primary transition-colors"
+                                >
+                                    Entrega {deliveryStatusModal.order.linkedDelivery.deliveryNumber ? `#${deliveryStatusModal.order.linkedDelivery.deliveryNumber}` : `#${deliveryStatusModal.order.linkedDelivery.id.slice(0, 6).toUpperCase()}`}
+                                </Link>
+                                .
+                            </span>
+                        </div>
+                    )}
                     {deliveryStatusModal.order?.isCarrierDelivery ? (
                         <FormDropdown
                             options={CARRIER_SHIPMENT_STATUS_OPTIONS}

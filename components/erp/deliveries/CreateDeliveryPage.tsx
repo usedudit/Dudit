@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -16,10 +16,8 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import {
     Badge,
     Button,
-    CustomerCard,
     DatePicker,
     FormDropdown,
-    FormSection,
     SidebarCard,
     Input,
     Tabs,
@@ -31,38 +29,33 @@ import {
     AlertModal,
     FormTextarea,
     ThreeDotsLoader,
-    IconPlaceholder,
     DefaultModal,
+    Tooltip,
 } from "@/components/reusable"
 import {
     createERPDeliveryAction,
     updateERPDeliveryAction,
     getERPDeliveryDetailsAction,
     fetchDeliveryOrderBucketAction,
+    fetchDeliveryOrdersByIdsAction,
     fetchDeliveryPeopleBucketAction,
     getERPDeliveryPlanAccessAction,
     unassignDuditDriverAction,
 } from "@/app/actions/erp/deliveries"
-import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction } from "@/app/actions/erp/delivery-driver-assignments"
+import { assignPlatformDriverToDeliveryAction } from "@/app/actions/erp/delivery-driver-assignments"
 import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
+import DeliveryOrderDetailSheet from "./DeliveryOrderDetailSheet"
 import {
-    CalendarIcon,
     ChevronLeftIcon,
     SaveIcon,
     SearchIcon,
     TrashIcon,
-    InfoIcon,
-    XIcon,
     TruckIcon,
     MoneyIcon,
-    BoxIcon,
 } from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
-import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
-import Portal from "@/components/Portal"
-import BottomSheet from "@/components/BottomSheet"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import DeliveryDriverPickerSheet from "@/components/erp/deliveries/DeliveryDriverPickerSheet"
 
 type DeliveryPerson = { id: string; userId?: string; fullName: string; source?: "legacy" | "platform"; vehicleType?: string }
@@ -144,59 +137,74 @@ export default function CreateDeliveryPage({
     onBack,
     onSuccess,
     initialOrderIds,
+    initialPrefillOrders,
     editDeliveryId,
 }: {
     partnerId: string
     onBack: () => void
     onSuccess: () => void
     initialOrderIds?: string[]
+    initialPrefillOrders?: OrderPickerItem[]
     editDeliveryId?: string
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
-    const isMobile = useMediaQuery("(max-width: 768px)")
 
     const initialDateTime = useMemo(() => getInitialDateTime(), [])
 
     const [activeTab, setActiveTab] = useState("Pedidos")
     const [step, setStep] = useState<1 | 2>(1)
-    const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
+    const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>(() =>
+        !editDeliveryId && initialOrderIds && initialOrderIds.length > 0
+            ? Array.from(new Set(initialOrderIds)).filter(Boolean)
+            : [],
+    )
+    const [prefilledOrders, setPrefilledOrders] = useState<OrderPickerItem[]>(() => initialPrefillOrders || [])
     const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState<string>("")
     const [status, setStatus] = useState("pending")
     const [date, setDate] = useState(initialDateTime.date)
     const [time, setTime] = useState(initialDateTime.time)
     const [notes, setNotes] = useState("")
     const [isSaving, setIsSaving] = useState(false)
+    const [hasSaved, setHasSaved] = useState(false)
     const [isLoadingDelivery, setIsLoadingDelivery] = useState(!!editDeliveryId)
     const [deliveryNumber, setDeliveryNumber] = useState<number | null>(null)
     const initialLoadedRef = useRef<any>(null)
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const [planAccess, setPlanAccess] = useState<{ allowed: boolean; maxOrders: number; planSlug: string; message?: string | null } | null>(null)
     const [infoOrder, setInfoOrder] = useState<OrderPickerItem | null>(null)
-    const [activeOrder, setActiveOrder] = useState<OrderPickerItem | null>(null)
-    // z-index dinâmico: este sheet abre acima de tudo que já estava aberto.
-    const infoSheetZIndex = useModalLayer(!!infoOrder)
-
-    useEffect(() => {
-        if (infoOrder) {
-            setActiveOrder(infoOrder)
-        }
-    }, [infoOrder])
-
     const [orderToRemove, setOrderToRemove] = useState<string | null>(null)
 
+    const showDispatchDateTime = ["sent", "delivered", "cancelled", "delivery_failed"].includes(status)
+
+    const initialOrderIdsKey = useMemo(
+        () =>
+            !editDeliveryId && initialOrderIds && initialOrderIds.length > 0
+                ? Array.from(new Set(initialOrderIds)).filter(Boolean).sort().join(",")
+                : "",
+        [editDeliveryId, initialOrderIds],
+    )
+
     const isDirty = useMemo(() => {
-        if (isSaving || isLoadingDelivery) return false
+        if (isSaving || isLoadingDelivery || hasSaved) return false
         if (editDeliveryId && initialLoadedRef.current) {
             const init = initialLoadedRef.current
             const sameOrders = selectedOrderIds.length === init.orderIds.length && selectedOrderIds.every((id) => init.orderIds.includes(id))
             return !sameOrders || selectedDeliveryPersonId !== init.deliveryPersonId || status !== init.status || date !== init.date || time !== init.time || notes !== init.notes
         }
-        return selectedOrderIds.length > 0 || !!selectedDeliveryPersonId || !!notes
-    }, [selectedOrderIds, selectedDeliveryPersonId, status, date, time, notes, isSaving, isLoadingDelivery, editDeliveryId])
+        const currentOrderIdsKey = [...selectedOrderIds].sort().join(",")
+        const ordersChangedFromPrefill = initialOrderIdsKey
+            ? currentOrderIdsKey !== initialOrderIdsKey
+            : selectedOrderIds.length > 0
+        return ordersChangedFromPrefill || !!selectedDeliveryPersonId || !!notes || status !== "pending"
+    }, [selectedOrderIds, initialOrderIdsKey, selectedDeliveryPersonId, status, date, time, notes, isSaving, isLoadingDelivery, hasSaved, editDeliveryId])
 
-    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation, allowNavigation } = useUnsavedChanges(isDirty)
 
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+    const handleConfirmExit = useCallback(() => {
+        allowNavigation()
+        confirmNavigation()
+    }, [allowNavigation, confirmNavigation])
     const searchRef = useRef<HTMLDivElement>(null)
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
     const [platformDriver, setPlatformDriver] = useState<any>(null)
@@ -308,11 +316,29 @@ export default function CreateDeliveryPage({
             run()
             return () => { mounted = false }
         } else if (initialOrderIds && initialOrderIds.length > 0) {
-            setSelectedOrderIds(Array.from(new Set(initialOrderIds)).filter(Boolean))
-            void orderPicker.loadBucket()
+            const uniqueIds = Array.from(new Set(initialOrderIds)).filter(Boolean)
+            setSelectedOrderIds(uniqueIds)
+            const alreadyHaveIds = new Set(prefilledOrders.map((o) => o.id))
+            const missingIds = uniqueIds.filter((id) => !alreadyHaveIds.has(id))
+            if (missingIds.length > 0) {
+                let alive = true
+                fetchDeliveryOrdersByIdsAction(partnerId, missingIds)
+                    .then((fetched) => {
+                        if (!alive || !Array.isArray(fetched) || fetched.length === 0) return
+                        setPrefilledOrders((prev) => {
+                            const map = new Map(prev.map((o) => [o.id, o]))
+                            for (const item of fetched as OrderPickerItem[]) {
+                                map.set(item.id, item)
+                            }
+                            return Array.from(map.values())
+                        })
+                    })
+                    .catch(() => {})
+                return () => { alive = false }
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editDeliveryId, partnerId])
+    }, [editDeliveryId, partnerId, initialOrderIds])
 
     useEffect(() => {
         let mounted = true
@@ -346,9 +372,11 @@ export default function CreateDeliveryPage({
     }, [])
 
     const selectedOrders = useMemo(() => {
-        const byId = new Map((orderPicker.bucket || []).map((o) => [o.id, o]))
+        const byId = new Map<string, OrderPickerItem>()
+        for (const o of prefilledOrders) byId.set(o.id, o)
+        for (const o of orderPicker.bucket || []) byId.set(o.id, o)
         return selectedOrderIds.map((id) => byId.get(id)).filter(Boolean) as OrderPickerItem[]
-    }, [orderPicker.bucket, selectedOrderIds])
+    }, [orderPicker.bucket, prefilledOrders, selectedOrderIds])
 
     const allItems = useMemo(() => {
         return selectedOrders.flatMap((order) =>
@@ -472,11 +500,15 @@ export default function CreateDeliveryPage({
     }
 
     const handleSave = async () => {
-        if (selectedOrderIds.length === 0 || !date || !time) return
+        if (selectedOrderIds.length === 0) return
+        if (showDispatchDateTime && (!date || !time)) return
 
         setIsSaving(true)
+        let savedSuccessfully = false
         try {
-            const startedAt = new Date(`${date}T${time}:00`).toISOString()
+            const startedAt = showDispatchDateTime && date && time
+                ? new Date(`${date}T${time}:00`).toISOString()
+                : undefined
             const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
             const platformDriverId = isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null
             const legacyDeliveryPersonId = isPlatformDriver ? null : (selectedDeliveryPersonId || null)
@@ -518,6 +550,9 @@ export default function CreateDeliveryPage({
                         return
                     }
                 }
+                savedSuccessfully = true
+                allowNavigation()
+                setHasSaved(true)
                 toast.success(editDeliveryId ? "Entrega atualizada com sucesso!" : "Entrega criada com sucesso!")
                 onSuccess()
             } else {
@@ -526,7 +561,9 @@ export default function CreateDeliveryPage({
         } catch (err: any) {
             toast.error(err?.message || "Erro inesperado ao salvar entrega.")
         } finally {
-            setIsSaving(false)
+            if (!savedSuccessfully) {
+                setIsSaving(false)
+            }
         }
     }
 
@@ -586,7 +623,7 @@ export default function CreateDeliveryPage({
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSave} disabled={isSaving || selectedOrderIds.length === 0 || !date || !time || isBlocked} leftIcon={<SaveIcon size={18} />}>
+                                        <Button onClick={handleSave} disabled={isSaving || selectedOrderIds.length === 0 || (showDispatchDateTime && (!date || !time)) || isBlocked} leftIcon={<SaveIcon size={18} />}>
                                             {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
@@ -754,34 +791,51 @@ export default function CreateDeliveryPage({
                                                                     const orderPaymentMeta = getPaymentStatusMeta(order.status)
                                                                     const orderDeliveryMeta = getDeliveryStatusMeta(order.deliveryStatus)
                                                                     return (
-                                                                        <div key={order.id} className="p-4 flex items-center justify-between gap-4">
+                                                                        <div
+                                                                            key={order.id}
+                                                                            className="p-4 flex items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-dark-border/40 cursor-pointer transition-colors"
+                                                                            onClick={() => setInfoOrder(order)}
+                                                                        >
                                                                             <div className="min-w-0">
                                                                                 <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
                                                                                     {order.displayId}
                                                                                 </p>
                                                                                 <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                    {order.customer?.name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
+                                                                                    {order.customer?.name || "Cliente"} • {formatCurrency(order.totalAmount || 0)}
                                                                                 </p>
                                                                             </div>
                                                                             <div className="flex items-center gap-2 shrink-0">
-                                                                                <Badge variant={orderPaymentMeta.variant} icon={<MoneyIcon />}>
-                                                                                    {orderPaymentMeta.label}
-                                                                                </Badge>
-                                                                                <Badge variant={orderDeliveryMeta.variant} icon={<TruckIcon />}>
-                                                                                    {orderDeliveryMeta.label}
-                                                                                </Badge>
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    className="w-9 h-9"
-                                                                                    onClick={() => setInfoOrder(order)}
-                                                                                    title="Informações do pedido"
-                                                                                >
-                                                                                    <InfoIcon className="w-4 h-4" />
-                                                                                </Button>
+                                                                                <Tooltip text={orderPaymentMeta.label}>
+                                                                                    <span className="inline-flex">
+                                                                                        <span className="hidden lg:inline-flex">
+                                                                                            <Badge variant={orderPaymentMeta.variant} icon={<MoneyIcon />}>
+                                                                                                {orderPaymentMeta.label}
+                                                                                            </Badge>
+                                                                                        </span>
+                                                                                        <span className="lg:hidden inline-flex">
+                                                                                            <Badge variant={orderPaymentMeta.variant} icon={<MoneyIcon />} />
+                                                                                        </span>
+                                                                                    </span>
+                                                                                </Tooltip>
+                                                                                <Tooltip text={orderDeliveryMeta.label}>
+                                                                                    <span className="inline-flex">
+                                                                                        <span className="hidden lg:inline-flex">
+                                                                                            <Badge variant={orderDeliveryMeta.variant} icon={<TruckIcon />}>
+                                                                                                {orderDeliveryMeta.label}
+                                                                                            </Badge>
+                                                                                        </span>
+                                                                                        <span className="lg:hidden inline-flex">
+                                                                                            <Badge variant={orderDeliveryMeta.variant} icon={<TruckIcon />} />
+                                                                                        </span>
+                                                                                    </span>
+                                                                                </Tooltip>
                                                                                 <Button
                                                                                     variant="ghostred"
                                                                                     className="w-9 h-9"
-                                                                                    onClick={() => setOrderToRemove(order.id)}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation()
+                                                                                        setOrderToRemove(order.id)
+                                                                                    }}
                                                                                     title="Remover"
                                                                                 >
                                                                                     <TrashIcon className="w-4 h-4" />
@@ -848,19 +902,23 @@ export default function CreateDeliveryPage({
                                                                     ]}
                                                                 />
 
-                                                                <DatePicker
-                                                                    label="Data de saída"
-                                                                    value={date}
-                                                                    onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
-                                                                    placeholder="Selecione a data"
-                                                                />
+                                                                {showDispatchDateTime && (
+                                                                    <>
+                                                                        <DatePicker
+                                                                            label="Data de saída"
+                                                                            value={date}
+                                                                            onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
+                                                                            placeholder="Selecione a data"
+                                                                        />
 
-                                                                <TimePicker
-                                                                    label="Horário de saída"
-                                                                    value={time}
-                                                                    onChange={setTime}
-                                                                    placeholder="Selecione o horário"
-                                                                />
+                                                                        <TimePicker
+                                                                            label="Horário de saída"
+                                                                            value={time}
+                                                                            onChange={setTime}
+                                                                            placeholder="Selecione o horário"
+                                                                        />
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </section>
 
@@ -916,19 +974,23 @@ export default function CreateDeliveryPage({
                                                             ]}
                                                         />
 
-                                                        <DatePicker
-                                                            label="Data de saída"
-                                                            value={date}
-                                                            onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
-                                                            placeholder="Selecione a data"
-                                                        />
+                                                        {showDispatchDateTime && (
+                                                            <>
+                                                                <DatePicker
+                                                                    label="Data de saída"
+                                                                    value={date}
+                                                                    onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
+                                                                    placeholder="Selecione a data"
+                                                                />
 
-                                                        <TimePicker
-                                                            label="Horário de saída"
-                                                            value={time}
-                                                            onChange={setTime}
-                                                            placeholder="Selecione o horário"
-                                                        />
+                                                                <TimePicker
+                                                                    label="Horário de saída"
+                                                                    value={time}
+                                                                    onChange={setTime}
+                                                                    placeholder="Selecione o horário"
+                                                                />
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </SidebarCard>
                                             </div>
@@ -960,20 +1022,27 @@ export default function CreateDeliveryPage({
                                     <FadeIn key={activeTab}>
                                         <div className="max-w-2xl space-y-4">
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Saída</h3>
-                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                <DatePicker
-                                                    label="Data de saída"
-                                                    value={date}
-                                                    onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
-                                                    placeholder="Selecione a data"
+                                            {showDispatchDateTime ? (
+                                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                    <DatePicker
+                                                        label="Data de saída"
+                                                        value={date}
+                                                        onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
+                                                        placeholder="Selecione a data"
+                                                    />
+                                                    <TimePicker
+                                                        label="Horário de saída"
+                                                        value={time}
+                                                        onChange={setTime}
+                                                        placeholder="Selecione o horário"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <InfoCard
+                                                    color="gray"
+                                                    message="A data e o horário de saída são preenchidos apenas quando o status for Enviado, Entregue ou Cancelada."
                                                 />
-                                                <TimePicker
-                                                    label="Horário de saída"
-                                                    value={time}
-                                                    onChange={setTime}
-                                                    placeholder="Selecione o horário"
-                                                />
-                                            </div>
+                                            )}
                                         </div>
                                     </FadeIn>
                                 </TabsContent>
@@ -999,7 +1068,7 @@ export default function CreateDeliveryPage({
                             <Button variant="outline" className="flex-1" onClick={handleBack} disabled={isSaving}>
                                 Cancelar
                             </Button>
-                            <Button onClick={handleSave} className="flex-1" disabled={isSaving || selectedOrderIds.length === 0 || !date || !time || isBlocked} leftIcon={<SaveIcon size={18} />}>
+                            <Button onClick={handleSave} className="flex-1" disabled={isSaving || selectedOrderIds.length === 0 || (showDispatchDateTime && (!date || !time)) || isBlocked} leftIcon={<SaveIcon size={18} />}>
                                 {isSaving ? "Salvando..." : "Salvar"}
                             </Button>
                         </div>
@@ -1011,185 +1080,16 @@ export default function CreateDeliveryPage({
 
             <UnsavedChangesDialog
                 open={showConfirmDialog}
-                onConfirm={confirmNavigation}
+                onConfirm={handleConfirmExit}
                 onCancel={cancelNavigation}
                 description="Você tem alterações na entrega que ainda não foram salvas."
             />
 
-            {(() => {
-                const isOpen = !!infoOrder;
-                const handleClose = () => setInfoOrder(null);
-
-                if (!activeOrder) return null;
-
-                const sheetContent = (
-                    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                        <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
-                            <Button variant="filled" onClick={handleClose} size="icon">
-                                <XIcon className="h-5 w-5" />
-                            </Button>
-                        </header>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative">
-                            <Tabs defaultValue="dados_gerais" className="w-full">
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                                    <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
-                                        Dados Gerais
-                                    </TabsTrigger>
-                                    <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
-                                        Itens do Pedido
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                <div className="space-y-6">
-                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(activeOrder.totalAmount || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(activeOrder.shippingFee || activeOrder.deliveryFee || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                    {(() => {
-                                                        if (Array.isArray((activeOrder as any).paymentBreakdown) && (activeOrder as any).paymentBreakdown.length > 0) {
-                                                            return (activeOrder as any).paymentBreakdown
-                                                                .map((e: any) => formatPaymentMethodLabel(e.method || e.payment_method || e.name, e.type || e.payment_type))
-                                                                .filter(Boolean)
-                                                                .join(", ") || formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
-                                                        }
-                                                        return formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
-                                                    })()}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).label}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {activeOrder.orderDate ? formatDateTime(activeOrder.orderDate) : "-"}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                        <CustomerCard
-                                            customer={{
-                                                ...(activeOrder.customer || {}),
-                                                name: activeOrder.customer?.name || "Cliente",
-                                                email: activeOrder.customer?.email || "",
-                                                phone: activeOrder.customer?.phone || "",
-                                            }}
-                                            address={activeOrder.customerAddress || buildCustomerAddress(activeOrder.address)}
-                                            showMap={false}
-                                            chrome="minimal"
-                                        />
-                                    </TabsContent>
-
-                                    <TabsContent value="itens" className="mt-0">
-                                        {(() => {
-                                            const filteredItems = (activeOrder.items || []).filter((item: any) => {
-                                                const pType = String(item.products?.product_type || "").toLowerCase()
-                                                return pType !== "serviço" && pType !== "servico" && pType !== "service"
-                                            })
-                                            if (filteredItems.length === 0) {
-                                                return (
-                                                    <div className="flex items-center justify-center">
-                                                        <IconPlaceholder
-                                                            icon={BoxIcon}
-                                                            title="Sem itens por aqui"
-                                                            subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
-                                                        />
-                                                    </div>
-                                                )
-                                            }
-                                            return (
-                                                <div className="space-y-4">
-                                                    {filteredItems.map((item: any) => {
-                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
-                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
-                                                        const itemUnit = item.products?.unit || item.unit || "un"
-                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
-                                                        const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
-
-                                                        return (
-                                                            <div key={item.id} className="flex items-start gap-4">
-                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                    <img
-                                                                        src={itemImage}
-                                                                        className="w-full h-full object-cover rounded-full"
-                                                                        alt={item.product_name || "Produto sem nome"}
-                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            {item.product_name || "Produto sem nome"}
-                                                                        </h4>
-                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(itemSubtotal)}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                        SKU: {itemSku}
-                                                                    </div>
-                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                        {formatQuantityWithUnit(item.quantity, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )
-                                        })()}
-                                    </TabsContent>
-                                </div>
-                            </Tabs>
-                        </div>
-
-                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
-                            <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
-                                Fechar
-                            </Button>
-                        </footer>
-                    </div>
-                );
-
-                return isMobile ? (
-                    <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                        {sheetContent}
-                    </BottomSheet>
-                ) : (
-                    <Portal>
-                        <div
-                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                            style={{ zIndex: infoSheetZIndex }}
-                            onClick={handleClose}
-                        >
-                            <div
-                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                {sheetContent}
-                            </div>
-                        </div>
-                    </Portal>
-                );
-            })()}
+            <DeliveryOrderDetailSheet
+                isOpen={!!infoOrder}
+                onClose={() => setInfoOrder(null)}
+                order={infoOrder}
+            />
 
             <DeliveryDriverPickerSheet
                 isOpen={isDriverSheetOpen}

@@ -427,3 +427,77 @@ export async function resendDeliveryDriverInvitationAdminAction(invitationId: st
   })
   return { success: true as const, emailSent: emailResult.success, inviteUrl: url }
 }
+
+export interface DispatchHealthMetrics {
+  days: number
+  city: string | null
+  summary: {
+    total_requests: number
+    accepted_count: number
+    accepted_tier0_count: number
+    exhausted_count: number
+    economic_cap_blocked_count: number
+    post_accept_cancelled_count: number
+    dimensions_complete_count: number
+    dimensions_unknown_count: number
+    p50_accept_min: number | null
+    p90_accept_min: number | null
+    p50_store_wait_min: number | null
+    avg_pickup_km: number | null
+    avg_delivery_fee: number | null
+  }
+  tiers: Array<{ tier: number; count: number }>
+  daily_funnel: Array<{
+    day: string
+    requests: number
+    accepted: number
+    exhausted: number
+    p50_accept_min: number | null
+  }>
+  recent_events: Array<{
+    id: number
+    assignment_id: string
+    tier: number
+    candidates: number
+    eligible: number
+    offers_created: number
+    effective_max_km: number | null
+    economic_cap_km: number | null
+    suggested_fee: number | null
+    outcome: string
+    took_ms: number | null
+    created_at: string
+  }>
+  density_readiness: {
+    evaluated_dispatches: number
+    meeting_density_4km: number
+    pct_meeting_density: number
+    ready_for_directed_mode: boolean
+  }
+}
+
+export async function getDispatchHealthAdminAction(params?: { days?: number; city?: string | null }) {
+  await requireRateLimit(RateLimitCategory.ADMIN_READ)
+  await requireAdminScope("user_enforcement", "admin")
+
+  const days = Math.min(Math.max(Number(params?.days || 14), 1), 90)
+  const city = clean(params?.city, 100) || null
+  const admin = getAdminClient()
+
+  const { data, error } = await admin.rpc("get_dispatch_health_metrics", {
+    p_days: days,
+    p_city: city,
+  })
+
+  if (error || !data) {
+    return {
+      success: false as const,
+      error: "Não foi possível carregar os indicadores de saúde do despacho.",
+    }
+  }
+
+  return {
+    success: true as const,
+    data: data as DispatchHealthMetrics,
+  }
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Ferramentas e Calculadoras Gratuitas para Lojistas e MEIs | Dudit",
+    title: "Ferramentas e Calculadoras Gratuitas para Lojistas e MEIs",
     description: "Calculadoras gratuitas de taxas de marketplace, margem de lucro e markup, ponto de equilíbrio e gerador de link do WhatsApp para impulsionar seu comércio local.",
     openGraph: {
         title: "Ferramentas e Calculadoras Gratuitas para Lojistas e MEIs | Dudit",

@@ -35,7 +35,8 @@ BEGIN
       ('purge-application-access-logs', '30 4 * * 0', 'SELECT public.purge_old_application_access_logs()'),
       ('purge-expired-deletion-evidence', '0 5 * * 0', 'SELECT public.purge_expired_deletion_evidence()'),
       ('purge-expired-security-incident-records', '0 5 * * 0', 'SELECT public.purge_expired_security_incident_records()'),
-      ('reset-monthly-counters', '5 0 * * *', 'select public.reset_monthly_counters();')
+      ('reset-monthly-counters', '5 0 * * *', 'select public.reset_monthly_counters();'),
+      ('dudit_dispatch_tick', '15 seconds', 'SELECT public.dispatch_tick();')
     ) AS jobs(jobname, schedule, command)
   LOOP
     IF NOT EXISTS (

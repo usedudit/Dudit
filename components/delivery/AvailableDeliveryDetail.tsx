@@ -19,7 +19,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { useSidebar } from "@/lib/sidebar-context"
 import { toast } from "@/hooks/use-notification"
-import { acceptDeliveryOfferAction } from "@/app/actions/delivery-drivers"
+import { acceptDeliveryOfferAction, declineDeliveryOfferAction } from "@/app/actions/delivery-drivers"
 import {
     ChevronLeftIcon,
     TruckIcon,
@@ -53,8 +53,25 @@ export interface AvailableDeliveryDetailProps {
         store_phone?: string
         store_address?: string
         store_logo_url?: string
+        offer_id?: string | null
+        offer_tier?: number | null
+        offer_mode?: "board" | "directed"
+        offer_expires_at?: string | null
+        dispatch_tier?: number
+        bonus_amount?: number
+        pickup_km?: number | null
         pickup_distance_km?: number | null
         distance_km?: number | null
+        pickup_minutes?: number | null
+        delivery_km?: number | null
+        delivery_distance_km?: number | null
+        delivery_minutes?: number | null
+        eta_total_minutes?: number | null
+        vehicle_compatible?: boolean
+        position_quality?: "live" | "address" | "unknown"
+        route_km?: number | null
+        rs_per_km?: number | null
+        dimensions_unknown?: boolean
         order_count?: number
         orders?: Array<{
             order_id?: string
@@ -84,6 +101,7 @@ export default function AvailableDeliveryDetail({
     const { setHeaderOverride } = useSidebar()
     const [offer, setOffer] = useState<any>(initialOffer)
     const [loading, setLoading] = useState(false)
+    const [declining, setDeclining] = useState(false)
     const [activeTab, setActiveTab] = useState("resumo")
     const [itemsPage, setItemsPage] = useState(1)
     const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<any | null>(null)
@@ -140,27 +158,33 @@ export default function AvailableDeliveryDetail({
         return ordersList.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0)
     }, [ordersList])
 
-    // Expiration Timer: 15 minutes (900 seconds)
-    const [timeLeftSeconds, setTimeLeftSeconds] = useState<number | null>(() => {
+    // Elapsed waiting time + janela do tier atual (Fase 2)
+    const [elapsedMinutes, setElapsedMinutes] = useState<number | null>(() => {
         if (!offer.assigned_at) return null
         const assignedTime = new Date(offer.assigned_at).getTime()
-        const expireTime = assignedTime + 15 * 60 * 1000
-        const diffSec = Math.max(0, Math.floor((expireTime - Date.now()) / 1000))
-        return diffSec
+        return Math.max(0, Math.floor((Date.now() - assignedTime) / 60000))
+    })
+    const [tierSecondsLeft, setTierSecondsLeft] = useState<number | null>(() => {
+        if (!offer.offer_expires_at) return null
+        return Math.max(0, Math.floor((new Date(offer.offer_expires_at).getTime() - Date.now()) / 1000))
     })
 
     useEffect(() => {
-        if (!offer.assigned_at) return
-        const interval = setInterval(() => {
-            const assignedTime = new Date(offer.assigned_at).getTime()
-            const expireTime = assignedTime + 15 * 60 * 1000
-            const diffSec = Math.max(0, Math.floor((expireTime - Date.now()) / 1000))
-            setTimeLeftSeconds(diffSec)
-        }, 30000)
+        const calc = () => {
+            if (offer.assigned_at) {
+                const assignedTime = new Date(offer.assigned_at).getTime()
+                setElapsedMinutes(Math.max(0, Math.floor((Date.now() - assignedTime) / 60000)))
+            }
+            if (offer.offer_expires_at) {
+                setTierSecondsLeft(Math.max(0, Math.floor((new Date(offer.offer_expires_at).getTime() - Date.now()) / 1000)))
+            } else {
+                setTierSecondsLeft(null)
+            }
+        }
+        calc()
+        const interval = setInterval(calc, offer.offer_expires_at ? 1000 : 30000)
         return () => clearInterval(interval)
-    }, [offer.assigned_at])
-
-    const isExpired = timeLeftSeconds !== null && timeLeftSeconds <= 0
+    }, [offer.assigned_at, offer.offer_expires_at])
 
     const orderNumberDisplay = offer.order_number
         ? `#${offer.order_number}`
@@ -194,11 +218,6 @@ export default function AvailableDeliveryDetail({
     }, [pageTitle, handleBackClick, setHeaderOverride])
 
     const handleAccept = async () => {
-        if (isExpired) {
-            toast.error("Esta oferta expirou após 15 minutos.")
-            return
-        }
-
         setLoading(true)
         try {
             const assignmentKey = offer.id || offer.assignment_id
@@ -217,6 +236,28 @@ export default function AvailableDeliveryDetail({
             toast.error(err?.message || "Erro inesperado ao aceitar entrega.")
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleDecline = async () => {
+        setDeclining(true)
+        try {
+            const assignmentKey = offer.id || offer.assignment_id
+            const res = await declineDeliveryOfferAction(assignmentKey, offer.offer_id || null)
+            if (res.success) {
+                if (res.data?.cooldown_applied) {
+                    toast.info("Oferta recusada. Pausa temporária de 15 min ativada após recusas consecutivas.")
+                } else {
+                    toast.info("Oferta recusada.")
+                }
+                handleBackClick()
+            } else {
+                toast.error(res.error || "Não foi possível recusar a oferta.")
+            }
+        } catch (err: any) {
+            toast.error(err?.message || "Erro inesperado ao recusar oferta.")
+        } finally {
+            setDeclining(false)
         }
     }
 
@@ -265,30 +306,48 @@ export default function AvailableDeliveryDetail({
                                                 <Badge variant="gray" className="shrink-0">{ordersList.length} paradas</Badge>
                                             )}
                                         </h1>
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        <div className={`hidden md:flex items-center gap-2 text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             <span>Loja: <strong className="text-brand-dark dark:text-dark-heading">{offer.store_name || offer.partner_name || "Estabelecimento"}</strong></span>
-                                            {timeLeftSeconds !== null && (
+                                            {tierSecondsLeft !== null && tierSecondsLeft > 0 ? (
                                                 <>
                                                     <span>•</span>
-                                                    <span className={`flex items-center gap-1 font-semibold ${isExpired ? "text-brand-red" : timeLeftSeconds < 180 ? "text-brand-orange" : "text-brand-inactive-text"}`}>
+                                                    <span className="flex items-center gap-1 font-semibold text-brand-inactive-text">
                                                         <ClockIcon size={13} />
-                                                        {isExpired ? "Expirada" : `${Math.floor(timeLeftSeconds / 60)} min restantes`}
+                                                        fecha em {tierSecondsLeft}s
                                                     </span>
                                                 </>
-                                            )}
+                                            ) : elapsedMinutes !== null ? (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="flex items-center gap-1 font-semibold text-brand-inactive-text">
+                                                        <ClockIcon size={13} />
+                                                        {elapsedMinutes === 0 ? "Solicitada agora" : `Aguardando há ${elapsedMinutes} min`}
+                                                    </span>
+                                                </>
+                                            ) : null}
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-3 shrink-0">
                                         <Button
+                                            variant="outline"
+                                            size="default"
+                                            onClick={handleDecline}
+                                            disabled={loading || declining}
+                                            isLoading={declining}
+                                            className="font-bold shadow-none"
+                                        >
+                                            Recusar
+                                        </Button>
+                                        <Button
                                             variant="default"
                                             size="default"
                                             onClick={handleAccept}
-                                            disabled={loading || isExpired}
+                                            disabled={loading || declining}
                                             isLoading={loading}
                                             className="font-bold shadow-none"
                                         >
-                                            {isExpired ? "Oferta Expirada" : "Aceitar Entrega"}
+                                            Aceitar Entrega
                                         </Button>
                                     </div>
                                 </div>
@@ -314,11 +373,27 @@ export default function AvailableDeliveryDetail({
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                             {/* LEFT MAIN COLUMN */}
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
-                                                {isExpired && (
+                                                {offer.vehicle_compatible === false && (
                                                     <InfoCard
-                                                        title="Oferta de entrega expirada"
-                                                        message="Esta oportunidade esteve disponível por 15 minutos e não foi aceita a tempo. Volte para a lista para ver novas entregas."
+                                                        title="Pedido acima do limite recomendado para o seu veículo"
+                                                        message="O peso ou volume estimado deste pedido excede o padrão do seu veículo cadastrado. Verifique os itens antes de aceitar."
                                                         color="red"
+                                                    />
+                                                )}
+
+                                                {offer.dimensions_unknown && (
+                                                    <InfoCard
+                                                        title="⚠ Itens sem dimensão informada"
+                                                        message="O estabelecimento não informou peso ou dimensões de todos os itens. Confirme se o pedido cabe no seu veículo antes de aceitar."
+                                                        color="orange"
+                                                    />
+                                                )}
+
+                                                {offer.position_quality === "address" && (
+                                                    <InfoCard
+                                                        title="Estimativa calculada pelo seu endereço de cadastro"
+                                                        message="Ative a localização GPS no topo da página para receber distâncias e tempos calculados a partir da sua posição atual."
+                                                        color="blue"
                                                     />
                                                 )}
 
@@ -340,8 +415,13 @@ export default function AvailableDeliveryDetail({
                                                                 </p>
                                                             )}
                                                             {offer.pickup_distance_km != null && (
-                                                                <p className="text-xs font-semibold text-brand-green flex items-center gap-1">
-                                                                    <span>📍 {offer.pickup_distance_km === 0 ? "No seu endereço de cadastro" : `Distância até a loja: ${offer.pickup_distance_km} km`}</span>
+                                                                <p className="text-xs font-semibold text-brand-green flex items-center gap-1 flex-wrap">
+                                                                    <span>
+                                                                        📍 {offer.pickup_distance_km === 0
+                                                                            ? "No seu local"
+                                                                            : `${offer.pickup_distance_km} km${offer.pickup_minutes != null ? ` · ${offer.pickup_minutes} min até a loja` : ""}`}
+                                                                        {offer.delivery_minutes != null ? ` · ${offer.delivery_minutes} min até o cliente` : ""}
+                                                                    </span>
                                                                 </p>
                                                             )}
                                                         </div>
@@ -437,6 +517,38 @@ export default function AvailableDeliveryDetail({
                                                         color="green"
                                                     />
                                                     <div className="space-y-3 text-sm mt-4">
+                                                        {offer.bonus_amount != null && Number(offer.bonus_amount) > 0 && (
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Bônus autorizado:</span>
+                                                                <span className="font-bold text-brand-green font-mono">
+                                                                    + {formatCurrency(Number(offer.bonus_amount))}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {offer.rs_per_km != null && offer.rs_per_km > 0 && (
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor por km:</span>
+                                                                <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                                                                    {formatCurrency(offer.rs_per_km)}/km
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {offer.eta_total_minutes != null && (
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tempo total estimado:</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                    ~{offer.eta_total_minutes} min
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {offer.route_km != null && offer.route_km > 0 && (
+                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Distância estimada:</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {offer.route_km} km
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
                                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total de Paradas:</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{ordersList.length}</span>
@@ -463,16 +575,26 @@ export default function AvailableDeliveryDetail({
                                                         )}
                                                     </div>
 
-                                                    <div className="pt-4 border-t border-brand-border dark:border-dark-border mt-4">
+                                                    <div className="pt-4 border-t border-brand-border dark:border-dark-border mt-4 flex flex-col gap-2">
                                                         <Button
                                                             variant="default"
                                                             size="lg"
                                                             onClick={handleAccept}
-                                                            disabled={loading || isExpired}
+                                                            disabled={loading || declining}
                                                             isLoading={loading}
                                                             className="w-full font-bold shadow-none"
                                                         >
-                                                            {isExpired ? "Oferta Expirada" : "Aceitar Entrega"}
+                                                            Aceitar Entrega
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="default"
+                                                            onClick={handleDecline}
+                                                            disabled={loading || declining}
+                                                            isLoading={declining}
+                                                            className="w-full font-bold shadow-none"
+                                                        >
+                                                            Recusar Oferta
                                                         </Button>
                                                     </div>
                                                 </SidebarCard>

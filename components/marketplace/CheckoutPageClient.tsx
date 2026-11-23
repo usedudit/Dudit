@@ -653,6 +653,7 @@ export function CheckoutPageClient() {
         formData.deliveryType === "delivery" &&
         carrierAllowed &&
         (!localDeliveryAvailable || raioNoCoverage || ownDeliveryBlocked)
+    const effectiveCarrierServiceId = carrierSectionVisible ? (selectedCarrierServiceId || null) : null
 
     const destinationCep = useMemo(() => {
         if (formData.deliveryType !== "delivery") return ""
@@ -781,7 +782,7 @@ export function CheckoutPageClient() {
         // handleCarrierSelect é recriado a cada render; o efeito só reage ao
         // estado do fluxo de cotação.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deliveryError, carrierQuoteLoading, carrierOptions, carrierError, carrierReason, selectedCarrierServiceId, sessionData?.carrierServiceId])
+    }, [carrierSectionVisible, deliveryError, carrierQuoteLoading, carrierOptions, carrierError, carrierReason, selectedCarrierServiceId, sessionData?.carrierServiceId])
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
 
@@ -1219,16 +1220,40 @@ export function CheckoutPageClient() {
         }
     }
 
+    const ignoreNextAddressSyncRef = useRef(false)
+
     useAddressSync(useCallback((updatedId?: string) => {
+        if (ignoreNextAddressSyncRef.current) {
+            ignoreNextAddressSyncRef.current = false
+            return
+        }
         void loadUserAddresses(updatedId)
     }, [userId]))
 
     const buildAddressString = (a: UserAddress) =>
         `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
 
+    const resetDeliveryStateForAddressChange = () => {
+        setCarrierOptions([])
+        setSelectedCarrierServiceId(null)
+        carrierQuoteKeyRef.current = null
+        setCarrierError(null)
+        setCarrierReason(null)
+        setCarrierQuoteLoading(false)
+        setDeliveryError(null)
+        setOwnDeliveryBlocked(false)
+        setDeliveryFee(0)
+        setDeliveryDistanceKm(null)
+        setDeliveryBreakdown(null)
+        setShowOutsideRadiusModal(false)
+    }
+
     const handleAddressSelect = (addressId: string) => {
+        if (addressId === selectedAddressId) return
+        resetDeliveryStateForAddressChange()
         setSelectedAddressId(addressId)
         const address = userAddresses.find(a => a.id === addressId)
+        ignoreNextAddressSyncRef.current = true
         notifyAddressUpdated(addressId, address)
         if (address) setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(address) }))
     }
@@ -1275,7 +1300,9 @@ export function CheckoutPageClient() {
                     return [savedAddr, ...withoutSaved]
                 })
 
+                resetDeliveryStateForAddressChange()
                 setSelectedAddressId(savedAddr.id)
+                ignoreNextAddressSyncRef.current = true
                 notifyAddressUpdated(savedAddr.id, savedAddr, (result as any)?.citySlug)
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(savedAddr) }))
 
@@ -1772,6 +1799,8 @@ export function CheckoutPageClient() {
             // Wait for the context to hydrate the default address before the
             // first authoritative pricing run. Pickup does not need an address.
             if (contextLoading || (productDeliveryQuoteActive && !formData.deliveryAddress)) {
+                setDeliveryQuoteLoading(false)
+                setCheckoutAmountsLoading(false)
                 return
             }
 
@@ -1782,7 +1811,6 @@ export function CheckoutPageClient() {
             // Checkout amounts (includes delivery fee calculation)
             if (activeCartItemIds.length && checkoutContext) {
                 const deliveryTypeForQuote = formData.deliveryType === "pickup" ? "pickup" : "delivery"
-                const effectiveCarrierServiceId = carrierSectionVisible ? (selectedCarrierServiceId || null) : null
                 const amountsCacheKey = JSON.stringify([
                     activeCartItemIds,
                     deliveryTypeForQuote,
@@ -1912,6 +1940,13 @@ export function CheckoutPageClient() {
                         setDeliveryDistanceKm(quote.distanceKm != null ? Number(quote.distanceKm) : null)
                         setDeliveryBreakdown(null)
                     }
+                } catch {
+                    if (!active) return
+                    setDeliveryError("Erro ao calcular a entrega.")
+                    setOwnDeliveryBlocked(true)
+                    setDeliveryFee(0)
+                    setDeliveryDistanceKm(null)
+                    setDeliveryBreakdown(null)
                 } finally {
                     if (active) setDeliveryQuoteLoading(false)
                 }
@@ -1931,6 +1966,7 @@ export function CheckoutPageClient() {
             window.clearTimeout(timer)
         }
     }, [
+        contextLoading,
         partnerId,
         formData.deliveryAddress,
         hasFreeDeliveryCoupon,
@@ -1944,8 +1980,7 @@ export function CheckoutPageClient() {
         depositAvailable,
         refreshTrigger,
         selectedAddressKey,
-        selectedCarrierServiceId,
-        carrierSectionVisible,
+        effectiveCarrierServiceId,
         carrierAllowed,
         mpAvailable,
         destinationCep,

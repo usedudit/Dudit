@@ -1,3 +1,5 @@
+import { isSubscriptionCreditOrder } from "@/lib/services/dre-rules"
+
 const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
 
 export type FinancialBreakdownLine = {
@@ -57,8 +59,14 @@ export function calculateOrderFinancialBreakdown(order: any, itemsInput?: any[])
     )
   }
 
-  const productsValue = round2(productItems.reduce((sum: number, item: any) => sum + nominalItemValue(item), 0))
-  const servicesValue = round2(serviceItems.reduce((sum: number, item: any) => sum + nominalItemValue(item), 0))
+  const isSubCredit = isSubscriptionCreditOrder(order)
+
+  const productsValue = isSubCredit
+    ? 0
+    : round2(productItems.reduce((sum: number, item: any) => sum + nominalItemValue(item), 0))
+  const servicesValue = isSubCredit
+    ? 0
+    : round2(serviceItems.reduce((sum: number, item: any) => sum + nominalItemValue(item), 0))
 
   const deliveryFee = Math.max(0, Number(order.delivery_fee || 0))
 
@@ -89,9 +97,11 @@ export function calculateOrderFinancialBreakdown(order: any, itemsInput?: any[])
 
   // Desconto manual: usa a coluna em reais. Pedidos antigos guardam o valor
   // cru em `discount_value` (fixo ou percentual) — convertemos aqui.
+  // Em pedidos de resgate por créditos de assinatura, `discount_value` guarda
+  // apenas o valor de referência das linhas (receita já é 0, não é desconto manual).
   const nominalSubtotal = round2(productsValue + servicesValue)
-  const storedManualDiscount = Math.max(0, Number(order.manual_discount_amount || 0))
-  const rawDiscountValue = Math.max(0, Number(order.discount_value || 0))
+  const storedManualDiscount = isSubCredit ? 0 : Math.max(0, Number(order.manual_discount_amount || 0))
+  const rawDiscountValue = isSubCredit ? 0 : Math.max(0, Number(order.discount_value || 0))
   const discountType = String(order.discount_type || "fixed").toLowerCase()
   let manualDiscount = storedManualDiscount
   if (manualDiscount === 0 && rawDiscountValue > 0) {

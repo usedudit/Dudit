@@ -156,13 +156,7 @@ export default function AvailableDeliveriesList() {
         try {
             const res = await listAvailableDeliveryOffersAction({ limit: 50 })
             if (res.success) {
-                const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
-                const now = Date.now()
-                const incoming = (res.items || []).filter((item) => {
-                    if (!item.assigned_at) return true
-                    const diff = now - new Date(item.assigned_at).getTime()
-                    return diff >= 0 && diff <= FIFTEEN_MINUTES_MS
-                })
+                const incoming = res.items || []
 
                 // Se for refresh e chegaram novos IDs, toca som de notificação
                 if (isRefresh && knownOfferIdsRef.current.size > 0) {

@@ -207,6 +207,14 @@ export function useEntityState() {
             url.searchParams.delete("payment")
             needsClean = true
         }
+        if (url.searchParams.has("orders")) {
+            url.searchParams.delete("orders")
+            needsClean = true
+        }
+        if (url.searchParams.has("order")) {
+            url.searchParams.delete("order")
+            needsClean = true
+        }
         if (!needsClean) return
         const newRelative = `${url.pathname}${url.search}${url.hash}`
         replaceUrl(newRelative)

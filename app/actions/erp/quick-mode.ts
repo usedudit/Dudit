@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeBusinessInfo, readOnboardingState, toBusinessInfoRecord } from "@/lib/business-info"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, updateTag } from "next/cache"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
 import { getDashboardLayout } from "@/lib/dashboard-engine/engine"
@@ -155,12 +155,43 @@ export async function switchBusinessModeAction(partnerId: string, targetMode: Bu
 
         if (updateError) throw updateError
 
-        revalidatePath("/erp")
-        // Invalidar o cache de acesso do usuário para que o businessInfo atualizado seja carregado
-        await safeRevalidateTag(TAGS.userAccess(user.id))
-        // O dashboard é cacheado pela tag do parceiro: invalida para que a home
-        // reflita o novo modo (e o estado do Guia de Configuração) imediatamente.
-        await safeRevalidateTag(TAGS.partner(partnerId))
+        // Espelha o novo modo também nas lojas do parceiro para evitar divergência
+        // em telas que leem `store.business_info.mode` com fallback para `partner.business_info`.
+        const { data: partnerStores } = await supabase
+            .from("stores")
+            .select("id, business_info")
+            .eq("partner_id", partnerId)
+
+        if (partnerStores && partnerStores.length > 0) {
+            await Promise.all(
+                partnerStores.map((st: any) => {
+                    const rawStoreInfo = toBusinessInfoRecord(st.business_info)
+                    return supabase
+                        .from("stores")
+                        .update({
+                            business_info: {
+                                ...rawStoreInfo,
+                                mode: targetMode,
+                                activeResources: defaultResources,
+                            },
+                        })
+                        .eq("id", st.id)
+                })
+            )
+        }
+
+        // Usa `updateTag` (expiração imediata, read-your-own-writes) em vez de
+        // `revalidateTag(..., "max")` (stale-while-revalidate), para que o reload
+        // imediato não sirva o dashboard antigo em cache (ex.: ainda em Desapego).
+        try {
+            updateTag(TAGS.userAccess(user.id))
+            updateTag(TAGS.partner(partnerId))
+        } catch {
+            await safeRevalidateTag(TAGS.userAccess(user.id))
+            await safeRevalidateTag(TAGS.partner(partnerId))
+        }
+        revalidatePath("/erp", "layout")
+        revalidatePath("/erp/inicio")
         return { success: true }
 
     } catch (e: any) {

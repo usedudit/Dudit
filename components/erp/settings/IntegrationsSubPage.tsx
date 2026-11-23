@@ -1601,9 +1601,13 @@ export const IntegrationsSubPage = ({
                                                             Tiny ERP (Olist)
                                                         </span>
                                                         {tinyStatus?.connected ? (
-                                                            <Badge variant="green"></Badge>
+                                                            <Tooltip text="Tiny conectado">
+                                                                <Badge variant="green" />
+                                                            </Tooltip>
                                                         ) : (
-                                                            <Badge variant="gray"></Badge>
+                                                            <Tooltip text="Tiny desconectado">
+                                                                <Badge variant="gray" />
+                                                            </Tooltip>
                                                         )}
                                                     </div>
                                                     <a
@@ -1720,18 +1724,23 @@ export const IntegrationsSubPage = ({
                                                 <div className="flex justify-start gap-2">
                                                     <Button
                                                         variant="link"
-                                                        onClick={() => setActiveModal("blingConfig")}
+                                                        onClick={() => {
+                                                            setBlingKnowMoreStep(0)
+                                                            setActiveModal("blingKnowMore")
+                                                        }}
                                                     >
-                                                        {blingStatus?.connected ? "Configurar" : "Conectar"}
+                                                        Saber mais
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setActiveModal("blingKnowMore")}
-                                                        className="h-8 px-2"
-                                                    >
-                                                        Saiba mais
-                                                    </Button>
+                                                    {blingStatus?.connected && (
+                                                        <Button
+                                                            variant="link"
+                                                            onClick={() => {
+                                                                setActiveModal("blingConfig")
+                                                            }}
+                                                        >
+                                                            Configurar
+                                                        </Button>
+                                                    )}
                                                 </div>
                                                 <Switch
                                                     checked={Boolean(blingStatus?.connected)}
@@ -3099,6 +3108,103 @@ export const IntegrationsSubPage = ({
                         </div>
                     </DefaultModal>
 
+                    {/* Bling ERP Know More Modal (Multi-step) */}
+                    <DefaultModal
+                        isOpen={activeModal === "blingKnowMore"}
+                        onClose={() => setActiveModal(null)}
+                        title="O que é o Bling ERP?"
+                        maxWidth="lg"
+                    >
+                        <div className="flex flex-col min-h-[500px]">
+                            <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group h-[200px]">
+                                <img
+                                    src="https://img.dudit.com.br/static/icons/brands/Bling.svg"
+                                    alt="Bling ERP"
+                                    className="w-28 h-28 object-contain"
+                                />
+                            </div>
+
+                            <div className="p-8 flex-1 flex flex-col">
+                                <div className="mb-8">
+                                    <div className="flex gap-2">
+                                        {BLING_KNOW_MORE_STEPS.map((_, i) => (
+                                            <motion.div
+                                                key={i}
+                                                layout
+                                                className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i <= blingKnowMoreStep ? "bg-brand-green" : "bg-brand-gray dark:bg-dark-border"
+                                                    }`}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={blingKnowMoreStep}
+                                        initial={{ opacity: 0, x: 10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="flex-1"
+                                    >
+                                        <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
+                                            {BLING_KNOW_MORE_STEPS[blingKnowMoreStep].title}
+                                        </h3>
+
+                                        {BLING_KNOW_MORE_STEPS[blingKnowMoreStep].description && (
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
+                                                {BLING_KNOW_MORE_STEPS[blingKnowMoreStep].description}
+                                            </p>
+                                        )}
+
+                                        {BLING_KNOW_MORE_STEPS[blingKnowMoreStep].list && (
+                                            <ul className="space-y-4 mt-6">
+                                                {BLING_KNOW_MORE_STEPS[blingKnowMoreStep].list.map((item, i) => (
+                                                    <li key={i} className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                        <span className="flex shrink-0 items-center justify-center text-md text-emerald-600">
+                                                            ●
+                                                        </span>
+                                                        {item}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </motion.div>
+                                </AnimatePresence>
+
+                                <div className="flex flex-col md:flex-row gap-3 mt-8">
+                                    <Button
+                                        variant="outline"
+                                        disabled={blingKnowMoreStep === 0}
+                                        onClick={() => setBlingKnowMoreStep(prev => prev - 1)}
+                                        className="flex-1 h-[46px]"
+                                    >
+                                        Anterior
+                                    </Button>
+
+                                    {blingKnowMoreStep === BLING_KNOW_MORE_STEPS.length - 1 ? (
+                                        <Button
+                                            className="flex-1 h-[46px]"
+                                            onClick={() => {
+                                                setActiveModal("blingConfig")
+                                                setBlingKnowMoreStep(0)
+                                            }}
+                                        >
+                                            {blingStatus?.connected ? "Abrir Configurações" : "Conectar Bling ERP"}
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            className="flex-1 h-[46px]"
+                                            onClick={() => setBlingKnowMoreStep(prev => prev + 1)}
+                                        >
+                                            Próximo
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </DefaultModal>
+
                     {/* Confirm Disconnect Tiny ERP */}
                     <AlertModal
                         isOpen={confirmTinyDisconnectOpen}
@@ -3141,23 +3247,31 @@ export const IntegrationsSubPage = ({
                                                         Link de Redirecionamento (Redirect URI) para cadastrar no Bling:
                                                     </p>
                                                     <div className="flex items-center gap-2">
-                                                        <input
+                                                        <Input
                                                             readOnly
                                                             value={blingStatus.redirectUri}
-                                                            className="flex-1 text-xs font-mono px-2.5 py-1.5 rounded-lg bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading select-all outline-none"
+                                                            className="min-w-0"
                                                         />
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(blingStatus.redirectUri || "")
-                                                                setBlingRedirectCopied(true)
-                                                                toast.success("URL de redirecionamento copiada!")
-                                                                setTimeout(() => setBlingRedirectCopied(false), 2000)
-                                                            }}
-                                                        >
-                                                            {blingRedirectCopied ? "Copiado" : "Copiar"}
-                                                        </Button>
+                                                        <Tooltip text={blingRedirectCopied ? "Copiado!" : "Copiar URL"}>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="shrink-0 h-[42px] w-[42px]"
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(blingStatus.redirectUri || "")
+                                                                    setBlingRedirectCopied(true)
+                                                                    toast.success("URL de redirecionamento copiada!")
+                                                                    setTimeout(() => setBlingRedirectCopied(false), 2000)
+                                                                }}
+                                                                aria-label="Copiar URL de redirecionamento"
+                                                            >
+                                                                {blingRedirectCopied ? (
+                                                                    <CheckCircleIcon size={16} className="text-brand-green" />
+                                                                ) : (
+                                                                    <CopyIcon size={16} />
+                                                                )}
+                                                            </Button>
+                                                        </Tooltip>
                                                     </div>
                                                 </div>
                                             )}
@@ -3212,88 +3326,167 @@ export const IntegrationsSubPage = ({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-5">
-                                    <div className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                                        <div>
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Sincronizar Estoque Automaticamente
+                                <>
+                                    <InfoCard
+                                        title="Conexão ativa com o Bling ERP (API v3)"
+                                        message={<div>
+                                            <p>
+                                                Seus produtos, estoque e pedidos podem ser sincronizados automaticamente.
                                             </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                Atualiza estoque físico e reservado entre Dudit e Bling
-                                            </p>
-                                        </div>
-                                        <Switch checked={blingSyncStock} onCheckedChange={setBlingSyncStock} />
-                                    </div>
 
-                                    <div className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                                        <div>
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Exportar Pedidos Automaticamente
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                Envia vendas do Checkout, ERP e PDV automaticamente para o Bling
-                                            </p>
-                                        </div>
-                                        <Switch checked={blingAutoExportOrders} onCheckedChange={setBlingAutoExportOrders} />
-                                    </div>
+                                            {blingStatus.metadata?.last_sync_at && (
+                                                <p className="text-xs mt-2">
+                                                    Última sincronização:{" "}
+                                                    {new Date(
+                                                        blingStatus.metadata.last_sync_at
+                                                    ).toLocaleString("pt-BR")}
 
-                                    {blingStatus?.webhookUrl && (
-                                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-2">
-                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                URL de Webhook (Estoque & NF-e em Tempo Real)
-                                            </p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                Cadastre esta URL nos Webhooks do seu aplicativo no Bling para eventos de Estoque e NF-e:
-                                            </p>
-                                            <div className="flex items-center gap-2 pt-1">
-                                                <input
-                                                    readOnly
-                                                    value={blingStatus.webhookUrl}
-                                                    className="flex-1 text-xs font-mono px-3 py-2 rounded-lg bg-brand-light-bg/60 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading select-all outline-none"
-                                                />
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(blingStatus.webhookUrl || "")
-                                                        setBlingWebhookCopied(true)
-                                                        toast.success("URL de webhook copiada!")
-                                                        setTimeout(() => setBlingWebhookCopied(false), 2000)
-                                                    }}
+                                                    {blingStatus.metadata.synced_count !== undefined && (
+                                                        <> ({blingStatus.metadata.synced_count} produtos)</>
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>}
+                                        color="green" />
+                                    <Tabs
+                                        value={blingActiveTab}
+                                        onValueChange={(v) => setBlingActiveTab(v as "sync" | "webhook")}
+                                        className="w-full"
+                                    >
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b">
+                                            <TabsTrigger value="sync">
+                                                Sincronização
+                                            </TabsTrigger>
+                                            <TabsTrigger value="webhook">
+                                                Webhook
+                                            </TabsTrigger>
+                                        </TabsList>
+
+                                        <TabsContent value="sync" className="mt-0">
+                                            <div className="space-y-6 pt-5">
+                                                <div className="rounded-xl border border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center justify-between gap-4 p-4 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                Sincronizar Estoque Automaticamente
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                Atualiza estoque físico e reservado entre Dudit e Bling
+                                                            </p>
+                                                        </div>
+                                                        <Switch checked={blingSyncStock} onCheckedChange={setBlingSyncStock} />
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between gap-4 p-4">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                Exportar Pedidos Automaticamente
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                Envia vendas do Checkout, ERP e PDV automaticamente para o Bling
+                                                            </p>
+                                                        </div>
+                                                        <Switch checked={blingAutoExportOrders} onCheckedChange={setBlingAutoExportOrders} />
+                                                    </div>
+                                                </div>
+
+                                                <FormSection
+                                                    title="Catálogo de Produtos"
+                                                    description="Puxe os produtos cadastrados no seu Bling ERP diretamente para o catálogo e vitrine da Dudit."
+                                                    hasSeparator
                                                 >
-                                                    {blingWebhookCopied ? "Copiado" : "Copiar"}
-                                                </Button>
+                                                    <Button
+                                                        className="w-full"
+                                                        variant="outline"
+                                                        onClick={handleBlingSync}
+                                                        disabled={blingIsSyncing}
+                                                        isLoading={blingIsSyncing}
+                                                    >
+                                                        {blingIsSyncing ? "Sincronizando Catálogo..." : "Sincronizar Produtos Agora"}
+                                                    </Button>
+                                                </FormSection>
                                             </div>
-                                        </div>
-                                    )}
+                                        </TabsContent>
 
-                                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                        <TabsContent value="webhook" className="mt-0">
+                                            <div className="pt-5">
+                                                <FormSection
+                                                    title="Webhook em Tempo Real (Estoque & NF-e)"
+                                                    titleRight={
+                                                        <Tooltip text={blingStatus.webhookUrl ? "Webhook ativo" : "Webhook inativo"}>
+                                                            <Badge variant={blingStatus.webhookUrl ? "green" : "red"} />
+                                                        </Tooltip>
+                                                    }
+                                                >
+                                                    <div className="space-y-3">
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                            Cadastre esta URL nos{" "}
+                                                            <a
+                                                                href="https://www.bling.com.br/integracoes/webhooks"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="font-semibold text-brand-green hover:underline"
+                                                            >
+                                                                Webhooks do seu aplicativo no Bling
+                                                            </a>{" "}
+                                                            para receber atualizações de estoque em tempo real e as Notas Fiscais (NF-e) anexadas aos pedidos:
+                                                        </p>
+
+                                                        {blingStatus.webhookUrl ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Input
+                                                                    readOnly
+                                                                    value={blingStatus.webhookUrl}
+                                                                    className="min-w-0"
+                                                                />
+                                                                <Tooltip text={blingWebhookCopied ? "Copiado!" : "Copiar URL"}>
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="icon"
+                                                                        className="shrink-0 h-[42px] w-[42px]"
+                                                                        onClick={handleCopyBlingWebhook}
+                                                                        aria-label="Copiar URL do webhook"
+                                                                    >
+                                                                        {blingWebhookCopied ? (
+                                                                            <CheckCircleIcon size={16} className="text-brand-green" />
+                                                                        ) : (
+                                                                            <CopyIcon size={16} />
+                                                                        )}
+                                                                    </Button>
+                                                                </Tooltip>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                O webhook será gerado automaticamente após a conexão com o Bling.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </FormSection>
+                                            </div>
+                                        </TabsContent>
+                                    </Tabs>
+
+                                    <div className="flex gap-3">
                                         <Button
-                                            variant="outline"
-                                            className="flex-1"
-                                            onClick={handleBlingSync}
-                                            isLoading={blingIsSyncing}
+                                            variant="outlinered"
+                                            onClick={() => setConfirmBlingDisconnectOpen(true)}
                                         >
-                                            Sincronizar Produtos Agora
+                                            Desconectar
                                         </Button>
-                                        <Button className="flex-1" onClick={handleSaveBlingConfig}>
+                                        <Button
+                                            className="flex-1"
+                                            onClick={handleSaveBlingConfig}
+                                        >
                                             Salvar Configurações
                                         </Button>
                                     </div>
 
-                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border flex justify-between items-center">
-                                        <Button
-                                            variant="link"
-                                            className="text-red-600 px-0"
-                                            onClick={() => setConfirmBlingDisconnectOpen(true)}
-                                        >
-                                            Desconectar Bling ERP
-                                        </Button>
+                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border flex justify-end">
                                         <Button variant="link" className="px-0" onClick={handleBlingStartOAuth}>
                                             Reautorizar OAuth
                                         </Button>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
                     </DefaultModal>

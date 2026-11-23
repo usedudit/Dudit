@@ -29,7 +29,13 @@ export type AuditAction =
     | "invite.expired"
     // Role management
     | "role.changed"
+    | "member.updated"
     | "member.removed"
+    // Store access management
+    | "store_member.added"
+    | "store_member.removed"
+    | "store_member.updated"
+    | "store_member.access_updated"
     // Auth events
     | "auth.login"
     | "auth.login_failed"
@@ -82,7 +88,12 @@ const ACTION_MESSAGES: Record<string, string> = {
     "invite.revoked": "revogou um convite.",
     "invite.expired": "convite expirou.",
     "role.changed": "alterou o cargo de um membro.",
+    "member.updated": "alterou o cargo de um membro.",
     "member.removed": "removeu um membro da equipe.",
+    "store_member.added": "concedeu acesso de um membro a uma loja.",
+    "store_member.removed": "removeu o acesso de um membro a uma loja.",
+    "store_member.updated": "atualizou o cargo de um membro em uma loja.",
+    "store_member.access_updated": "atualizou os acessos às lojas de um membro.",
     "auth.login": "realizou login.",
     "auth.login_failed": "tentativa de login falhou.",
     "auth.logout": "realizou logout.",

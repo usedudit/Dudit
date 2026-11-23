@@ -7,17 +7,18 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 import type { Metadata } from "next"
-import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 
 export const metadata: Metadata = {
-    title: "Dudit | Descubra. Anuncie. Organize.",
+    title: {
+        absolute: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
+    },
     description: "Descubra produtos e serviços perto de você ou compre de pequenos negócios que enviam para todo o Brasil com 0% de comissão. Plataforma de vendas e gestão para pessoas físicas, autônomos e empresas.",
     openGraph: {
-        title: "Dudit | Descubra. Anuncie. Organize.",
+        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
         description: "Descubra produtos e serviços perto de você ou compre de pequenos negócios que enviam para todo o Brasil com 0% de comissão. Plataforma de vendas e gestão para pessoas físicas, autônomos e empresas.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
             {
                 url: "https://img.dudit.com.br/static/og-image.png",
                 width: 1200,
-                height: 400,
+                height: 630,
             },
         ],
         locale: "pt_BR",
@@ -33,14 +34,17 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        site: "@dudit",
-        creator: "@dudit",
-        title: "Dudit | Descubra. Anuncie. Organize.",
+        site: "@usedudit",
+        creator: "@usedudit",
+        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
         description: "Descubra produtos e serviços perto de você ou compre de lojas que enviam para todo o Brasil com 0% de comissão.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br",
+        languages: {
+            "pt-BR": "https://dudit.com.br",
+        },
     },
     keywords: [
         "comprar online brasil",
@@ -232,31 +236,11 @@ export default async function HomePage() {
 
     const cartCount = sessionData?.cartCount || 0
 
-    const homeJsonLd = {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        name: "Dudit",
-        url: "https://dudit.com.br",
-        description: "Encontre produtos e serviços locais e compre de lojas que enviam para todo o Brasil com 0% de comissão.",
-        potentialAction: {
-            "@type": "SearchAction",
-            target: {
-                "@type": "EntryPoint",
-                urlTemplate: "https://dudit.com.br/explorar?q={search_term_string}",
-            },
-            "query-input": "required name=search_term_string",
-        },
-    }
-
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[80px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading overflow-x-clip">
             <h1 className="sr-only">
                 Dudit | Compre perto de você e receba de qualquer lugar do Brasil com 0% de comissão
             </h1>
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(homeJsonLd) }}
-            />
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 
             <Suspense fallback={<HomeFeedSkeleton />}>

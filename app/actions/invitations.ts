@@ -165,6 +165,16 @@ export async function createInvitation(input: {
         }
 
         // 7. Audit log
+        let storeNames: string[] = []
+        if (input.storeIds && input.storeIds.length > 0) {
+            const { data: storesData } = await admin
+                .from("stores")
+                .select("name")
+                .eq("partner_id", input.partnerId)
+                .in("id", input.storeIds)
+            storeNames = (storesData || []).map((st: any) => st.name).filter(Boolean)
+        }
+
         await auditLog({
             action: "invite.created",
             actorUserId: user.id,
@@ -173,6 +183,7 @@ export async function createInvitation(input: {
                 role: input.role,
                 email: normalizedEmail,
                 expiresAt: expiresAt.toISOString(),
+                storeNames,
             },
         })
 
@@ -343,6 +354,16 @@ export async function acceptInvitation(
         }
 
         // 9. Audit log
+        let acceptedStoreNames: string[] = []
+        if (storeIds && storeIds.length > 0) {
+            const { data: storesData } = await admin
+                .from("stores")
+                .select("name")
+                .eq("partner_id", invitation.partner_id)
+                .in("id", storeIds)
+            acceptedStoreNames = (storesData || []).map((st: any) => st.name).filter(Boolean)
+        }
+
         await auditLog({
             action: "invite.accepted",
             actorUserId: user.id,
@@ -351,6 +372,9 @@ export async function acceptInvitation(
             metadata: {
                 invitationId: invitation.id,
                 role: invitation.role,
+                email: invitation.email,
+                invitedByUserId: invitation.created_by_user_id,
+                storeNames: acceptedStoreNames,
             },
         })
 
@@ -386,7 +410,7 @@ export async function revokeInvitation(input: {
         // 2. Load the invitation
         const { data: invitation } = await admin
             .from("partner_invitations")
-            .select("id, role, used_at, revoked_at, created_by_role, partner_id")
+            .select("id, email, role, used_at, revoked_at, created_by_role, partner_id")
             .eq("id", input.invitationId)
             .eq("partner_id", input.partnerId) // SECURITY: ensure same tenant
             .single()
@@ -425,6 +449,7 @@ export async function revokeInvitation(input: {
             metadata: {
                 invitationId: invitation.id,
                 revokedRole: invitation.role,
+                email: invitation.email,
             },
         })
 

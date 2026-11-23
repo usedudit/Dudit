@@ -11,6 +11,9 @@ import {
   isOrderCashCollected,
   isServiceOrderLinkedOrder,
   isServiceOrderOriginSale,
+  isSubscriptionCreditOrder,
+  isSubscriptionCycleBillingOrder,
+  computeReturnRequestDreImpact,
   isPaidAmountSettled,
   computeServiceOrderAmounts,
   computeProratedMonthlyTax,
@@ -220,5 +223,131 @@ describe("getTaxRegimeLabel", () => {
 
   it("rotula regime normal quando crt = 3", () => {
     expect(getTaxRegimeLabel("pj", "3")).toBe("Lucro Presumido / Lucro Real")
+  })
+})
+
+describe("assinaturas: cobrança do ciclo vs resgate de créditos", () => {
+  it("identifica pedido de resgate por créditos de assinatura via payment_method ou payment_breakdown", () => {
+    expect(isSubscriptionCreditOrder({ payment_method: "Assinatura (Créditos)" })).toBe(true)
+    expect(isSubscriptionCreditOrder({ payment_method: "Créditos de Assinatura" })).toBe(true)
+    expect(
+      isSubscriptionCreditOrder({
+        payment_method: "Outro",
+        payment_breakdown: [{ method: "Assinatura (Créditos)", paymentType: "subscription_credits" }],
+      }),
+    ).toBe(true)
+  })
+
+  it("não confunde crédito em loja / vale-compra com crédito de assinatura", () => {
+    expect(isSubscriptionCreditOrder({ payment_method: "Vale-compra" })).toBe(false)
+    expect(
+      isSubscriptionCreditOrder({
+        payment_method: "Vale-compra",
+        payment_breakdown: [{ method: "Vale-compra", paymentType: "store_credit" }],
+      }),
+    ).toBe(false)
+    expect(isSubscriptionCreditOrder({ payment_method: "Pix" })).toBe(false)
+    expect(isSubscriptionCreditOrder(null)).toBe(false)
+  })
+
+  it("identifica pedido de cobrança do ciclo de assinatura (recurring_execution_id)", () => {
+    expect(
+      isSubscriptionCycleBillingOrder({
+        recurring_execution_id: "exec-1",
+        payment_method: "A combinar",
+      }),
+    ).toBe(true)
+    expect(
+      isSubscriptionCycleBillingOrder({
+        recurring_execution_id: null,
+        payment_method: "Assinatura (Créditos)",
+      }),
+    ).toBe(false)
+    expect(
+      isSubscriptionCycleBillingOrder({
+        recurring_execution_id: "exec-1",
+        payment_method: "Assinatura (Créditos)",
+      }),
+    ).toBe(false)
+  })
+})
+
+describe("computeReturnRequestDreImpact", () => {
+  it("deduz store_credit_amount e estorna CMV quando item volta ao estoque", () => {
+    const impact = computeReturnRequestDreImpact({
+      status: "RESOLVED",
+      approved_resolution: "store_credit",
+      refund_amount: 0,
+      store_credit_amount: 100,
+      inventory_movement_id: "mov-1",
+      orders: { situation: "paid" },
+      return_items: [
+        {
+          quantity: 2,
+          order_items: { unit_cost: 20, service_id: null, line_type: "product" },
+        },
+      ],
+    })
+    expect(impact).toEqual({
+      deductionAmount: 100,
+      cogsProductsReversal: 40,
+      cogsServicesReversal: 0,
+    })
+  })
+
+  it("deduz refund_amount + store_credit_amount mas não estorna CMV sem retorno ao estoque", () => {
+    const impact = computeReturnRequestDreImpact({
+      status: "RESOLVED",
+      approved_resolution: "refund",
+      refund_amount: 80,
+      store_credit_amount: 20,
+      inventory_movement_id: null,
+      orders: { situation: "partially_paid" },
+      return_items: [
+        {
+          quantity: 1,
+          order_items: { unit_cost: 30, service_id: null, line_type: "product" },
+        },
+      ],
+    })
+    expect(impact).toEqual({
+      deductionAmount: 100,
+      cogsProductsReversal: 0,
+      cogsServicesReversal: 0,
+    })
+  })
+
+  it("ignora devolução quando pedido original já foi excluído da receita (cancelled/refunded)", () => {
+    const impact = computeReturnRequestDreImpact({
+      status: "RESOLVED",
+      approved_resolution: "refund",
+      refund_amount: 100,
+      store_credit_amount: 0,
+      inventory_movement_id: "mov-1",
+      orders: { situation: "cancelled" },
+      return_items: [{ quantity: 1, order_items: { unit_cost: 40 } }],
+    })
+    expect(impact).toEqual({
+      deductionAmount: 0,
+      cogsProductsReversal: 0,
+      cogsServicesReversal: 0,
+    })
+  })
+
+  it("ignora solicitações não resolvidas ou rejeitadas", () => {
+    expect(
+      computeReturnRequestDreImpact({
+        status: "PENDING_REVIEW",
+        approved_resolution: "store_credit",
+        store_credit_amount: 100,
+      }).deductionAmount,
+    ).toBe(0)
+    expect(
+      computeReturnRequestDreImpact({
+        status: "RESOLVED",
+        approved_resolution: "rejected",
+        store_credit_amount: 100,
+      }).deductionAmount,
+    ).toBe(0)
   })
 })

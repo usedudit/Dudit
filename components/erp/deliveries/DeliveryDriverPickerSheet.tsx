@@ -5,7 +5,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
-import { Button, FormTextarea, ThreeDotsLoader, Badge, InfoCard } from "@/components/reusable"
+import { Button, FormTextarea, ThreeDotsLoader, Badge, InfoCard, Checkbox, Input } from "@/components/reusable"
 import {
     TruckIcon,
     XIcon,
@@ -14,7 +14,6 @@ import {
     ClockIcon,
     CheckCircleIcon,
     PhoneIcon,
-    AlertCircleIcon,
     Package,
 } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
@@ -23,6 +22,8 @@ import {
     requestDuditDeliveryAction,
     cancelDuditDeliveryRequestAction,
     getDuditDeliveryRequestStatusAction,
+    checkOrderDimensionsForDeliveryAction,
+    authorizeDeliveryBonusAction,
 } from "@/app/actions/erp/delivery-driver-assignments"
 
 export interface DeliveryDriverPickerSheetProps {
@@ -64,8 +65,20 @@ export default function DeliveryDriverPickerSheet({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isCancelling, setIsCancelling] = useState(false)
     const [activeRequest, setActiveRequest] = useState<any | null>(null)
+    const [dimensionsCheck, setDimensionsCheck] = useState<{
+        dimensionsUnknown: boolean
+        missingProducts: Array<{ productId: string | null; productName: string }>
+    } | null>(null)
+    const [acknowledgeUnknownDimensions, setAcknowledgeUnknownDimensions] = useState(false)
+    const [bonusInput, setBonusInput] = useState("")
+    const [bonusReason, setBonusReason] = useState("")
+    const [isAuthorizingBonus, setIsAuthorizingBonus] = useState(false)
 
-    const primaryOrderId = (orderIds && orderIds.length > 0 ? orderIds[0] : orderId) || undefined
+    const targetOrderIds = React.useMemo(
+        () => Array.from(new Set(orderIds || (orderId ? [orderId] : []))).filter(Boolean),
+        [orderIds, orderId]
+    )
+    const primaryOrderId = targetOrderIds[0] || undefined
 
     const checkRequestStatus = useCallback(async () => {
         if (!primaryOrderId || !partnerId) return
@@ -84,9 +97,25 @@ export default function DeliveryDriverPickerSheet({
 
     useEffect(() => {
         if (isOpen && primaryOrderId) {
+            setAcknowledgeUnknownDimensions(false)
             void checkRequestStatus()
+            void checkOrderDimensionsForDeliveryAction({ partnerId, orderIds: targetOrderIds })
+                .then((res) => {
+                    if (res.success) {
+                        setDimensionsCheck({
+                            dimensionsUnknown: res.dimensionsUnknown,
+                            missingProducts: res.missingProducts,
+                        })
+                    }
+                })
+                .catch(() => {
+                    setDimensionsCheck(null)
+                })
+        } else if (!isOpen) {
+            setAcknowledgeUnknownDimensions(false)
+            setDimensionsCheck(null)
         }
-    }, [isOpen, primaryOrderId, checkRequestStatus])
+    }, [isOpen, primaryOrderId, partnerId, targetOrderIds, checkRequestStatus])
 
     // Polling while request is pending acceptance
     useEffect(() => {
@@ -98,9 +127,13 @@ export default function DeliveryDriverPickerSheet({
     }, [isOpen, primaryOrderId, activeRequest, checkRequestStatus])
 
     const handleRequestDelivery = async () => {
-        const targetOrderIds = Array.from(new Set(orderIds || (orderId ? [orderId] : []))).filter(Boolean)
         if (targetOrderIds.length === 0 || !partnerId) {
             toast.error("Salve o pedido primeiro para poder solicitar um entregador Dudit.")
+            return
+        }
+
+        if (dimensionsCheck?.dimensionsUnknown && !acknowledgeUnknownDimensions) {
+            toast.error("Confirme que deseja continuar mesmo sem peso/dimensões nos produtos.")
             return
         }
 
@@ -111,6 +144,7 @@ export default function DeliveryDriverPickerSheet({
                 orderIds: targetOrderIds,
                 deliveryId: deliveryId || null,
                 notes,
+                acknowledgeUnknownDimensions,
             })
 
             if (!res.success) {
@@ -130,6 +164,36 @@ export default function DeliveryDriverPickerSheet({
             toast.error(err?.message || "Erro inesperado ao solicitar entrega.")
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleAuthorizeBonus = async () => {
+        if (!activeRequest?.id || !partnerId) return
+        const parsed = Number(String(bonusInput).replace(",", "."))
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            toast.error("Informe um valor de bônus válido.")
+            return
+        }
+        setIsAuthorizingBonus(true)
+        try {
+            const res = await authorizeDeliveryBonusAction({
+                partnerId,
+                assignmentId: activeRequest.id,
+                amount: parsed,
+                reason: bonusReason,
+            })
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível autorizar o bônus.")
+                return
+            }
+            toast.success("Bônus autorizado e oferta reenviada para os entregadores!")
+            setBonusInput("")
+            setBonusReason("")
+            void checkRequestStatus()
+        } catch (err: any) {
+            toast.error(err?.message || "Erro ao autorizar bônus.")
+        } finally {
+            setIsAuthorizingBonus(false)
         }
     }
 
@@ -174,10 +238,30 @@ export default function DeliveryDriverPickerSheet({
                     /* ACTIVE REQUEST STATE */
                     <div className="space-y-5">
                         {activeRequest.status === "available" || activeRequest.status === "requested" ? (
-                            <InfoCard
-                                title="Procurando entregadores..."
-                                message="Sua solicitação está disponível para os entregadores da sua região."
-                            />
+                            activeRequest.dispatchExhaustedAt ? (
+                                <InfoCard
+                                    color="orange"
+                                    title={
+                                        activeRequest.dispatchExhaustedReason === "no_economically_viable_courier"
+                                            ? "Sem entregador no raio coberto pela taxa"
+                                            : "Nenhum entregador disponível no momento"
+                                    }
+                                    message={
+                                        activeRequest.dispatchExhaustedReason === "no_economically_viable_courier"
+                                            ? `A taxa atual cobre até ${activeRequest.economicCapKm ?? "—"} km pelo piso operacional.${
+                                                  activeRequest.suggestedFee
+                                                      ? ` Sugestão total para alcançar entregadores próximos: ${formatCurrency(activeRequest.suggestedFee)}.`
+                                                      : ""
+                                              } Você pode autorizar um bônus adicional ou aguardar/usar retirada.`
+                                            : "Todos os raios de busca foram percorridos sem aceite. Você pode autorizar um bônus para incentivar a coleta ou cancelar a solicitação."
+                                    }
+                                />
+                            ) : (
+                                <InfoCard
+                                    title="Procurando entregadores..."
+                                    message={`Sua solicitação está disponível na rede Dudit (nível de busca ${Number(activeRequest.dispatchTier || 0) + 1}/5).`}
+                                />
+                            )
                         ) : activeRequest.status === "accepted" ? (
                             <InfoCard
                                 title="Entregador a caminho da loja!"
@@ -240,6 +324,14 @@ export default function DeliveryDriverPickerSheet({
                                     {formatCurrency(activeRequest.deliveryFee || deliveryFee)}
                                 </span>
                             </div>
+                            {Number(activeRequest.bonusAmount || 0) > 0 && (
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Bônus autorizado:</span>
+                                    <span className="font-bold text-brand-green">
+                                        + {formatCurrency(Number(activeRequest.bonusAmount))}
+                                    </span>
+                                </div>
+                            )}
                             {destinationAddress && (
                                 <div className="flex items-start gap-2 pt-2 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text dark:text-dark-body">
                                     <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
@@ -247,6 +339,50 @@ export default function DeliveryDriverPickerSheet({
                                 </div>
                             )}
                         </div>
+
+                        {/* AUTHORIZE BONUS (Fase 2 — §7.4, sempre manual) */}
+                        {activeRequest.status === "available" && (
+                            <div className="rounded-2xl border border-brand-border p-4 dark:border-dark-border space-y-3 bg-white dark:bg-dark-surface">
+                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    Autorizar bônus opcional ao entregador
+                                </span>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Valor adicional bancado pelo estabelecimento para acelerar o aceite (não altera a taxa cobrada do cliente).
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-28 shrink-0">
+                                        <Input
+                                            name="bonus_amount"
+                                            type="number"
+                                            min="1"
+                                            step="0.50"
+                                            placeholder="Ex: 5,00"
+                                            value={bonusInput}
+                                            onChange={(e) => setBonusInput(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <Input
+                                            name="bonus_reason"
+                                            type="text"
+                                            placeholder="Motivo (opcional)"
+                                            value={bonusReason}
+                                            onChange={(e) => setBonusReason(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={handleAuthorizeBonus}
+                                    disabled={isAuthorizingBonus || !bonusInput}
+                                    isLoading={isAuthorizingBonus}
+                                >
+                                    Autorizar bônus e reenviar
+                                </Button>
+                            </div>
+                        )}
 
                         {/* CANCEL BUTTON */}
                         {activeRequest.status === "available" && (
@@ -322,7 +458,53 @@ export default function DeliveryDriverPickerSheet({
                             />
                         </div>
 
-                        {!orderId && (
+                        {/* DIMENSIONS UNKNOWN WARNING (Fase 0.7 / §12.3) */}
+                        {dimensionsCheck?.dimensionsUnknown && (
+                            <><InfoCard
+                                title="Dimensões não informadas"
+                                color="orange"
+                                message={(
+                                    <>
+                                        <p className="text-sm">
+                                            {dimensionsCheck.missingProducts.length > 0
+                                                ? `${dimensionsCheck.missingProducts.length} ${dimensionsCheck.missingProducts.length === 1 ? "produto" : "produtos"} sem peso/dimensão.`
+                                                : "Itens sem peso/dimensão informados."}
+                                        </p>
+                                        <p className="text-sm mt-1 opacity-90">
+                                            O entregador verá este aviso no card da oferta e pode recusar se não couber no veículo.
+                                        </p>
+                                        {dimensionsCheck.missingProducts.length > 0 && (
+                                            <ul className="text-sm mt-1.5 list-disc pl-4 space-y-0.5 opacity-90">
+                                                {dimensionsCheck.missingProducts.slice(0, 3).map((p, idx) => (
+                                                    <li key={p.productId || idx} className="truncate">{p.productName}</li>
+                                                ))}
+                                                {dimensionsCheck.missingProducts.length > 3 && (
+                                                    <li>+ {dimensionsCheck.missingProducts.length - 3} outro(s)</li>
+                                                )}
+                                            </ul>
+                                        )}
+                                    </>
+                                )}
+                                bottomElement={<a
+                                    href={dimensionsCheck.missingProducts[0]?.productId
+                                        ? `/erp/produtos/${dimensionsCheck.missingProducts[0].productId}`
+                                        : "/erp/produtos"}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Preencher agora
+                                </a>} />
+
+                                <Checkbox
+                                    label="Continuar mesmo assim (estou ciente do aviso ao entregador)"
+                                    checked={acknowledgeUnknownDimensions}
+                                    onChange={(checked) => setAcknowledgeUnknownDimensions(checked)}
+                                    className="mt-0.5"
+                                />
+                            </>
+                        )}
+
+                        {!primaryOrderId && (
                             <InfoCard message="Salve o pedido primeiro para poder disparar a solicitação para a rede." color="orange" />
                         )}
                     </div>
@@ -337,7 +519,11 @@ export default function DeliveryDriverPickerSheet({
                             variant="default"
                             className="w-full h-11"
                             onClick={handleRequestDelivery}
-                            disabled={isSubmitting || !orderId}
+                            disabled={
+                                isSubmitting ||
+                                !primaryOrderId ||
+                                (Boolean(dimensionsCheck?.dimensionsUnknown) && !acknowledgeUnknownDimensions)
+                            }
                         >
                             {isSubmitting ? "Solicitando..." : "Solicitar Entregador Dudit"}
                         </Button>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireUser, requireStorePermission, requirePartnerAccess } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { logAudit } from "@/lib/observability/audit-log"
+import { auditLog } from "@/lib/security/audit-logger"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
@@ -53,13 +54,13 @@ export async function addStoreMemberAction(
         const [{ data: target }, { data: store }] = await Promise.all([
             admin
                 .from("partner_users")
-                .select("id, role_id")
+                .select("id, user_id, role_id")
                 .eq("id", partnerUserId)
                 .eq("partner_id", partnerId)
                 .maybeSingle(),
             admin
                 .from("stores")
-                .select("id")
+                .select("id, name")
                 .eq("id", storeId)
                 .eq("partner_id", partnerId)
                 .maybeSingle(),
@@ -98,6 +99,18 @@ export async function addStoreMemberAction(
             targetUserId: partnerUserId,
         })
 
+        await auditLog({
+            action: "store_member.added",
+            actorUserId: user.id,
+            partnerId,
+            targetUserId: target.user_id,
+            metadata: {
+                storeId,
+                storeName: store.name,
+                role: assignedRole,
+            },
+        })
+
         revalidatePath("/erp/lojas/membros")
         return { success: true, data: undefined }
     } catch (error) {
@@ -122,13 +135,13 @@ export async function updateStoreMemberAction(
         const [{ data: targetMembership }, { data: store }] = await Promise.all([
             admin
                 .from("store_members")
-                .select("partner_user_id, store_id")
+                .select("partner_user_id, store_id, role")
                 .eq("id", memberId)
                 .eq("store_id", storeId)
                 .maybeSingle(),
             admin
                 .from("stores")
-                .select("id")
+                .select("id, name")
                 .eq("id", storeId)
                 .eq("partner_id", partnerId)
                 .maybeSingle(),
@@ -140,7 +153,7 @@ export async function updateStoreMemberAction(
 
         const { data: target } = await admin
             .from("partner_users")
-            .select("id, role_id")
+            .select("id, user_id, role_id")
             .eq("id", targetMembership.partner_user_id)
             .eq("partner_id", partnerId)
             .maybeSingle()
@@ -179,6 +192,19 @@ export async function updateStoreMemberAction(
             newRole: role,
         })
 
+        await auditLog({
+            action: "store_member.updated",
+            actorUserId: user.id,
+            partnerId,
+            targetUserId: target.user_id,
+            metadata: {
+                storeId,
+                storeName: store.name,
+                oldRole: targetMembership.role || null,
+                newRole: role || null,
+            },
+        })
+
         revalidatePath("/erp/lojas/membros")
         return { success: true, data: undefined }
     } catch (error) {
@@ -192,23 +218,31 @@ export async function removeStoreMemberAction(
     partnerId: string
 ): Promise<ActionResponse<void>> {
     try {
-        await requireUser()
+        const user = await requireUser()
         await requireStorePermission(storeId, partnerId, "stores", "manage_members")
 
         const admin = getAdminClient()
-        const { data: membership } = await admin
-            .from("store_members")
-            .select("partner_user_id")
-            .eq("id", memberId)
-            .eq("store_id", storeId)
-            .maybeSingle()
+        const [{ data: membership }, { data: store }] = await Promise.all([
+            admin
+                .from("store_members")
+                .select("partner_user_id")
+                .eq("id", memberId)
+                .eq("store_id", storeId)
+                .maybeSingle(),
+            admin
+                .from("stores")
+                .select("id, name")
+                .eq("id", storeId)
+                .eq("partner_id", partnerId)
+                .maybeSingle(),
+        ])
         if (!membership) {
             return { success: false, error: "Membro não encontrado nesta loja." }
         }
 
         const { data: target } = await admin
             .from("partner_users")
-            .select("id")
+            .select("id, user_id")
             .eq("id", membership.partner_user_id)
             .eq("partner_id", partnerId)
             .maybeSingle()
@@ -229,6 +263,17 @@ export async function removeStoreMemberAction(
             partnerId,
             storeId,
             memberId,
+        })
+
+        await auditLog({
+            action: "store_member.removed",
+            actorUserId: user.id,
+            partnerId,
+            targetUserId: target.user_id,
+            metadata: {
+                storeId,
+                storeName: store?.name || storeId,
+            },
         })
 
         revalidatePath("/erp/lojas/membros")
@@ -282,23 +327,24 @@ export async function saveMemberStoreAccessAction(params: {
         }
 
         const admin = getAdminClient()
-        const [{ data: target }, stores] = await Promise.all([
+        const [{ data: target }, allPartnerStores] = await Promise.all([
             admin
                 .from("partner_users")
-                .select("id, role_id")
+                .select("id, user_id, role_id")
                 .eq("id", partnerUserId)
                 .eq("partner_id", partnerId)
                 .maybeSingle(),
-            storeAccesses.length > 0
-                ? admin
-                    .from("stores")
-                    .select("id")
-                    .eq("partner_id", partnerId)
-                    .in("id", [...new Set(storeAccesses.map((item) => item.storeId))])
-                : Promise.resolve({ data: [] as Array<{ id: string }> }),
+            admin
+                .from("stores")
+                .select("id, name")
+                .eq("partner_id", partnerId),
         ])
 
-        if (!target || (stores.data || []).length !== new Set(storeAccesses.map((item) => item.storeId)).size) {
+        const partnerStoreMap = new Map<string, string>(
+            (allPartnerStores.data || []).map((s: any) => [s.id, s.name])
+        )
+        const requestedStoreIds = [...new Set(storeAccesses.map((item) => item.storeId))]
+        if (!target || requestedStoreIds.some((sid) => !partnerStoreMap.has(sid))) {
             return { success: false, error: "Membro ou loja não pertence a este parceiro." }
         }
 
@@ -324,29 +370,38 @@ export async function saveMemberStoreAccessAction(params: {
         const existingMap = new Map((existing || []).map((e: any) => [e.store_id, e]))
         const targetMap = new Map(storeAccesses.map(a => [a.storeId, a.role]))
 
+        const removedStores: string[] = []
+        const addedStores: string[] = []
+        const roleChanges: string[] = []
+
         for (const [storeId, sm] of existingMap.entries()) {
             if (!targetMap.has(storeId)) {
                 await supabase.from("store_members").delete().eq("id", sm.id)
+                removedStores.push(partnerStoreMap.get(storeId) || storeId)
             }
         }
 
-        for (const access of storeAccesses) {
-            const sm = existingMap.get(access.storeId)
+        for (const item of storeAccesses) {
+            const sm = existingMap.get(item.storeId)
+            const storeName = partnerStoreMap.get(item.storeId) || item.storeId
             if (sm) {
-                if (sm.role !== access.role) {
+                if (sm.role !== item.role) {
                     await supabase
                         .from("store_members")
-                        .update({ role: access.role })
+                        .update({ role: item.role })
                         .eq("id", sm.id)
+                    roleChanges.push(`${storeName}:${sm.role || ""}:${item.role}`)
                 }
             } else {
+                const newRole = item.role || "OPERATOR"
                 await supabase
                     .from("store_members")
                     .insert({
                         partner_user_id: partnerUserId,
-                        store_id: access.storeId,
-                        role: access.role || "OPERATOR",
+                        store_id: item.storeId,
+                        role: newRole,
                     })
+                addedStores.push(`${storeName}:${newRole}`)
             }
         }
 
@@ -355,6 +410,21 @@ export async function saveMemberStoreAccessAction(params: {
             targetPartnerUserId: partnerUserId,
             storeCount: storeAccesses.length,
         })
+
+        if (addedStores.length > 0 || removedStores.length > 0 || roleChanges.length > 0) {
+            await auditLog({
+                action: "store_member.access_updated",
+                actorUserId: user.id,
+                partnerId,
+                targetUserId: target.user_id,
+                metadata: {
+                    addedStores,
+                    removedStores,
+                    roleChanges,
+                    storeCount: storeAccesses.length,
+                },
+            })
+        }
 
         revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }

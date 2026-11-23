@@ -15,8 +15,6 @@ interface AvailableDeliveryGridCardProps {
     isAccepting?: boolean
 }
 
-const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
-
 export default function AvailableDeliveryGridCard({
     offer,
     onAccept,
@@ -25,19 +23,26 @@ export default function AvailableDeliveryGridCard({
 }: AvailableDeliveryGridCardProps) {
     const router = useRouter()
     const assignmentId = offer.assignment_id || offer.id || ""
-    const [timeLeftSeconds, setTimeLeftSeconds] = useState<number | null>(null)
+    const [elapsedMinutes, setElapsedMinutes] = useState<number | null>(null)
+    const [tierSecondsLeft, setTierSecondsLeft] = useState<number | null>(null)
 
     useEffect(() => {
-        if (!offer.assigned_at) return
         const calc = () => {
-            const assignedTime = new Date(offer.assigned_at!).getTime()
-            const diff = Math.max(0, Math.floor((assignedTime + FIFTEEN_MINUTES_MS - Date.now()) / 1000))
-            setTimeLeftSeconds(diff)
+            if (offer.assigned_at) {
+                const assignedTime = new Date(offer.assigned_at).getTime()
+                setElapsedMinutes(Math.max(0, Math.floor((Date.now() - assignedTime) / 60000)))
+            }
+            if (offer.offer_expires_at) {
+                const expTime = new Date(offer.offer_expires_at).getTime()
+                setTierSecondsLeft(Math.max(0, Math.floor((expTime - Date.now()) / 1000)))
+            } else {
+                setTierSecondsLeft(null)
+            }
         }
         calc()
-        const interval = setInterval(calc, 30000)
+        const interval = setInterval(calc, offer.offer_expires_at ? 1000 : 30000)
         return () => clearInterval(interval)
-    }, [offer.assigned_at])
+    }, [offer.assigned_at, offer.offer_expires_at])
 
     const orderCount = offer.order_count || offer.orders?.length || 1
 
@@ -96,18 +101,50 @@ export default function AvailableDeliveryGridCard({
                                     {orderCount} paradas
                                 </span>
                             )}
+                            {offer.dimensions_unknown && (
+                                <span
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 shrink-0"
+                                    title="Itens sem dimensão informada — confirme se cabe no seu veículo"
+                                >
+                                    ⚠ Sem dimensão
+                                </span>
+                            )}
+                            {offer.vehicle_compatible === false && (
+                                <span
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300 shrink-0"
+                                    title="Peso ou volume acima do limite recomendado para o seu veículo"
+                                >
+                                    ⚠ Acima do veículo
+                                </span>
+                            )}
                         </div>
 
 
                     </div>
 
                     {/* Row 2: Estabelecimento */}
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate mt-1">
-                        <span className="truncate">{offer.store_name || offer.partner_name || "Estabelecimento"}</span>
-                        {offer.pickup_distance_km != null && (
-                            <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-brand-green shrink-0">
-                                <MapPinIcon size={11} />
-                                {offer.pickup_distance_km === 0 ? "No seu local" : `${offer.pickup_distance_km} km`}
+                    <div className="flex flex-col gap-0.5 mt-1">
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                            <span className="truncate">{offer.store_name || offer.partner_name || "Estabelecimento"}</span>
+                        </div>
+                        {(offer.pickup_distance_km != null || offer.delivery_minutes != null) && (
+                            <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold text-brand-green">
+                                <MapPinIcon size={11} className="shrink-0" />
+                                <span>
+                                    {offer.pickup_distance_km != null
+                                        ? offer.pickup_distance_km === 0
+                                            ? "No seu local"
+                                            : `${offer.pickup_distance_km} km${offer.pickup_minutes != null ? ` · ${offer.pickup_minutes} min até a loja` : ""}`
+                                        : ""}
+                                    {offer.delivery_minutes != null
+                                        ? `${offer.pickup_distance_km != null ? " · " : ""}${offer.delivery_minutes} min até o cliente`
+                                        : ""}
+                                </span>
+                            </div>
+                        )}
+                        {offer.position_quality === "address" && (
+                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body">
+                                Calculado pelo endereço de cadastro
                             </span>
                         )}
                     </div>
@@ -129,13 +166,18 @@ export default function AvailableDeliveryGridCard({
                         </span>
                     </div>
                     <div className="flex flex-col gap-0.5 items-end shrink-0">
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body text-right">Tempo Restante</span>
-                        {timeLeftSeconds !== null ? (
-                            <span className={`text-xs font-bold flex items-center gap-1 ${
-                                timeLeftSeconds < 180 ? "text-amber-600 dark:text-amber-400 animate-pulse" : "text-brand-dark dark:text-dark-heading"
-                            }`}>
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body text-right">
+                            {tierSecondsLeft !== null && tierSecondsLeft > 0 ? "Janela atual" : "Aguardando"}
+                        </span>
+                        {tierSecondsLeft !== null && tierSecondsLeft > 0 ? (
+                            <span className="text-xs font-bold flex items-center gap-1 text-brand-dark dark:text-dark-heading">
                                 <ClockIcon size={12} />
-                                {Math.floor(timeLeftSeconds / 60)}:{String(timeLeftSeconds % 60).padStart(2, "0")}
+                                fecha em {tierSecondsLeft}s
+                            </span>
+                        ) : elapsedMinutes !== null ? (
+                            <span className="text-xs font-bold flex items-center gap-1 text-brand-dark dark:text-dark-heading">
+                                <ClockIcon size={12} />
+                                {elapsedMinutes === 0 ? "Agora" : `há ${elapsedMinutes} min`}
                             </span>
                         ) : (
                             <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
@@ -148,9 +190,21 @@ export default function AvailableDeliveryGridCard({
                 <div className="flex justify-between items-center gap-2 pt-1">
                     <div className="flex flex-col gap-0.5 min-w-0">
                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Sua Remuneração</span>
-                        <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                            {formatCurrency(offer.delivery_fee || 0)}
-                        </span>
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                                {formatCurrency(offer.delivery_fee || 0)}
+                            </span>
+                            {offer.bonus_amount != null && offer.bonus_amount > 0 && (
+                                <span className="text-[11px] font-bold text-brand-green font-mono">
+                                    + bônus {formatCurrency(offer.bonus_amount)}
+                                </span>
+                            )}
+                            {offer.rs_per_km != null && offer.rs_per_km > 0 && (
+                                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-mono">
+                                    {formatCurrency(offer.rs_per_km)}/km
+                                </span>
+                            )}
+                        </div>
                         {itemCount > 0 && (
                             <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
                                 <Package size={11} />

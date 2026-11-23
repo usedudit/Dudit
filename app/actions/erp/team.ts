@@ -291,11 +291,11 @@ export async function getPDVSellersAction(): Promise<{ members: TeamMember[]; er
  */
 export async function getTeamMemberStatsAction(memberId?: string): Promise<{ stats: TeamMemberStats[]; error?: string }> {
     try {
-        await requireUser()
+        const user = await requireUser()
         const context = await getCurrentPartnerContext()
         if (!context) return { stats: [], error: "Contexto de ERP não encontrado" }
 
-        const access = await requirePermission(context.partnerId, "settings", "settings_team")
+        const access = await requirePermission(context.partnerId, "settings", "settings_team", user)
         if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { stats: [], error: "Sem permissão para visualizar estatísticas." }
         }
@@ -313,43 +313,25 @@ export async function getTeamMemberStatsAction(memberId?: string): Promise<{ sta
 }
 
 // Lightweight stats for a single member, cached per partner+member.
-// Uses the (partner_id, seller_partner_user_id) indexes to avoid scanning all
-// of the partner's orders when the user just wants one member's numbers.
+// Runs ownership verification, orders summary, and commissions in a single parallel round-trip.
 const fetchTeamMemberStatsCached = (partnerId: string, memberId: string) => unstable_cache(
     async (partnerId: string, memberId: string): Promise<TeamMemberStats | null> => {
         const admin = getAdminClient()
 
-        // Make sure the member actually belongs to this partner
-        const { data: user } = await admin
-            .from("partner_users")
-            .select("id, user_id")
-            .eq("partner_id", partnerId)
-            .eq("id", memberId)
-            .single()
-        if (!user) return null
-
-        const [countRes, totalsRes, lastSaleRes, commissionsRes] = await Promise.all([
+        const [userRes, ordersRes, commissionsRes] = await Promise.all([
             admin
-                .from("orders")
-                .select("id", { count: "exact", head: true })
+                .from("partner_users")
+                .select("id, user_id")
                 .eq("partner_id", partnerId)
-                .eq("seller_partner_user_id", memberId)
-                .neq("situation", "cancelled"),
+                .eq("id", memberId)
+                .maybeSingle(),
             admin
                 .from("orders")
-                .select("total_amount")
-                .eq("partner_id", partnerId)
-                .eq("seller_partner_user_id", memberId)
-                .neq("situation", "cancelled"),
-            admin
-                .from("orders")
-                .select("created_at")
+                .select("total_amount, created_at", { count: "exact" })
                 .eq("partner_id", partnerId)
                 .eq("seller_partner_user_id", memberId)
                 .neq("situation", "cancelled")
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .maybeSingle(),
+                .order("created_at", { ascending: false }),
             admin
                 .from("transactions")
                 .select("amount")
@@ -359,8 +341,11 @@ const fetchTeamMemberStatsCached = (partnerId: string, memberId: string) => unst
                 .eq("transaction_type", "expense"),
         ])
 
+        if (!userRes.data) return null
+
+        const orders = ordersRes.data || []
         let totalSalesValue = 0
-        for (const order of totalsRes.data || []) {
+        for (const order of orders) {
             totalSalesValue += Number(order.total_amount || 0)
         }
 
@@ -369,20 +354,14 @@ const fetchTeamMemberStatsCached = (partnerId: string, memberId: string) => unst
             totalCommissionValue += Number(tx.amount || 0)
         }
 
-        const { data: profile } = await admin
-            .from("user_profiles")
-            .select("full_name")
-            .eq("user_id", user.user_id)
-            .maybeSingle()
-
         return {
             partnerUserId: memberId,
-            fullName: profile?.full_name || null,
+            fullName: null,
             avatarUrl: null,
-            saleCount: countRes.count || 0,
+            saleCount: ordersRes.count ?? orders.length,
             totalSalesValue,
             totalCommissionValue,
-            lastSaleDate: lastSaleRes.data?.created_at || null,
+            lastSaleDate: orders[0]?.created_at || null,
         }
     },
     ["team-member-stats", partnerId, memberId],
@@ -548,12 +527,23 @@ export async function updateTeamMemberRole(
             })
             .eq("partner_user_id", targetRecord.id)
 
+        const { data: targetProfile } = await admin
+            .from("user_profiles")
+            .select("full_name, email")
+            .eq("user_id", memberUserId)
+            .maybeSingle()
+
         await import("@/lib/security/audit-logger").then(m => m.auditLog({
-            action: "member.updated" as any,
+            action: "role.changed",
             actorUserId: user.id,
             partnerId,
             targetUserId: memberUserId,
-            metadata: { oldRole: targetRoleId, newRole: String(newRole || "").toLowerCase() }
+            metadata: {
+                oldRole: targetRoleId,
+                newRole: String(newRole || "").toLowerCase(),
+                targetName: targetProfile?.full_name || null,
+                targetEmail: targetProfile?.email || null,
+            }
         }))
 
         const { revalidatePath } = await import("next/cache")
@@ -620,6 +610,12 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
             return { success: false, error: "O proprietário da loja não pode ser removido." }
         }
 
+        const { data: targetProfile } = await admin
+            .from("user_profiles")
+            .select("full_name, email")
+            .eq("user_id", memberUserId)
+            .maybeSingle()
+
         const { error } = await admin
             .from("partner_users")
             .delete()
@@ -628,10 +624,15 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
         if (error) return { success: false, error: "Erro ao remover membro." }
 
         await import("@/lib/security/audit-logger").then(m => m.auditLog({
-            action: "member.removed" as any,
+            action: "member.removed",
             actorUserId: user.id,
             partnerId,
             targetUserId: memberUserId,
+            metadata: {
+                removedRole: targetRoleId,
+                targetName: targetProfile?.full_name || null,
+                targetEmail: targetProfile?.email || null,
+            },
         }))
 
         // Invalidate the removed user's access cache so the ERP disappears from their selector
@@ -648,3 +649,401 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
     }
 }
 
+
+// ─── Team History ───────────────────────────────────────────────────────────
+
+export interface TeamHistoryEntry {
+    id: string
+    actor_name: string
+    change_lines: string[]
+    created_at: string
+    metadata?: Record<string, any> | null
+    entry_type?: string
+}
+
+const TEAM_ROLE_LABELS: Record<string, string> = {
+    owner: "Proprietário",
+    admin: "Administrador",
+    manager: "Gestor",
+    operator: "Operador",
+    delivery: "Entregador",
+}
+
+function formatTeamRoleLabel(role?: string | null): string {
+    if (!role) return ""
+    return TEAM_ROLE_LABELS[String(role).toLowerCase()] || String(role)
+}
+
+const TEAM_AUDIT_ACTIONS = [
+    "invite_created",
+    "invite_accepted",
+    "invite_revoked",
+    "invite_expired",
+    "role_changed",
+    "member_updated",
+    "member_removed",
+    "store_member_added",
+    "store_member_removed",
+    "store_member_updated",
+    "store_member_role_updated",
+    "store_member_access_updated",
+]
+
+/**
+ * Returns the full team history timeline for the current ERP:
+ * member joins, who invited whom, invites sent/revoked, removals,
+ * role changes, and store access changes.
+ */
+export async function getTeamHistoryAction(): Promise<{
+    entries: TeamHistoryEntry[]
+    error?: string
+}> {
+    try {
+        const user = await requireUser()
+        const context = await getCurrentPartnerContext()
+        if (!context) return { entries: [], error: "Contexto de ERP não encontrado" }
+
+        const access = await requirePermission(context.partnerId, "settings", "settings_team", user)
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { entries: [], error: "Sem permissão para visualizar histórico da equipe." }
+        }
+
+        const admin = getAdminClient()
+        const partnerId = context.partnerId
+
+        const [logsRes, invitesRes, membersRes, partnerRes, storesRes] = await Promise.all([
+            admin
+                .from("audit_logs")
+                .select("id, actor_user_id, actor_name, action_type, change_lines, metadata, created_at")
+                .eq("partner_id", partnerId)
+                .in("action_type", TEAM_AUDIT_ACTIONS)
+                .order("created_at", { ascending: false })
+                .limit(150),
+            admin
+                .from("partner_invitations")
+                .select("id, email, role, permissions, created_at, used_at, used_by, revoked_at, revoked_by, created_by_user_id")
+                .eq("partner_id", partnerId)
+                .order("created_at", { ascending: false })
+                .limit(100),
+            admin
+                .from("partner_users")
+                .select("id, user_id, role_id, created_at")
+                .eq("partner_id", partnerId),
+            admin
+                .from("partners")
+                .select("user_id")
+                .eq("id", partnerId)
+                .maybeSingle(),
+            admin
+                .from("stores")
+                .select("id, name")
+                .eq("partner_id", partnerId),
+        ])
+
+        const logs = logsRes.data || []
+        const invitations = invitesRes.data || []
+        const partnerUsers = membersRes.data || []
+        const ownerUserId = partnerRes.data?.user_id || null
+        const storeNameById = new Map<string, string>(
+            (storesRes.data || []).map((s: any) => [s.id, s.name])
+        )
+
+        // Collect all user IDs to resolve display names in one batch
+        const userIds = new Set<string>()
+        for (const l of logs as any[]) {
+            if (l.actor_user_id) userIds.add(l.actor_user_id)
+            const meta = (l.metadata || {}) as Record<string, any>
+            if (meta._targetUserId) userIds.add(meta._targetUserId)
+            if (meta.invitedByUserId) userIds.add(meta.invitedByUserId)
+        }
+        for (const inv of invitations as any[]) {
+            if (inv.created_by_user_id) userIds.add(inv.created_by_user_id)
+            if (inv.used_by) userIds.add(inv.used_by)
+            if (inv.revoked_by) userIds.add(inv.revoked_by)
+        }
+        for (const pu of partnerUsers as any[]) {
+            if (pu.user_id) userIds.add(pu.user_id)
+        }
+
+        const nameMap = new Map<string, string>()
+        const emailMap = new Map<string, string>()
+        const allUserIds = Array.from(userIds)
+
+        if (allUserIds.length > 0) {
+            const { data: profiles } = await admin
+                .from("user_profiles")
+                .select("user_id, full_name, email")
+                .in("user_id", allUserIds)
+
+            for (const p of (profiles || []) as any[]) {
+                if (p.full_name && typeof p.full_name === "string" && p.full_name.trim()) {
+                    nameMap.set(p.user_id, p.full_name.trim())
+                }
+                if (p.email) emailMap.set(p.user_id, p.email)
+            }
+
+            // Fallback to auth.users only for IDs still missing a name
+            const missingIds = allUserIds.filter((uid) => !nameMap.has(uid))
+            if (missingIds.length > 0) {
+                const authResults = await Promise.allSettled(
+                    missingIds.slice(0, 30).map((uid) => admin.auth.admin.getUserById(uid))
+                )
+                for (let i = 0; i < authResults.length; i++) {
+                    const res = authResults[i]
+                    const uid = missingIds[i]
+                    if (res.status === "fulfilled" && res.value.data?.user) {
+                        const u = res.value.data.user
+                        if (u.email) emailMap.set(uid, u.email)
+                        const meta = u.user_metadata || {}
+                        const metaName = meta.full_name || meta.name || meta.display_name
+                        if (metaName && typeof metaName === "string" && metaName.trim()) {
+                            nameMap.set(uid, metaName.trim())
+                        }
+                    }
+                }
+            }
+        }
+
+        const resolveUserName = (uid?: string | null, fallbackName?: string | null, fallbackEmail?: string | null): string => {
+            if (uid && nameMap.has(uid)) return nameMap.get(uid)!
+            if (fallbackName && fallbackName.trim()) return fallbackName.trim()
+            const email = (uid && emailMap.get(uid)) || fallbackEmail
+            if (email) return email
+            return "Usuário"
+        }
+
+        const entries: TeamHistoryEntry[] = []
+
+        // Track audit log keys for deduplication with backfilled invitation/member records
+        const loggedInviteCreated = new Set<string>()
+        const loggedInviteAccepted = new Set<string>()
+        const loggedInviteRevoked = new Set<string>()
+        const acceptedUserIds = new Set<string>()
+
+        for (const log of logs as any[]) {
+            const action = String(log.action_type || "").toLowerCase()
+            const meta = (log.metadata || {}) as Record<string, any>
+            const actorName = log.actor_user_id
+                ? resolveUserName(log.actor_user_id, log.actor_name)
+                : (log.actor_name || "Sistema")
+            const targetName = resolveUserName(meta._targetUserId, meta.targetName, meta.targetEmail)
+
+            let lines: string[] = []
+            let entryType = action
+
+            switch (action) {
+                case "invite_created": {
+                    const email = meta.email || "e-mail não informado"
+                    const roleLabel = formatTeamRoleLabel(meta.role)
+                    lines.push(
+                        `Enviou convite para ${email}${roleLabel ? ` com o cargo de ${roleLabel}` : ""}.`
+                    )
+                    if (Array.isArray(meta.storeNames) && meta.storeNames.length > 0) {
+                        lines.push(`Lojas liberadas no convite: ${meta.storeNames.join(", ")}.`)
+                    }
+                    if (meta.email) loggedInviteCreated.add(String(meta.email).toLowerCase())
+                    break
+                }
+
+                case "invite_accepted": {
+                    const roleLabel = formatTeamRoleLabel(meta.role)
+                    const inviterId = meta.invitedByUserId || meta._targetUserId
+                    const inviterName = inviterId ? resolveUserName(inviterId) : null
+                    lines.push(
+                        `Entrou na equipe${roleLabel ? ` como ${roleLabel}` : ""}${inviterName ? ` (convidado por ${inviterName})` : ""}.`
+                    )
+                    if (Array.isArray(meta.storeNames) && meta.storeNames.length > 0) {
+                        lines.push(`Acesso inicial às lojas: ${meta.storeNames.join(", ")}.`)
+                    }
+                    entryType = "approved"
+                    if (meta.invitationId) loggedInviteAccepted.add(String(meta.invitationId))
+                    if (log.actor_user_id) acceptedUserIds.add(log.actor_user_id)
+                    break
+                }
+
+                case "invite_revoked": {
+                    const email = meta.email ? ` para ${meta.email}` : ""
+                    const roleLabel = formatTeamRoleLabel(meta.revokedRole || meta.role)
+                    lines.push(
+                        `Revogou o convite${email}${roleLabel ? ` (${roleLabel})` : ""}.`
+                    )
+                    entryType = "cancelled"
+                    if (meta.invitationId) loggedInviteRevoked.add(String(meta.invitationId))
+                    break
+                }
+
+                case "role_changed":
+                case "member_updated": {
+                    const oldRole = formatTeamRoleLabel(meta.oldRole)
+                    const newRole = formatTeamRoleLabel(meta.newRole)
+                    if (oldRole && newRole) {
+                        lines.push(`Alterou o cargo de ${targetName} de ${oldRole} para ${newRole}.`)
+                    } else {
+                        lines.push(`Alterou o cargo de ${targetName}.`)
+                    }
+                    break
+                }
+
+                case "member_removed": {
+                    const removedRole = formatTeamRoleLabel(meta.removedRole)
+                    lines.push(
+                        `Removeu ${targetName}${removedRole ? ` (${removedRole})` : ""} da equipe.`
+                    )
+                    entryType = "cancelled"
+                    break
+                }
+
+                case "store_member_access_updated": {
+                    lines.push(`Atualizou o acesso às lojas de ${targetName}.`)
+                    if (Array.isArray(meta.addedStores) && meta.addedStores.length > 0) {
+                        const formatted = meta.addedStores.map((item: string) => {
+                            const [name, role] = String(item).split(":")
+                            const r = formatTeamRoleLabel(role)
+                            return r ? `${name} (${r})` : name
+                        })
+                        lines.push(`Acesso concedido: ${formatted.join(", ")}.`)
+                    }
+                    if (Array.isArray(meta.removedStores) && meta.removedStores.length > 0) {
+                        lines.push(`Acesso removido: ${meta.removedStores.join(", ")}.`)
+                    }
+                    if (Array.isArray(meta.roleChanges) && meta.roleChanges.length > 0) {
+                        for (const item of meta.roleChanges) {
+                            const [name, oldR, newR] = String(item).split(":")
+                            lines.push(
+                                `Cargo na loja ${name}: ${formatTeamRoleLabel(oldR) || "Padrão"} → ${formatTeamRoleLabel(newR)}.`
+                            )
+                        }
+                    }
+                    break
+                }
+
+                case "store_member_added": {
+                    const storeName = meta.storeName || storeNameById.get(meta.storeId) || "loja"
+                    const roleLabel = formatTeamRoleLabel(meta.role)
+                    lines.push(
+                        `Concedeu acesso de ${targetName} à loja ${storeName}${roleLabel ? ` como ${roleLabel}` : ""}.`
+                    )
+                    entryType = "approved"
+                    break
+                }
+
+                case "store_member_removed": {
+                    const storeName = meta.storeName || storeNameById.get(meta.storeId) || "loja"
+                    lines.push(`Removeu o acesso de ${targetName} à loja ${storeName}.`)
+                    entryType = "cancelled"
+                    break
+                }
+
+                case "store_member_updated":
+                case "store_member_role_updated": {
+                    const storeName = meta.storeName || storeNameById.get(meta.storeId) || "loja"
+                    const oldRole = formatTeamRoleLabel(meta.oldRole)
+                    const newRole = formatTeamRoleLabel(meta.newRole)
+                    if (oldRole && newRole) {
+                        lines.push(`Alterou o cargo de ${targetName} na loja ${storeName} de ${oldRole} para ${newRole}.`)
+                    } else if (newRole) {
+                        lines.push(`Alterou o cargo de ${targetName} na loja ${storeName} para ${newRole}.`)
+                    } else {
+                        lines.push(`Atualizou permissões de ${targetName} na loja ${storeName}.`)
+                    }
+                    break
+                }
+
+                default: {
+                    lines = Array.isArray(log.change_lines) && log.change_lines.length > 0
+                        ? log.change_lines
+                        : ["Ação registrada na equipe."]
+                    break
+                }
+            }
+
+            entries.push({
+                id: String(log.id),
+                actor_name: actorName,
+                change_lines: lines,
+                created_at: log.created_at,
+                metadata: meta,
+                entry_type: entryType,
+            })
+        }
+
+        // Backfill invitation lifecycle events not present in audit_logs
+        for (const inv of invitations as any[]) {
+            const roleLabel = formatTeamRoleLabel(inv.role)
+            const invStoreIds = ((inv.permissions as any)?._store_ids_ || []) as string[]
+            const invStoreNames = invStoreIds
+                .map((sid) => storeNameById.get(sid))
+                .filter((n): n is string => Boolean(n))
+
+            if (inv.created_at && !loggedInviteCreated.has(String(inv.email || "").toLowerCase())) {
+                const lines = [
+                    `Enviou convite para ${inv.email}${roleLabel ? ` com o cargo de ${roleLabel}` : ""}.`,
+                ]
+                if (invStoreNames.length > 0) {
+                    lines.push(`Lojas liberadas no convite: ${invStoreNames.join(", ")}.`)
+                }
+                entries.push({
+                    id: `inv-created-${inv.id}`,
+                    actor_name: inv.created_by_user_id ? resolveUserName(inv.created_by_user_id) : "Sistema",
+                    change_lines: lines,
+                    created_at: inv.created_at,
+                    entry_type: "invite_created",
+                })
+            }
+
+            if (inv.used_at && !loggedInviteAccepted.has(String(inv.id))) {
+                const inviterName = inv.created_by_user_id ? resolveUserName(inv.created_by_user_id) : null
+                const lines = [
+                    `Entrou na equipe${roleLabel ? ` como ${roleLabel}` : ""}${inviterName ? ` (convidado por ${inviterName})` : ""}.`,
+                ]
+                if (invStoreNames.length > 0) {
+                    lines.push(`Acesso inicial às lojas: ${invStoreNames.join(", ")}.`)
+                }
+                entries.push({
+                    id: `inv-accepted-${inv.id}`,
+                    actor_name: resolveUserName(inv.used_by, null, inv.email),
+                    change_lines: lines,
+                    created_at: inv.used_at,
+                    entry_type: "approved",
+                })
+                if (inv.used_by) acceptedUserIds.add(inv.used_by)
+            }
+
+            if (inv.revoked_at && !loggedInviteRevoked.has(String(inv.id))) {
+                entries.push({
+                    id: `inv-revoked-${inv.id}`,
+                    actor_name: inv.revoked_by ? resolveUserName(inv.revoked_by) : "Sistema",
+                    change_lines: [
+                        `Revogou o convite para ${inv.email}${roleLabel ? ` (${roleLabel})` : ""}.`,
+                    ],
+                    created_at: inv.revoked_at,
+                    entry_type: "cancelled",
+                })
+            }
+        }
+
+        // Backfill member join events for members without an invite_accepted entry (e.g. owner)
+        for (const pu of partnerUsers as any[]) {
+            if (!pu.created_at || acceptedUserIds.has(pu.user_id)) continue
+            const isOwner = pu.user_id === ownerUserId || String(pu.role_id || "").toLowerCase() === "owner"
+            const roleLabel = formatTeamRoleLabel(pu.role_id)
+            entries.push({
+                id: `member-joined-${pu.id}`,
+                actor_name: resolveUserName(pu.user_id),
+                change_lines: [
+                    isOwner
+                        ? "Criou a equipe como Proprietário."
+                        : `Entrou na equipe${roleLabel ? ` como ${roleLabel}` : ""}.`,
+                ],
+                created_at: pu.created_at,
+                entry_type: "approved",
+            })
+        }
+
+        entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+        return { entries }
+    } catch (error: any) {
+        return { entries: [], error: error.message }
+    }
+}

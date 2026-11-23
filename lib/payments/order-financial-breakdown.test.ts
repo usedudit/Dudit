@@ -318,4 +318,94 @@ describe("calculateOrderFinancialBreakdown", () => {
     expect(res.netProfit).toBe(60.00)
     expect(res.netMargin).toBe(60.00)
   })
+
+  it("order paid with store credit / vale-compra counts full revenue and normal CMV (not discount/cost)", () => {
+    const order = {
+      subtotal_value: 100.00,
+      total_amount: 100.00,
+      paid_amount: 100.00,
+      store_credit_amount: 100.00,
+      delivery_fee: 0,
+      discount_value: 0,
+      discount_amount: 0,
+      item_discount_amount: 0,
+      manual_discount_amount: 0,
+      payment_method: "Vale-compra",
+      payment_breakdown: [
+        {
+          method: "Vale-compra",
+          paymentType: "store_credit",
+          amount: 100.00,
+          amountReceived: 100.00,
+          feeAmount: 0,
+          fixedFeeAmount: 0,
+        },
+      ],
+      order_items: [
+        {
+          product_id: "prod-1",
+          product_name: "Camiseta",
+          product_price: 100.00,
+          original_price: 100.00,
+          quantity: 1,
+          subtotal: 100.00,
+          unit_cost: 40.00,
+          is_gift: false,
+        },
+      ],
+    }
+
+    const res = calculateOrderFinancialBreakdown(order)
+
+    expect(res.revenue.total).toBe(100.00)
+    expect(res.discounts.total).toBe(0)
+    expect(res.costs.total).toBe(-40.00)
+    expect(res.netProfit).toBe(60.00)
+    expect(res.netMargin).toBe(60.00)
+  })
+
+  it("subscription credit redemption order has zero revenue, no fake manual discount, and real CMV", () => {
+    const order = {
+      subtotal_value: 120.00,
+      total_amount: 0,
+      paid_amount: 0,
+      delivery_fee: 0,
+      discount_value: 120.00,
+      discount_type: "fixed",
+      discount_amount: 0,
+      item_discount_amount: 0,
+      manual_discount_amount: 0,
+      payment_method: "Assinatura (Créditos)",
+      payment_breakdown: [
+        {
+          method: "Assinatura (Créditos)",
+          paymentType: "subscription_credits",
+          amount: 0,
+          effectiveAmount: 0,
+          amountReceived: 0,
+        },
+      ],
+      order_items: [
+        {
+          product_id: "prod-1",
+          product_name: "Café Especial 500g",
+          product_price: 60.00,
+          quantity: 2,
+          subtotal: 120.00,
+          unit_cost: 25.00,
+          line_type: "product",
+        },
+      ],
+    }
+
+    const res = calculateOrderFinancialBreakdown(order)
+
+    expect(res.revenue.total).toBe(0)
+    expect(res.revenue.lines).toEqual([])
+    expect(res.discounts.total).toBe(0)
+    expect(res.discounts.lines).toEqual([])
+    expect(res.costs.total).toBe(-50.00)
+    expect(res.costs.lines).toEqual([{ label: "Custo dos produtos", value: -50.00 }])
+    expect(res.netProfit).toBe(-50.00)
+  })
 })

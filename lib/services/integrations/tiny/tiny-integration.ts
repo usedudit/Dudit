@@ -99,6 +99,7 @@ export async function syncTinyProductsToDudit(params: {
   let totalCreated = 0
   let totalUpdated = 0
   const errors: string[] = []
+  const syncedProductIds = new Set<string>()
 
   // Resolve storeId padrão se não fornecido
   let effectiveStoreId = storeId
@@ -245,6 +246,7 @@ export async function syncTinyProductsToDudit(params: {
               errors.push(`Erro ao atualizar ${name} (${sku}): ${updateErr.message}`)
             } else {
               totalUpdated++
+              if (targetProductId) syncedProductIds.add(targetProductId)
             }
           } else {
             // Insere novo produto (sem ncm na tabela products)
@@ -284,6 +286,7 @@ export async function syncTinyProductsToDudit(params: {
             } else {
               targetProductId = createdProduct?.id || null
               totalCreated++
+              if (targetProductId) syncedProductIds.add(targetProductId)
             }
           }
 
@@ -482,6 +485,21 @@ export async function syncTinyProductsToDudit(params: {
       })
       .eq("partner_id", partnerId)
       .eq("provider_slug", TINY_PROVIDER)
+
+    // Revalida cache de produtos e vitrine do Marketplace imediatamente para refletir estoque/preço na hora
+    if (syncedProductIds.size > 0) {
+      try {
+        const { invalidateProductCache } = await import("@/lib/cache/invalidation")
+        const { revalidateProducts, revalidateMarketplace } = await import("@/lib/utils/revalidation")
+        for (const pid of syncedProductIds) {
+          await invalidateProductCache(pid, partnerId, "update")
+          await revalidateProducts(partnerId, pid)
+        }
+        await revalidateMarketplace()
+      } catch (cacheErr) {
+        console.warn("[TINY] Aviso ao revalidar cache do marketplace após sync:", cacheErr)
+      }
+    }
 
     return {
       success: true,
@@ -910,16 +928,34 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       : null
 
     const breakdown = (order.delivery_breakdown as Record<string, any> | null) || null
+    const isCarrier = Boolean(
+      activeShipment?.carrier ||
+      breakdown?.source === "superfrete" ||
+      breakdown?.companyName ||
+      breakdown?.carrier
+    )
 
-    // Nome da transportadora real (prioriza companyName do breakdown, ex: "Jadlog", "Correios")
+    // Nome da transportadora / modalidade real:
+    // - Retirada (pickup) -> forma_envio: "X", frete_por_conta: "S"
+    // - Delivery próprio / motoboy -> forma_envio: "E" (Customizado), frete_por_conta: "3" (Transporte Próprio por conta do Remetente - padrão SEFAZ/Tiny)
+    // - Transportadora (Correios, Jadlog, etc.) -> forma_envio: "C" | "J" | "T", frete_por_conta: "R"
     let carrierName: string | undefined = undefined
     let formaFrete: string | undefined = undefined
     let formaEnvio: string | undefined = undefined
+    let fretePorConta: "R" | "D" | "T" | "3" | "4" | "S" = "S"
 
     if (isPickup) {
-      formaEnvio = "X" // Sem frete / Retirada no Tiny API v2
+      formaEnvio = "X"
+      fretePorConta = "S"
       carrierName = "Retirada na Loja"
+    } else if (!isCarrier) {
+      // Delivery / Entrega própria da loja (motoboy)
+      formaEnvio = "E"
+      fretePorConta = "3"
+      formaFrete = "Delivery / Entrega Própria"
+      carrierName = "Entrega Própria (Delivery)"
     } else {
+      fretePorConta = deliveryFee > 0 ? "R" : "S"
       carrierName =
         breakdown?.companyName ||
         activeShipment?.carrier ||
@@ -939,14 +975,11 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       } else if (lowerCarrier.includes("jadlog") || lowerCarrier.includes(".package") || lowerCarrier.includes(".com")) {
         formaEnvio = "J" // Jadlog
         if (!carrierName || carrierName.toLowerCase() === "superfrete") carrierName = "Jadlog"
-      } else if (carrierName || deliveryFee > 0) {
-        formaEnvio = "T" // Transportadora
       } else {
-        formaEnvio = "X" // Sem frete
+        formaEnvio = "T" // Transportadora
       }
     }
 
-    const fretePorConta: "R" | "S" = isPickup ? "S" : deliveryFee > 0 ? "R" : "S"
     const trackingCode = activeShipment?.tracking_number || undefined
     const trackingUrl = activeShipment?.tracking_url || undefined
 
@@ -984,6 +1017,21 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
               itemDescricao = `${itemDescricao} - ${fallbackVars[0].variant_name}`
             }
           }
+        }
+
+        // Para variações (ou quando não temos idProduto do Tiny), resolve o id_produto da variação no Tiny pelo SKU
+        // garantindo vínculo exato no Tiny para reserva e baixa de estoque de variantes
+        if (!idProduto && itemCodigo) {
+          try {
+            const skuNorm = itemCodigo.trim().toLowerCase()
+            const search = await client.searchProducts({ pesquisa: itemCodigo })
+            const found = (search.produtos || []).find(
+              (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+            )
+            if (found?.produto?.id) {
+              idProduto = Number(found.produto.id) || undefined
+            }
+          } catch { }
         }
 
         return {
@@ -1301,8 +1349,11 @@ export async function syncDuditStockToTiny(params: {
 
       if (vRow?.sku) {
         try {
+          const skuNorm = String(vRow.sku).trim().toLowerCase()
           const search = await client.searchProducts({ pesquisa: vRow.sku })
-          const found = (search.produtos || []).find((p: any) => p.produto.codigo === vRow.sku)
+          const found = (search.produtos || []).find(
+            (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+          )
           if (found?.produto?.id) {
             targetTinyId = found.produto.id
           }
@@ -1322,8 +1373,11 @@ export async function syncDuditStockToTiny(params: {
         targetTinyId = pRow.external_id
       } else if (pRow?.sku) {
         try {
+          const skuNorm = String(pRow.sku).trim().toLowerCase()
           const search = await client.searchProducts({ pesquisa: pRow.sku })
-          const found = (search.produtos || []).find((p: any) => p.produto.codigo === pRow.sku)
+          const found = (search.produtos || []).find(
+            (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+          )
           if (found?.produto?.id) {
             targetTinyId = found.produto.id
           }
@@ -1334,8 +1388,11 @@ export async function syncDuditStockToTiny(params: {
     // 3. Fallback por SKU direto
     if (!targetTinyId && sku) {
       try {
+        const skuNorm = String(sku).trim().toLowerCase()
         const search = await client.searchProducts({ pesquisa: sku })
-        const found = (search.produtos || []).find((p: any) => p.produto.codigo === sku)
+        const found = (search.produtos || []).find(
+          (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+        )
         if (found?.produto?.id) {
           targetTinyId = found.produto.id
         }

@@ -29,7 +29,12 @@ export default function DeliveryKanbanBoard({
     )
     const preparingDeliveries = deliveries.filter((d) => d.status === "preparing")
     const sentDeliveries = deliveries.filter(
-        (d) => d.status === "sent" || d.status === "pickup_available"
+        (d) =>
+            d.status === "sent" ||
+            d.status === "partially_delivered" ||
+            d.status === "in_transit" ||
+            d.status === "out_for_delivery" ||
+            d.status === "pickup_available"
     )
     const deliveredDeliveries = deliveries.filter((d) => d.status === "delivered")
     const cancelledDeliveries = deliveries.filter(

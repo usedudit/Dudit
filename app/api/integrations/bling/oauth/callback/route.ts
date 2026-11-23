@@ -123,6 +123,22 @@ export async function GET(request: NextRequest) {
     const nowIso = new Date().toISOString()
     const expiresAtIso = new Date(Date.now() + Number(tokenData.expires_in || 21600) * 1000).toISOString()
 
+    // Tenta buscar o ID da empresa no Bling (companyId) para rotear webhooks globais de App Público
+    let blingAccountId: string | null = existing?.account_id || null
+    let blingAccountEmail: string | null = existing?.account_email || null
+    try {
+      const meRes = await fetch("https://api.bling.com.br/Api/v3/empresas/me/dados-basicos", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}`, Accept: "application/json" },
+        cache: "no-store",
+      })
+      if (meRes.ok) {
+        const meJson = await meRes.json().catch(() => ({}))
+        const info = meJson?.data
+        if (info?.id) blingAccountId = String(info.id)
+        if (info?.email) blingAccountEmail = String(info.email)
+      }
+    } catch { }
+
     const existingConfig = (existing?.config as Record<string, any>) || {}
     const webhookSecret = existingConfig.webhook_secret || crypto.randomUUID().replace(/-/g, "")
 
@@ -132,6 +148,8 @@ export async function GET(request: NextRequest) {
       partner_id: partnerId,
       provider_slug: BLING_PROVIDER,
       status: "connected",
+      account_id: blingAccountId,
+      account_email: blingAccountEmail,
       access_token_encrypted: encrypt(tokenData.access_token, BLING_PROVIDER),
       config: {
         sync_stock: existingConfig.sync_stock ?? true,

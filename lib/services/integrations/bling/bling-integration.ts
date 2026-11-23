@@ -289,6 +289,7 @@ export async function syncBlingProductsToDudit(params: {
   let totalCreated = 0
   let totalUpdated = 0
   const errors: string[] = []
+  const syncedProductIds = new Set<string>()
 
   let effectiveStoreId = storeId
   if (!effectiveStoreId) {
@@ -422,6 +423,7 @@ export async function syncBlingProductsToDudit(params: {
               errors.push(`Erro ao atualizar ${name} (${sku}): ${updateErr.message}`)
             } else {
               totalUpdated++
+              if (targetProductId) syncedProductIds.add(targetProductId)
             }
           } else {
             const { data: createdProduct, error: insertErr } = await supabase
@@ -459,6 +461,7 @@ export async function syncBlingProductsToDudit(params: {
             } else {
               targetProductId = createdProduct?.id || null
               totalCreated++
+              if (targetProductId) syncedProductIds.add(targetProductId)
             }
           }
 
@@ -635,6 +638,21 @@ export async function syncBlingProductsToDudit(params: {
           updated_at: new Date().toISOString(),
         })
         .eq("id", integration.id)
+    }
+
+    // Revalida cache de produtos e vitrine do Marketplace imediatamente para refletir estoque/preço na hora
+    if (syncedProductIds.size > 0) {
+      try {
+        const { invalidateProductCache } = await import("@/lib/cache/invalidation")
+        const { revalidateProducts, revalidateMarketplace } = await import("@/lib/utils/revalidation")
+        for (const pid of syncedProductIds) {
+          await invalidateProductCache(pid, partnerId, "update")
+          await revalidateProducts(partnerId, pid)
+        }
+        await revalidateMarketplace()
+      } catch (cacheErr) {
+        console.warn("[BLING] Aviso ao revalidar cache do marketplace após sync:", cacheErr)
+      }
     }
 
     return {
@@ -821,11 +839,27 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       ? order.order_shipments.find((s: any) => s.kind !== "return")
       : null
     const breakdown = (order.delivery_breakdown as Record<string, any> | null) || null
+    const isCarrier = Boolean(
+      activeShipment?.carrier ||
+      breakdown?.source === "superfrete" ||
+      breakdown?.companyName ||
+      breakdown?.carrier
+    )
 
     const carrierName = isPickup
       ? "Retirada na Loja"
-      : breakdown?.companyName || activeShipment?.carrier || breakdown?.carrier || undefined
-    const serviceName = activeShipment?.service_name || breakdown?.serviceName || breakdown?.service_name || undefined
+      : !isCarrier
+        ? "Entrega Própria (Delivery)"
+        : breakdown?.companyName || activeShipment?.carrier || breakdown?.carrier || undefined
+    const serviceName = isPickup
+      ? undefined
+      : !isCarrier
+        ? "Delivery / Motoboy"
+        : activeShipment?.service_name || breakdown?.serviceName || breakdown?.service_name || undefined
+
+    // Modalidade oficial SEFAZ/Bling:
+    // 9 = Sem ocorrência de transporte (Retirada), 3 = Transporte Próprio por conta do Remetente (Delivery/Motoboy), 0 = CIF Transportadora
+    const blingFretePorConta = isPickup ? 9 : !isCarrier ? 3 : deliveryFee > 0 ? 0 : 9
 
     const items = (order.order_items || []).map((it: any) => {
       const prod = it.products
@@ -876,7 +910,7 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       ...(totalDiscount > 0.009 ? { desconto: { valor: Number(totalDiscount.toFixed(2)), unidade: "REAL" } } : {}),
       ...(parcelas.length > 0 ? { parcelas } : {}),
       transporte: {
-        fretePorConta: isPickup ? 9 : deliveryFee > 0 ? 0 : 9,
+        fretePorConta: blingFretePorConta,
         frete: deliveryFee > 0 ? deliveryFee : 0,
         ...(carrierName ? { contato: { nome: carrierName } } : {}),
         ...(addressData?.street

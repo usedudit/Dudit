@@ -7517,9 +7517,13 @@ Para que um pedido possa ser despachado por um entregador parceiro em motociclet
 
 ---
 
-## 2. Raio de distância e área de cobertura
+## 2. Raio de distância, escalada e viabilidade econômica
 
-* **Raio operacional:** Até **20 km** de distância entre o endereço do estabelecimento (coleta) e o endereço do cliente (entrega).
+* **Raio dinâmico por loja:** O raio máximo respeita o limite configurado pela loja em **Configurações de Entrega** (padrão de até **20 km**), expandindo gradualmente por níveis de proximidade (2 km → 4 km → 7 km → 12 km → teto econômico) para priorizar entregadores mais próximos.
+* **Viabilidade por R$/km:** O raio de busca também considera a viabilidade econômica da taxa em relação à distância da rota. Caso nenhum entregador esteja dentro do raio coberto pela taxa, o estabelecimento vê o aviso no painel e pode **autorizar um bônus opcional** para incentivar a coleta (sem alterar a taxa cobrada do cliente).
+* **Localização em tempo real:** Entregadores online compartilham a posição GPS enquanto disponíveis ou em rota para cálculos de distância e tempo estimado em minutos até a loja e até o cliente. Quando o GPS não está disponível, o sistema utiliza o endereço de cadastro com aviso transparente.
+* **Recusa e pausa temporária:** O entregador pode recusar ofertas diretamente no card. Após **3 recusas consecutivas**, entra automaticamente em pausa temporária de **15 minutos** antes de receber novas ofertas.
+* **Dimensões pendentes:** Caso os produtos do pedido não tenham peso ou dimensões cadastrados, o lojista recebe um alerta antes do disparo e o entregador vê um aviso no card para confirmar se o volume cabe no veículo.
 * **Abrangência:** A modalidade destina-se a entregas locais na mesma cidade ou região metropolitana atendida pelos entregadores parceiros ativos na plataforma.
 
 ---

@@ -5,21 +5,37 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
 import DeliveriesPage from "@/components/erp/deliveries/DeliveriesPage"
 import {
+  fetchDeliveryOrdersByIdsAction,
   getERPCarrierDeliveriesEnabledAction,
   getERPDeliveriesPageAction,
 } from "@/app/actions/erp/deliveries"
 
 export const dynamic = "force-dynamic"
 
-export default async function DeliveriesRoutePage() {
+export default async function DeliveriesRoutePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ orders?: string; create?: string }>
+}) {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
 
+  const resolvedSearchParams = searchParams ? await searchParams : {}
+  const prefillOrderIds = resolvedSearchParams?.orders
+    ? String(resolvedSearchParams.orders)
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : []
+
   const partnerId = context.partnerId
-  const [{ allowed }, page, carrier] = await Promise.all([
+  const [{ allowed }, page, carrier, initialPrefillOrders] = await Promise.all([
     checkPermission(partnerId, "delivery", "view"),
     getERPDeliveriesPageAction(partnerId, { cursor: null, limit: 25 }),
     getERPCarrierDeliveriesEnabledAction(partnerId),
+    prefillOrderIds.length > 0
+      ? fetchDeliveryOrdersByIdsAction(partnerId, prefillOrderIds)
+      : Promise.resolve([]),
   ])
 
   if (!allowed) return <AccessDenied />
@@ -43,6 +59,7 @@ export default async function DeliveriesRoutePage() {
           userRole={userRole}
           planSlug={page.planSlug}
           carrierEnabled={carrier.success ? carrier.enabled : false}
+          initialPrefillOrders={initialPrefillOrders}
         />
       </FadeIn>
     </>

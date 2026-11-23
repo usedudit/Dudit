@@ -45,11 +45,13 @@ export function DeliveryRouteMap({
   origin,
   initialLat,
   initialLng,
+  onRouteStatsChange,
 }: {
   points: RoutePoint[]
   origin?: RouteOrigin
   initialLat?: number | null
   initialLng?: number | null
+  onRouteStatsChange?: (stats: RouteStats | null) => void
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
@@ -59,6 +61,13 @@ export function DeliveryRouteMap({
   const [mapError, setMapError] = useState<{ message: string; status: number | null } | null>(null)
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null)
   const [isRouteLoading, setIsRouteLoading] = useState(false)
+
+  const onRouteStatsChangeRef = useRef(onRouteStatsChange)
+  onRouteStatsChangeRef.current = onRouteStatsChange
+
+  useEffect(() => {
+    onRouteStatsChangeRef.current?.(routeStats)
+  }, [routeStats])
 
   const rawToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
   const token = rawToken ? rawToken.replace(/['"]/g, "").trim() : ""

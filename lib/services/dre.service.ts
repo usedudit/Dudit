@@ -14,6 +14,9 @@ import {
   isOrderCashCollected,
   isServiceOrderLinkedOrder,
   isServiceOrderOriginSale,
+  isSubscriptionCreditOrder,
+  isSubscriptionCycleBillingOrder,
+  computeReturnRequestDreImpact,
   isPaidAmountSettled,
   computeServiceOrderAmounts,
   computeProratedMonthlyTax,
@@ -217,10 +220,11 @@ async function computeDrePeriod(
       manual_discount_amount, item_discount_amount, campaign_discount_amount,
       paid_amount, delivery_fee, situation, created_at, paid_at, order_source,
       source_service_order_id, delivery_payer, subtotal_original,
-       payment_method_fee_amount, payment_method_fixed_fee_amount,
-       payment_method_interest_amount, payment_method_discount_amount,
-       payment_method_extra_amount,
-      order_items (id, product_id, variant_id, product_name, quantity,
+      payment_method, payment_breakdown, recurring_execution_id, store_credit_amount,
+      payment_method_fee_amount, payment_method_fixed_fee_amount,
+      payment_method_interest_amount, payment_method_discount_amount,
+      payment_method_extra_amount,
+      order_items (id, product_id, variant_id, service_id, line_type, product_name, quantity,
         product_price, unit_cost, subtotal, original_price, is_gift, discount_amount)
     `)
     .eq("partner_id", partnerId)
@@ -297,7 +301,7 @@ async function computeDrePeriod(
     txQuery = txQuery.eq("status", "paid").gte("payment_date", startIso).lte("payment_date", endIso)
   }
 
-  // 6. Devoluções e Reembolsos (`returns`)
+  // 6. Devoluções e Reembolsos (`returns` legado + `return_requests` atual)
   let returnsQuery = supabase
     .from("returns")
     .select("id, refund_amount, status, created_at, refund_transaction_id")
@@ -313,6 +317,30 @@ async function computeDrePeriod(
     returnsQuery = returnsQuery.in("store_id", allowedStoreIds)
   }
 
+  let returnRequestsQuery = supabase
+    .from("return_requests")
+    .select(`
+      id, status, approved_resolution, refund_amount, store_credit_amount,
+      inventory_movement_id, created_at, updated_at,
+      orders!order_id(situation),
+      return_items!return_items_return_request_id_fkey(
+        quantity,
+        order_items!order_item_id(unit_cost, service_id, line_type)
+      )
+    `)
+    .eq("partner_id", partnerId)
+    .eq("status", "RESOLVED")
+    .is("deleted_at", null)
+    .gte("updated_at", startIso)
+    .lte("updated_at", endIso)
+    .limit(5000)
+
+  if (storeId) {
+    returnRequestsQuery = returnRequestsQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    returnRequestsQuery = returnRequestsQuery.in("store_id", allowedStoreIds)
+  }
+
   // ── Execução Paralela Simultânea de Todas as Queries em 1 Roundtrip ─────────
   const [
     storesRes,
@@ -322,6 +350,7 @@ async function computeDrePeriod(
     apptRes,
     txRes,
     returnsRes,
+    returnRequestsRes,
   ] = await Promise.all([
     storeQuery,
     salesQuery,
@@ -330,6 +359,7 @@ async function computeDrePeriod(
     apptQuery,
     txQuery,
     returnsQuery,
+    returnRequestsQuery,
   ])
 
   const stores = storesRes.data || []
@@ -347,6 +377,7 @@ async function computeDrePeriod(
   const appointmentsList = apptRes.data || []
   const transactionsList = txRes.data || []
   const returnsList = returnsRes.data || []
+  const returnRequestsList = returnRequestsRes.data || []
 
   // ==========================================================================
   // 1. RECEITA OPERACIONAL BRUTA (Valor Nominal Cheio)
@@ -431,62 +462,73 @@ async function computeDrePeriod(
       : isOrderRevenueRecognized(situation)
     if (!countsInRegime) continue
 
-    // Descontos: colunas persistidas (imutáveis)
-    const itemDiscount = Math.max(0, Number(o.item_discount_amount || 0))
-    const manualDiscount = Math.max(0, Number(o.manual_discount_amount || 0))
-    const couponDiscount = Math.max(0, Number(o.discount_amount || 0))
-    const pmDiscount = Math.max(0, Number(o.payment_method_discount_amount || 0))
-    const totalOrderDiscount = itemDiscount + manualDiscount + couponDiscount + pmDiscount
+    const isSubCredit = isSubscriptionCreditOrder(o as any)
+    const isSubCycleBilling = isSubscriptionCycleBillingOrder(o as any)
 
-    // Receita bruta nominal por item
-    let itemsNominalGross = 0
-    for (const item of (o.order_items as any[]) || []) {
-      const qty = Number(item.quantity || 0)
-      const chargedPrice = Number(item.product_price || 0)
-      const nominalPrice = Number(item.original_price || 0) > 0
-        ? Number(item.original_price)
-        : chargedPrice
-      if (item.is_gift) continue // brinde: receita 0
-      itemsNominalGross += nominalPrice * qty
+    // Pedido de resgate por créditos de assinatura: receita já entrou na
+    // mensalidade do plano (evita duplicação); aqui contabilizamos apenas CMV/CSP.
+    // Já crédito em loja / vale-compra conta como receita normal (forma de pagamento).
+    if (!isSubCredit) {
+      // Descontos: colunas persistidas (imutáveis)
+      const itemDiscount = Math.max(0, Number(o.item_discount_amount || 0))
+      const manualDiscount = Math.max(0, Number(o.manual_discount_amount || 0))
+      const couponDiscount = Math.max(0, Number(o.discount_amount || 0))
+      const pmDiscount = Math.max(0, Number(o.payment_method_discount_amount || 0))
+      const totalOrderDiscount = itemDiscount + manualDiscount + couponDiscount + pmDiscount
+
+      // Receita bruta nominal por item
+      let itemsNominalGross = 0
+      for (const item of (o.order_items as any[]) || []) {
+        const qty = Number(item.quantity || 0)
+        const chargedPrice = Number(item.product_price || 0)
+        const nominalPrice = Number(item.original_price || 0) > 0
+          ? Number(item.original_price)
+          : chargedPrice
+        if (item.is_gift) continue // brinde: receita 0
+        itemsNominalGross += nominalPrice * qty
+      }
+
+      const revenueBucket = getOrderRevenueBucket((o as any).order_source)
+      const addToRevenue = (value: number) => {
+        if (revenueBucket === "recurring") recurringRevenue += value
+        else productsRevenue += value
+      }
+
+      if (itemsNominalGross > 0) {
+        addToRevenue(itemsNominalGross)
+      } else {
+        // Fallback conservador: total_amount + descontos - delivery
+        const deliveryFee = Number(o.delivery_fee || 0)
+        const reconstructedGross = Math.max(0, Number(o.total_amount || 0) + totalOrderDiscount - deliveryFee)
+        addToRevenue(reconstructedGross)
+      }
+
+      orderDiscounts += totalOrderDiscount
+      orderCount++
     }
-
-    const revenueBucket = getOrderRevenueBucket((o as any).order_source)
-    const addToRevenue = (value: number) => {
-      if (revenueBucket === "recurring") recurringRevenue += value
-      else productsRevenue += value
-    }
-
-    if (itemsNominalGross > 0) {
-      addToRevenue(itemsNominalGross)
-    } else {
-      // Fallback conservador: total_amount + descontos - delivery
-      const deliveryFee = Number(o.delivery_fee || 0)
-      const reconstructedGross = Math.max(0, Number(o.total_amount || 0) + totalOrderDiscount - deliveryFee)
-      addToRevenue(reconstructedGross)
-    }
-
-    orderDiscounts += totalOrderDiscount
 
     // Taxas de cartão/gateway (juros de parcelamento cobrados do cliente NÃO são taxa)
     orderFees += Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
 
-    // CMV dos itens deste pedido (mesmo regime/reconhecimento)
-    for (const item of (o.order_items as any[]) || []) {
-      const qty = Number(item.quantity || 0)
-      const cost = Number(item.unit_cost || 0)
-      if (!item.is_gift && cost <= 0) {
-        orderZeroCostItems++
-      }
-      // Brindes entram no CMV (receita 0, custo real)
-      const isServiceLine = item.service_id || item.line_type === "service_booking"
-      if (isServiceLine) {
-        orderCogsServices += qty * cost
-      } else {
-        orderCogsProducts += qty * cost
+    // CMV dos itens deste pedido (mesmo regime/reconhecimento).
+    // Pedido de cobrança do ciclo de assinatura (`recurring_execution_id`) é apenas
+    // registro financeiro — o estoque/CMV sai no pedido de entrega por créditos.
+    if (!isSubCycleBilling) {
+      for (const item of (o.order_items as any[]) || []) {
+        const qty = Number(item.quantity || 0)
+        const cost = Number(item.unit_cost || 0)
+        if (!item.is_gift && cost <= 0) {
+          orderZeroCostItems++
+        }
+        // Brindes entram no CMV (receita 0, custo real)
+        const isServiceLine = item.service_id || item.line_type === "service_booking"
+        if (isServiceLine) {
+          orderCogsServices += qty * cost
+        } else {
+          orderCogsProducts += qty * cost
+        }
       }
     }
-
-    orderCount++
   }
 
   // 1.3 Prestação de Serviços (OS + Agendamentos)
@@ -568,13 +610,22 @@ async function computeDrePeriod(
   let returnsAndRefunds = 0
   let salesTaxes = 0
 
-  // 2.1 Devoluções e Reembolsos de Pedidos/PDV
+  // 2.1 Devoluções e Reembolsos de Pedidos/PDV (inclui reembolso e crédito em loja / vale-compra)
   const returnTxIds = new Set<string>()
   for (const r of returnsList) {
     returnsAndRefunds += Number(r.refund_amount || 0)
     if (r.refund_transaction_id) {
       returnTxIds.add(r.refund_transaction_id)
     }
+  }
+
+  let returnedCogsProducts = 0
+  let returnedCogsServices = 0
+  for (const rr of returnRequestsList) {
+    const impact = computeReturnRequestDreImpact(rr as any)
+    returnsAndRefunds += impact.deductionAmount
+    returnedCogsProducts += impact.cogsProductsReversal
+    returnedCogsServices += impact.cogsServicesReversal
   }
 
   // 2.2 Impostos sobre faturamento (Simples Nacional / DAS-MEI)
@@ -588,6 +639,7 @@ async function computeDrePeriod(
 
   // 2.3 Transações financeiras manuais de dedução (sem duplicar as já calculadas)
   for (const tx of transactionsList) {
+    if (isOrderDerivedTransaction(tx)) continue
     if (tx.transaction_type === "expense" && !returnTxIds.has(tx.id)) {
       const g = (tx.dre_group as any)?.dre_group
       const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
@@ -635,8 +687,9 @@ async function computeDrePeriod(
   }
 
   // 3.2 CMV de itens vendidos online — já calculado no loop de receita (mesmo regime/reconhecimento)
-  cogsProducts += orderCogsProducts
-  cogsServices += orderCogsServices
+  // Estorna o CMV dos itens devolvidos que retornaram fisicamente ao estoque.
+  cogsProducts = Math.max(0, cogsProducts + orderCogsProducts - returnedCogsProducts)
+  cogsServices = Math.max(0, cogsServices + orderCogsServices - returnedCogsServices)
   cogsSupplies += orderCogsSupplies
   zeroCostItemsCount += orderZeroCostItems
 

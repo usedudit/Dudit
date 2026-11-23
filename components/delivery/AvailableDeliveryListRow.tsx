@@ -10,6 +10,11 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 export interface AvailableDeliveryOffer {
     id?: string
     assignment_id: string
+    offer_id?: string | null
+    offer_tier?: number | null
+    offer_mode?: "board" | "directed"
+    offer_expires_at?: string | null
+    dispatch_tier?: number
     order_id: string
     order_number?: string | number
     order_count?: number
@@ -23,13 +28,27 @@ export interface AvailableDeliveryOffer {
     customer_phone?: string
     delivery_address?: string
     delivery_fee: number
+    bonus_amount?: number
     total_amount?: number
     payment_method?: string
     assigned_at?: string
     notes?: string
     items?: Array<{ name: string; quantity: number }>
+    pickup_km?: number | null
     pickup_distance_km?: number | null
     distance_km?: number | null
+    pickup_minutes?: number | null
+    delivery_km?: number | null
+    delivery_distance_km?: number | null
+    delivery_minutes?: number | null
+    eta_total_minutes?: number | null
+    vehicle_compatible?: boolean
+    position_quality?: "live" | "address" | "unknown"
+    route_km?: number | null
+    rs_per_km?: number | null
+    dimensions_unknown?: boolean
+    package_weight_kg?: number | null
+    package_volume_l?: number | null
 }
 
 interface AvailableDeliveryListRowProps {
@@ -39,8 +58,6 @@ interface AvailableDeliveryListRowProps {
     isAccepting?: boolean
 }
 
-const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
-
 export default function AvailableDeliveryListRow({
     offer,
     onAccept,
@@ -49,19 +66,26 @@ export default function AvailableDeliveryListRow({
 }: AvailableDeliveryListRowProps) {
     const router = useRouter()
     const assignmentId = offer.assignment_id || offer.id || ""
-    const [timeLeftSeconds, setTimeLeftSeconds] = useState<number | null>(null)
+    const [elapsedMinutes, setElapsedMinutes] = useState<number | null>(null)
+    const [tierSecondsLeft, setTierSecondsLeft] = useState<number | null>(null)
 
     useEffect(() => {
-        if (!offer.assigned_at) return
         const calc = () => {
-            const assignedTime = new Date(offer.assigned_at!).getTime()
-            const diff = Math.max(0, Math.floor((assignedTime + FIFTEEN_MINUTES_MS - Date.now()) / 1000))
-            setTimeLeftSeconds(diff)
+            if (offer.assigned_at) {
+                const assignedTime = new Date(offer.assigned_at).getTime()
+                setElapsedMinutes(Math.max(0, Math.floor((Date.now() - assignedTime) / 60000)))
+            }
+            if (offer.offer_expires_at) {
+                const expTime = new Date(offer.offer_expires_at).getTime()
+                setTierSecondsLeft(Math.max(0, Math.floor((expTime - Date.now()) / 1000)))
+            } else {
+                setTierSecondsLeft(null)
+            }
         }
         calc()
-        const interval = setInterval(calc, 30000)
+        const interval = setInterval(calc, offer.offer_expires_at ? 1000 : 30000)
         return () => clearInterval(interval)
-    }, [offer.assigned_at])
+    }, [offer.assigned_at, offer.offer_expires_at])
 
     const orderCount = offer.order_count || offer.orders?.length || 1
 
@@ -104,11 +128,31 @@ export default function AvailableDeliveryListRow({
                             </span>
                         )}
                     </div>
-                    {timeLeftSeconds !== null && (
-                        <span className={`text-[11px] font-semibold flex items-center gap-1 mt-0.5 ${timeLeftSeconds < 180 ? "text-amber-600 dark:text-amber-400 animate-pulse" : "text-brand-inactive-text dark:text-dark-body"
-                            }`}>
+                    {tierSecondsLeft !== null && tierSecondsLeft > 0 ? (
+                        <span className="text-[11px] font-semibold flex items-center gap-1 mt-0.5 text-brand-inactive-text dark:text-dark-body">
                             <ClockIcon size={11} />
-                            {Math.floor(timeLeftSeconds / 60)}:{String(timeLeftSeconds % 60).padStart(2, "0")} restante
+                            Fecha em {tierSecondsLeft}s
+                        </span>
+                    ) : elapsedMinutes !== null ? (
+                        <span className="text-[11px] font-semibold flex items-center gap-1 mt-0.5 text-brand-inactive-text dark:text-dark-body">
+                            <ClockIcon size={11} />
+                            {elapsedMinutes === 0 ? "Agora" : `Há ${elapsedMinutes} min`}
+                        </span>
+                    ) : null}
+                    {offer.dimensions_unknown && (
+                        <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 w-fit"
+                            title="Itens sem peso/dimensão informados — confirme se cabe no seu veículo"
+                        >
+                            ⚠ Sem dimensão
+                        </span>
+                    )}
+                    {offer.vehicle_compatible === false && (
+                        <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300 w-fit"
+                            title="Peso ou volume acima do limite recomendado para o seu veículo"
+                        >
+                            ⚠ Acima do limite do veículo
                         </span>
                     )}
                 </div>
@@ -123,7 +167,19 @@ export default function AvailableDeliveryListRow({
                     {offer.pickup_distance_km != null && (
                         <span className="text-[11px] font-medium text-brand-green flex items-center gap-1 mt-0.5">
                             <MapPinIcon size={11} />
-                            {offer.pickup_distance_km === 0 ? "No mesmo local" : `A ${offer.pickup_distance_km} km de você`}
+                            {offer.pickup_distance_km === 0
+                                ? "No mesmo local"
+                                : `${offer.pickup_distance_km} km${offer.pickup_minutes != null ? ` · ${offer.pickup_minutes} min até a loja` : ""}`}
+                        </span>
+                    )}
+                    {offer.delivery_minutes != null && (
+                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                            {offer.delivery_minutes} min até o cliente{offer.eta_total_minutes != null ? ` · ~${offer.eta_total_minutes} min total` : ""}
+                        </span>
+                    )}
+                    {offer.position_quality === "address" && (
+                        <span className="text-[10px] text-brand-inactive-text/80 dark:text-dark-body/80 mt-0.5">
+                            Distância pelo endereço de cadastro
                         </span>
                     )}
                 </div>
@@ -148,6 +204,16 @@ export default function AvailableDeliveryListRow({
                     <span className="font-bold text-[13px] text-emerald-600 dark:text-emerald-400">
                         {formatCurrency(offer.delivery_fee || 0)}
                     </span>
+                    {offer.bonus_amount != null && offer.bonus_amount > 0 && (
+                        <span className="text-[11px] font-bold text-brand-green font-mono">
+                            + bônus {formatCurrency(offer.bonus_amount)}
+                        </span>
+                    )}
+                    {offer.rs_per_km != null && offer.rs_per_km > 0 && (
+                        <span className="text-[11px] font-semibold text-emerald-700/90 dark:text-emerald-300/90 font-mono">
+                            {formatCurrency(offer.rs_per_km)}/km
+                        </span>
+                    )}
                     {itemCount > 0 && (
                         <span className="flex items-center gap-1 text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                             <Package size={11} />
