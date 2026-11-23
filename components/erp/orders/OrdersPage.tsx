@@ -527,6 +527,7 @@ export default function OrdersPage({
                     delivered: <CheckCircleIcon size={12} />,
                     pickup_available: <DeliveryPickupIcon size={12} />,
                     delivery_failed: <DeliveryFailedIcon size={12} />,
+                    cancelled: <BlockedIcon size={12} />,
                 }
 
                 const orderItems = o.order_items || []
@@ -866,7 +867,8 @@ export default function OrdersPage({
                         : status === "sent" || status === "pickup_available" ? "sent"
                             : status === "delivered" ? "delivered"
                                 : status === "delivery_failed" ? "delivery_failed"
-                                    : "not_sent"
+                                    : status === "cancelled" ? "cancelled"
+                                        : "not_sent"
         )
     }
 

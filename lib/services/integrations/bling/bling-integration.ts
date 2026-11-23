@@ -374,7 +374,7 @@ export async function syncBlingProductsToDudit(params: {
 
           let { data: existingProduct } = await supabase
             .from("products")
-            .select("id")
+            .select("id, stock_reserved")
             .eq("partner_id", partnerId)
             .eq("external_id", externalId)
             .maybeSingle()
@@ -382,7 +382,7 @@ export async function syncBlingProductsToDudit(params: {
           if (!existingProduct && sku) {
             const { data: bySku } = await supabase
               .from("products")
-              .select("id")
+              .select("id, stock_reserved")
               .eq("partner_id", partnerId)
               .eq("sku", sku)
               .maybeSingle()
@@ -405,7 +405,7 @@ export async function syncBlingProductsToDudit(params: {
                 unit,
                 min_stock: minStock,
                 stock_quantity: stock,
-                stock_reserved: stockReserved,
+                stock_reserved: Math.max(Number(existingProduct.stock_reserved || 0), stockReserved),
                 description: description || undefined,
                 images: images.length > 0 ? images : undefined,
                 status: isActive ? "ativo" : "inativo",
@@ -698,7 +698,11 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       total_amount,
       paid_amount,
       situation,
+      delivery_status,
+      inventory_deducted,
       delivery_fee,
+      additional_costs,
+      payment_method_extra_amount,
       delivery_type,
       delivery_breakdown,
       delivery_address,
@@ -761,7 +765,11 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     return { success: false, error: "Pedido não encontrado" }
   }
 
-  if (order.external_sync_status === "synced" && order.external_order_id) {
+  if (
+    order.external_sync_status === "synced" &&
+    order.external_order_id &&
+    order.external_provider === BLING_PROVIDER
+  ) {
     return {
       success: true,
       blingOrderId: Number(order.external_order_id),
@@ -893,8 +901,15 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       Number((order as any).campaign_discount_amount || 0) +
       Number(order.payment_method_discount_amount || 0)
     )
-    const impliedDiscount = Math.max(0, Number((itemsTotal + deliveryFee - orderTotal).toFixed(2)))
+    const explicitExtra = Math.max(
+      0,
+      Number((order as any).additional_costs || 0) +
+      Number((order as any).payment_method_extra_amount || 0)
+    )
+    const impliedDiscount = Math.max(0, Number((itemsTotal + deliveryFee + explicitExtra - orderTotal).toFixed(2)))
     const totalDiscount = explicitDiscount > 0.009 ? explicitDiscount : impliedDiscount
+    const impliedExtra = Math.max(0, Number((orderTotal + totalDiscount - itemsTotal - deliveryFee).toFixed(2)))
+    const totalOutrasDespesas = Math.max(explicitExtra, impliedExtra)
 
     const parcelas = buildBlingOrderParcelas(order)
     const baseDate = order.created_at ? new Date(order.created_at) : new Date()
@@ -908,6 +923,7 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       contato: { id: contactId },
       itens: items,
       ...(totalDiscount > 0.009 ? { desconto: { valor: Number(totalDiscount.toFixed(2)), unidade: "REAL" } } : {}),
+      ...(totalOutrasDespesas > 0.009 ? { outrasDespesas: Number(totalOutrasDespesas.toFixed(2)) } : {}),
       ...(parcelas.length > 0 ? { parcelas } : {}),
       transporte: {
         fretePorConta: blingFretePorConta,
@@ -942,6 +958,46 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     }
 
     const blingRes = await client.createOrder(payload)
+
+    // Se a venda já saiu entregue/enviada (ou PDV com baixa física imediata), sincroniza o saldo físico no Bling
+    const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
+    const isDeliveredOrDeducted =
+      deliveryStatus === "delivered" ||
+      deliveryStatus === "sent" ||
+      Boolean((order as any).inventory_deducted)
+
+    if (isDeliveredOrDeducted && blingRes.id) {
+      for (const it of (order.order_items || []) as any[]) {
+        if (!it.product_id) continue
+        try {
+          let newStock = 0
+          if (it.variant_id) {
+            const { data: vRow } = await supabase
+              .from("product_variants")
+              .select("stock_quantity")
+              .eq("id", it.variant_id)
+              .maybeSingle()
+            newStock = Number(vRow?.stock_quantity || 0)
+          } else {
+            const { data: pRow } = await supabase
+              .from("products")
+              .select("stock_quantity")
+              .eq("id", it.product_id)
+              .maybeSingle()
+            newStock = Number(pRow?.stock_quantity || 0)
+          }
+          await syncDuditStockToBling({
+            partnerId: order.partner_id,
+            productId: it.product_id,
+            variantId: it.variant_id || undefined,
+            newStock,
+            reason: `Baixa venda Dudit #${order.order_number || order.id}`,
+          })
+        } catch (stockErr: any) {
+          console.warn(`[BLING] Aviso ao baixar estoque físico do item ${it.product_id} no Bling:`, stockErr?.message)
+        }
+      }
+    }
 
     await supabase
       .from("orders")
@@ -1184,10 +1240,17 @@ export async function processBlingWebhook(
   let affectedCount = 0
 
   // ─── 1. Atualização de Estoque em Tempo Real ───
-  if (event.startsWith("stock.") || event.startsWith("virtual_stock.")) {
+  const isStockPayload =
+    event.startsWith("stock.") ||
+    event.startsWith("virtual_stock.") ||
+    data?.saldoFisicoTotal !== undefined ||
+    data?.saldoVirtualTotal !== undefined ||
+    data?.deposito?.saldoFisico !== undefined
+
+  if (isStockPayload) {
     const prodId = data?.produto?.id ? String(data.produto.id) : null
-    const physical = Math.max(0, Number(data?.saldoFisicoTotal ?? data?.saldoFisico ?? 0))
-    const virtual = Math.max(0, Number(data?.saldoVirtualTotal ?? data?.saldoVirtual ?? physical))
+    const physical = Math.max(0, Number(data?.saldoFisicoTotal ?? data?.deposito?.saldoFisico ?? data?.saldoFisico ?? 0))
+    const virtual = Math.max(0, Number(data?.saldoVirtualTotal ?? data?.deposito?.saldoVirtual ?? data?.saldoVirtual ?? physical))
     const reserved = Math.max(0, physical - virtual)
 
     // Tenta resolver SKU no Bling se necessário

@@ -1272,15 +1272,15 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         }
         const carrierQuoteState = storeKey && isOwnQuoteRaio(storeKey) ? carrierQuotes[storeKey] : null
         if (carrierQuoteState?.loading) {
-            return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando frete nacional...</span>
+            return <span className="text-brand-inactive-text dark:text-dark-body">Calculando frete nacional...</span>
         }
         if (isOwnQuoteRaio(storeKey)) {
-            return <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">A combinar</span>
+            return <span className="text-brand-inactive-text dark:text-dark-body font-normal">A combinar</span>
         }
         if (quote?.error && quote.error !== "Entrega não disponível no plano atual.") {
             const isTechnical = quote.error.includes("incompleto") || quote.error.includes("coordenadas") || quote.error.includes("plano")
             if (!isTechnical) {
-                return <span className="text-xs text-red-500 font-normal">{quote.error}</span>
+                return <span className="text-brand-red font-normal">{quote.error}</span>
             }
         }
         if (quote?.breakdown?.deliveryPayer === "seller" || settings?.delivery_payer === "seller") {

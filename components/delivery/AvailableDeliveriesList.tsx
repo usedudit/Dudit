@@ -24,20 +24,22 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import AvailableDeliveryGridCard from "./AvailableDeliveryGridCard"
 import AvailableDeliveryListRow, { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
 import AvailableDeliveryDetail from "./AvailableDeliveryDetail"
+import { triggerDriverLocationCapture } from "./DriverLocationBeacon"
 import { useSupabase } from "@/providers/supabase-provider"
 import { supabaseBrowser } from "@/lib/supabase/browser-client"
 
-type SortKey = "order" | "partner" | "dest" | "fee"
+type SortKey = "order" | "partner" | "route" | "dest" | "fee"
 type SortDirection = "asc" | "desc"
 
 const ITEMS_PER_PAGE = 8
 
 const FIXED_COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
-    { id: "order", label: "Pedido", align: "left" as const, width: "180px" },
-    { id: "partner", label: "Estabelecimento", align: "left" as const, width: "220px" },
-    { id: "dest", label: "Destino da Entrega", align: "left" as const, width: "300px" },
-    { id: "fee", label: "Taxa do Entregador", align: "left" as const, width: "150px" },
-    { id: "actions", label: "Ação", align: "right" as const, width: "150px" },
+    { id: "order", label: "Pedido", align: "left" as const, width: "160px" },
+    { id: "partner", label: "Estabelecimento", align: "left" as const, width: "250px" },
+    { id: "route", label: "Distância / Tempo", align: "left" as const, width: "190px" },
+    { id: "dest", label: "Destino da Entrega", align: "left" as const, width: "230px" },
+    { id: "fee", label: "Remuneração", align: "left" as const, width: "140px" },
+    { id: "actions", label: "Ação", align: "right" as const, width: "130px" },
 ]
 
 function playNewOfferSound() {
@@ -203,26 +205,37 @@ export default function AvailableDeliveriesList() {
             return
         }
 
+        // Prioriza sempre a oferta já sanitizada (LGPD) e enriquecida da lista de ofertas disponíveis
         const local = offers.find((it) => (it.assignment_id || it.id) === viewedId)
         if (local) {
             setViewedOffer(local)
+            setIsLoadingViewed(false)
+            return
         }
 
-        async function fetchDetails() {
+        // Caso acessado diretamente via URL antes da lista carregar, busca na lista de ofertas disponíveis
+        let cancelled = false
+        async function fetchOfferFromAvailableList() {
             setIsLoadingViewed(true)
             try {
-                const res = await getMyDeliveryAssignmentAction(viewedId!)
-                if (res.success && res.data) {
-                    setViewedOffer(res.data)
+                const res = await listAvailableDeliveryOffersAction({ limit: 100 })
+                if (!cancelled && res.success) {
+                    const match = (res.items || []).find((it: any) => (it.assignment_id || it.id) === viewedId)
+                    if (match) {
+                        setViewedOffer(match)
+                    }
                 }
             } catch (err) {
-                console.error("Erro ao buscar detalhes da entrega disponível:", err)
+                console.error("Erro ao buscar detalhes da oferta disponível:", err)
             } finally {
-                setIsLoadingViewed(false)
+                if (!cancelled) setIsLoadingViewed(false)
             }
         }
-        void fetchDetails()
-    }, [viewedId])
+        void fetchOfferFromAvailableList()
+        return () => {
+            cancelled = true
+        }
+    }, [viewedId, offers])
 
     // 1. Initial load on mount
     useEffect(() => {
@@ -312,6 +325,7 @@ export default function AvailableDeliveriesList() {
                 return
             }
 
+            triggerDriverLocationCapture("accept")
             toast.success("Entrega aceita com sucesso! Redirecionando...")
             router.push(`/entregadores/entregas?view=${assignmentId}`)
         } catch (e: any) {
@@ -355,6 +369,10 @@ export default function AvailableDeliveriesList() {
                 const dateA = new Date(a.assigned_at || 0).getTime()
                 const dateB = new Date(b.assigned_at || 0).getTime()
                 res = dateA - dateB
+            } else if (key === "route") {
+                const distA = a.pickup_distance_km ?? 9999
+                const distB = b.pickup_distance_km ?? 9999
+                res = distA - distB
             } else if (key === "fee") {
                 res = (a.delivery_fee || 0) - (b.delivery_fee || 0)
             } else if (key === "order") {

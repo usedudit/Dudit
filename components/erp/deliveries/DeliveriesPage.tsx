@@ -399,8 +399,8 @@ export default function DeliveriesPage({
                     "Em preparação",
                     "Enviado",
                     "Entregue",
-                    "Cancelada",
                     "Falha na entrega",
+                    "Cancelada",
                 ],
             },
             {
@@ -1436,8 +1436,8 @@ export default function DeliveriesPage({
                                 { value: "preparing", label: "Em preparação" },
                                 { value: "sent", label: "Enviado" },
                                 { value: "delivered", label: "Entregue" },
-                                { value: "cancelled", label: "Cancelada" },
                                 { value: "delivery_failed", label: "Falha na entrega" },
+                                { value: "cancelled", label: "Cancelada" },
                             ]}
                             placeholder="Selecione o status"
                         />

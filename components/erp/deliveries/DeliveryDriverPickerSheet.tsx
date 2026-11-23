@@ -24,6 +24,7 @@ import {
     getDuditDeliveryRequestStatusAction,
     checkOrderDimensionsForDeliveryAction,
     authorizeDeliveryBonusAction,
+    reassignDuditDeliveryDriverAction,
 } from "@/app/actions/erp/delivery-driver-assignments"
 
 export interface DeliveryDriverPickerSheetProps {
@@ -32,6 +33,7 @@ export interface DeliveryDriverPickerSheetProps {
     partnerId: string
     orderId?: string
     orderIds?: string[]
+    draftItems?: Array<{ productId?: string | null; productName?: string; quantity?: number }>
     deliveryId?: string
     orderNumber?: string | null
     destinationAddress?: string | null
@@ -49,6 +51,7 @@ export default function DeliveryDriverPickerSheet({
     partnerId,
     orderId,
     orderIds,
+    draftItems,
     deliveryId,
     orderNumber,
     destinationAddress,
@@ -73,6 +76,7 @@ export default function DeliveryDriverPickerSheet({
     const [bonusInput, setBonusInput] = useState("")
     const [bonusReason, setBonusReason] = useState("")
     const [isAuthorizingBonus, setIsAuthorizingBonus] = useState(false)
+    const [isReassigning, setIsReassigning] = useState(false)
 
     const targetOrderIds = React.useMemo(
         () => Array.from(new Set(orderIds || (orderId ? [orderId] : []))).filter(Boolean),
@@ -95,11 +99,23 @@ export default function DeliveryDriverPickerSheet({
         }
     }, [partnerId, primaryOrderId])
 
+    const draftItemsKey = React.useMemo(
+        () => JSON.stringify((draftItems || []).map((i) => [i.productId || null, i.productName || "", i.quantity || 1])),
+        [draftItems],
+    )
+
     useEffect(() => {
-        if (isOpen && primaryOrderId) {
+        const hasDraftItems = Array.isArray(draftItems) && draftItems.length > 0
+        if (isOpen && (primaryOrderId || hasDraftItems)) {
             setAcknowledgeUnknownDimensions(false)
-            void checkRequestStatus()
-            void checkOrderDimensionsForDeliveryAction({ partnerId, orderIds: targetOrderIds })
+            if (primaryOrderId) {
+                void checkRequestStatus()
+            }
+            void checkOrderDimensionsForDeliveryAction({
+                partnerId,
+                orderIds: targetOrderIds,
+                draftItems: hasDraftItems ? draftItems : undefined,
+            })
                 .then((res) => {
                     if (res.success) {
                         setDimensionsCheck({
@@ -115,7 +131,8 @@ export default function DeliveryDriverPickerSheet({
             setAcknowledgeUnknownDimensions(false)
             setDimensionsCheck(null)
         }
-    }, [isOpen, primaryOrderId, partnerId, targetOrderIds, checkRequestStatus])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, primaryOrderId, partnerId, targetOrderIds, draftItemsKey, checkRequestStatus])
 
     // Polling while request is pending acceptance
     useEffect(() => {
@@ -197,6 +214,27 @@ export default function DeliveryDriverPickerSheet({
         }
     }
 
+    const handleReassignDriver = async () => {
+        if (!activeRequest?.id || !partnerId) return
+        setIsReassigning(true)
+        try {
+            const res = await reassignDuditDeliveryDriverAction({
+                partnerId,
+                assignmentId: activeRequest.id,
+            })
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível reatribuir o entregador.")
+                return
+            }
+            toast.success("Entrega liberada e reenviada para outros entregadores da rede!")
+            void checkRequestStatus()
+        } catch (err: any) {
+            toast.error(err?.message || "Erro ao reatribuir entregador.")
+        } finally {
+            setIsReassigning(false)
+        }
+    }
+
     const handleCancelRequest = async () => {
         if (!orderId || !partnerId) return
         setIsCancelling(true)
@@ -248,11 +286,10 @@ export default function DeliveryDriverPickerSheet({
                                     }
                                     message={
                                         activeRequest.dispatchExhaustedReason === "no_economically_viable_courier"
-                                            ? `A taxa atual cobre até ${activeRequest.economicCapKm ?? "—"} km pelo piso operacional.${
-                                                  activeRequest.suggestedFee
-                                                      ? ` Sugestão total para alcançar entregadores próximos: ${formatCurrency(activeRequest.suggestedFee)}.`
-                                                      : ""
-                                              } Você pode autorizar um bônus adicional ou aguardar/usar retirada.`
+                                            ? `A taxa atual cobre até ${activeRequest.economicCapKm ?? "—"} km pelo piso operacional.${activeRequest.suggestedFee
+                                                ? ` Sugestão total para alcançar entregadores próximos: ${formatCurrency(activeRequest.suggestedFee)}.`
+                                                : ""
+                                            } Você pode autorizar um bônus adicional ou aguardar/usar retirada.`
                                             : "Todos os raios de busca foram percorridos sem aceite. Você pode autorizar um bônus para incentivar a coleta ou cancelar a solicitação."
                                     }
                                 />
@@ -384,6 +421,29 @@ export default function DeliveryDriverPickerSheet({
                             </div>
                         )}
 
+                        {/* REASSIGN DRIVER IF ACCEPTED BUT NOT PICKED UP YET */}
+                        {activeRequest.status === "accepted" && (
+                            <div className="space-y-3">
+                                {activeRequest.acceptedAt &&
+                                    Date.now() - new Date(activeRequest.acceptedAt).getTime() >= 15 * 60 * 1000 && (
+                                        <InfoCard
+                                            color="orange"
+                                            title="Entregador ainda não retirou o pedido"
+                                            message="Já se passaram mais de 15 minutos desde o aceite sem confirmação de retirada. Você pode liberar a entrega para outro entregador."
+                                        />
+                                    )}
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={handleReassignDriver}
+                                    disabled={isReassigning}
+                                    isLoading={isReassigning}
+                                >
+                                    Reatribuir entregador
+                                </Button>
+                            </div>
+                        )}
+
                         {/* CANCEL BUTTON */}
                         {activeRequest.status === "available" && (
                             <Button
@@ -460,41 +520,47 @@ export default function DeliveryDriverPickerSheet({
 
                         {/* DIMENSIONS UNKNOWN WARNING (Fase 0.7 / §12.3) */}
                         {dimensionsCheck?.dimensionsUnknown && (
-                            <><InfoCard
-                                title="Dimensões não informadas"
-                                color="orange"
-                                message={(
-                                    <>
-                                        <p className="text-sm">
-                                            {dimensionsCheck.missingProducts.length > 0
-                                                ? `${dimensionsCheck.missingProducts.length} ${dimensionsCheck.missingProducts.length === 1 ? "produto" : "produtos"} sem peso/dimensão.`
-                                                : "Itens sem peso/dimensão informados."}
-                                        </p>
-                                        <p className="text-sm mt-1 opacity-90">
-                                            O entregador verá este aviso no card da oferta e pode recusar se não couber no veículo.
-                                        </p>
-                                        {dimensionsCheck.missingProducts.length > 0 && (
-                                            <ul className="text-sm mt-1.5 list-disc pl-4 space-y-0.5 opacity-90">
-                                                {dimensionsCheck.missingProducts.slice(0, 3).map((p, idx) => (
-                                                    <li key={p.productId || idx} className="truncate">{p.productName}</li>
-                                                ))}
-                                                {dimensionsCheck.missingProducts.length > 3 && (
-                                                    <li>+ {dimensionsCheck.missingProducts.length - 3} outro(s)</li>
-                                                )}
-                                            </ul>
-                                        )}
-                                    </>
-                                )}
-                                bottomElement={<a
-                                    href={dimensionsCheck.missingProducts[0]?.productId
-                                        ? `/erp/produtos/${dimensionsCheck.missingProducts[0].productId}`
-                                        : "/erp/produtos"}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    Preencher agora
-                                </a>} />
-
+                            <>
+                                <InfoCard
+                                    title="Dimensões não informadas"
+                                    color="orange"
+                                    message={(
+                                        <>
+                                            <p className="text-sm">
+                                                {dimensionsCheck.missingProducts.length > 0
+                                                    ? `${dimensionsCheck.missingProducts.length} ${dimensionsCheck.missingProducts.length === 1 ? "produto" : "produtos"} sem peso/dimensão.`
+                                                    : "Itens sem peso/dimensão informados."}
+                                            </p>
+                                            <p className="text-sm mt-1 opacity-90">
+                                                O entregador verá este aviso no card da oferta e pode recusar se não couber no veículo.
+                                            </p>
+                                            {dimensionsCheck.missingProducts.length > 0 && (
+                                                <ul className="text-sm mt-1.5 list-disc pl-4 space-y-0.5 opacity-90">
+                                                    {dimensionsCheck.missingProducts.slice(0, 3).map((p, idx) => (
+                                                        <li key={p.productId || idx} className="truncate">{p.productName}</li>
+                                                    ))}
+                                                    {dimensionsCheck.missingProducts.length > 3 && (
+                                                        <li>+ {dimensionsCheck.missingProducts.length - 3} outro(s)</li>
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </>
+                                    )}
+                                    bottomElement={
+                                        <Button
+                                            variant="link"
+                                            onClick={() =>
+                                                window.open(
+                                                    dimensionsCheck.missingProducts[0]?.productId
+                                                        ? `/erp/produtos/${dimensionsCheck.missingProducts[0].productId}`
+                                                        : "/erp/produtos",
+                                                )
+                                            }
+                                        >
+                                            Preencher agora
+                                        </Button>
+                                    }
+                                />
                                 <Checkbox
                                     label="Continuar mesmo assim (estou ciente do aviso ao entregador)"
                                     checked={acknowledgeUnknownDimensions}

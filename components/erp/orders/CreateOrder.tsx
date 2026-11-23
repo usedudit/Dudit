@@ -1371,7 +1371,7 @@ export default function CreateOrder({
 
         const requiresDispatchDateTime = deliveryMethod === "delivery"
             && !isCarrierDelivery
-            && ["sent", "delivered", "delivery_failed"].includes(deliveryStatus)
+            && ["sent", "delivered", "delivery_failed", "cancelled"].includes(deliveryStatus)
         if (requiresDispatchDateTime && (!deliveryDate || !deliveryTime)) {
             setFieldErrors(new Set(["deliveryDate", "deliveryTime"]))
             setActiveTab("delivery")
@@ -1594,7 +1594,7 @@ export default function CreateOrder({
                 if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId && !isCarrierDelivery) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
                     const platformDriverId = isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null
-                    const requiresDispatchDateTime = ["sent", "delivered", "delivery_failed"].includes(String(payload.deliveryStatus))
+                    const requiresDispatchDateTime = ["sent", "delivered", "delivery_failed", "cancelled"].includes(String(payload.deliveryStatus))
                     const startedAt = requiresDispatchDateTime && deliveryDate && deliveryTime
                         ? new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString()
                         : undefined
@@ -2518,6 +2518,13 @@ export default function CreateOrder({
                     partnerId={partnerId}
                     orderId={editOrderId || (orderId !== "new" ? orderId : undefined)}
                     orderNumber={editOrderId ? String(editOrderId).slice(0, 8) : undefined}
+                    draftItems={items
+                        .filter((item: any) => !item.isService && !item.serviceId && item.lineType !== "service_booking")
+                        .map((item: any) => ({
+                            productId: item.productId || null,
+                            productName: item.name || "Produto sem nome",
+                            quantity: Number(item.quantity || 1),
+                        }))}
                     destinationAddress={street ? `${street}, ${number || "S/N"} - ${neighborhood}, ${city}` : undefined}
                     deliveryFee={Number(shippingFee) || 0}
                     onDeliveryRequested={() => {

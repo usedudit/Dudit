@@ -2290,6 +2290,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         </a>
                                                     ) : null
                                                 }
+                                                className="px-4 py-3"
                                             />
                                         </FormSection>
                                     )}

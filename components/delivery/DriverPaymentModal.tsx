@@ -962,7 +962,6 @@ export default function DriverPaymentModal({
                               <MoneyInput
                                 value={cashGiven}
                                 onChange={(val: number) => setCashGiven(val)}
-                                className="font-bold text-base"
                               />
 
                               <div className="flex flex-wrap items-center gap-1.5 pt-1">

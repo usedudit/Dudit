@@ -42,7 +42,8 @@ export async function exportOrderToConnectedErps(orderId: string): Promise<void>
     await exportDuditOrderToTiny(orderId).catch((err) => {
       console.error("[erp-sync] Tiny export failed:", err)
     })
-  } else if (providers.has(BLING_PROVIDER)) {
+  }
+  if (providers.has(BLING_PROVIDER)) {
     await exportDuditOrderToBling(orderId).catch((err) => {
       console.error("[erp-sync] Bling export failed:", err)
     })

@@ -898,6 +898,7 @@ export default function CreateDeliveryPage({
                                                                         { value: "preparing", label: "Em preparação" },
                                                                         { value: "sent", label: "Enviado" },
                                                                         { value: "delivered", label: "Entregue" },
+                                                                        { value: "delivery_failed", label: "Falha na entrega" },
                                                                         { value: "cancelled", label: "Cancelada" },
                                                                     ]}
                                                                 />
@@ -970,6 +971,7 @@ export default function CreateDeliveryPage({
                                                                 { value: "preparing", label: "Em preparação" },
                                                                 { value: "sent", label: "Enviado" },
                                                                 { value: "delivered", label: "Entregue" },
+                                                                { value: "delivery_failed", label: "Falha na entrega" },
                                                                 { value: "cancelled", label: "Cancelada" },
                                                             ]}
                                                         />
@@ -1040,7 +1042,7 @@ export default function CreateDeliveryPage({
                                             ) : (
                                                 <InfoCard
                                                     color="gray"
-                                                    message="A data e o horário de saída são preenchidos apenas quando o status for Enviado, Entregue ou Cancelada."
+                                                    message="A data e o horário de saída são preenchidos apenas quando o status for Enviado, Entregue, Falha na entrega ou Cancelada."
                                                 />
                                             )}
                                         </div>

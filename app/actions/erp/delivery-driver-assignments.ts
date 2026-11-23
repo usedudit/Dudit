@@ -111,10 +111,75 @@ async function computeOrdersPackageDimensions(admin: any, orderIds: string[]): P
 
 export async function checkOrderDimensionsForDeliveryAction(input: {
   partnerId: string
-  orderIds: string[]
+  orderIds?: string[]
+  draftItems?: Array<{ productId?: string | null; productName?: string; quantity?: number }>
 }) {
   await requireUser()
   await requirePartnerRouteAccess(input.partnerId, "logistics")
+  const admin = getAdminClient()
+
+  const draftItems = Array.isArray(input.draftItems) ? input.draftItems : []
+  if (draftItems.length > 0) {
+    const productIds = Array.from(new Set(draftItems.map((r) => r.productId).filter(Boolean) as string[]))
+    const logisticsByProduct = new Map<string, { weight_gross?: number; weight_net?: number; width?: number; height?: number; length?: number }>()
+
+    if (productIds.length > 0) {
+      const { data: logisticsRows } = await admin
+        .from("product_logistics")
+        .select("product_id, weight_gross, weight_net, width, height, length")
+        .in("product_id", productIds)
+
+      for (const row of logisticsRows || []) {
+        if (row?.product_id) {
+          logisticsByProduct.set(String(row.product_id), row)
+        }
+      }
+    }
+
+    const missingMap = new Map<string, { productId: string | null; productName: string }>()
+    let totalWeight = 0
+    let totalVolume = 0
+
+    for (const item of draftItems) {
+      const qty = Math.max(Number(item.quantity || 1), 1)
+      const pl = item.productId ? logisticsByProduct.get(String(item.productId)) : undefined
+      const gross = Number(pl?.weight_gross || 0)
+      const net = Number(pl?.weight_net || 0)
+      const unitWeight = gross > 0 ? gross : (net > 0 ? net : 0)
+
+      const w = Number(pl?.width || 0)
+      const h = Number(pl?.height || 0)
+      const l = Number(pl?.length || 0)
+      const unitVolumeL = w > 0 && h > 0 && l > 0 ? (w * h * l) / 1000 : 0
+
+      if (unitWeight <= 0 && unitVolumeL <= 0) {
+        const key = String(item.productId || item.productName || "unknown")
+        if (!missingMap.has(key)) {
+          missingMap.set(key, {
+            productId: item.productId ? String(item.productId) : null,
+            productName: String(item.productName || "Produto sem nome"),
+          })
+        }
+      }
+
+      totalWeight += unitWeight * qty
+      totalVolume += unitVolumeL * qty
+    }
+
+    const totalWeightKg = totalWeight > 0 ? Math.round(totalWeight * 1000) / 1000 : null
+    const totalVolumeL = totalVolume > 0 ? Math.round(totalVolume * 1000) / 1000 : null
+    const missingProducts = Array.from(missingMap.values())
+    const dimensionsUnknown = missingProducts.length > 0 || (totalWeightKg === null && totalVolumeL === null)
+
+    return {
+      success: true as const,
+      dimensionsUnknown,
+      totalWeightKg,
+      totalVolumeL,
+      missingProducts,
+    }
+  }
+
   const orderIds = Array.from(new Set(input.orderIds || [])).filter(Boolean)
   if (orderIds.length === 0) {
     return {
@@ -126,7 +191,6 @@ export async function checkOrderDimensionsForDeliveryAction(input: {
     }
   }
 
-  const admin = getAdminClient()
   const { data: validOrders } = await admin
     .from("orders")
     .select("id")
@@ -674,6 +738,127 @@ export async function authorizeDeliveryBonusAction(input: {
   revalidatePath("/entregadores/entregas-disponiveis")
 
   return { success: true as const, data }
+}
+
+export async function reassignDuditDeliveryDriverAction(input: {
+  partnerId: string
+  assignmentId: string
+  reason?: string
+}) {
+  const user = await requireUser()
+  await requirePartnerRouteAccess(input.partnerId, "logistics", { specificPermission: "can_assign_driver" })
+  const admin = getAdminClient()
+
+  const { data: current } = await admin
+    .from("delivery_assignments")
+    .select("id, order_id, delivery_id, partner_id, driver_id, status, accepted_at, delivery_fee, bonus_amount, notes, dimensions_unknown")
+    .eq("id", input.assignmentId)
+    .eq("partner_id", input.partnerId)
+    .maybeSingle()
+
+  if (!current) {
+    return { success: false as const, error: "Atribuição de entrega não encontrada." }
+  }
+
+  if (current.status !== "accepted") {
+    return {
+      success: false as const,
+      error: "Só é possível reatribuir enquanto o entregador ainda não retirou o pedido na loja.",
+    }
+  }
+
+  const nowIso = new Date().toISOString()
+  const acceptedMs = current.accepted_at ? new Date(current.accepted_at).getTime() : 0
+  const isNoShow = acceptedMs > 0 && Date.now() - acceptedMs >= 15 * 60 * 1000
+  const cleanReason = String(input.reason || "").trim().slice(0, 300) || (isNoShow ? "Entregador não compareceu para retirada (>15 min)" : "Reatribuído pelo estabelecimento")
+
+  // 1. Cancelar atribuição atual (e todas do mesmo delivery_id se agrupado)
+  const cancelQuery = current.delivery_id
+    ? admin.from("delivery_assignments").update({
+        status: "cancelled",
+        cancelled_at: nowIso,
+        failure_reason: cleanReason,
+        updated_at: nowIso,
+      }).eq("delivery_id", current.delivery_id).eq("status", "accepted")
+    : admin.from("delivery_assignments").update({
+        status: "cancelled",
+        cancelled_at: nowIso,
+        failure_reason: cleanReason,
+        updated_at: nowIso,
+      }).eq("id", current.id)
+
+  const { error: cancelErr } = await cancelQuery
+  if (cancelErr) {
+    return { success: false as const, error: "Não foi possível liberar a atribuição atual." }
+  }
+
+  // 2. Se passou de 15 min sem retirada (no-show), aplicar cooldown de 15 min no entregador anterior
+  if (isNoShow && current.driver_id) {
+    const cooldownUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    await admin
+      .from("delivery_drivers")
+      .update({ cooldown_until: cooldownUntil, updated_at: nowIso })
+      .eq("user_id", current.driver_id)
+  }
+
+  // 3. Limpar delivery_person_id na tabela deliveries se aplicável
+  if (current.delivery_id) {
+    await admin
+      .from("deliveries")
+      .update({ delivery_person_id: null, status: "pending", updated_at: nowIso })
+      .eq("id", current.delivery_id)
+  }
+
+  // 4. Criar nova solicitação aberta para a rede Dudit
+  const { data: created, error: createErr } = await admin
+    .from("delivery_assignments")
+    .insert({
+      order_id: current.order_id,
+      delivery_id: current.delivery_id || null,
+      partner_id: current.partner_id,
+      driver_id: null,
+      assigned_by: user.id,
+      status: "available",
+      delivery_fee: Number(current.delivery_fee || 0),
+      bonus_amount: Number(current.bonus_amount || 0),
+      notes: current.notes || null,
+      dimensions_unknown: Boolean(current.dimensions_unknown),
+      assigned_at: nowIso,
+    })
+    .select("id")
+    .single()
+
+  if (createErr || !created) {
+    return { success: false as const, error: "Não foi possível reenviar a solicitação para a rede." }
+  }
+
+  // 5. Evitar que o mesmo entregador que atrasou pegue imediatamente se foi no-show
+  try { await admin.rpc("dispatch_tick") } catch { }
+
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: user.id,
+    entityType: "delivery_assignment",
+    entityId: created.id,
+    actionType: "dudit_delivery_reassigned",
+    changeLines: [`Entregador reatribuído pelo estabelecimento. Motivo: ${cleanReason}`],
+    metadata: {
+      previousAssignmentId: current.id,
+      previousDriverId: current.driver_id,
+      newAssignmentId: created.id,
+      isNoShow,
+      reason: cleanReason,
+    },
+    source: "erp",
+  })
+
+  revalidatePath("/erp/entregas")
+  revalidatePath("/erp/logistica")
+  revalidatePath("/erp/pedidos")
+  revalidatePath("/entregadores")
+  revalidatePath("/entregadores/entregas-disponiveis")
+
+  return { success: true as const, newAssignmentId: created.id }
 }
 
 export async function syncPlatformDriverForOrderAction(input: {

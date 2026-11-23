@@ -3862,7 +3862,7 @@ const PaymentModal = ({
                                                     <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
-                                                <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-xl p-4 text-sm mb-2 text-center w-full">
+                                                <div className="border border-brand-green rounded-xl p-4 text-sm mb-2 text-center w-full">
                                                     <span className="font-semibold text-brand-dark dark:text-dark-heading">Saldo de Crédito disponível: </span>
                                                     <span className="font-bold text-brand-green">{formatCurrency(getCustomerCredit(customer, fetchedCustomerCredit))}</span>
                                                 </div>
@@ -3879,7 +3879,6 @@ const PaymentModal = ({
                                                             const num = maxCredit > 0 ? Math.min(maxCredit, Number(val || 0)) : Number(val || 0);
                                                             handlePaymentBaseAmountChange(num);
                                                         }}
-                                                        className="font-bold text-lg"
                                                     />
                                                 </div>
                                             </div>

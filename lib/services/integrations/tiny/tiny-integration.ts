@@ -195,7 +195,7 @@ export async function syncTinyProductsToDudit(params: {
           // Checa se já existe na Dudit pelo external_id ou SKU
           let { data: existingProduct } = await supabase
             .from("products")
-            .select("id, stock_quantity")
+            .select("id, stock_quantity, stock_reserved")
             .eq("partner_id", partnerId)
             .eq("external_id", externalId)
             .maybeSingle()
@@ -203,7 +203,7 @@ export async function syncTinyProductsToDudit(params: {
           if (!existingProduct && sku) {
             const { data: bySku } = await supabase
               .from("products")
-              .select("id, stock_quantity")
+              .select("id, stock_quantity, stock_reserved")
               .eq("partner_id", partnerId)
               .eq("sku", sku)
               .maybeSingle()
@@ -228,7 +228,7 @@ export async function syncTinyProductsToDudit(params: {
                 unit,
                 min_stock: minStock,
                 stock_quantity: stock,
-                stock_reserved: stockReserved,
+                stock_reserved: Math.max(Number(existingProduct.stock_reserved || 0), stockReserved),
                 description: description || undefined,
                 images: images.length > 0 ? images : undefined,
                 status: isActive ? "ativo" : "inativo",
@@ -770,7 +770,11 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       total_amount,
       paid_amount,
       situation,
+      delivery_status,
+      inventory_deducted,
       delivery_fee,
+      additional_costs,
+      payment_method_extra_amount,
       delivery_type,
       delivery_breakdown,
       delivery_address,
@@ -1064,8 +1068,15 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     )
 
     // Fallback: se o pedido tiver desconto via discount_value ou diferença entre (itens + frete) e total_pedido
-    const impliedDiscount = Math.max(0, Number((itemsTotal + deliveryFee - orderTotal).toFixed(2)))
+    const explicitExtra = Math.max(
+      0,
+      Number((order as any).additional_costs || 0) +
+      Number((order as any).payment_method_extra_amount || 0)
+    )
+    const impliedDiscount = Math.max(0, Number((itemsTotal + deliveryFee + explicitExtra - orderTotal).toFixed(2)))
     const totalDiscount = explicitDiscount > 0.009 ? explicitDiscount : impliedDiscount
+    const impliedExtra = Math.max(0, Number((orderTotal + totalDiscount - itemsTotal - deliveryFee).toFixed(2)))
+    const totalOutrasDespesas = Math.max(explicitExtra, impliedExtra)
 
     const payload: TinyOrderPayload = {
       pedido: {
@@ -1101,6 +1112,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
         itens: items,
         total_pedido: orderTotal,
         valor_desconto: totalDiscount > 0.009 ? Number(totalDiscount.toFixed(2)) : undefined,
+        outras_despesas: totalOutrasDespesas > 0.009 ? Number(totalOutrasDespesas.toFixed(2)) : undefined,
         valor_frete: deliveryFee > 0 ? deliveryFee : undefined,
         forma_envio: formaEnvio,
         forma_frete: formaFrete,
@@ -1119,13 +1131,62 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 
     const tinyRes = await client.createOrder(payload)
 
-    // Se o pedido já estiver pago na Dudit, atualiza situação para "aprovado" no Tiny para reservar/baixar estoque
+    // Se o pedido já saiu entregue/enviado (ou PDV com baixa física imediata), marca como entregue/enviado
+    // e sincroniza o saldo físico real (balanço) de cada item/variante no Tiny para efetivar a baixa física.
+    // Caso contrário, se já estiver pago, aprova o pedido no Tiny para manter a reserva de estoque.
+    const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
+    const isDeliveredOrDeducted =
+      deliveryStatus === "delivered" ||
+      deliveryStatus === "sent" ||
+      Boolean((order as any).inventory_deducted)
     const isPaid = String(order.situation || "").toLowerCase() === "paid" || Number(order.paid_amount || 0) >= Number(order.total_amount || 0)
-    if (isPaid && tinyRes.id) {
-      try {
-        await client.updateOrderStatus(tinyRes.id, "aprovado")
-      } catch (statusErr: any) {
-        console.warn(`[TINY] Aviso ao aprovar pedido ${tinyRes.id} no Tiny:`, statusErr?.message)
+
+    if (tinyRes.id) {
+      if (isDeliveredOrDeducted) {
+        const tinySit = deliveryStatus === "sent" ? "enviado" : "entregue"
+        try {
+          await client.updateOrderStatus(tinyRes.id, tinySit)
+        } catch (statusErr: any) {
+          console.warn(`[TINY] Aviso ao marcar pedido ${tinyRes.id} como ${tinySit} no Tiny:`, statusErr?.message)
+        }
+
+        // Garante baixa física no estoque do Tiny (incluindo variantes) via balanço idempotente
+        for (const it of (order.order_items || []) as any[]) {
+          if (!it.product_id) continue
+          try {
+            let newStock = 0
+            if (it.variant_id) {
+              const { data: vRow } = await supabase
+                .from("product_variants")
+                .select("stock_quantity")
+                .eq("id", it.variant_id)
+                .maybeSingle()
+              newStock = Number(vRow?.stock_quantity || 0)
+            } else {
+              const { data: pRow } = await supabase
+                .from("products")
+                .select("stock_quantity")
+                .eq("id", it.product_id)
+                .maybeSingle()
+              newStock = Number(pRow?.stock_quantity || 0)
+            }
+            await syncDuditStockToTiny({
+              partnerId: order.partner_id,
+              productId: it.product_id,
+              variantId: it.variant_id || undefined,
+              newStock,
+              reason: `Baixa venda Dudit #${order.order_number || order.id}`,
+            })
+          } catch (stockErr: any) {
+            console.warn(`[TINY] Aviso ao baixar estoque físico do item ${it.product_id} no Tiny:`, stockErr?.message)
+          }
+        }
+      } else if (isPaid) {
+        try {
+          await client.updateOrderStatus(tinyRes.id, "aprovado")
+        } catch (statusErr: any) {
+          console.warn(`[TINY] Aviso ao aprovar pedido ${tinyRes.id} no Tiny:`, statusErr?.message)
+        }
       }
     }
 

@@ -203,6 +203,7 @@ export const DELIVERY_STATUS_OPTIONS = [
   { value: "sent", label: "Enviado" },
   { value: "delivered", label: "Entregue" },
   { value: "delivery_failed", label: "Falha na entrega" },
+  { value: "cancelled", label: "Cancelada" },
 ]
 
 export const PICKUP_STATUS_OPTIONS = [
@@ -211,6 +212,7 @@ export const PICKUP_STATUS_OPTIONS = [
   { value: "pickup_available", label: "Pronto para retirada" },
   { value: "delivered", label: "Retirado" },
   { value: "delivery_failed", label: "Não retirado" },
+  { value: "cancelled", label: "Cancelada" },
 ]
 
 export const MIXED_STATUS_OPTIONS = [
@@ -219,6 +221,7 @@ export const MIXED_STATUS_OPTIONS = [
   { value: "sent", label: "Enviado/Pronto para retirada" },
   { value: "delivered", label: "Entregue/Retirado" },
   { value: "delivery_failed", label: "Falha na entrega/Não retirado" },
+  { value: "cancelled", label: "Cancelada" },
 ]
 
 /**
@@ -238,4 +241,5 @@ export const DELIVERY_STATUS_FILTER_OPTIONS: { value: string; label: string }[] 
   { value: "pickup_available", label: "Pronto para retirada" },
   { value: "delivered", label: "Entregue" },
   { value: "delivery_failed", label: "Falha na entrega" },
+  { value: "cancelled", label: "Cancelada" },
 ]

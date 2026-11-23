@@ -114,6 +114,179 @@ const DEFAULT_MP_ACCEPTED_PAYMENT_METHODS: MpAcceptedPaymentMethods = {
     mercado_pago_wallet: true,
 }
 
+type ConnectFlowIntegration = "mercadopago" | "whatsapp" | "superfrete" | "tiny" | "bling"
+
+interface IntegrationConnectMeta {
+    title: string
+    icon: string
+    iconAlt: string
+    description: string
+    banner: string
+    bannerClassName: string
+    privacyUrl: string
+    requiredPlan?: "crescer" | "escalar"
+    permissions: Array<{
+        heading: string
+        paragraphs: string[]
+    }>
+}
+
+const INTEGRATION_CONNECT_META: Record<ConnectFlowIntegration, IntegrationConnectMeta> = {
+    mercadopago: {
+        title: "Conectar ao Mercado Pago",
+        icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png",
+        iconAlt: "Mercado Pago",
+        description: "Venda de forma profissional aceitando as principais formas de pagamento do mercado com integração automática.",
+        banner: "https://img.dudit.com.br/static/banners/MercadoPago.png",
+        bannerClassName: "w-full h-full object-contain",
+        privacyUrl: "https://www.mercadopago.com.br/privacidade",
+        requiredPlan: "crescer",
+        permissions: [
+            {
+                heading: "Sobre os dados da sua loja",
+                paragraphs: [
+                    "O aplicativo terá acesso apenas para leitura dos seus produtos e categorias (ou seja, não poderá alterar essas informações).",
+                    "Também poderá gerenciar dados relacionados a fornecedores e transações de pagamento.",
+                ],
+            },
+            {
+                heading: "Sobre os dados dos seus clientes",
+                paragraphs: [
+                    "O app poderá criar, editar e excluir informações de vendas na sua loja.",
+                ],
+            },
+            {
+                heading: "Outras permissões",
+                paragraphs: [
+                    "Pode adicionar componentes em JavaScript para melhorar o funcionamento da sua loja.",
+                ],
+            },
+        ],
+    },
+    whatsapp: {
+        title: "Conectar ao WhatsApp Business",
+        icon: "https://img.dudit.com.br/static/icons/WhatsApp.png",
+        iconAlt: "WhatsApp Business",
+        description: "Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos, entregas e orçamentos direto para o WhatsApp do cliente.",
+        banner: "https://img.dudit.com.br/static/banners/WhatsappLogo.png",
+        bannerClassName: "w-full h-full object-contain",
+        privacyUrl: "https://www.whatsapp.com/legal/privacy-policy",
+        requiredPlan: "escalar",
+        permissions: [
+            {
+                heading: "Sobre os dados da sua loja",
+                paragraphs: [
+                    "O aplicativo terá acesso para leitura de agendamentos, pedidos, entregas e orçamentos para disparar notificações automáticas.",
+                    "Também poderá consultar o status da conexão do número vinculado e registrar histórico de envios.",
+                ],
+            },
+            {
+                heading: "Sobre os dados dos seus clientes",
+                paragraphs: [
+                    "O aplicativo poderá acessar o nome e o telefone (WhatsApp) dos seus clientes exclusivamente para enviar lembretes e atualizações.",
+                ],
+            },
+            {
+                heading: "Outras permissões",
+                paragraphs: [
+                    "Manter a sessão pareada ativa para realizar envios automáticos conforme as configurações da sua loja.",
+                ],
+            },
+        ],
+    },
+    superfrete: {
+        title: "Conectar à SuperFrete",
+        icon: "https://img.dudit.com.br/static/icons/brands/Superfrete.png",
+        iconAlt: "SuperFrete",
+        description: "Conecte sua conta SuperFrete para calcular fretes automaticamente no checkout e gerar etiquetas com Correios, JadLog, Loggi e J&T.",
+        banner: "https://img.dudit.com.br/static/icons/brands/SuperfreteLogo.png",
+        bannerClassName: "w-full h-full object-contain",
+        privacyUrl: "https://superfrete.com/politica-de-privacidade",
+        requiredPlan: "escalar",
+        permissions: [
+            {
+                heading: "Sobre os dados da sua loja",
+                paragraphs: [
+                    "O aplicativo terá acesso às dimensões, pesos, CEP de origem e preferências de envio dos seus produtos para cotação automática de frete.",
+                    "Também poderá gerar etiquetas de postagem, consultar saldo da conta e configurar webhooks de rastreio.",
+                ],
+            },
+            {
+                heading: "Sobre os dados dos seus clientes",
+                paragraphs: [
+                    "O aplicativo poderá acessar nome, endereço de entrega, telefone e CPF/CNPJ do destinatário para emissão de etiquetas e envio.",
+                ],
+            },
+            {
+                heading: "Outras permissões",
+                paragraphs: [
+                    "Receber atualizações automáticas de status de postagem e entrega das transportadoras integradas.",
+                ],
+            },
+        ],
+    },
+    tiny: {
+        title: "Conectar ao Tiny ERP",
+        icon: "https://img.dudit.com.br/static/icons/brands/TinyIcon.svg",
+        iconAlt: "Tiny ERP",
+        description: "Sincronize catálogo de produtos, saldos de estoque e envie pedidos vendidos na Dudit diretamente para o seu Tiny ERP (Olist).",
+        banner: "https://img.dudit.com.br/static/banners/LogoTiny.svg",
+        bannerClassName: "w-full h-full object-contain",
+        privacyUrl: "https://olist.com/politica-de-privacidade/",
+        permissions: [
+            {
+                heading: "Sobre os dados da sua loja",
+                paragraphs: [
+                    "O aplicativo terá acesso para importar e sincronizar produtos, variações, preços, fotos, SKU, GTIN/EAN e saldos de estoque.",
+                    "Também poderá receber atualizações via webhook para manter o estoque e as Notas Fiscais (NF-e) sempre atualizados.",
+                ],
+            },
+            {
+                heading: "Sobre os dados dos seus clientes",
+                paragraphs: [
+                    "O aplicativo poderá enviar os dados dos pedidos aprovados (itens, valores e dados cadastrais do comprador) para geração de pedidos de venda e emissão fiscal no Tiny.",
+                ],
+            },
+            {
+                heading: "Outras permissões",
+                paragraphs: [
+                    "Atualizar automaticamente o status dos pedidos e anexar Notas Fiscais (NF-e/DANFE) nas vendas da sua loja.",
+                ],
+            },
+        ],
+    },
+    bling: {
+        title: "Conectar ao Bling ERP",
+        icon: "https://img.dudit.com.br/static/icons/brands/Bling.svg",
+        iconAlt: "Bling ERP",
+        description: "Sincronize catálogo, variações, estoque físico e reservado, pedidos e notas fiscais diretamente com o Bling ERP via API v3 (OAuth 2.0).",
+        banner: "https://img.dudit.com.br/static/icons/brands/Bling.svg",
+        bannerClassName: "w-28 h-28 object-contain",
+        privacyUrl: "https://www.bling.com.br/politica-de-privacidade",
+        permissions: [
+            {
+                heading: "Sobre os dados da sua loja",
+                paragraphs: [
+                    "O aplicativo terá acesso via OAuth 2.0 (API v3) para sincronizar catálogo de produtos, variações, fotos, preços, SKU, GTIN/EAN e estoque físico e reservado.",
+                    "Também poderá receber eventos em tempo real via webhook para atualização de estoque e Notas Fiscais (NF-e/NFC-e).",
+                ],
+            },
+            {
+                heading: "Sobre os dados dos seus clientes",
+                paragraphs: [
+                    "O aplicativo poderá exportar pedidos do Checkout, ERP e PDV com os dados cadastrais do comprador para gestão e emissão fiscal no Bling.",
+                ],
+            },
+            {
+                heading: "Outras permissões",
+                paragraphs: [
+                    "Renovar tokens de acesso OAuth automaticamente para manter a integração conectada de forma contínua e segura.",
+                ],
+            },
+        ],
+    },
+}
+
 // ─── Mercado Pago icon ────────────────────────────────────────────────────────
 
 export const IntegrationsSubPage = ({
@@ -136,7 +309,9 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | "blingConfig" | "blingKnowMore" | "addonKnowMore" | "addonSubscribe" | null>(null)
+    const [activeModal, setActiveModal] = useState<"knowMore" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | "tinyConfig" | "tinyKnowMore" | "blingConfig" | "blingKnowMore" | "addonKnowMore" | "addonSubscribe" | null>(null)
+    const [connectFlow, setConnectFlow] = useState<{ integration: ConnectFlowIntegration; step: "info" | "permissions" } | null>(null)
+    const [knowMoreReturnIntegration, setKnowMoreReturnIntegration] = useState<ConnectFlowIntegration | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
     const [sfKnowMoreStep, setSfKnowMoreStep] = useState(0)
     const [tinyKnowMoreStep, setTinyKnowMoreStep] = useState(0)
@@ -496,7 +671,7 @@ export const IntegrationsSubPage = ({
             setEvoQrCode(null)
             setEvoPhoneNumber(null)
             setEvoConnection(null)
-            await fetchWaStatus()
+            window.location.reload()
         } finally { setEvoIsLoading(false) }
     }
 
@@ -513,6 +688,7 @@ export const IntegrationsSubPage = ({
     const [confirmEvoDisconnectOpen, setConfirmEvoDisconnectOpen] = useState(false)
     const [confirmWaDisconnectOpen, setConfirmWaDisconnectOpen] = useState(false)
     const [confirmMpDisconnectOpen, setConfirmMpDisconnectOpen] = useState(false)
+    const [confirmSfDisconnectOpen, setConfirmSfDisconnectOpen] = useState(false)
 
     const [provider] = useState<"meta">("meta")
 
@@ -563,7 +739,7 @@ export const IntegrationsSubPage = ({
                 toast.error(`Erro: ${result.error}`)
             } else {
                 toast.success("WhatsApp desconectado com sucesso")
-                await fetchWaStatus()
+                window.location.reload()
             }
         } catch (err) {
             toast.error("Erro inesperado ao desconectar")
@@ -704,6 +880,7 @@ export const IntegrationsSubPage = ({
             if (res.success) {
                 toast.success("SuperFrete desconectado")
                 setSfStatus({ connected: false, webhookConfigured: false, planAllowed: true })
+                window.location.reload()
             } else {
                 toast.error(res.error || "Erro ao desconectar SuperFrete")
             }
@@ -765,6 +942,7 @@ export const IntegrationsSubPage = ({
                 setTinyStatus({ connected: false })
                 setConfirmTinyDisconnectOpen(false)
                 setActiveModal(null)
+                window.location.reload()
             } else {
                 toast.error(res.error || "Erro ao desconectar Tiny ERP")
             }
@@ -895,7 +1073,7 @@ export const IntegrationsSubPage = ({
                 toast.success("Bling ERP desconectado")
                 setConfirmBlingDisconnectOpen(false)
                 setActiveModal(null)
-                await fetchBlingStatus()
+                window.location.reload()
             } else {
                 toast.error(res.error || "Erro ao desconectar Bling ERP")
             }
@@ -976,17 +1154,53 @@ export const IntegrationsSubPage = ({
         }
     }, [fetchBlingStatus])
 
-    const handleConnectClick = () => {
-        if (!hasMinimumPlan(planSlug, "crescer")) {
-            openPlanUpgrade("crescer")
+    const openConnectInfoModal = (integration: ConnectFlowIntegration) => {
+        const requiredPlan = INTEGRATION_CONNECT_META[integration].requiredPlan
+        if (requiredPlan && !hasMinimumPlan(planSlug, requiredPlan)) {
+            openPlanUpgrade(requiredPlan)
             return
         }
-        setActiveModal("info")
+        setConnectFlow({ integration, step: "info" })
+    }
+
+    const openKnowMoreForIntegration = (integration: ConnectFlowIntegration, returnToInfo: boolean) => {
+        setKnowMoreReturnIntegration(returnToInfo ? integration : null)
+        if (returnToInfo) setConnectFlow(null)
+
+        if (integration === "mercadopago") {
+            setKnowMoreStep(0)
+            setActiveModal("knowMore")
+        } else if (integration === "whatsapp") {
+            setWaKnowMoreStep(0)
+            setWaActiveModal("knowMore")
+        } else if (integration === "superfrete") {
+            setSfKnowMoreStep(0)
+            setActiveModal("sfKnowMore")
+        } else if (integration === "tiny") {
+            setTinyKnowMoreStep(0)
+            setActiveModal("tinyKnowMore")
+        } else if (integration === "bling") {
+            setBlingKnowMoreStep(0)
+            setActiveModal("blingKnowMore")
+        }
+    }
+
+    const closeKnowMoreModal = () => {
+        setActiveModal(null)
+        setWaActiveModal(null)
+        if (knowMoreReturnIntegration) {
+            setConnectFlow({ integration: knowMoreReturnIntegration, step: "info" })
+            setKnowMoreReturnIntegration(null)
+        }
+    }
+
+    const handleConnectClick = () => {
+        openConnectInfoModal("mercadopago")
     }
 
     const handleStartOAuth = async () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
-            setActiveModal(null)
+            setConnectFlow(null)
             openPlanUpgrade("crescer")
             return
         }
@@ -996,6 +1210,34 @@ export const IntegrationsSubPage = ({
         } catch (err) {
             toast.error("Erro ao iniciar conexão com Mercado Pago. Tente novamente.")
             setIsLoading(false)
+        }
+    }
+
+    const handleAcceptConnectPermissions = () => {
+        if (!connectFlow) return
+        const { integration } = connectFlow
+        const requiredPlan = INTEGRATION_CONNECT_META[integration].requiredPlan
+        if (requiredPlan && !hasMinimumPlan(planSlug, requiredPlan)) {
+            setConnectFlow(null)
+            openPlanUpgrade(requiredPlan)
+            return
+        }
+
+        if (integration === "mercadopago") {
+            handleStartOAuth()
+        } else if (integration === "whatsapp") {
+            setConnectFlow(null)
+            setEvoModalOpen(true)
+        } else if (integration === "superfrete") {
+            setConnectFlow(null)
+            setSfActiveTab("connect")
+            setActiveModal("superfreteConfig")
+        } else if (integration === "tiny") {
+            setConnectFlow(null)
+            setActiveModal("tinyConfig")
+        } else if (integration === "bling") {
+            setConnectFlow(null)
+            setActiveModal("blingConfig")
         }
     }
 
@@ -1327,10 +1569,7 @@ export const IntegrationsSubPage = ({
                                                 <div className="flex justify-start gap-2">
                                                     <Button
                                                         variant="link"
-                                                        onClick={() => {
-                                                            setKnowMoreStep(0)
-                                                            setActiveModal("knowMore")
-                                                        }}
+                                                        onClick={() => openKnowMoreForIntegration("mercadopago", false)}
                                                     >
                                                         Saber mais
                                                     </Button>
@@ -1450,36 +1689,31 @@ export const IntegrationsSubPage = ({
                                                 <div className="flex items-start gap-2">
                                                     <Button
                                                         variant="link"
-                                                        onClick={() => {
-                                                            setWaKnowMoreStep(0)
-                                                            setWaActiveModal("knowMore")
-                                                        }}
+                                                        onClick={() => openKnowMoreForIntegration("whatsapp", false)}
                                                     >
                                                         Saber mais
                                                     </Button>
-                                                    <Button
-                                                        variant="link"
-                                                        onClick={() => {
-                                                            if (!hasMinimumPlan(planSlug, "escalar")) {
-                                                                openPlanUpgrade("escalar")
-                                                                return
-                                                            }
-                                                            setEvoModalOpen(true)
-                                                        }}
-                                                    >
-                                                        Configurar
-                                                    </Button>
+                                                    {evoStatus === "connected" && (
+                                                        <Button
+                                                            variant="link"
+                                                            onClick={() => {
+                                                                if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                                    openPlanUpgrade("escalar")
+                                                                    return
+                                                                }
+                                                                setEvoModalOpen(true)
+                                                            }}
+                                                        >
+                                                            Configurar
+                                                        </Button>
+                                                    )}
                                                 </div>
                                                 <Switch
                                                     checked={evoStatus === "connected"}
                                                     onCheckedChange={(checked) => {
                                                         if (evoIsLoading || isCheckingPlan) return
                                                         if (checked) {
-                                                            if (!hasMinimumPlan(planSlug, "escalar")) {
-                                                                openPlanUpgrade("escalar")
-                                                                return
-                                                            }
-                                                            setEvoModalOpen(true)
+                                                            openConnectInfoModal("whatsapp")
                                                         } else {
                                                             setConfirmEvoDisconnectOpen(true)
                                                         }
@@ -1544,10 +1778,7 @@ export const IntegrationsSubPage = ({
                                                 <div className="flex justify-start gap-2">
                                                     <Button
                                                         variant="link"
-                                                        onClick={() => {
-                                                            setSfKnowMoreStep(0)
-                                                            setActiveModal("sfKnowMore")
-                                                        }}
+                                                        onClick={() => openKnowMoreForIntegration("superfrete", false)}
                                                     >
                                                         Saber mais
                                                     </Button>
@@ -1568,14 +1799,9 @@ export const IntegrationsSubPage = ({
                                                     onCheckedChange={(checked) => {
                                                         if (sfIsLoading || isCheckingPlan) return
                                                         if (checked) {
-                                                            if (!hasMinimumPlan(planSlug, "escalar")) {
-                                                                openPlanUpgrade("escalar")
-                                                                return
-                                                            }
-                                                            setSfActiveTab("connect")
-                                                            setActiveModal("superfreteConfig")
+                                                            openConnectInfoModal("superfrete")
                                                         } else {
-                                                            handleSfDisconnect()
+                                                            setConfirmSfDisconnectOpen(true)
                                                         }
                                                     }}
                                                     className={sfIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
@@ -1638,10 +1864,7 @@ export const IntegrationsSubPage = ({
                                                 <div className="flex justify-start gap-2">
                                                     <Button
                                                         variant="link"
-                                                        onClick={() => {
-                                                            setTinyKnowMoreStep(0)
-                                                            setActiveModal("tinyKnowMore")
-                                                        }}
+                                                        onClick={() => openKnowMoreForIntegration("tiny", false)}
                                                     >
                                                         Saber mais
                                                     </Button>
@@ -1661,7 +1884,7 @@ export const IntegrationsSubPage = ({
                                                     onCheckedChange={(checked) => {
                                                         if (tinyIsLoading) return
                                                         if (checked) {
-                                                            setActiveModal("tinyConfig")
+                                                            openConnectInfoModal("tiny")
                                                         } else {
                                                             setConfirmTinyDisconnectOpen(true)
                                                         }
@@ -1724,10 +1947,7 @@ export const IntegrationsSubPage = ({
                                                 <div className="flex justify-start gap-2">
                                                     <Button
                                                         variant="link"
-                                                        onClick={() => {
-                                                            setBlingKnowMoreStep(0)
-                                                            setActiveModal("blingKnowMore")
-                                                        }}
+                                                        onClick={() => openKnowMoreForIntegration("bling", false)}
                                                     >
                                                         Saber mais
                                                     </Button>
@@ -1747,7 +1967,7 @@ export const IntegrationsSubPage = ({
                                                     onCheckedChange={(checked) => {
                                                         if (blingIsLoading) return
                                                         if (checked) {
-                                                            setActiveModal("blingConfig")
+                                                            openConnectInfoModal("bling")
                                                         } else {
                                                             setConfirmBlingDisconnectOpen(true)
                                                         }
@@ -2140,7 +2360,7 @@ export const IntegrationsSubPage = ({
                     {/* SuperFrete Know More Modal */}
                     <DefaultModal
                         isOpen={activeModal === "sfKnowMore"}
-                        onClose={() => setActiveModal(null)}
+                        onClose={closeKnowMoreModal}
                         title="O que é a SuperFrete?"
                         maxWidth="lg"
                     >
@@ -2212,11 +2432,12 @@ export const IntegrationsSubPage = ({
                                             className="flex-1 h-[46px]"
                                             onClick={() => {
                                                 if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                    setKnowMoreReturnIntegration(null)
                                                     setActiveModal(null)
                                                     openPlanUpgrade("escalar")
                                                     return
                                                 }
-                                                setActiveModal(null)
+                                                closeKnowMoreModal()
                                             }}
                                         >
                                             Entendido
@@ -2233,70 +2454,10 @@ export const IntegrationsSubPage = ({
                             </div>
                         </div>
                     </DefaultModal>
-                    <DefaultModal
-                        isOpen={waActiveModal === "info"}
-                        onClose={() => setWaActiveModal(null)}
-                        title="Conectar ao WhatsApp Business"
-                        maxWidth="md"
-                    >
-                        <div className="flex flex-col">
-                            {/* Header with Icons */}
-                            <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
-                                <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
-                                    <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
-                                </div>
-
-                                <div className="flex flex-col items-center gap-1">
-                                    <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
-                                        <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                                    </div>
-                                </div>
-
-                                <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
-                                    <img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="w-full h-full object-contain" />
-                                </div>
-                            </div>
-
-                            <div className="px-2 text-center md:text-left">
-                                <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-2 leading-relaxed">
-                                    Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos, entregas e orçamentos direto para o WhatsApp do cliente.
-                                </p>
-
-                                <Button
-                                    variant="link"
-                                    onClick={() => {
-                                        setWaKnowMoreStep(0)
-                                        setWaActiveModal("knowMore")
-                                    }}
-                                    className="flex items-center gap-2 mb-4 px-0"
-                                >
-                                    <InfoIcon size={14} />
-                                    Saber mais sobre essa integração
-                                </Button>
-
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setWaActiveModal(null)}>
-                                        Cancelar
-                                    </Button>
-                                    <WhatsappConnectButton
-                                        className="flex-1 h-[46px]"
-                                        planSlug={planSlug}
-                                        requiredPlan="escalar"
-                                        storeId={currentStoreId}
-                                        onSuccess={async () => {
-                                            setWaActiveModal(null)
-                                            await fetchWaStatus()
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </DefaultModal>
-
                     {/* 2. WhatsApp Know More Modal */}
                     <DefaultModal
                         isOpen={waActiveModal === "knowMore"}
-                        onClose={() => setWaActiveModal("info")}
+                        onClose={closeKnowMoreModal}
                         title="O que é o WhatsApp API?"
                         maxWidth="lg"
                     >
@@ -2387,11 +2548,12 @@ export const IntegrationsSubPage = ({
                                             className="flex-1 h-[46px]"
                                             onClick={() => {
                                                 if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                    setKnowMoreReturnIntegration(null)
                                                     setWaActiveModal(null)
                                                     openPlanUpgrade("escalar")
                                                     return
                                                 }
-                                                setWaActiveModal(null)
+                                                closeKnowMoreModal()
                                             }}
                                         >
                                             Entendido
@@ -2497,74 +2659,78 @@ export const IntegrationsSubPage = ({
                         )}
                     </DefaultModal>
 
-                    {/* 1. Connection Info Modal */}
-                    <DefaultModal
-                        isOpen={activeModal === "info"}
-                        onClose={() => setActiveModal(null)}
-                        title="Conectar ao Mercado Pago"
-                        maxWidth="md"
-                    >
-                        <div className="flex flex-col">
-                            {/* Header with Icons */}
-                            <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
-                                <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
-                                    <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
-                                </div>
+                    {/* 1. Unified Connection Info Modal (Mercado Pago, WhatsApp, SuperFrete, Tiny, Bling) */}
+                    {(() => {
+                        const meta = connectFlow ? INTEGRATION_CONNECT_META[connectFlow.integration] : null
+                        return (
+                            <DefaultModal
+                                isOpen={connectFlow?.step === "info" && meta !== null}
+                                onClose={() => setConnectFlow(null)}
+                                title={meta?.title || ""}
+                                maxWidth="md"
+                            >
+                                {meta && connectFlow && (
+                                    <div className="flex flex-col">
+                                        {/* Header with Icons */}
+                                        <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
+                                            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
+                                                <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
+                                            </div>
 
-                                <div className="flex flex-col items-center gap-1">
-                                    <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
-                                        <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                                                    <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                                                </div>
+                                            </div>
+
+                                            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
+                                                <img src={meta.icon} alt={meta.iconAlt} className="w-full h-full object-contain" />
+                                            </div>
+                                        </div>
+
+                                        <div className="px-2 text-center md:text-left">
+                                            <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-2 leading-relaxed">
+                                                {meta.description}
+                                            </p>
+
+                                            <Button
+                                                variant="link"
+                                                onClick={() => openKnowMoreForIntegration(connectFlow.integration, true)}
+                                                className="flex items-center gap-2 mb-4 px-0"
+                                            >
+                                                <InfoIcon size={14} />
+                                                Saber mais sobre essa integração
+                                            </Button>
+
+                                            <div className="flex flex-col md:flex-row gap-3">
+                                                <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setConnectFlow(null)}>
+                                                    Cancelar
+                                                </Button>
+                                                <Button
+                                                    className="flex-1 h-[46px]"
+                                                    onClick={() => {
+                                                        if (meta.requiredPlan && !hasMinimumPlan(planSlug, meta.requiredPlan)) {
+                                                            setConnectFlow(null)
+                                                            openPlanUpgrade(meta.requiredPlan)
+                                                            return
+                                                        }
+                                                        setConnectFlow({ integration: connectFlow.integration, step: "permissions" })
+                                                    }}
+                                                >
+                                                    Conectar agora
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
-                                    <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-full h-full object-contain" />
-                                </div>
-                            </div>
-
-                            <div className="px-2 text-center md:text-left">
-                                <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-2 leading-relaxed">
-                                    Venda de forma profissional aceitando as principais formas de pagamento do mercado com integração automática.
-                                </p>
-
-                                <Button
-                                    variant="link"
-                                    onClick={() => {
-                                        setKnowMoreStep(0)
-                                        setActiveModal("knowMore")
-                                    }}
-                                    className="flex items-center gap-2 mb-4 px-0"
-                                >
-                                    <InfoIcon size={14} />
-                                    Saber mais sobre essa integração
-                                </Button>
-
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setActiveModal(null)}>
-                                        Cancelar
-                                    </Button>
-                                    <Button
-                                        className="flex-1 h-[46px]"
-                                        onClick={() => {
-                                            if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                setActiveModal(null)
-                                                openPlanUpgrade("crescer")
-                                                return
-                                            }
-                                            setActiveModal("permissions")
-                                        }}
-                                    >
-                                        Conectar agora
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </DefaultModal>
+                                )}
+                            </DefaultModal>
+                        )
+                    })()}
 
                     {/* 2. Know More Modal (Multi-step) */}
                     <DefaultModal
                         isOpen={activeModal === "knowMore"}
-                        onClose={() => setActiveModal("info")}
+                        onClose={closeKnowMoreModal}
                         title="O que é o Mercado Pago?"
                         maxWidth="lg"
                     >
@@ -2637,11 +2803,12 @@ export const IntegrationsSubPage = ({
                                             className="flex-1 h-[46px]"
                                             onClick={() => {
                                                 if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                    setKnowMoreReturnIntegration(null)
                                                     setActiveModal(null)
                                                     openPlanUpgrade("crescer")
                                                     return
                                                 }
-                                                setActiveModal(null)
+                                                closeKnowMoreModal()
                                             }}
                                         >
                                             Entendido
@@ -2659,86 +2826,101 @@ export const IntegrationsSubPage = ({
                         </div>
                     </DefaultModal>
 
-                    {/* 3. Permissions Modal */}
-                    <DefaultModal
-                        isOpen={activeModal === "permissions"}
-                        onClose={() => setActiveModal("info")}
-                        title="Permissões do Aplicativo"
-                        maxWidth="lg"
-                    >
-                        <div className="flex flex-col">
-                            <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl flex items-center justify-center relative group">
-                                <img src="https://img.dudit.com.br/static/banners/MercadoPago.png" alt="" className="w-full h-full object-contain" />
-                            </div>
-
-                            <div className="p-8">
-
-                                <div className="space-y-6 mb-8">
-                                    <InfoCard
-                                        message="Antes de instalar, é importante dar uma olhada nas permissões do aplicativo e concordar com elas para ativar na sua loja."
-                                        color="green"
-                                    />
-                                    <div className="flex flex-col gap-6">
-                                        <div className="space-y-2">
-                                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Sobre os dados da sua loja</h4>
-                                            <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                                O aplicativo terá acesso apenas para leitura dos seus produtos e categorias (ou seja, não poderá alterar essas informações).
-                                            </p>
-                                            <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed mt-2">
-                                                Também poderá gerenciar dados relacionados a fornecedores e transações de pagamento.
-                                            </p>
+                    {/* 3. Unified Permissions Modal */}
+                    {(() => {
+                        const meta = connectFlow ? INTEGRATION_CONNECT_META[connectFlow.integration] : null
+                        return (
+                            <DefaultModal
+                                isOpen={connectFlow?.step === "permissions" && meta !== null}
+                                onClose={() => connectFlow && setConnectFlow({ integration: connectFlow.integration, step: "info" })}
+                                title="Permissões do Aplicativo"
+                                maxWidth="lg"
+                            >
+                                {meta && connectFlow && (
+                                    <div className="flex flex-col">
+                                        <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl flex items-center justify-center relative group h-[200px]">
+                                            <img src={meta.banner} alt={meta.iconAlt} className={meta.bannerClassName} />
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Sobre os dados dos seus clientes</h4>
-                                            <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                                O app poderá criar, editar e excluir informações de vendas na sua loja.
-                                            </p>
-                                        </div>
+                                        <div className="p-8">
+                                            <div className="space-y-6 mb-8">
+                                                <InfoCard
+                                                    message="Antes de instalar, é importante dar uma olhada nas permissões do aplicativo e concordar com elas para ativar na sua loja."
+                                                    color="green"
+                                                />
+                                                <div className="flex flex-col gap-6">
+                                                    {meta.permissions.map((section, idx) => (
+                                                        <div key={idx} className="space-y-2">
+                                                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">{section.heading}</h4>
+                                                            {section.paragraphs.map((paragraph, pIdx) => (
+                                                                <p
+                                                                    key={pIdx}
+                                                                    className={`text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed ${pIdx > 0 ? "mt-2" : ""}`}
+                                                                >
+                                                                    {paragraph}
+                                                                </p>
+                                                            ))}
+                                                        </div>
+                                                    ))}
+                                                </div>
 
-                                        <div className="space-y-2">
-                                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Outras permissões</h4>
-                                            <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                                Pode adicionar componentes em JavaScript para melhorar o funcionamento da sua loja.
-                                            </p>
+                                                <div className="pt-6 border-t border-brand-border dark:border-dark-border">
+                                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                        Ao conectar, você concorda com a{" "}
+                                                        <a
+                                                            href={meta.privacyUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-brand-green font-bold hover:underline"
+                                                        >
+                                                            política de privacidade do aplicativo
+                                                        </a>. Se quiser, pode desconectar o aplicativo a qualquer momento.
+                                                    </p>
+                                                    <InfoCard
+                                                        message="Importante: a plataforma não é responsável pelo funcionamento do aplicativo, então é sempre bom avaliar antes de instalar, ok?"
+                                                        color="orange"
+                                                        className="mt-4"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col-reverse md:flex-row gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    className="flex-1 h-[46px]"
+                                                    onClick={() => setConnectFlow({ integration: connectFlow.integration, step: "info" })}
+                                                >
+                                                    Cancelar
+                                                </Button>
+                                                <Button
+                                                    className="flex-1 h-[46px]"
+                                                    onClick={handleAcceptConnectPermissions}
+                                                    isLoading={connectFlow.integration === "mercadopago" && isLoading}
+                                                >
+                                                    Aceitar e Conectar
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
+                                )}
+                            </DefaultModal>
+                        )
+                    })()}
 
-                                    <div className="pt-6 border-t border-brand-border dark:border-dark-border">
-                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                            Ao conectar, você concorda com a{" "}
-                                            <a
-                                                href="https://www.mercadopago.com.br/privacidade"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-brand-green font-bold hover:underline"
-                                            >
-                                                política de privacidade do aplicativo
-                                            </a>. Se quiser, pode desconectar o aplicativo a qualquer momento.
-                                        </p>
-                                        <InfoCard
-                                            message="Importante: a plataforma não é responsável pelo funcionamento do aplicativo, então é sempre bom avaliar antes de instalar, ok?"
-                                            color="orange"
-                                            className="mt-4"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col-reverse md:flex-row gap-3">
-                                    <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setActiveModal("info")}>
-                                        Cancelar
-                                    </Button>
-                                    <Button
-                                        className="flex-1 h-[46px]"
-                                        onClick={handleStartOAuth}
-                                        isLoading={isLoading}
-                                    >
-                                        Aceitar e Conectar
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </DefaultModal>
+                    {/* Confirm Disconnect SuperFrete */}
+                    <AlertModal
+                        isOpen={confirmSfDisconnectOpen}
+                        onClose={() => setConfirmSfDisconnectOpen(false)}
+                        onConfirm={() => {
+                            setConfirmSfDisconnectOpen(false)
+                            handleSfDisconnect()
+                        }}
+                        title="Desconectar SuperFrete"
+                        message="Tem certeza que deseja desconectar sua conta da SuperFrete? O cálculo automático de frete e a geração de etiquetas deixarão de funcionar."
+                        confirmText="Desconectar"
+                        variant="danger"
+                        isDestructive
+                    />
 
                     {/* Confirm Disconnect WhatsApp Evolution */}
                     <AlertModal
@@ -3018,7 +3200,7 @@ export const IntegrationsSubPage = ({
                     {/* Tiny ERP Know More Modal (Multi-step) */}
                     <DefaultModal
                         isOpen={activeModal === "tinyKnowMore"}
-                        onClose={() => setActiveModal(null)}
+                        onClose={closeKnowMoreModal}
                         title="O que é o Tiny ERP?"
                         maxWidth="lg"
                     >
@@ -3089,8 +3271,14 @@ export const IntegrationsSubPage = ({
                                         <Button
                                             className="flex-1 h-[46px]"
                                             onClick={() => {
-                                                setActiveModal("tinyConfig")
                                                 setTinyKnowMoreStep(0)
+                                                setKnowMoreReturnIntegration(null)
+                                                if (tinyStatus?.connected) {
+                                                    setActiveModal("tinyConfig")
+                                                } else {
+                                                    setActiveModal(null)
+                                                    openConnectInfoModal("tiny")
+                                                }
                                             }}
                                         >
                                             {tinyStatus?.connected ? "Abrir Configurações" : "Conectar Tiny ERP"}
@@ -3111,7 +3299,7 @@ export const IntegrationsSubPage = ({
                     {/* Bling ERP Know More Modal (Multi-step) */}
                     <DefaultModal
                         isOpen={activeModal === "blingKnowMore"}
-                        onClose={() => setActiveModal(null)}
+                        onClose={closeKnowMoreModal}
                         title="O que é o Bling ERP?"
                         maxWidth="lg"
                     >
@@ -3186,8 +3374,14 @@ export const IntegrationsSubPage = ({
                                         <Button
                                             className="flex-1 h-[46px]"
                                             onClick={() => {
-                                                setActiveModal("blingConfig")
                                                 setBlingKnowMoreStep(0)
+                                                setKnowMoreReturnIntegration(null)
+                                                if (blingStatus?.connected) {
+                                                    setActiveModal("blingConfig")
+                                                } else {
+                                                    setActiveModal(null)
+                                                    openConnectInfoModal("bling")
+                                                }
                                             }}
                                         >
                                             {blingStatus?.connected ? "Abrir Configurações" : "Conectar Bling ERP"}
@@ -3224,19 +3418,20 @@ export const IntegrationsSubPage = ({
                     <DefaultModal
                         isOpen={activeModal === "blingConfig"}
                         onClose={() => setActiveModal(null)}
-                        title="Configurar Bling ERP (API v3)"
+                        title="Configurar Bling ERP"
                         maxWidth="lg"
                     >
                         <div className="p-6 space-y-5">
                             {!blingStatus?.connected ? (
                                 <div className="space-y-4">
-                                    <InfoCard
-                                        message={
+                                    <IconPlaceholder
+                                        icon="https://img.dudit.com.br/static/icons/brands/Bling.svg"
+                                        title="Conta do Bling ERP"
+                                        subtitle={
                                             blingStatus?.hasOAuthAppConfigured
                                                 ? "Conecte sua conta do Bling ERP com 1 clique via OAuth 2.0. Você será redirecionado para autorizar o acesso seguro da Dudit."
                                                 : "Configure BLING_CLIENT_ID e BLING_CLIENT_SECRET no servidor (ou informe abaixo as credenciais de um Aplicativo Privado do Bling para testes)."
                                         }
-                                        color="green"
                                     />
 
                                     {!blingStatus?.hasOAuthAppConfigured && (
@@ -3328,14 +3523,10 @@ export const IntegrationsSubPage = ({
                             ) : (
                                 <>
                                     <InfoCard
-                                        title="Conexão ativa com o Bling ERP (API v3)"
+                                        title="Conexão ativa com o Bling ERP"
                                         message={<div>
-                                            <p>
-                                                Seus produtos, estoque e pedidos podem ser sincronizados automaticamente.
-                                            </p>
-
                                             {blingStatus.metadata?.last_sync_at && (
-                                                <p className="text-xs mt-2">
+                                                <p>
                                                     Última sincronização:{" "}
                                                     {new Date(
                                                         blingStatus.metadata.last_sync_at

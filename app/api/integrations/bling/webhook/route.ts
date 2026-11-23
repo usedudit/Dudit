@@ -27,21 +27,65 @@ export async function POST(req: Request) {
 
   const supabase = getAdminClient()
 
-  // No Bling v3 (App Público), a URL de webhook é única no aplicativo e o Bling envia `companyId` no payload
-  if (!partnerId && payload?.companyId) {
+  // No Bling v3 (App Público), a URL de webhook é única no aplicativo e o Bling envia `companyId` (hash MD5 de 32 chars) no payload
+  const companyId = payload?.companyId ? String(payload.companyId).trim() : null
+
+  if (!partnerId && companyId) {
     const { data: byCompany } = await supabase
       .from("partner_integrations")
       .select("partner_id")
       .eq("provider_slug", BLING_PROVIDER)
       .eq("status", "connected")
-      .eq("account_id", String(payload.companyId))
+      .eq("account_id", companyId)
       .maybeSingle()
     if (byCompany?.partner_id) {
       partnerId = byCompany.partner_id
     }
   }
 
+  // Fallback 1: se o companyId ainda não estava salvo como hash (ex: salvo ID numérico ou null),
+  // tenta resolver pelo produto.id presente no payload e grava o companyId para os próximos webhooks
+  if (!partnerId && payload?.data?.produto?.id) {
+    const blingProdId = String(payload.data.produto.id)
+    const { data: matchedProd } = await supabase
+      .from("products")
+      .select("partner_id")
+      .eq("external_provider", BLING_PROVIDER)
+      .eq("external_id", blingProdId)
+      .limit(1)
+      .maybeSingle()
+
+    if (matchedProd?.partner_id) {
+      partnerId = matchedProd.partner_id
+      if (companyId) {
+        await supabase
+          .from("partner_integrations")
+          .update({ account_id: companyId, updated_at: new Date().toISOString() })
+          .eq("partner_id", partnerId)
+          .eq("provider_slug", BLING_PROVIDER)
+      }
+    }
+  }
+
+  // Fallback 2: se houver apenas 1 conta Bling conectada sem hash salvo ainda, vincula e processa
+  if (!partnerId && companyId) {
+    const { data: connectedBlings } = await supabase
+      .from("partner_integrations")
+      .select("id, partner_id, account_id")
+      .eq("provider_slug", BLING_PROVIDER)
+      .eq("status", "connected")
+
+    if (connectedBlings && connectedBlings.length === 1) {
+      partnerId = connectedBlings[0].partner_id
+      await supabase
+        .from("partner_integrations")
+        .update({ account_id: companyId, updated_at: new Date().toISOString() })
+        .eq("id", connectedBlings[0].id)
+    }
+  }
+
   if (!partnerId) {
+    console.warn("[BLING WEBHOOK] partnerId não resolvido:", { companyId, event: payload?.event, produtoId: payload?.data?.produto?.id })
     return NextResponse.json(
       { error: "Identificador do parceiro (partnerId ou companyId) não resolvido." },
       { status: 400 }

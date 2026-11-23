@@ -37,6 +37,7 @@ import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, for
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { getMaskedDeliveryLocation } from "@/lib/utils/address"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useModalLayer } from "@/lib/modal-stack"
@@ -44,6 +45,7 @@ import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/Hist
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "@/components/erp/orders/CreateOrder"
 import type { DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
+import { triggerDriverLocationCapture } from "./DriverLocationBeacon"
 
 const ITEMS_PER_PAGE = 10
 
@@ -124,10 +126,13 @@ export default function AvailableDeliveryDetail({
         setOffer(initialOffer)
     }, [initialOffer])
 
-    // Multi-stop orders normalization
+    // Multi-stop orders normalization (sempre mascarando endereço do destinatário antes do aceite — LGPD)
     const ordersList = useMemo(() => {
         if (offer.orders && offer.orders.length > 0) {
-            return offer.orders
+            return offer.orders.map((ord: any) => ({
+                ...ord,
+                delivery_address: getMaskedDeliveryLocation(ord.delivery_address),
+            }))
         }
         return [
             {
@@ -135,8 +140,8 @@ export default function AvailableDeliveryDetail({
                 order_number: offer.order_number,
                 position: 1,
                 customer_name: offer.customer_name,
-                customer_phone: offer.customer_phone,
-                delivery_address: offer.delivery_address,
+                customer_phone: "",
+                delivery_address: getMaskedDeliveryLocation(offer.delivery_address),
                 total_amount: offer.total_amount,
                 delivery_fee: offer.delivery_fee,
                 payment_method: offer.payment_method,
@@ -223,6 +228,7 @@ export default function AvailableDeliveryDetail({
             const assignmentKey = offer.id || offer.assignment_id
             const res = await acceptDeliveryOfferAction(assignmentKey)
             if (res.success) {
+                triggerDriverLocationCapture("accept")
                 toast.success("Entrega aceita com sucesso! Boa rota!")
                 if (onAccepted) {
                     onAccepted()
@@ -280,10 +286,10 @@ export default function AvailableDeliveryDetail({
     const paginatedItems = allItems.slice((itemsPage - 1) * ITEMS_PER_PAGE, itemsPage * ITEMS_PER_PAGE)
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -306,13 +312,12 @@ export default function AvailableDeliveryDetail({
                                                 <Badge variant="gray" className="shrink-0">{ordersList.length} paradas</Badge>
                                             )}
                                         </h1>
-                                        <div className={`hidden md:flex items-center gap-2 text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             <span>Loja: <strong className="text-brand-dark dark:text-dark-heading">{offer.store_name || offer.partner_name || "Estabelecimento"}</strong></span>
                                             {tierSecondsLeft !== null && tierSecondsLeft > 0 ? (
                                                 <>
                                                     <span>•</span>
                                                     <span className="flex items-center gap-1 font-semibold text-brand-inactive-text">
-                                                        <ClockIcon size={13} />
                                                         fecha em {tierSecondsLeft}s
                                                     </span>
                                                 </>
@@ -320,7 +325,6 @@ export default function AvailableDeliveryDetail({
                                                 <>
                                                     <span>•</span>
                                                     <span className="flex items-center gap-1 font-semibold text-brand-inactive-text">
-                                                        <ClockIcon size={13} />
                                                         {elapsedMinutes === 0 ? "Solicitada agora" : `Aguardando há ${elapsedMinutes} min`}
                                                     </span>
                                                 </>
@@ -330,22 +334,16 @@ export default function AvailableDeliveryDetail({
 
                                     <div className="flex items-center gap-3 shrink-0">
                                         <Button
-                                            variant="outline"
-                                            size="default"
                                             onClick={handleDecline}
                                             disabled={loading || declining}
                                             isLoading={declining}
-                                            className="font-bold shadow-none"
                                         >
                                             Recusar
                                         </Button>
                                         <Button
-                                            variant="default"
-                                            size="default"
                                             onClick={handleAccept}
                                             disabled={loading || declining}
                                             isLoading={loading}
-                                            className="font-bold shadow-none"
                                         >
                                             Aceitar Entrega
                                         </Button>
@@ -383,7 +381,7 @@ export default function AvailableDeliveryDetail({
 
                                                 {offer.dimensions_unknown && (
                                                     <InfoCard
-                                                        title="⚠ Itens sem dimensão informada"
+                                                        title="Itens sem dimensão informada"
                                                         message="O estabelecimento não informou peso ou dimensões de todos os itens. Confirme se o pedido cabe no seu veículo antes de aceitar."
                                                         color="orange"
                                                     />
@@ -573,29 +571,6 @@ export default function AvailableDeliveryDetail({
                                                                 </div>
                                                             </>
                                                         )}
-                                                    </div>
-
-                                                    <div className="pt-4 border-t border-brand-border dark:border-dark-border mt-4 flex flex-col gap-2">
-                                                        <Button
-                                                            variant="default"
-                                                            size="lg"
-                                                            onClick={handleAccept}
-                                                            disabled={loading || declining}
-                                                            isLoading={loading}
-                                                            className="w-full font-bold shadow-none"
-                                                        >
-                                                            Aceitar Entrega
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="default"
-                                                            onClick={handleDecline}
-                                                            disabled={loading || declining}
-                                                            isLoading={declining}
-                                                            className="w-full font-bold shadow-none"
-                                                        >
-                                                            Recusar Oferta
-                                                        </Button>
                                                     </div>
                                                 </SidebarCard>
                                             </div>

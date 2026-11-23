@@ -132,7 +132,8 @@ export type ERPOrderPayload = {
   | "sent"
   | "delivered"
   | "pickup_available"
-  | "delivery_failed";
+  | "delivery_failed"
+  | "cancelled";
   items: ERPItemPayload[];
   subtotal: number;
   discountValue: number;
@@ -6892,6 +6893,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
       "delivered",
       "pickup_available",
       "delivery_failed",
+      "cancelled",
     ]);
 
     if (
@@ -6982,6 +6984,27 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     // Pedidos com efeito colateral: finaliza estoque e atualiza individualmente (marca inventory_deducted).
     for (const order of finalizeDeliveryOrders) {
+      // Garante que a reserva exista antes de finalizar (protege contra casos onde uma sincronização de ERP
+      // zerou stock_reserved antes da entrega, evitando "Reserva insuficiente para finalizar o produto")
+      const orderItemsList = order.order_items || [];
+      if (orderItemsList.length > 0) {
+        const shortfallItems = await buildStockShortfallItems(
+          supabase,
+          payload.partnerId,
+          orderItemsList,
+        );
+        if (shortfallItems.length > 0) {
+          const reserveResult = await reserveOrderInventory({
+            client: supabase,
+            partnerId: payload.partnerId,
+            orderId: order.id,
+            items: shortfallItems,
+            storeId: order.store_id,
+          });
+          if ("error" in reserveResult) return { error: reserveResult.error };
+        }
+      }
+
       const finalizeResult = await finalizeOrderInventory({
         client: supabase,
         partnerId: payload.partnerId,

@@ -32,6 +32,7 @@ import {
     transitionMyDeliveryAssignmentAction,
     markSingleOrderDeliveredAction,
 } from "@/app/actions/delivery-drivers"
+import { triggerDriverLocationCapture } from "./DriverLocationBeacon"
 import { DeliveryOtpModal } from "@/components/delivery/DeliveryOtpModal"
 import {
     ChevronLeftIcon,
@@ -271,6 +272,7 @@ export default function DeliveryAssignmentDetail({
                 return { success: false, error: res.error }
             }
             setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+            triggerDriverLocationCapture("status_change")
             toast.success("Entrega finalizada com sucesso!")
             return { success: true }
         } else {
@@ -285,6 +287,7 @@ export default function DeliveryAssignmentDetail({
                 return { success: false, error: res.error }
             }
             setOrderDeliveredMap(prev => ({ ...prev, [otpModalState.orderId!]: true }))
+            triggerDriverLocationCapture("status_change")
             toast.success(`Pedido #${otpModalState.orderNumber || ""} entregue com sucesso!`)
             const allDone = ordersList.every((o: any) => o.order_id === otpModalState.orderId || orderDeliveredMap[o.order_id])
             if (allDone) {
@@ -330,6 +333,7 @@ export default function DeliveryAssignmentDetail({
         }
 
         setAssignment((prev: any) => ({ ...prev, status: next.status }))
+        triggerDriverLocationCapture("status_change")
         toast.success(`Status atualizado para "${next.label}"!`)
     }
 

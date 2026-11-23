@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Button } from "@/components/reusable"
+import { Badge, Button } from "@/components/reusable"
 import { Package, ClockIcon, MapPinIcon } from "@/lib/icons"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 
 export interface AvailableDeliveryOffer {
     id?: string
@@ -88,9 +88,8 @@ export default function AvailableDeliveryListRow({
     }, [offer.assigned_at, offer.offer_expires_at])
 
     const orderCount = offer.order_count || offer.orders?.length || 1
-
     const orderNumberDisplay = orderCount > 1
-        ? `Rota c/ ${orderCount} pedidos`
+        ? `Rota (${orderCount})`
         : offer.order_number
             ? `#${offer.order_number}`
             : `#${String(offer.order_id || assignmentId).slice(0, 8)}`
@@ -98,7 +97,6 @@ export default function AvailableDeliveryListRow({
     const itemCount = (offer.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0)
 
     const handleRowClick = (e: React.MouseEvent) => {
-        // Ignora se clicou em um botão
         if ((e.target as HTMLElement).closest("button")) return
         if (onView) {
             onView(offer)
@@ -115,116 +113,127 @@ export default function AvailableDeliveryListRow({
             onClick={handleRowClick}
             className="group hover:bg-brand-gray/60 dark:hover:bg-dark-border/20 transition-colors bg-white dark:bg-dark-background cursor-pointer"
         >
-            {/* PEDIDO / ROTA */}
-            <td className="py-2.5 pr-2 border-b border-brand-border dark:border-dark-border w-[180px]">
-                <div className="flex flex-col">
+            {/* PEDIDO */}
+            <td className="py-2.5 pl-6 pr-2 border-b border-brand-border dark:border-dark-border w-[160px]">
+                <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
                             {orderNumberDisplay}
                         </span>
                         {orderCount > 1 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                            <Badge variant="purple" className="scale-90 origin-left">
                                 {orderCount} paradas
-                            </span>
+                            </Badge>
                         )}
                     </div>
                     {tierSecondsLeft !== null && tierSecondsLeft > 0 ? (
-                        <span className="text-[11px] font-semibold flex items-center gap-1 mt-0.5 text-brand-inactive-text dark:text-dark-body">
+                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
                             <ClockIcon size={11} />
                             Fecha em {tierSecondsLeft}s
                         </span>
                     ) : elapsedMinutes !== null ? (
-                        <span className="text-[11px] font-semibold flex items-center gap-1 mt-0.5 text-brand-inactive-text dark:text-dark-body">
+                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
                             <ClockIcon size={11} />
                             {elapsedMinutes === 0 ? "Agora" : `Há ${elapsedMinutes} min`}
                         </span>
                     ) : null}
-                    {offer.dimensions_unknown && (
-                        <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 w-fit"
-                            title="Itens sem peso/dimensão informados — confirme se cabe no seu veículo"
-                        >
-                            ⚠ Sem dimensão
-                        </span>
-                    )}
-                    {offer.vehicle_compatible === false && (
-                        <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300 w-fit"
-                            title="Peso ou volume acima do limite recomendado para o seu veículo"
-                        >
-                            ⚠ Acima do limite do veículo
-                        </span>
+                    {(offer.dimensions_unknown || offer.vehicle_compatible === false) && (
+                        <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                            {offer.dimensions_unknown && (
+                                <Badge variant="orange" className="scale-90 origin-left">
+                                    Sem dimensão
+                                </Badge>
+                            )}
+                            {offer.vehicle_compatible === false && (
+                                <Badge variant="red" className="scale-90 origin-left">
+                                    Acima do veículo
+                                </Badge>
+                            )}
+                        </div>
                     )}
                 </div>
             </td>
 
-            {/* ESTABELECIMENTO */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[220px]">
+            {/* ESTABELECIMENTO + ENDEREÇO */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[250px]">
                 <div className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[200px]">
+                    <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading truncate block max-w-[230px]">
                         {offer.store_name || offer.partner_name || "Estabelecimento"}
                     </span>
-                    {offer.pickup_distance_km != null && (
-                        <span className="text-[11px] font-medium text-brand-green flex items-center gap-1 mt-0.5">
-                            <MapPinIcon size={11} />
+                    <span
+                        className="text-xs text-brand-inactive-text dark:text-dark-body truncate block max-w-[230px] mt-0.5"
+                        title={offer.store_address || ""}
+                    >
+                        {offer.store_address || "Endereço não informado"}
+                    </span>
+                </div>
+            </td>
+
+            {/* DISTÂNCIA / TEMPO */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[190px]">
+                <div className="flex flex-col min-w-0">
+                    {offer.pickup_distance_km != null ? (
+                        <span className="text-xs font-semibold text-brand-green flex items-center gap-1">
+                            <MapPinIcon size={12} className="shrink-0" />
                             {offer.pickup_distance_km === 0
-                                ? "No mesmo local"
-                                : `${offer.pickup_distance_km} km${offer.pickup_minutes != null ? ` · ${offer.pickup_minutes} min até a loja` : ""}`}
+                                ? "No local"
+                                : `${offer.pickup_distance_km} km${offer.pickup_minutes != null ? ` · ${offer.pickup_minutes} min` : ""}`}
                         </span>
+                    ) : (
+                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">—</span>
                     )}
                     {offer.delivery_minutes != null && (
                         <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                            {offer.delivery_minutes} min até o cliente{offer.eta_total_minutes != null ? ` · ~${offer.eta_total_minutes} min total` : ""}
+                            {offer.delivery_minutes} min entrega{offer.eta_total_minutes != null ? ` (~${offer.eta_total_minutes} min)` : ""}
                         </span>
                     )}
                     {offer.position_quality === "address" && (
                         <span className="text-[10px] text-brand-inactive-text/80 dark:text-dark-body/80 mt-0.5">
-                            Distância pelo endereço de cadastro
+                            Pelo endereço de cadastro
                         </span>
                     )}
                 </div>
             </td>
 
             {/* DESTINO DA ENTREGA */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[300px]">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[230px]">
                 <div className="flex flex-col min-w-0">
-                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[260px]" title={offer.delivery_address || "Região local"}>
+                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[210px]" title={offer.delivery_address || "Região local"}>
                         {offer.delivery_address || "Região local"}
                     </span>
-                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1 mt-0.5">
-                        <span>🔒 Rua e nº após aceite</span>
-                        {orderCount > 1 && <span>• {orderCount} paradas</span>}
+                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                        Rua e nº após aceite
                     </span>
                 </div>
             </td>
 
-            {/* TAXA */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[150px]">
+            {/* REMUNERAÇÃO */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[140px]">
                 <div className="flex flex-col">
-                    <span className="font-bold text-[13px] text-emerald-600 dark:text-emerald-400">
+                    <span className="font-bold text-[13px] text-brand-green">
                         {formatCurrency(offer.delivery_fee || 0)}
                     </span>
                     {offer.bonus_amount != null && offer.bonus_amount > 0 && (
-                        <span className="text-[11px] font-bold text-brand-green font-mono">
-                            + bônus {formatCurrency(offer.bonus_amount)}
+                        <span className="text-[11px] font-semibold text-brand-green">
+                            + {formatCurrency(offer.bonus_amount)} bônus
                         </span>
                     )}
                     {offer.rs_per_km != null && offer.rs_per_km > 0 && (
-                        <span className="text-[11px] font-semibold text-emerald-700/90 dark:text-emerald-300/90 font-mono">
+                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
                             {formatCurrency(offer.rs_per_km)}/km
                         </span>
                     )}
                     {itemCount > 0 && (
                         <span className="flex items-center gap-1 text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                             <Package size={11} />
-                            {itemCount} itens
+                            {itemCount} {itemCount === 1 ? "item" : "itens"}
                         </span>
                     )}
                 </div>
             </td>
 
             {/* AÇÃO */}
-            <td className="py-2.5 pr-6 pl-2 border-b border-brand-border dark:border-dark-border text-right w-[150px] rounded-r-lg">
+            <td className="py-2.5 pr-6 pl-2 border-b border-brand-border dark:border-dark-border text-right w-[130px] rounded-r-lg">
                 <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
                         variant="default"
@@ -232,7 +241,6 @@ export default function AvailableDeliveryListRow({
                         onClick={() => onAccept(assignmentId)}
                         disabled={isAccepting}
                         isLoading={isAccepting}
-                        className="font-bold px-4"
                     >
                         Aceitar
                     </Button>

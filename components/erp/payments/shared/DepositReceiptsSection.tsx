@@ -4,6 +4,7 @@ import { formatCurrency } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { formatBrazilDateFromDbInput } from "@/lib/utils/formatters"
 import { normalizePaymentMethodKey } from "@/lib/payments/payment-ledger"
+import { UNDEFINED_PAYMENT_PLACEHOLDERS } from "@/lib/orders/order-utils"
 import {
   QRCodeIcon,
   MoneyIcon,
@@ -22,8 +23,23 @@ type DepositReceiptsSectionProps = {
   syncing?: boolean
   onSelectLeg?: (leg: PaymentBreakdownLeg) => void
   hasRemainingBalance?: boolean
+  showUnpaidMethods?: boolean
   installments?: OrderInstallmentItem[]
   onPayInstallment?: (installment: OrderInstallmentItem) => void
+}
+
+function isPlaceholderMethod(method?: string | null) {
+  const norm = String(method || "").trim().toLowerCase()
+  if (!norm) return true
+  if (UNDEFINED_PAYMENT_PLACEHOLDERS.includes(norm)) return true
+  if (
+    norm.includes("não definido") ||
+    norm.includes("metodo nao definido") ||
+    norm.includes("pendente")
+  ) {
+    return true
+  }
+  return false
 }
 
 function isMpLeg(entry: PaymentBreakdownLeg) {
@@ -48,6 +64,7 @@ export function DepositReceiptsSection({
   syncing = false,
   onSelectLeg,
   hasRemainingBalance = false,
+  showUnpaidMethods = true,
   installments = [],
   onPayInstallment,
 }: DepositReceiptsSectionProps) {
@@ -59,8 +76,10 @@ export function DepositReceiptsSection({
   const consolidatedLegs = React.useMemo(() => {
     const result: PaymentBreakdownLeg[] = []
     for (const entry of legs) {
-      const received = Number(entry.amountReceived || 0)
-      if (received <= 0.009) continue
+      if ((entry as any)?.checkoutPricing) continue
+      if (isPlaceholderMethod(entry.method)) continue
+      const received = Math.max(0, Number(entry.amountReceived || 0))
+      if (!showUnpaidMethods && received <= 0.009) continue
 
       const existing = result.find((item) => {
         if (item.mpPaymentId || entry.mpPaymentId) {
@@ -86,11 +105,11 @@ export function DepositReceiptsSection({
           existing.installmentNumber = entry.installmentNumber
         }
       } else {
-        result.push({ ...entry })
+        result.push({ ...entry, amountReceived: received })
       }
     }
     return result
-  }, [legs])
+  }, [legs, showUnpaidMethods])
 
   if (consolidatedLegs.length === 0) return null
 
@@ -123,11 +142,20 @@ export function DepositReceiptsSection({
           const totalInstCount = hasLedgerInstallments ? matchingInstallments.length : declaredInstallments
           const paidInstCount = matchingInstallments.filter((i) => i.status === "paid").length
           const hasInstallments = totalInstCount > 1 || hasLedgerInstallments
-          const canPayMoreWithThis = !hasInstallments && !isCreditCard && hasRemainingBalance && Boolean(onSelectLeg)
+          const isUnpaidLeg = received <= 0.009
+          const showInstallmentsAction = hasLedgerInstallments || (!isUnpaidLeg && hasInstallments)
+          const canPayMoreWithThis =
+            !showInstallmentsAction &&
+            (isUnpaidLeg || !isCreditCard) &&
+            hasRemainingBalance &&
+            Boolean(onSelectLeg)
 
           // Subtítulo do método (ex: "3x de R$ 300,00" ou "À vista (1x)")
+          const baseForInstallment = !isUnpaidLeg
+            ? received
+            : Number(entry.effectiveAmount ?? entry.amount ?? 0)
           const installmentSubtitle = totalInstCount > 1
-            ? `${totalInstCount}x de ${formatCurrency(received / totalInstCount)}`
+            ? `${totalInstCount}x de ${formatCurrency(baseForInstallment / totalInstCount)}`
             : isCreditCard
               ? "À vista (1x)"
               : null
@@ -178,7 +206,7 @@ export function DepositReceiptsSection({
                         Verificar
                       </Button>
                     )}
-                    {hasInstallments ? (
+                    {showInstallmentsAction ? (
                       <Button
                         variant="link"
                         size="sm"
@@ -207,7 +235,7 @@ export function DepositReceiptsSection({
                   </div>
                 }
                 onClick={
-                  hasInstallments
+                  showInstallmentsAction
                     ? () =>
                         setSelectedLegForInstallmentsModal({
                           leg: entry,
