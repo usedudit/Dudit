@@ -405,6 +405,93 @@ export class BlingClient {
   }
 
   /**
+   * Garante que um contato já existente no Bling tenha CPF/CNPJ e endereço preenchidos
+   * (evita pendências cadastrais para emissão de NF-e quando o contato foi criado incompleto).
+   */
+  private async ensureContactComplete(
+    contactId: number,
+    customer: {
+      nome: string
+      numeroDocumento?: string
+      tipo?: "F" | "J"
+      email?: string
+      telefone?: string
+      endereco?: {
+        endereco?: string
+        numero?: string
+        complemento?: string
+        bairro?: string
+        cep?: string
+        municipio?: string
+        uf?: string
+      }
+    }
+  ): Promise<void> {
+    const cleanDoc = customer.numeroDocumento?.replace(/\D/g, "") || ""
+    const hasNewAddress = Boolean(customer.endereco?.endereco)
+    if (!cleanDoc && !hasNewAddress) return
+
+    try {
+      const res = await this.request<{ data?: any }>(`/contatos/${contactId}`)
+      const existing = res?.data
+      if (!existing) return
+
+      const existingDoc = String(existing.numeroDocumento || "").replace(/\D/g, "")
+      const existingGeral = existing.endereco?.geral || {}
+      const missingDoc = Boolean(cleanDoc && !existingDoc)
+      const missingAddressFields = Boolean(
+        hasNewAddress &&
+          (!existingGeral.endereco ||
+            !existingGeral.numero ||
+            !existingGeral.bairro ||
+            !existingGeral.cep ||
+            !existingGeral.municipio ||
+            !existingGeral.uf)
+      )
+
+      if (!missingDoc && !missingAddressFields) return
+
+      const mergedGeral = {
+        endereco: existingGeral.endereco || customer.endereco?.endereco || "",
+        numero: existingGeral.numero || customer.endereco?.numero || "",
+        complemento: existingGeral.complemento || customer.endereco?.complemento || "",
+        bairro: existingGeral.bairro || customer.endereco?.bairro || "",
+        cep: existingGeral.cep || customer.endereco?.cep || "",
+        municipio: existingGeral.municipio || customer.endereco?.municipio || "",
+        uf: existingGeral.uf || customer.endereco?.uf || "",
+      }
+
+      const finalDoc = existingDoc || cleanDoc
+      const finalTipo =
+        existing.tipo ||
+        customer.tipo ||
+        (finalDoc.length === 14 ? "J" : "F")
+
+      await this.request(`/contatos/${contactId}`, {
+        method: "PUT",
+        body: {
+          nome: existing.nome || customer.nome || "Cliente Dudit",
+          tipo: finalTipo,
+          situacao: existing.situacao || "A",
+          ...(finalDoc ? { numeroDocumento: finalDoc } : {}),
+          ...(existing.email || customer.email ? { email: existing.email || customer.email } : {}),
+          ...(existing.telefone || customer.telefone ? { telefone: existing.telefone || customer.telefone } : {}),
+          ...(mergedGeral.endereco
+            ? {
+              endereco: {
+                ...(existing.endereco || {}),
+                geral: mergedGeral,
+              },
+            }
+            : {}),
+        },
+      })
+    } catch (err: any) {
+      console.warn(`[BLING] Aviso ao completar cadastro do contato ${contactId}:`, err?.message)
+    }
+  }
+
+  /**
    * Busca ou cria um contato (cliente) no Bling — obrigatório para POST /pedidos/vendas
    */
   async findOrCreateContact(customer: {
@@ -432,7 +519,10 @@ export class BlingClient {
         const matched = (search?.data || []).find(
           (c) => String(c.numeroDocumento || "").replace(/\D/g, "") === cleanDoc
         )
-        if (matched?.id) return matched.id
+        if (matched?.id) {
+          await this.ensureContactComplete(matched.id, customer)
+          return matched.id
+        }
       } catch { }
     }
 
@@ -446,7 +536,10 @@ export class BlingClient {
             (customer.email && c.email && c.email.toLowerCase() === customer.email.toLowerCase()) ||
             String(c.nome || "").trim().toLowerCase() === customer.nome.trim().toLowerCase()
         )
-        if (matched?.id) return matched.id
+        if (matched?.id) {
+          await this.ensureContactComplete(matched.id, customer)
+          return matched.id
+        }
       } catch { }
     }
 

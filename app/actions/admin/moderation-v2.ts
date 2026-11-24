@@ -985,7 +985,6 @@ export async function deleteModerationTarget(
                     deleted_at: new Date().toISOString(),
                     deleted_reason: notes?.trim() || "Removido pela moderação",
                     deleted_by: admin.userId,
-                    is_active: false,
                     status: "deleted",
                 }).eq("id", id)
                 break
@@ -996,7 +995,6 @@ export async function deleteModerationTarget(
                     deleted_at: new Date().toISOString(),
                     deleted_reason: notes?.trim() || "Removido pela moderação",
                     deleted_by: admin.userId,
-                    is_active: false,
                     status: "deleted",
                 }).eq("id", id)
                 break

@@ -358,7 +358,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
 
   await requirePermission(partnerId, "customers", "delete", user)
 
-  const payload = buildSoftDeletePayload(user.id)
+  const payload = { ...buildSoftDeletePayload(user.id), is_active: false }
   const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
 
   if (error) {
@@ -1090,7 +1090,7 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
   const partnerId = partnerIds[0]
   await requirePermission(partnerId, "customers", "delete", user)
 
-  const payload = buildSoftDeletePayload(user.id)
+  const payload = { ...buildSoftDeletePayload(user.id), is_active: false }
   const { error } = await supabase
     .from("customers")
     .update(payload)
@@ -1117,7 +1117,7 @@ export async function archiveCustomerAction(customerId: string) {
 
   await requirePermission(customer.partner_id, "customers", "edit", user)
 
-  const payload = buildArchivePayload("arquivado")
+  const payload = { ...buildArchivePayload("arquivado"), is_active: false }
   const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
   if (error) return { error: error.message }
 
@@ -1142,7 +1142,7 @@ export async function unarchiveCustomerAction(customerId: string) {
     return { error: limitCheck.message || "Limite de clientes do seu plano atingido. Faça upgrade para reativar este cliente." }
   }
 
-  const payload = buildRestorePayload("ativo")
+  const payload = { ...buildRestorePayload("ativo"), is_active: true }
   const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
   if (error) return { error: error.message }
 

@@ -152,7 +152,7 @@ export async function enforcePlanLimitsAndArchiveExcess(
       const excessIds = excessCustomers.map((c: any) => c.id)
 
       if (excessIds.length > 0) {
-        const payload = buildArchivePayload("arquivado")
+        const payload = { ...buildArchivePayload("arquivado"), is_active: false }
         const { error } = await admin
           .from("customers")
           .update(payload)

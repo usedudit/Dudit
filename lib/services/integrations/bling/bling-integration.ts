@@ -799,17 +799,21 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     })
 
     const customerName = buyerFiscal.name || order.customer_name || "Cliente Dudit"
-    const customerDocument = buyerFiscal.document?.replace(/\D/g, "") || undefined
-    const isPj = buyerFiscal.personType === "pj" || (customerDocument && customerDocument.length === 14)
+    let customerDocument = buyerFiscal.document?.replace(/\D/g, "") || undefined
 
     const targetCustomerId = buyerFiscal.customerId || order.customer_id
     let customerPhone: string | undefined
     let customerEmail: string | undefined
     let addressData: any = null
+    let linkedUserId: string | null = order.buyer_id || null
 
     if (targetCustomerId) {
       const [{ data: custRow }, { data: addrRow }] = await Promise.all([
-        supabase.from("customers").select("email, phone, phone_fixed").eq("id", targetCustomerId).maybeSingle(),
+        supabase
+          .from("customers")
+          .select("email, phone, phone_fixed, cpf, cnpj, user_id, marketplace_user_id")
+          .eq("id", targetCustomerId)
+          .maybeSingle(),
         supabase
           .from("addresses")
           .select("street, number, complement, neighborhood, city, state, zip_code")
@@ -821,7 +825,39 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       customerPhone = custRow?.phone || custRow?.phone_fixed || undefined
       customerEmail = custRow?.email || undefined
       addressData = addrRow || null
+      linkedUserId = custRow?.user_id || custRow?.marketplace_user_id || linkedUserId
+
+      if (!customerDocument) {
+        if (custRow?.cnpj) {
+          const cleanCnpj = String(custRow.cnpj).replace(/\D/g, "")
+          if (cleanCnpj) customerDocument = cleanCnpj
+        }
+        if (!customerDocument && custRow?.cpf) {
+          try {
+            const { decryptCpfIfEncrypted } = await import("@/lib/crypto")
+            const decrypted = await decryptCpfIfEncrypted(custRow.cpf)
+            const cleanCpf = String(decrypted || "").replace(/\D/g, "")
+            if (cleanCpf) customerDocument = cleanCpf
+          } catch { }
+        }
+      }
     }
+
+    // Fallback para compradores do Marketplace (endereço salvo por user_id)
+    if (!addressData && linkedUserId) {
+      const { data: userAddr } = await supabase
+        .from("addresses")
+        .select("street, number, complement, neighborhood, city, state, zip_code")
+        .eq("user_id", linkedUserId)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (userAddr) {
+        addressData = userAddr
+      }
+    }
+
+    const isPj = buyerFiscal.personType === "pj" || (customerDocument && customerDocument.length === 14)
 
     const rawDeliveryAddress = String(order.delivery_address || "").trim()
     const parsedDelivery = parseDeliveryAddressString(rawDeliveryAddress)
@@ -986,12 +1022,32 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
 
     const blingRes = await client.createOrder(payload)
 
-    // Se a venda já saiu entregue/enviada (ou PDV com baixa física imediata), sincroniza o saldo físico no Bling
+    // Atualiza a situação do pedido no Bling se já estiver pago, enviado ou entregue/retirado
+    // (o Bling cria sempre como "Em aberto" por padrão no POST /pedidos/vendas)
     const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
+    const orderSituation = String((order as any).situation || "").toLowerCase()
     const isDeliveredOrDeducted =
       deliveryStatus === "delivered" ||
       deliveryStatus === "sent" ||
       Boolean((order as any).inventory_deducted)
+
+    const initialBlingSit: "entregue" | "enviado" | "aprovado" | null =
+      deliveryStatus === "delivered"
+        ? "entregue"
+        : deliveryStatus === "sent" || Boolean((order as any).inventory_deducted)
+          ? "enviado"
+          : orderSituation === "paid"
+            ? "aprovado"
+            : null
+
+    if (initialBlingSit && blingRes.id) {
+      try {
+        const targetStatusId = await resolveBlingStatusId(client, initialBlingSit)
+        await client.updateOrderStatus(blingRes.id, targetStatusId)
+      } catch (statusErr: any) {
+        console.warn(`[BLING] Aviso ao atualizar situação inicial (${initialBlingSit}) do pedido ${blingRes.id}:`, statusErr?.message)
+      }
+    }
 
     if (isDeliveredOrDeducted && blingRes.id) {
       for (const it of (order.order_items || []) as any[]) {
@@ -1079,8 +1135,39 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
   }
 }
 
+async function resolveBlingStatusId(
+  client: BlingClient,
+  situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
+): Promise<number> {
+  const statuses = await client.listOrderStatuses()
+
+  const matchKeywords: Record<string, string[]> = {
+    cancelado: ["cancelado"],
+    aprovado: ["em andamento", "aprovado", "atendido"],
+    aberto: ["em aberto"],
+    enviado: ["atendido", "enviado"],
+    entregue: ["atendido", "entregue", "finalizado"],
+  }
+
+  const keywords = matchKeywords[situacao] || [situacao]
+  for (const kw of keywords) {
+    const matched = statuses.find((s) => String(s.nome || "").toLowerCase().includes(kw))
+    if (matched?.id) return matched.id
+  }
+
+  // IDs padrão do Bling v3 (6 = Em aberto, 9 = Atendido, 12 = Cancelado, 15 = Em andamento)
+  const fallbackIds: Record<string, number> = {
+    aberto: 6,
+    aprovado: 15,
+    enviado: 9,
+    entregue: 9,
+    cancelado: 12,
+  }
+  return fallbackIds[situacao] || 9
+}
+
 /**
- * Atualiza a situação de um pedido no Bling ERP (ex: cancelado)
+ * Atualiza a situação de um pedido no Bling ERP (ex: cancelado, atendido, em andamento)
  */
 export async function updateBlingOrderStatus(params: {
   orderId: string
@@ -1101,30 +1188,7 @@ export async function updateBlingOrderStatus(params: {
 
   try {
     const client = await getValidBlingClient(order.partner_id)
-    const statuses = await client.listOrderStatuses()
-
-    const matchKeywords: Record<string, string[]> = {
-      cancelado: ["cancelado"],
-      aprovado: ["atendido", "em andamento", "aprovado"],
-      aberto: ["em aberto"],
-      enviado: ["atendido", "enviado"],
-      entregue: ["atendido", "entregue"],
-    }
-
-    const keywords = matchKeywords[situacao] || [situacao]
-    const matched = statuses.find((s) =>
-      keywords.some((kw) => String(s.nome || "").toLowerCase().includes(kw))
-    )
-
-    // IDs padrão do Bling v3 (6 = Em aberto, 9 = Atendido, 12 = Cancelado)
-    const fallbackIds: Record<string, number> = {
-      aberto: 6,
-      aprovado: 9,
-      enviado: 9,
-      entregue: 9,
-      cancelado: 12,
-    }
-    const targetStatusId = matched?.id || fallbackIds[situacao] || 12
+    const targetStatusId = await resolveBlingStatusId(client, situacao)
 
     await client.updateOrderStatus(order.external_order_id, targetStatusId)
 

@@ -116,4 +116,60 @@ describe("BlingClient (API v3)", () => {
     expect(parsed.operacao).toBe("B")
     expect(parsed.quantidade).toBe(40)
   })
+
+  it("updates existing contact via PUT /contatos/{id} when CPF or address is missing", async () => {
+    const client = createBlingClient(fakeToken)
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      // 1. Search by numeroDocumento -> empty
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [] }),
+      } as any)
+      // 2. Search by nome -> finds existing incomplete contact
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ id: 777, nome: "João Silva" }] }),
+      } as any)
+      // 3. GET /contatos/777 -> missing numeroDocumento and endereco
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { id: 777, nome: "João Silva", tipo: "F", situacao: "A", numeroDocumento: "", endereco: { geral: {} } },
+        }),
+      } as any)
+      // 4. PUT /contatos/777 -> succeeds
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { id: 777 } }),
+      } as any)
+
+    const id = await client.findOrCreateContact({
+      nome: "João Silva",
+      numeroDocumento: "12345678901",
+      tipo: "F",
+      endereco: {
+        endereco: "Rua das Flores",
+        numero: "100",
+        bairro: "Centro",
+        cep: "01001000",
+        municipio: "São Paulo",
+        uf: "SP",
+      },
+    })
+
+    expect(id).toBe(777)
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    const [putUrl, putInit] = fetchSpy.mock.calls[3]
+    expect(String(putUrl)).toContain("/contatos/777")
+    expect(putInit?.method).toBe("PUT")
+    const putBody = JSON.parse(String(putInit?.body))
+    expect(putBody.numeroDocumento).toBe("12345678901")
+    expect(putBody.endereco.geral.endereco).toBe("Rua das Flores")
+    expect(putBody.endereco.geral.cep).toBe("01001000")
+    expect(putBody.endereco.geral.uf).toBe("SP")
+  })
 })

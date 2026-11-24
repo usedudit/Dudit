@@ -6844,11 +6844,20 @@ export async function updateOrdersStatusInBatchAction(payload: {
           });
         }
 
-        // Export order to Tiny ERP if configured (non-blocking)
+        // Export order to ERP (Tiny/Bling) if not yet exported, and update its status to approved/delivered
         try {
-          import("@/lib/services/integrations/erp-sync").then(({ exportOrderToConnectedErps }) => {
-            exportOrderToConnectedErps(order.id).catch((err) => {
+          import("@/lib/services/integrations/erp-sync").then(async ({ exportOrderToConnectedErps, updateOrderStatusOnConnectedErps }) => {
+            await exportOrderToConnectedErps(order.id).catch((err) => {
               console.error("[updateOrderStatusAction] ERP export failed:", err)
+            })
+            const nextSit =
+              order.delivery_status === "delivered"
+                ? "entregue"
+                : order.delivery_status === "sent"
+                  ? "enviado"
+                  : "aprovado"
+            await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: nextSit }).catch((err) => {
+              console.error("[updateOrderStatusAction] ERP status update failed:", err)
             })
           }).catch((erpErr) => {
             console.error("[updateOrderStatusAction] Error loading ERP sync:", erpErr)
@@ -7082,6 +7091,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
         successfullyUpdatedOrderIds.add(String(order.id)),
       );
       deliveryProcessedCount += simpleDeliveryOrders.length;
+
+      if (payload.statusValue === "delivered" || payload.statusValue === "sent") {
+        const erpSit = payload.statusValue === "delivered" ? "entregue" : "enviado";
+        import("@/lib/services/integrations/erp-sync")
+          .then(async ({ updateOrderStatusOnConnectedErps }) => {
+            for (const order of simpleDeliveryOrders) {
+              await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit });
+            }
+          })
+          .catch(() => {});
+      }
     }
 
     if (deliveryProcessedCount === 0) {

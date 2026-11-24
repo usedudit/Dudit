@@ -3125,10 +3125,20 @@ export function ProductDetailsPageClient({
                                             href={whatsappUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex-grow h-12 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-full transition-colors text-sm"
                                         >
-                                            <WhatsappIcon size={20} className="fill-white" />
-                                            Consultar preço
+                                            <Button
+                                                onClick={() =>
+                                                    trackEvent("whatsapp_lead_clicked", {
+                                                        product_id: product.id,
+                                                        partner_id: partner.id,
+                                                        store_id: product.store_id,
+                                                    })
+                                                }
+                                                className="w-full h-[46px]"
+                                                leftIcon={<WhatsappIcon />}
+                                            >
+                                                Consultar preço
+                                            </Button>
                                         </a>
                                     )
                                 })()

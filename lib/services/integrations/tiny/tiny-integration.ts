@@ -875,13 +875,13 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     })
 
     const customerName = buyerFiscal.name || order.customer_name || "Cliente Dudit"
-    const customerDocument = buyerFiscal.document?.replace(/\D/g, "") || undefined
-    const isPj = buyerFiscal.personType === "pj" || (customerDocument && customerDocument.length === 14)
+    let customerDocument = buyerFiscal.document?.replace(/\D/g, "") || undefined
 
     // Resolve dados de contato e endereço estruturado do cliente
     const targetCustomerId = buyerFiscal.customerId || order.customer_id
     let customerPhone: string | undefined
     let customerEmail: string | undefined
+    let linkedUserId: string | null = order.buyer_id || null
     let addressData: {
       street?: string | null
       number?: string | null
@@ -896,7 +896,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       const [{ data: custRow }, { data: addrRow }] = await Promise.all([
         supabase
           .from("customers")
-          .select("email, phone, phone_fixed")
+          .select("email, phone, phone_fixed, cpf, cnpj, user_id, marketplace_user_id")
           .eq("id", targetCustomerId)
           .maybeSingle(),
         supabase
@@ -910,10 +910,41 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 
       customerPhone = custRow?.phone || custRow?.phone_fixed || undefined
       customerEmail = custRow?.email || undefined
+      linkedUserId = custRow?.user_id || custRow?.marketplace_user_id || linkedUserId
       if (addrRow) {
         addressData = addrRow
       }
+
+      if (!customerDocument) {
+        if (custRow?.cnpj) {
+          const cleanCnpj = String(custRow.cnpj).replace(/\D/g, "")
+          if (cleanCnpj) customerDocument = cleanCnpj
+        }
+        if (!customerDocument && custRow?.cpf) {
+          try {
+            const { decryptCpfIfEncrypted } = await import("@/lib/crypto")
+            const decrypted = await decryptCpfIfEncrypted(custRow.cpf)
+            const cleanCpf = String(decrypted || "").replace(/\D/g, "")
+            if (cleanCpf) customerDocument = cleanCpf
+          } catch { }
+        }
+      }
     }
+
+    if (!addressData && linkedUserId) {
+      const { data: userAddr } = await supabase
+        .from("addresses")
+        .select("street, number, complement, neighborhood, city, state, zip_code")
+        .eq("user_id", linkedUserId)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (userAddr) {
+        addressData = userAddr
+      }
+    }
+
+    const isPj = buyerFiscal.personType === "pj" || (customerDocument && customerDocument.length === 14)
 
     const rawDeliveryAddress = String(order.delivery_address || "").trim()
     const parsedDelivery = parseDeliveryAddressString(rawDeliveryAddress)

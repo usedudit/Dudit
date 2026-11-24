@@ -8,7 +8,6 @@ export interface SoftDeletePayload {
   deleted_by: string
   deleted_reason: string | null
   status: string
-  is_active: boolean
 }
 
 export interface CatalogSoftDeletePayload extends SoftDeletePayload {
@@ -20,7 +19,6 @@ export interface RestorePayload {
   deleted_by: null
   deleted_reason: null
   status: string
-  is_active: boolean
 }
 
 export interface ArchivePayload {
@@ -28,7 +26,6 @@ export interface ArchivePayload {
   deleted_by: null
   deleted_reason: null
   status: string
-  is_active: boolean
 }
 
 /**
@@ -56,6 +53,9 @@ export function scopeWithArchived<T>(query: T): T {
 
 /**
  * Helper to build a standardized soft delete payload.
+ * Note: Intentionally omits `is_active` because `products.is_active` and `services.is_active`
+ * are PostgreSQL `GENERATED ALWAYS AS (status = 'ativo') STORED` columns (updating them raises 428C9).
+ * Tables with a regular boolean `is_active` column (e.g. `customers`) should spread and set it explicitly.
  */
 export function buildSoftDeletePayload(userId: string, reason?: string | null): SoftDeletePayload {
   return {
@@ -63,7 +63,6 @@ export function buildSoftDeletePayload(userId: string, reason?: string | null): 
     deleted_by: userId,
     deleted_reason: reason || null,
     status: "deleted",
-    is_active: false,
   }
 }
 
@@ -80,6 +79,7 @@ export function buildCatalogSoftDeletePayload(userId: string, reason?: string | 
 
 /**
  * Helper to build a standardized restore payload.
+ * Intentionally omits `is_active` (generated column on `products` and `services`).
  */
 export function buildRestorePayload(status: "ativo" | "active" = "ativo"): RestorePayload {
   return {
@@ -87,12 +87,12 @@ export function buildRestorePayload(status: "ativo" | "active" = "ativo"): Resto
     deleted_by: null,
     deleted_reason: null,
     status,
-    is_active: true,
   }
 }
 
 /**
  * Helper to build a standardized archive payload (plan limits or manual archive).
+ * Intentionally omits `is_active` (generated column on `products` and `services`).
  */
 export function buildArchivePayload(status: "arquivado" | "archived" = "arquivado"): ArchivePayload {
   return {
@@ -100,6 +100,5 @@ export function buildArchivePayload(status: "arquivado" | "archived" = "arquivad
     deleted_by: null,
     deleted_reason: null,
     status,
-    is_active: false,
   }
 }

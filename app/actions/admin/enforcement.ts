@@ -2066,7 +2066,6 @@ export async function softDeleteProduct(
             deleted_at: new Date().toISOString(),
             deleted_reason: reason.trim(),
             deleted_by: admin.userId,
-            is_active: false,
             status: "deleted",
         } as any)
         .eq("id", productId)
@@ -2124,7 +2123,6 @@ export async function softDeleteService(
             deleted_at: new Date().toISOString(),
             deleted_reason: reason.trim(),
             deleted_by: admin.userId,
-            is_active: false,
             status: "deleted",
         } as any)
         .eq("id", serviceId)
