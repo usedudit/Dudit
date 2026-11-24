@@ -62,6 +62,11 @@ export type AuditAction =
     | "account.deletion_code_failed"
     | "account.deletion_confirmed"
     | "account.deletion_requested"
+    // Store/branch deletion lifecycle
+    | "store.deletion_code_requested"
+    | "store.deletion_code_failed"
+    | "store.deletion_confirmed"
+    | "store.deleted"
 
 interface AuditLogEntry {
     /** The action being logged */
@@ -115,6 +120,10 @@ const ACTION_MESSAGES: Record<string, string> = {
     "account.deletion_code_failed": "falha na validação do código de exclusão de conta.",
     "account.deletion_confirmed": "confirmou a exclusão definitiva da conta.",
     "account.deletion_requested": "iniciou o processo de exclusão de conta.",
+    "store.deletion_code_requested": "solicitou código de confirmação para exclusão de filial.",
+    "store.deletion_code_failed": "falha na validação do código de exclusão de filial.",
+    "store.deletion_confirmed": "confirmou a exclusão definitiva de uma filial.",
+    "store.deleted": "excluiu uma filial e todos os seus dados.",
 }
 
 // ─── Main Logger ────────────────────────────────────────────────────────────

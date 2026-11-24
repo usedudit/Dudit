@@ -43,7 +43,7 @@ export function NotificationBell({
         className={cn(
           "rounded-full w-9 h-9 p-0 flex items-center justify-center relative",
           variant === "marketplace" &&
-          "border-white/30 bg-white/10 hover:bg-white/20 text-white border",
+          "border border-white/10 hover:bg-white/5 hover:border-white/30 text-gray-400 dark:text-dark-body group-hover:text-white transition-all group",
           buttonClassName,
         )}
         aria-label="Notificações"

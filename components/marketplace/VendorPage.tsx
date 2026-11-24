@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, RepeatIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, FilterIcon, MotorbikeIcon, EnergyIcon, ShieldIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, RepeatIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, FilterIcon, MotorbikeIcon, EnergyIcon, ShieldIcon, SearchIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -22,10 +22,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, FormSection, InfoCard, RadioButton, Spinner } from "@/components/reusable"
+import { Button, DefaultModal, Input, FormSection, InfoCard, RadioButton, Spinner, CepInput } from "@/components/reusable"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
-import { DUDIT_ACTIVE_ADDRESS_STORAGE_KEY, useAddressSync } from "@/lib/utils/address-sync"
+import { DUDIT_ACTIVE_ADDRESS_STORAGE_KEY, notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
@@ -223,8 +223,10 @@ const openStatusToneClass = (status?: string) =>
         : status === "closing_soon" ? "text-brand-orange"
             : "text-brand-red"
 
-const StoreStatusLine = ({ openStatus, delivery }: { openStatus: { label: string; status: string } | null; delivery: ReactNode | null }) => (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] lg:text-[14px] leading-snug">
+const MAX_LOCAL_DELIVERY_FALLBACK_KM = 50
+
+const StoreStatusLine = ({ openStatus, delivery, className = "" }: { openStatus: { label: string; status: string } | null; delivery: ReactNode | null; className?: string }) => (
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] lg:text-[14px] leading-snug ${className}`}>
         {openStatus && (
             <span className={`font-medium ${openStatusToneClass(openStatus.status)}`}>
                 {openStatus.label}
@@ -905,11 +907,11 @@ function VendorListItem({ item, partner }: { item: any; partner: any }) {
     )
 }
 
-function DeliveryCalculatorBottomSheet({
+function DeliveryCalculatorModal({
     isOpen,
     onClose,
     partner,
-    userProfile,
+    userId,
     currentAddressLabel,
     initialCoords,
     initialDeliveryInfo,
@@ -918,7 +920,7 @@ function DeliveryCalculatorBottomSheet({
     isOpen: boolean
     onClose: () => void
     partner: any
-    userProfile: any
+    userId?: string | null
     currentAddressLabel: string | null
     initialCoords?: { lat: number; lng: number } | null
     initialDeliveryInfo?: {
@@ -928,10 +930,18 @@ function DeliveryCalculatorBottomSheet({
         isFreeDelivery: boolean
         outOfRadius: boolean
     } | null
-    onApplyLocation: (data: { lat: number; lng: number; label: string; cep?: string | null }) => void
+    onApplyLocation: (data: {
+        lat: number | null
+        lng: number | null
+        label: string
+        cep?: string | null
+        addressId?: string | null
+        addressData?: any
+    }) => void
 }) {
     const [calcCep, setCalcCep] = useState("")
     const [calcLoading, setCalcLoading] = useState(false)
+    const [gpsLoading, setGpsLoading] = useState(false)
     const [calcError, setCalcError] = useState<string | null>(null)
     const [calcResult, setCalcResult] = useState<{
         distanceKm: number | null
@@ -943,36 +953,45 @@ function DeliveryCalculatorBottomSheet({
         lat: number | null
         lng: number | null
         cep?: string | null
+        addressId?: string | null
+        addressData?: any
     } | null>(null)
 
     const [savedAddresses, setSavedAddresses] = useState<any[]>([])
     const [loadingSavedAddresses, setLoadingSavedAddresses] = useState(false)
+    const wasOpenRef = useRef(false)
 
-    // Preenche o resultado inicial se já houver endereço ativo ou cálculo
+    // Preenche o resultado inicial apenas na abertura do modal (evita sobrescrever resultado/erro durante re-renders)
     useEffect(() => {
-        if (!isOpen) return
+        if (!isOpen) {
+            wasOpenRef.current = false
+            return
+        }
+        if (wasOpenRef.current) return
+        wasOpenRef.current = true
         setCalcError(null)
 
         if (currentAddressLabel && (initialCoords || initialDeliveryInfo)) {
             setCalcResult({
                 distanceKm: initialDeliveryInfo?.distanceKm ?? null,
-                deliveryTime: initialDeliveryInfo?.deliveryTime ?? null,
-                feeLabel: initialDeliveryInfo?.feeLabel ?? (initialDeliveryInfo?.outOfRadius ? "A combinar" : "A consultar"),
-                isFree: Boolean(initialDeliveryInfo?.isFreeDelivery),
+                deliveryTime: initialDeliveryInfo?.outOfRadius ? null : (initialDeliveryInfo?.deliveryTime ?? null),
+                feeLabel: initialDeliveryInfo?.outOfRadius
+                    ? "A combinar"
+                    : (initialDeliveryInfo?.feeLabel ?? "A combinar"),
+                isFree: Boolean(!initialDeliveryInfo?.outOfRadius && initialDeliveryInfo?.isFreeDelivery),
                 outOfRadius: Boolean(initialDeliveryInfo?.outOfRadius),
                 addressLabel: currentAddressLabel,
                 lat: initialCoords?.lat ?? null,
                 lng: initialCoords?.lng ?? null,
             })
+        } else {
+            setCalcResult(null)
         }
     }, [isOpen, currentAddressLabel, initialCoords, initialDeliveryInfo])
 
     // Carrega endereços salvos do usuário se estiver logado
     useEffect(() => {
         if (!isOpen) return
-        setCalcError(null)
-
-        const userId = userProfile?.userId || userProfile?.user_id
         if (userId) {
             setLoadingSavedAddresses(true)
             getAddressesAction(userId, "user")
@@ -986,7 +1005,7 @@ function DeliveryCalculatorBottomSheet({
                     setLoadingSavedAddresses(false)
                 })
         }
-    }, [isOpen, userProfile?.userId, userProfile?.user_id])
+    }, [isOpen, userId])
 
     const formatCepMask = (val: string) => {
         const clean = val.replace(/\D/g, "").slice(0, 8)
@@ -996,10 +1015,34 @@ function DeliveryCalculatorBottomSheet({
         return clean
     }
 
+    const reverseGeocodeLabel = async (lat: number, lng: number): Promise<string> => {
+        try {
+            const controller = new AbortController()
+            const timer = setTimeout(() => controller.abort(), 4000)
+            const res = await fetch(
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=pt`,
+                { signal: controller.signal }
+            )
+            clearTimeout(timer)
+            if (res.ok) {
+                const data = await res.json()
+                const city = data?.city || data?.locality
+                const uf = data?.principalSubdivisionCode?.replace(/^BR-/i, "") || ""
+                if (city && uf) return `Minha localização (${city}/${uf})`
+                if (city) return `Minha localização (${city})`
+            }
+        } catch {
+            // Fallback silencioso
+        }
+        return "Minha localização atual"
+    }
+
     const processCoordsCalculation = async (
         destCoords: { lat: number; lng: number } | null,
         label: string,
-        cep?: string
+        cep?: string,
+        addressId?: string | null,
+        addressData?: any
     ) => {
         const storeLat = partner?.lat ?? partner?.latitude ?? null
         const storeLng = partner?.lng ?? partner?.longitude ?? null
@@ -1016,6 +1059,9 @@ function DeliveryCalculatorBottomSheet({
         let feeLabel: string | null = null
         let outOfRadius = false
         const maxDeliveryKm = getEffectiveMaxDeliveryKm(settings)
+        const effectiveRadiusLimit = (maxDeliveryKm != null && maxDeliveryKm > 0)
+            ? maxDeliveryKm
+            : MAX_LOCAL_DELIVERY_FALLBACK_KM
 
         // Se a loja não tem coordenadas salvas no parceiro, chamamos quoteDeliveryFeeAction que resolve no banco
         if (distanceKm == null && (partner.partner_id || partner.partnerId)) {
@@ -1030,7 +1076,10 @@ function DeliveryCalculatorBottomSheet({
                     distanceKm = quoteRes.distanceKm != null ? Number(quoteRes.distanceKm.toFixed(1)) : null
                     fee = Number(quoteRes.fee || 0)
                     feeLabel = fee === 0 ? "Grátis" : formatCurrency(fee)
-                    if (quoteRes.maxDeliveryKm != null && distanceKm != null && distanceKm > quoteRes.maxDeliveryKm) {
+                    const serverMaxKm = (quoteRes.maxDeliveryKm != null && quoteRes.maxDeliveryKm > 0)
+                        ? quoteRes.maxDeliveryKm
+                        : effectiveRadiusLimit
+                    if (distanceKm != null && distanceKm > serverMaxKm) {
                         outOfRadius = true
                     }
                 } else if (quoteRes && (quoteRes as any).isOutsideRadius) {
@@ -1041,10 +1090,10 @@ function DeliveryCalculatorBottomSheet({
         }
 
         if (distanceKm != null) {
-            if (maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm) {
+            if (distanceKm > effectiveRadiusLimit) {
                 outOfRadius = true
             }
-            if (!feeLabel) {
+            if (!outOfRadius && !feeLabel) {
                 feeLabel = estimateDeliveryFeeLabel({
                     distanceKm,
                     baseFee: settings?.base_fee ?? settings?.baseFee,
@@ -1058,25 +1107,31 @@ function DeliveryCalculatorBottomSheet({
         }
 
         let deliveryTime: string | null = null
-        if (distanceKm != null && !outOfRadius) {
-            const rawRange = estimateDeliveryTimeRange(distanceKm)
-            deliveryTime = rawRange ? rawRange.replace("-", " a ") : estimateAverageDeliveryTime(distanceKm)
-        } else if (!outOfRadius && partner?.delivery_time_formatted) {
-            deliveryTime = formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted)?.replace("-", " a ") || null
+        if (!outOfRadius && isDeliveryEnabled) {
+            if (distanceKm != null) {
+                const rawRange = estimateDeliveryTimeRange(Math.max(0.1, distanceKm))
+                deliveryTime = rawRange ? rawRange.replace("-", " a ") : estimateAverageDeliveryTime(Math.max(0.1, distanceKm))
+            } else if (partner?.delivery_time_formatted) {
+                deliveryTime = formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted)?.replace("-", " a ") || null
+            }
         }
 
-        const isFree = feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller")
+        const isFree = !outOfRadius && (feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller"))
 
         setCalcResult({
             distanceKm,
-            deliveryTime: deliveryTime || "",
-            feeLabel: feeLabel || (isDeliveryEnabled ? "A consultar" : "Apenas retirada"),
+            deliveryTime: outOfRadius ? null : (deliveryTime || null),
+            feeLabel: outOfRadius
+                ? "A combinar"
+                : (feeLabel || (isDeliveryEnabled ? "A combinar" : "Apenas retirada")),
             isFree,
             outOfRadius,
             addressLabel: label,
             lat: destCoords?.lat ?? null,
             lng: destCoords?.lng ?? null,
             cep: cep || null,
+            addressId: addressId || null,
+            addressData: addressData || null,
         })
     }
 
@@ -1112,28 +1167,43 @@ function DeliveryCalculatorBottomSheet({
 
     const handleUseGps = () => {
         if (typeof window === "undefined" || !navigator.geolocation) {
-            setCalcError("Geolocalização não suportada no seu navegador.")
+            setCalcError("Geolocalização não suportada no seu navegador. Digite seu CEP acima.")
             return
         }
         setCalcLoading(true)
+        setGpsLoading(true)
         setCalcError(null)
         setCalcResult(null)
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                try {
-                    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-                    await processCoordsCalculation(coords, "Minha localização atual")
-                } catch {
-                    setCalcError("Erro ao calcular entrega para sua localização.")
-                } finally {
-                    setCalcLoading(false)
-                }
-            },
-            () => {
+
+        const onSuccess = async (pos: GeolocationPosition) => {
+            try {
+                const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                const label = await reverseGeocodeLabel(coords.lat, coords.lng)
+                await processCoordsCalculation(coords, label)
+            } catch {
+                setCalcError("Erro ao calcular entrega para sua localização.")
+            } finally {
                 setCalcLoading(false)
-                setCalcError("Não foi possível obter sua localização. Permita o acesso ao GPS ou digite o CEP.")
-            },
-            { timeout: 10000, enableHighAccuracy: true }
+                setGpsLoading(false)
+            }
+        }
+
+        const onError = (err: GeolocationPositionError) => {
+            setCalcLoading(false)
+            setGpsLoading(false)
+            if (err.code === err.PERMISSION_DENIED) {
+                setCalcError("Permissão de localização negada. Ative nas configurações do navegador ou digite seu CEP.")
+            } else if (err.code === err.TIMEOUT) {
+                setCalcError("Tempo esgotado ao obter sua localização. Tente novamente ou digite seu CEP.")
+            } else {
+                setCalcError("Não foi possível obter sua localização. Verifique o serviço de localização ou digite seu CEP.")
+            }
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            onSuccess,
+            onError,
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
         )
     }
 
@@ -1144,7 +1214,7 @@ function DeliveryCalculatorBottomSheet({
         try {
             const label = [addr.street ? `${addr.street}${addr.number ? `, ${addr.number}` : ""}` : "", addr.neighborhood, `${addr.city}/${addr.state}`].filter(Boolean).join(" - ")
             let coords: { lat: number; lng: number } | null = null
-            if (addr.latitude && addr.longitude) {
+            if (addr.latitude != null && addr.longitude != null && !isNaN(Number(addr.latitude)) && !isNaN(Number(addr.longitude)) && (Number(addr.latitude) !== 0 || Number(addr.longitude) !== 0)) {
                 coords = { lat: Number(addr.latitude), lng: Number(addr.longitude) }
             } else if (addr.zip_code) {
                 const res = await fetch(`/api/cep?cep=${addr.zip_code.replace(/\D/g, "")}`)
@@ -1155,7 +1225,7 @@ function DeliveryCalculatorBottomSheet({
                     }
                 }
             }
-            await processCoordsCalculation(coords, label || "Endereço cadastrado", addr.zip_code)
+            await processCoordsCalculation(coords, label || "Endereço cadastrado", addr.zip_code, addr.id, addr)
         } catch {
             setCalcError("Erro ao calcular para este endereço.")
         } finally {
@@ -1166,30 +1236,32 @@ function DeliveryCalculatorBottomSheet({
     const handleConfirm = () => {
         if (!calcResult) return
         onApplyLocation({
-            lat: calcResult.lat || 0,
-            lng: calcResult.lng || 0,
+            lat: calcResult.lat,
+            lng: calcResult.lng,
             label: calcResult.addressLabel,
             cep: calcResult.cep || null,
+            addressId: calcResult.addressId || null,
+            addressData: calcResult.addressData || null,
         })
         onClose()
     }
 
     return (
-        <BottomSheet isOpen={isOpen} onClose={onClose}>
-            <div className="flex flex-col p-1 pb-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-brand-border/60 dark:border-dark-border/60 pb-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
-                            <MotorbikeIcon size={16} />
-                        </div>
-                        <div>
-                            <h3 className="text-[16px] font-semibold text-brand-dark dark:text-dark-heading leading-tight">
-                                Calcular Entrega
-                            </h3>
-                            <p className="text-[12px] text-brand-inactive-text dark:text-dark-body">
-                                {partner?.storeName || "Loja"}
+        <DefaultModal isOpen={isOpen} onClose={onClose} title="Calcular Entrega" maxWidth="md">
+            <div className="flex flex-col pb-2 space-y-4">
+                <div className="flex items-center gap-2.5 pb-3 border-b border-brand-border/60 dark:border-dark-border/60">
+                    <div className="w-8 h-8 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
+                        <MotorbikeIcon size={16} />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading truncate">
+                            {partner?.storeName || "Loja"}
+                        </p>
+                        {partner?.city && (
+                            <p className="text-[12px] text-brand-inactive-text dark:text-dark-body truncate">
+                                {partner.city}{partner.state ? `, ${partner.state}` : ""}
                             </p>
-                        </div>
+                        )}
                     </div>
                 </div>
 
@@ -1200,18 +1272,17 @@ function DeliveryCalculatorBottomSheet({
                     </label>
                     <div className="flex gap-2">
                         <div className="flex-1">
-                            <Input
-                                placeholder="00000-000"
+                            <CepInput
+                                label=""
                                 value={calcCep}
-                                onChange={(e) => {
-                                    const masked = formatCepMask(e.target.value)
+                                onChange={(val) => {
+                                    const masked = formatCepMask(val)
                                     setCalcCep(masked)
                                     if (masked.replace(/\D/g, "").length === 8) {
                                         void handleCalculateByCep(masked)
                                     }
                                 }}
                                 disabled={calcLoading}
-                                prefix={<MapPinIcon size={16} className="text-brand-inactive-text" />}
                             />
                         </div>
                         <Button
@@ -1219,7 +1290,7 @@ function DeliveryCalculatorBottomSheet({
                             disabled={calcLoading || calcCep.replace(/\D/g, "").length !== 8}
                             className="w-[42px] h-[42px]"
                         >
-                            {calcLoading ? <Spinner /> : "Calcular"}
+                            {calcLoading && !gpsLoading ? <Spinner /> : <SearchIcon />}
                         </Button>
                     </div>
                 </div>
@@ -1230,9 +1301,17 @@ function DeliveryCalculatorBottomSheet({
                         type="button"
                         onClick={handleUseGps}
                         disabled={calcLoading}
-                        className="flex items-center gap-1.5 text-[12px] font-semibold text-brand-green hover:underline active:opacity-75 transition-opacity"
+                        className="flex items-center gap-1.5 text-[12px] font-semibold text-brand-green hover:underline active:opacity-75 disabled:opacity-60 transition-opacity"
                     >
-                        <MapPinIcon size={14} /> Usar minha localização atual (GPS)
+                        {gpsLoading ? (
+                            <>
+                                <Spinner size={14} /> Obtendo localização...
+                            </>
+                        ) : (
+                            <>
+                                <MapPinIcon size={14} /> Usar minha localização atual
+                            </>
+                        )}
                     </button>
                     <a
                         href="https://buscacepinter.correios.com.br/app/endereco/index.php"
@@ -1251,6 +1330,11 @@ function DeliveryCalculatorBottomSheet({
                 )}
 
                 {/* Endereços Salvos */}
+                {loadingSavedAddresses && savedAddresses.length === 0 && (
+                    <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40 flex items-center gap-2 text-[12px] text-brand-inactive-text dark:text-dark-body">
+                        <Spinner size={14} /> Carregando seus endereços...
+                    </div>
+                )}
                 {savedAddresses.length > 0 && (
                     <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40">
                         <p className="text-[11px] font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-2">
@@ -1287,18 +1371,18 @@ function DeliveryCalculatorBottomSheet({
                     <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-dark-surface/80 border border-brand-border/80 dark:border-dark-border space-y-3">
                         <div className="flex items-center justify-between pb-2 border-b border-brand-border/60 dark:border-dark-border/60">
                             <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">Destino:</span>
-                            <span className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading text-right truncate max-w-[200px]">
+                            <span className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading text-right truncate max-w-[220px]">
                                 {calcResult.addressLabel}
                             </span>
                         </div>
 
                         {calcResult.outOfRadius && (
                             <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300">
-                                Endereço fora do raio de entrega configurado pela loja (~{calcResult.distanceKm} km).
+                                Este vendedor não realiza entrega local para o endereço selecionado. Combine a entrega diretamente com a loja.
                             </div>
                         )}
 
-                        {/* Cards de Entrega e Tempo Estimado exatamente iguais ao card da página */}
+                        {/* Cards de Entrega e Tempo Estimado */}
                         <div className="border border-brand-border dark:border-dark-border rounded-lg p-3">
                             <div className="grid grid-cols-2 divide-x divide-brand-border dark:divide-dark-border">
                                 {/* Entrega */}
@@ -1321,7 +1405,7 @@ function DeliveryCalculatorBottomSheet({
                                                 : "text-brand-dark dark:text-dark-heading"
                                             }`}>
                                             {!calcResult.outOfRadius && calcResult.distanceKm != null
-                                                ? (calcResult.feeLabel || "A consultar")
+                                                ? (calcResult.feeLabel || "A combinar")
                                                 : "A combinar"}
                                         </span>
                                     </div>
@@ -1342,7 +1426,7 @@ function DeliveryCalculatorBottomSheet({
                                             </>
                                         ) : (
                                             <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
-                                                A Consultar
+                                                A combinar
                                             </span>
                                         )}
                                     </div>
@@ -1357,12 +1441,12 @@ function DeliveryCalculatorBottomSheet({
                             onClick={handleConfirm}
                             className="w-full mt-2 font-semibold"
                         >
-                            Usar meu endereço
+                            Usar este endereço
                         </Button>
                     </div>
                 )}
             </div>
-        </BottomSheet>
+        </DefaultModal>
     )
 }
 
@@ -1378,8 +1462,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     // Delivery calculation states
     const [isDeliveryCalculatorOpen, setIsDeliveryCalculatorOpen] = useState(false)
-    const [customCoords, setCustomCoords] = useState<{ lat: number; lng: number } | null>(null)
-    const [customAddressLabel, setCustomAddressLabel] = useState<string | null>(null)
+    const [sessionOverrideCoords, setSessionOverrideCoords] = useState<{ lat: number; lng: number } | null>(null)
+    const [sessionOverrideLabel, setSessionOverrideLabel] = useState<string | null>(null)
+    const [guestSavedCoords, setGuestSavedCoords] = useState<{ lat: number; lng: number } | null>(null)
+    const [guestSavedLabel, setGuestSavedLabel] = useState<string | null>(null)
     const [userAddressCoords, setUserAddressCoords] = useState<{ lat: number; lng: number } | null>(null)
     const [userAddressLabel, setUserAddressLabel] = useState<string | null>(null)
     const [serverDelivery, setServerDelivery] = useState<{
@@ -1389,15 +1475,24 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         outOfRadius: boolean
     } | null>(null)
 
-    // Recupera cálculo persistido anteriormente em localStorage
+    const currentUserId = user?.id || userProfile?.userId || userProfile?.user_id || null
+
+    // Recupera cálculo persistido anteriormente em localStorage apenas como fallback para visitantes (sem sobrescrever o endereço ativo/padrão do usuário logado)
     useEffect(() => {
         try {
             const saved = localStorage.getItem("dudit_vendor_delivery_calc")
             if (saved) {
                 const parsed = JSON.parse(saved)
-                if (parsed && typeof parsed.lat === "number" && typeof parsed.lng === "number") {
-                    setCustomCoords({ lat: parsed.lat, lng: parsed.lng })
-                    if (parsed.label) setCustomAddressLabel(parsed.label)
+                if (
+                    parsed &&
+                    typeof parsed.lat === "number" &&
+                    typeof parsed.lng === "number" &&
+                    Number.isFinite(parsed.lat) &&
+                    Number.isFinite(parsed.lng) &&
+                    (parsed.lat !== 0 || parsed.lng !== 0)
+                ) {
+                    setGuestSavedCoords({ lat: parsed.lat, lng: parsed.lng })
+                    if (parsed.label) setGuestSavedLabel(parsed.label)
                 }
             }
         } catch { }
@@ -1405,11 +1500,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     // Busca endereço ativo/padrão do usuário e resolve coordenadas automaticamente ao entrar na página
     const loadUserActiveAddress = useCallback(async () => {
-        const userId = user?.id || userProfile?.userId || userProfile?.user_id
-        if (!userId) return
+        if (!currentUserId) return
 
         try {
-            const res = await getAddressesAction(userId, "user")
+            const res = await getAddressesAction(currentUserId, "user")
             if (!res?.addresses || res.addresses.length === 0) return
 
             const list = res.addresses as any[]
@@ -1430,7 +1524,13 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             ].filter(Boolean)
             const label = labelParts.length > 0 ? labelParts.join(" - ") : (activeAddr.label || "Endereço cadastrado")
 
-            if (activeAddr.latitude && activeAddr.longitude && !isNaN(Number(activeAddr.latitude)) && !isNaN(Number(activeAddr.longitude))) {
+            if (
+                activeAddr.latitude != null &&
+                activeAddr.longitude != null &&
+                !isNaN(Number(activeAddr.latitude)) &&
+                !isNaN(Number(activeAddr.longitude)) &&
+                (Number(activeAddr.latitude) !== 0 || Number(activeAddr.longitude) !== 0)
+            ) {
                 setUserAddressCoords({ lat: Number(activeAddr.latitude), lng: Number(activeAddr.longitude) })
                 setUserAddressLabel(label)
             } else if (activeAddr.zip_code) {
@@ -1449,7 +1549,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 }
             }
         } catch { }
-    }, [user?.id, userProfile?.userId, userProfile?.user_id])
+    }, [currentUserId])
 
     useEffect(() => {
         void loadUserActiveAddress()
@@ -1457,23 +1557,30 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     // Sincroniza se o endereço mudar em outra parte da aplicação (header, modal, etc.)
     useAddressSync(useCallback(() => {
+        setSessionOverrideCoords(null)
+        setSessionOverrideLabel(null)
         void loadUserActiveAddress()
     }, [loadUserActiveAddress]))
 
     const userCoords = useMemo(() => {
         if (userAddressCoords) return userAddressCoords
-        return userProfile?.latitude && userProfile?.longitude
-            ? { lat: Number(userProfile.latitude), lng: Number(userProfile.longitude) }
-            : null
+        const lat = Number(userProfile?.latitude)
+        const lng = Number(userProfile?.longitude)
+        if (userProfile?.latitude != null && userProfile?.longitude != null && Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+            return { lat, lng }
+        }
+        return null
     }, [userAddressCoords, userProfile?.latitude, userProfile?.longitude])
 
     const effectiveCoords = useMemo(() => {
-        return customCoords || userCoords
-    }, [customCoords, userCoords])
+        return sessionOverrideCoords || userCoords || guestSavedCoords
+    }, [sessionOverrideCoords, userCoords, guestSavedCoords])
 
     const effectiveAddressLabel = useMemo(() => {
-        return customAddressLabel || userAddressLabel || userProfile?.address || null
-    }, [customAddressLabel, userAddressLabel, userProfile?.address])
+        if (sessionOverrideCoords) return sessionOverrideLabel || "Endereço selecionado"
+        if (userCoords) return userAddressLabel || userProfile?.address || null
+        return guestSavedLabel || userAddressLabel || userProfile?.address || null
+    }, [sessionOverrideCoords, sessionOverrideLabel, userCoords, userAddressLabel, userProfile?.address, guestSavedLabel])
 
     // Resolve cálculo no servidor se a loja não tiver latitude/longitude direta
     useEffect(() => {
@@ -1498,7 +1605,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 if (active && quoteRes?.success) {
                     const dist = quoteRes.distanceKm != null ? Number(quoteRes.distanceKm.toFixed(1)) : null
                     const fee = Number(quoteRes.fee || 0)
-                    const isOutside = Boolean(quoteRes.isOutsideRadius || (quoteRes.maxDeliveryKm != null && dist != null && dist > quoteRes.maxDeliveryKm))
+                    const serverMaxKm = (quoteRes.maxDeliveryKm != null && quoteRes.maxDeliveryKm > 0)
+                        ? quoteRes.maxDeliveryKm
+                        : MAX_LOCAL_DELIVERY_FALLBACK_KM
+                    const isOutside = Boolean(quoteRes.isOutsideRadius || (dist != null && dist > serverMaxKm))
                     setServerDelivery({
                         distanceKm: dist,
                         feeLabel: isOutside ? null : (fee === 0 ? "Grátis" : formatCurrency(fee)),
@@ -1538,24 +1648,27 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
 
         const maxDeliveryKm = getEffectiveMaxDeliveryKm(settings)
+        const effectiveRadiusLimit = (maxDeliveryKm != null && maxDeliveryKm > 0)
+            ? maxDeliveryKm
+            : MAX_LOCAL_DELIVERY_FALLBACK_KM
         const outOfRadius = isDeliveryEnabled
             && (
                 serverDelivery?.outOfRadius ??
-                (distanceKm != null && maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm)
+                (distanceKm != null && distanceKm > effectiveRadiusLimit)
             )
 
-        // Formata o tempo estimado como faixa "20 a 30 min", estilo da imagem do usuário
+        // Formata o tempo estimado como faixa "20 a 30 min" somente quando está dentro da área de entrega
         let deliveryTimeRange: string | null = null
-        if (distanceKm != null && !outOfRadius) {
+        if (distanceKm != null && !outOfRadius && isDeliveryEnabled) {
             const rawRange = estimateDeliveryTimeRange(Math.max(0.1, distanceKm))
             if (rawRange) {
                 deliveryTimeRange = rawRange.replace("-", " a ")
             }
         }
 
-        const fallbackDeliveryTime = outOfRadius ? null
+        const fallbackDeliveryTime = (outOfRadius || !isDeliveryEnabled) ? null
             : (distanceKm != null
-                ? estimateAverageDeliveryTime(distanceKm)
+                ? estimateAverageDeliveryTime(Math.max(0.1, distanceKm))
                 : (partner?.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted)?.replace("-", " a ") || null : null))
 
         const deliveryTime = deliveryTimeRange || fallbackDeliveryTime
@@ -1574,7 +1687,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             })
         }
 
-        const isFreeDelivery = serverDelivery?.isFreeDelivery ?? (feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller"))
+        const isFreeDelivery = !outOfRadius && (serverDelivery?.isFreeDelivery ?? (feeLabel ? /gr[áa]tis/i.test(feeLabel) : (settings?.delivery_payer === "seller")))
 
         return {
             isDeliveryEnabled,
@@ -1599,29 +1712,45 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     )
 
     const deliveryNode = useMemo<ReactNode | null>(() => {
-        if (deliveryInfo.outOfRadius) {
-            return null
-        }
         if (!deliveryInfo.isDeliveryEnabled || !deliveryInfo.sellsProducts) {
             return <span className="font-medium text-brand-dark dark:text-dark-heading">Retirada no local</span>
         }
 
-        const { deliveryTime, feeLabel } = deliveryInfo
-        if (!deliveryTime && !feeLabel) return null
+        const { outOfRadius, deliveryTime, feeLabel } = deliveryInfo
+
+        if (outOfRadius || (!deliveryTime && !feeLabel)) {
+            return (
+                <button
+                    type="button"
+                    onClick={() => setIsDeliveryCalculatorOpen(true)}
+                    className="inline-flex items-center gap-1 font-medium text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors cursor-pointer"
+                    title="Calcular entrega"
+                >
+                    <span>Entrega • A combinar</span>
+                    <ChevronRightIcon size={13} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                </button>
+            )
+        }
 
         const isFreeDelivery = feeLabel ? /gr[áa]tis/i.test(feeLabel) : false
         const mainLabel = ["Entrega", deliveryTime].filter(Boolean).join(" • ")
 
-        if (!feeLabel) {
-            return <span className="font-medium text-brand-dark dark:text-dark-heading">{mainLabel}</span>
-        }
-
         return (
-            <span className="flex flex-wrap items-center gap-x-1.5">
+            <button
+                type="button"
+                onClick={() => setIsDeliveryCalculatorOpen(true)}
+                className="inline-flex flex-wrap items-center gap-x-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+                title="Calcular entrega"
+            >
                 <span className="font-medium text-brand-dark dark:text-dark-heading">{mainLabel}</span>
-                <span aria-hidden className="text-brand-inactive-text dark:text-dark-body">•</span>
-                <span className={`font-semibold ${isFreeDelivery ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{feeLabel}</span>
-            </span>
+                {feeLabel && (
+                    <>
+                        <span aria-hidden className="text-brand-inactive-text dark:text-dark-body">•</span>
+                        <span className={`font-semibold ${isFreeDelivery ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{feeLabel}</span>
+                    </>
+                )}
+                <ChevronRightIcon size={13} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+            </button>
         )
     }, [deliveryInfo])
 
@@ -2408,8 +2537,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div className="w-[360px] shrink-0">
                             <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                             {hasStatusLine && (
-                                <div className="mt-1.5">
-                                    <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} />
+                                <div className="mt-1.5 flex justify-end">
+                                    <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} className="justify-end" />
                                 </div>
                             )}
                         </div>
@@ -2551,7 +2680,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     </>
                                 ) : (
                                     <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
-                                        A Consultar
+                                        A combinar
                                     </span>
                                 )}
                             </div>
@@ -2929,35 +3058,49 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             </BottomSheet>
 
-            <DeliveryCalculatorBottomSheet
+            <DeliveryCalculatorModal
                 isOpen={isDeliveryCalculatorOpen}
                 onClose={() => setIsDeliveryCalculatorOpen(false)}
                 partner={partner}
-                userProfile={userProfile}
+                userId={currentUserId}
                 currentAddressLabel={effectiveAddressLabel}
                 initialCoords={effectiveCoords}
-                initialDeliveryInfo={{
-                    distanceKm: deliveryInfo.distanceKm,
-                    deliveryTime: deliveryInfo.deliveryTime,
-                    feeLabel: deliveryInfo.feeLabel,
-                    isFreeDelivery: deliveryInfo.isFreeDelivery,
-                    outOfRadius: deliveryInfo.outOfRadius,
-                }}
+                initialDeliveryInfo={deliveryInfo}
                 onApplyLocation={(data) => {
-                    if (data.lat && data.lng) {
-                        setCustomCoords({ lat: data.lat, lng: data.lng })
+                    if (data.addressId) {
+                        setSessionOverrideCoords(null)
+                        setSessionOverrideLabel(null)
+                        if (data.lat != null && data.lng != null) {
+                            setUserAddressCoords({ lat: data.lat, lng: data.lng })
+                        }
+                        if (data.label) {
+                            setUserAddressLabel(data.label)
+                        }
+                        notifyAddressUpdated(data.addressId, data.addressData)
+                        try {
+                            localStorage.removeItem("dudit_vendor_delivery_calc")
+                        } catch { }
+                        return
+                    }
+
+                    if (data.lat != null && data.lng != null) {
+                        setSessionOverrideCoords({ lat: data.lat, lng: data.lng })
                     }
                     if (data.label) {
-                        setCustomAddressLabel(data.label)
+                        setSessionOverrideLabel(data.label)
                     }
-                    try {
-                        localStorage.setItem("dudit_vendor_delivery_calc", JSON.stringify({
-                            lat: data.lat,
-                            lng: data.lng,
-                            label: data.label,
-                            cep: data.cep,
-                        }))
-                    } catch { }
+                    if (!currentUserId && data.lat != null && data.lng != null) {
+                        setGuestSavedCoords({ lat: data.lat, lng: data.lng })
+                        setGuestSavedLabel(data.label)
+                        try {
+                            localStorage.setItem("dudit_vendor_delivery_calc", JSON.stringify({
+                                lat: data.lat,
+                                lng: data.lng,
+                                label: data.label,
+                                cep: data.cep,
+                            }))
+                        } catch { }
+                    }
                 }}
             />
 

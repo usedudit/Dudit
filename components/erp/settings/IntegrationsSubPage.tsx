@@ -455,6 +455,16 @@ export const IntegrationsSubPage = ({
                 toast.error(res.error || "Não foi possível iniciar o checkout no Mercado Pago.")
                 return
             }
+            if (res.addedToExistingBundle) {
+                const totalLabel =
+                    typeof res.newMonthlyTotal === "number"
+                        ? ` Nova fatura mensal de aplicativos: R$ ${res.newMonthlyTotal.toFixed(2).replace(".", ",")}.`
+                        : ""
+                toast.success(`Aplicativo ativado! O valor será somado na próxima fatura.${totalLabel}`)
+                setActiveModal(null)
+                await fetchAddons()
+                return
+            }
             if (res.alreadyIncluded || res.alreadyActive) {
                 toast.success("Aplicativo ativado com sucesso!")
                 setActiveModal(null)

@@ -1,13 +1,14 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { listStoresAction, deleteStoreAction } from "@/app/actions/erp/stores"
+import { listStoresAction } from "@/app/actions/erp/stores"
 import { useStore } from "@/lib/store-context"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { StoreModal } from "./StoreModal"
+import { DeleteStoreModal } from "./DeleteStoreModal"
 import StoreGridCard, { type StoreRow } from "./StoreGridCard"
 import StoreListRow from "./StoreListRow"
 
@@ -15,7 +16,6 @@ import {
   Button,
   Input,
   IconPlaceholder,
-  AlertModal,
   Pagination,
   Tabs,
   TabsList,
@@ -112,8 +112,7 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingStore, setEditingStore] = useState<StoreRow | null>(null)
   const [deletingStore, setDeletingStore] = useState<StoreRow | null>(null)
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   const itemsPerPage = 8
 
@@ -161,30 +160,40 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
       return
     }
     setDeletingStore(store)
-    setIsDeleteAlertOpen(true)
+    setIsDeleteModalOpen(true)
   }
 
-  const confirmDelete = async () => {
-    if (!deletingStore) return
-    setIsDeleting(true)
-    try {
-      const res = await deleteStoreAction(deletingStore.id, partnerId)
-      if (res.success) {
-        setIsDeleteAlertOpen(false)
-        setDeletingStore(null)
-        setSelectedIds((prev) => {
-          const next = new Set(prev)
-          next.delete(deletingStore.id)
-          return next
-        })
-        await loadStores()
-        await refreshStores()
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setIsDeleting(false)
+  const handleStoreDeleted = async (deletedStoreId: string, fallbackStoreId: string | null) => {
+    const deletedWasCurrent = selectedStore?.id === deletedStoreId
+    setIsDeleteModalOpen(false)
+    setDeletingStore(null)
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(deletedStoreId)
+      return next
+    })
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(`cachedStores:${partnerId}`)
+        localStorage.removeItem(`cachedStoresTimestamp:${partnerId}`)
+        if (deletedWasCurrent) {
+          if (fallbackStoreId) {
+            localStorage.setItem(`selectedStoreId:${partnerId}`, fallbackStoreId)
+          } else {
+            localStorage.removeItem(`selectedStoreId:${partnerId}`)
+          }
+        }
+      } catch { }
     }
+
+    if (deletedWasCurrent && typeof window !== "undefined") {
+      window.location.reload()
+      return
+    }
+
+    await loadStores()
+    await refreshStores()
   }
 
   // Filter & Search
@@ -567,16 +576,16 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
           }}
         />
 
-        {/* DELETE CONFIRMATION ALERT MODAL */}
-        <AlertModal
-          isOpen={isDeleteAlertOpen}
-          onClose={() => setIsDeleteAlertOpen(false)}
-          onConfirm={confirmDelete}
-          title="Excluir Loja"
-          message={`Tem certeza que deseja excluir a loja "${deletingStore?.name}"? Esta ação manterá os registros históricos vinculados.`}
-          confirmText={isDeleting ? "Excluindo..." : "Sim, Excluir"}
-          cancelText="Cancelar"
-          variant="danger"
+        {/* DELETE STORE 2-STEP CONFIRMATION MODAL */}
+        <DeleteStoreModal
+          isOpen={isDeleteModalOpen}
+          store={deletingStore}
+          partnerId={partnerId}
+          onClose={() => {
+            setIsDeleteModalOpen(false)
+            setDeletingStore(null)
+          }}
+          onDeleted={handleStoreDeleted}
         />
       </div>
     </FadeIn>

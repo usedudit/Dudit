@@ -2,9 +2,11 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { headers } from "next/headers"
+import crypto from "crypto"
 import { requireUser, requirePartnerAccess, requirePartnerAccessWithPermission, requireStorePermission, requireStoreAccess, requireMinimumPlan } from "@/lib/auth/authorization"
-import { setActiveStore } from "@/lib/auth/partner-context"
+import { setActiveStore, getActiveStoreId, clearActiveStore } from "@/lib/auth/partner-context"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
@@ -17,6 +19,17 @@ import { toBusinessInfoRecord } from "@/lib/business-info"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { getFiscalPublishBlockReason } from "@/lib/fiscal/publish-gate"
 import { moderateStoreContent } from "@/lib/moderation/product-moderation"
+import { StoreDeletionService, type StorePreDeleteReport } from "@/lib/services/store-deletion.service"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
+import { getTrustedClientCountry, getTrustedClientIP } from "@/lib/security/client-ip"
+import { SMTP2GOService } from "@/lib/services/smtp2go.service"
+import {
+    getStoreDeletionEmailHtml,
+    getStoreDeletionEmailText,
+} from "@/lib/services/email-templates/store-deletion-code.template"
+import { SecureLogger } from "@/lib/secure-logger"
+import { auditLog } from "@/lib/security/audit-logger"
 
 export async function listStoresAction(partnerId: string) {
     const user = await requireUser()
@@ -519,44 +532,436 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
     }
 }
 
-export async function deleteStoreAction(storeId: string, partnerId: string): Promise<ActionResponse<void>> {
+function maskEmailAddress(email: string): string {
+    const parts = email.split("@")
+    if (parts.length !== 2) return "seu e-mail"
+    const [name, domain] = parts
+    const maskedName = name.length > 2
+        ? `${name[0]}***${name[name.length - 1]}`
+        : `${name[0]}***`
+    return `${maskedName}@${domain}`
+}
+
+/**
+ * Dry-run volumetry report before deleting a branch/store.
+ */
+export async function getStoreDeletionDryRunAction(
+    storeId: string,
+    partnerId: string,
+    csrf_token?: string,
+): Promise<{ success?: boolean; report?: StorePreDeleteReport; error?: string }> {
+    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+    const csrfValidation = await requireCSRF(csrf_token)
+    if (!csrfValidation.valid) {
+        return { error: csrfValidation.error || "Token CSRF inválido" }
+    }
+
     try {
         await requireUser()
         await requireStorePermission(storeId, partnerId, "stores", "delete")
 
-        const supabase = await getSupabaseServerClient()
+        const res = await StoreDeletionService.getPreDeleteReport(partnerId, storeId)
+        if (!res.success || !res.report) {
+            return { error: res.error || "Erro ao simular exclusão da filial." }
+        }
+        return { success: true, report: res.report }
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : "Erro ao simular exclusão da filial." }
+    }
+}
 
-        const { data: store } = await supabase
-            .from("stores")
-            .select("slug")
-            .eq("id", storeId)
-            .maybeSingle()
+/**
+ * Cancels all active recurring subscriptions linked strictly to a branch/store
+ * before requesting branch deletion.
+ */
+export async function cancelStoreRecurringSubscriptionsAction(
+    storeId: string,
+    partnerId: string,
+    csrf_token?: string,
+): Promise<{ success?: boolean; cancelled?: number; failed?: number; error?: string }> {
+    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+    const csrfValidation = await requireCSRF(csrf_token)
+    if (!csrfValidation.valid) {
+        return { error: csrfValidation.error || "Token CSRF inválido" }
+    }
 
-        const { error } = await supabase
-            .from("stores")
-            .delete()
-            .eq("id", storeId)
-            .eq("partner_id", partnerId)
+    try {
+        await requireUser()
+        await requireStorePermission(storeId, partnerId, "stores", "delete")
 
-        if (error) throw new Error(error.message)
-
-        logAudit("store.deleted", {
+        const { cancelled, failed } = await StoreDeletionService.cancelStoreRecurringSubscriptions(
             partnerId,
             storeId,
+        )
+
+        revalidatePath("/erp/assinaturas")
+        revalidatePath("/assinaturas")
+        try {
+            revalidateTag(`partner_recurring_plans_${partnerId}`, { expire: 0 })
+        } catch { }
+
+        return { success: true, cancelled, failed }
+    } catch (error) {
+        SecureLogger.error("Error cancelling store recurring subscriptions", {
+            storeId,
+            partnerId,
+            error: error instanceof Error ? error.message : String(error),
+        })
+        return { error: "Não foi possível cancelar as assinaturas recorrentes desta filial agora." }
+    }
+}
+
+/**
+ * Step 1 of Store/Branch Deletion Flow:
+ * Validates permissions, ensures store is deletable and has no active recurring subscriptions,
+ * generates a 6-digit numeric OTP, saves SHA-256 hash into store_deletion_requests,
+ * and sends the verification code via SMTP2GO.
+ */
+export async function requestStoreDeletionCodeAction(input: {
+    storeId: string
+    partnerId: string
+    reason?: string | null
+    csrf_token?: string
+}): Promise<{
+    success?: boolean
+    error?: string
+    maskedEmail?: string
+    cooldownSeconds?: number
+}> {
+    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+
+    try {
+        const [, csrfValidation, user, reqHeaders] = await Promise.all([
+            requireRateLimit(RateLimitCategory.STORE_DELETE_REQUEST),
+            requireCSRF(input.csrf_token),
+            requireUser(),
+            headers(),
+        ])
+
+        if (!csrfValidation.valid) {
+            return { error: csrfValidation.error || "Token CSRF inválido" }
+        }
+
+        await requireStorePermission(input.storeId, input.partnerId, "stores", "delete")
+
+        const rawEmail = user.email?.trim().toLowerCase()
+        if (!rawEmail) {
+            return { error: "Usuário não possui um e-mail válido vinculado à conta." }
+        }
+
+        const validation = await StoreDeletionService.validateStoreDeletable(input.partnerId, input.storeId)
+        if (!validation.valid || !validation.store) {
+            return { error: validation.error || "Esta filial não pode ser excluída." }
+        }
+
+        const { countActiveStoreRecurringSubscriptions } = await import("@/lib/services/recurring/limits")
+        const activeRecurringCount = await countActiveStoreRecurringSubscriptions(input.partnerId, input.storeId)
+        if (activeRecurringCount > 0) {
+            return {
+                error: `Esta filial possui ${activeRecurringCount} assinatura(s) recorrente(s) ativa(s). Cancele todas antes de solicitar a exclusão.`,
+            }
+        }
+
+        const admin = createAdminClient()
+        const nowMs = Date.now()
+        const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
+
+        const { data: recentRequests } = await admin
+            .from("store_deletion_requests")
+            .select("created_at")
+            .eq("user_id", user.id)
+            .eq("store_id", input.storeId)
+            .gt("created_at", twentyFourHoursAgo)
+            .order("created_at", { ascending: false })
+            .limit(5)
+
+        const latestRequest = recentRequests?.[0]
+        if (latestRequest) {
+            const elapsedMs = nowMs - new Date(latestRequest.created_at).getTime()
+            if (elapsedMs < 60 * 1000) {
+                const remainingSec = Math.max(1, Math.ceil((60 * 1000 - elapsedMs) / 1000))
+                return {
+                    error: `Aguarde ${remainingSec} segundos antes de solicitar um novo código.`,
+                    cooldownSeconds: remainingSec,
+                }
+            }
+        }
+
+        if ((recentRequests?.length || 0) >= 5) {
+            return { error: "Você atingiu o limite de solicitações de código para esta filial hoje. Tente novamente mais tarde." }
+        }
+
+        const nowIso = new Date(nowMs).toISOString()
+        const rawCode = crypto.randomInt(100000, 1000000).toString()
+        const codeHash = crypto.createHash("sha256").update(rawCode).digest("hex")
+        const expiresAt = new Date(nowMs + 15 * 60 * 1000) // 15 minutes
+
+        const userAgent = reqHeaders.get("user-agent")
+        const ip = getTrustedClientIP(reqHeaders)
+        const country = getTrustedClientCountry(reqHeaders) || "unknown"
+        const sanitizedReason = input.reason ? sanitizeInput(input.reason, 500) : null
+
+        const [, { data: requestRow, error: insertError }, emailResult] = await Promise.all([
+            admin
+                .from("store_deletion_requests")
+                .update({ expires_at: nowIso })
+                .eq("user_id", user.id)
+                .eq("store_id", input.storeId)
+                .is("verified_at", null)
+                .lt("created_at", nowIso),
+            admin
+                .from("store_deletion_requests")
+                .insert({
+                    user_id: user.id,
+                    partner_id: input.partnerId,
+                    store_id: input.storeId,
+                    email: rawEmail,
+                    code_hash: codeHash,
+                    expires_at: expiresAt.toISOString(),
+                    attempts: 0,
+                    max_attempts: 5,
+                    request_ip: ip,
+                    user_agent: userAgent,
+                    metadata: {
+                        reason: sanitizedReason,
+                        store_name: validation.store.name,
+                        country,
+                    },
+                })
+                .select("id")
+                .single(),
+            SMTP2GOService.sendEmail({
+                to: [{ email: rawEmail, name: user.user_metadata?.full_name || undefined }],
+                subject: `Confirme a exclusão da filial ${validation.store.name} - Dudit`,
+                html: getStoreDeletionEmailHtml(rawCode, validation.store.name, 15),
+                text: getStoreDeletionEmailText(rawCode, validation.store.name, 15),
+                userId: user.id,
+                partnerId: input.partnerId,
+            }),
+        ])
+
+        if (insertError || !requestRow) {
+            SecureLogger.error("Failed to insert store_deletion_requests record", {
+                userId: user.id,
+                storeId: input.storeId,
+                error: insertError?.message,
+            })
+            return { error: "Erro ao gerar código de confirmação." }
+        }
+
+        if (!emailResult.success) {
+            SecureLogger.error("Failed to send store deletion verification email", {
+                userId: user.id,
+                storeId: input.storeId,
+                error: emailResult.error,
+            })
+            return { error: "Não foi possível enviar o e-mail com o código. Tente novamente." }
+        }
+
+        void auditLog({
+            action: "store.deletion_code_requested",
+            actorUserId: user.id,
+            partnerId: input.partnerId,
+            metadata: {
+                requestId: requestRow.id,
+                storeId: input.storeId,
+                storeName: validation.store.name,
+                maskedEmail: maskEmailAddress(rawEmail),
+            },
+        }).catch(() => { })
+
+        return {
+            success: true,
+            maskedEmail: maskEmailAddress(rawEmail),
+            cooldownSeconds: 60,
+        }
+    } catch (error) {
+        SecureLogger.error("Unexpected error in requestStoreDeletionCodeAction", {
+            storeId: input.storeId,
+            error: error instanceof Error ? error.message : String(error),
+        })
+        return { error: error instanceof Error ? error.message : "Ocorreu um erro inesperado ao solicitar o código." }
+    }
+}
+
+/**
+ * Step 2 of Store/Branch Deletion Flow:
+ * Verifies the 6-digit numeric code with constant-time comparison, tracks failed attempts,
+ * and on success executes full atomic deletion of all store data across ERP and Marketplace.
+ */
+export async function confirmStoreDeletionAction(input: {
+    storeId: string
+    partnerId: string
+    code: string
+    reason?: string | null
+    csrf_token?: string
+}): Promise<{
+    success?: boolean
+    error?: string
+    remainingAttempts?: number
+    isLocked?: boolean
+    fallbackStoreId?: string | null
+}> {
+    await requireRateLimit(RateLimitCategory.STORE_DELETE_VERIFY)
+
+    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+    const csrfValidation = await requireCSRF(input.csrf_token)
+    if (!csrfValidation.valid) {
+        return { error: csrfValidation.error || "Token CSRF inválido" }
+    }
+
+    try {
+        const user = await requireUser()
+        await requireStorePermission(input.storeId, input.partnerId, "stores", "delete")
+
+        const cleanCode = (input.code || "").trim()
+        if (!/^\d{6}$/.test(cleanCode)) {
+            return { error: "O código de confirmação deve ter exatamente 6 dígitos numéricos." }
+        }
+
+        const admin = createAdminClient()
+
+        const { data: requestRow, error: reqError } = await admin
+            .from("store_deletion_requests")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("partner_id", input.partnerId)
+            .eq("store_id", input.storeId)
+            .is("verified_at", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (reqError || !requestRow) {
+            return { error: "Nenhuma solicitação de código pendente encontrada. Solicite um novo código." }
+        }
+
+        if (requestRow.attempts >= requestRow.max_attempts) {
+            return {
+                error: "Número máximo de tentativas incorretas excedido. Solicite um novo código.",
+                isLocked: true,
+                remainingAttempts: 0,
+            }
+        }
+
+        if (new Date(requestRow.expires_at).getTime() < Date.now()) {
+            return { error: "O código de confirmação expirou. Solicite um novo código." }
+        }
+
+        const inputHash = crypto.createHash("sha256").update(cleanCode).digest("hex")
+        const storedHash = String(requestRow.code_hash || "")
+        const isMatch =
+            storedHash.length === inputHash.length &&
+            crypto.timingSafeEqual(Buffer.from(storedHash, "utf8"), Buffer.from(inputHash, "utf8"))
+
+        if (!isMatch) {
+            const newAttempts = requestRow.attempts + 1
+            await admin
+                .from("store_deletion_requests")
+                .update({
+                    attempts: newAttempts,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", requestRow.id)
+
+            void auditLog({
+                action: "store.deletion_code_failed",
+                actorUserId: user.id,
+                partnerId: input.partnerId,
+                metadata: {
+                    requestId: requestRow.id,
+                    storeId: input.storeId,
+                    attempt: newAttempts,
+                },
+            }).catch(() => { })
+
+            const remaining = Math.max(0, requestRow.max_attempts - newAttempts)
+            if (remaining === 0) {
+                return {
+                    error: "Código incorreto. Limite de 5 tentativas atingido. Solicite um novo código.",
+                    isLocked: true,
+                    remainingAttempts: 0,
+                }
+            }
+
+            return {
+                error: `Código incorreto. Você ainda tem ${remaining} tentativa(s).`,
+                remainingAttempts: remaining,
+            }
+        }
+
+        // Mark code verified
+        await admin
+            .from("store_deletion_requests")
+            .update({
+                verified_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", requestRow.id)
+
+        const rawReason = input.reason || requestRow.metadata?.reason || null
+        const finalReason = rawReason ? sanitizeInput(String(rawReason), 500) : null
+
+        await auditLog({
+            action: "store.deletion_confirmed",
+            actorUserId: user.id,
+            partnerId: input.partnerId,
+            metadata: {
+                requestId: requestRow.id,
+                storeId: input.storeId,
+                reason: finalReason,
+            },
         })
 
-        const { invalidateStoreCache } = await import("@/lib/cache/invalidation")
-        await invalidateStoreCache(storeId, partnerId, store?.slug)
-        const { removeFromExploreRedis } = await import("@/lib/redis-sync")
-        await removeFromExploreRedis(storeId, "loja", true)
+        // Execute complete store-scoped purge
+        const deletionResult = await StoreDeletionService.executeStoreDeletion({
+            storeId: input.storeId,
+            partnerId: input.partnerId,
+            actorUserId: user.id,
+            reason: finalReason,
+        })
 
-        await safeRevalidateTag(TAGS.partner(partnerId))
-        await safeRevalidateTag(TAGS.storeProfile(storeId))
-        if (store?.slug) await safeRevalidateTag(`store-${store.slug}`)
-        revalidatePath("/erp/lojas")
-        return { success: true, data: undefined }
+        logAudit("store.deleted", {
+            partnerId: input.partnerId,
+            storeId: input.storeId,
+            storeName: deletionResult.storeName,
+            reason: finalReason,
+            dbRowsDeleted: deletionResult.dbRowsDeleted,
+        })
+
+        // If the user's active store cookie was the deleted store, switch it to fallback (headquarters)
+        const currentActiveStoreId = await getActiveStoreId()
+        if (currentActiveStoreId === input.storeId) {
+            if (deletionResult.fallbackStoreId) {
+                await setActiveStore(deletionResult.fallbackStoreId)
+            } else {
+                await clearActiveStore()
+            }
+        }
+
+        return {
+            success: true,
+            fallbackStoreId: deletionResult.fallbackStoreId,
+        }
     } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : "Erro ao excluir loja" }
+        SecureLogger.error("Unexpected error in confirmStoreDeletionAction", {
+            storeId: input.storeId,
+            partnerId: input.partnerId,
+            error: error instanceof Error ? error.message : String(error),
+        })
+        return {
+            error: error instanceof Error ? error.message : "Ocorreu um erro inesperado ao excluir a filial.",
+        }
+    }
+}
+
+/**
+ * Legacy direct store deletion action: blocked to enforce 2-step email OTP verification.
+ */
+export async function deleteStoreAction(storeId: string, partnerId: string): Promise<ActionResponse<void>> {
+    return {
+        success: false,
+        error: "A exclusão direta de filiais foi descontinuada. Confirme com o código de 6 dígitos enviado por e-mail.",
     }
 }
 

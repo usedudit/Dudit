@@ -72,7 +72,7 @@ function getStatusVariant(status: string, metadata?: any): "green" | "red" | "or
 function getTypeLabel(type: string): string {
     const labels: Record<string, string> = {
         subscription: "Assinatura",
-        addon: "Add-on",
+        addon: "Aplicativos",
         marketplace_feature: "Funcionalidade Marketplace",
         credit_pack: "Pacote de Créditos",
         service: "Serviço",

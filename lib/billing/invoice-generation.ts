@@ -378,7 +378,7 @@ export async function refreshInvoiceForPurchase(
 function resolveInvoiceEmission(context: InvoiceContext): string {
   const purchase = context.purchase
   const fallback = purchase.created_at || new Date().toISOString()
-  if (purchase.purchase_type !== "subscription") return fallback
+  if (purchase.purchase_type !== "subscription" && purchase.purchase_type !== "addon") return fallback
 
   const oldestPayment = context.payments.length > 0
     ? context.payments[context.payments.length - 1]

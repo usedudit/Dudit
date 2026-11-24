@@ -623,6 +623,23 @@ export async function getDuditDeliveryRequestStatusAction(input: {
     return { success: true as const, activeRequest: null }
   }
 
+  // Avança tiers sob demanda enquanto houver solicitação aberta (sem depender de pg_cron ocioso)
+  if (!assignment.driver_id && assignment.status === "available" && !assignment.dispatch_exhausted_at) {
+    try {
+      await admin.rpc("dispatch_tick")
+      const { data: refreshed } = await admin
+        .from("delivery_assignments")
+        .select("dispatch_tier, dispatch_exhausted_at, dispatch_exhausted_reason")
+        .eq("id", assignment.id)
+        .maybeSingle()
+      if (refreshed) {
+        assignment.dispatch_tier = refreshed.dispatch_tier
+        assignment.dispatch_exhausted_at = refreshed.dispatch_exhausted_at
+        assignment.dispatch_exhausted_reason = refreshed.dispatch_exhausted_reason
+      }
+    } catch { }
+  }
+
   let suggestedFee: number | null = null
   let economicCapKm: number | null = null
   if (assignment.dispatch_exhausted_at) {

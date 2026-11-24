@@ -163,7 +163,9 @@ import {
     PinIcon as PinIcon01,
     ArchiveArrowDownIcon,
     SettingsError01Icon,
-    CircleUnlock01Icon
+    CircleUnlock01Icon,
+    CustomerSupportIcon as CustomerSupportIcon01,
+    News01Icon
 } from "@hugeicons/core-free-icons"
 
 
@@ -453,3 +455,6 @@ export const CadastrosIcon = CreateIcon(ResourcesAddIcon)
 export const InstallmentIcon = CreateIcon(SplitIcon)
 export const RepeatIcon = CreateIcon(RepeatIcon01)
 export const ManagerIcon = CreateIcon(ManagerIcon01)
+
+export const CustomerSupportIcon = CreateIcon(CustomerSupportIcon01)
+export const NewsIcon = CreateIcon(News01Icon)

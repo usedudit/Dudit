@@ -129,6 +129,7 @@ export interface InvoiceData {
         gateway_label: string
         status: string
         paid_at: string | null
+        due_date?: string | null
         installments: number | null
     }
 

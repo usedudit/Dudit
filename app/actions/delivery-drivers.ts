@@ -744,6 +744,12 @@ export async function transitionMyDeliveryAssignmentAction(params: {
     await revalidateOrderHistory(orderId)
   }
 
+  if (params.status === "delivered") {
+    try {
+      await admin.rpc("dispatch_tick")
+    } catch { }
+  }
+
   revalidatePath("/entregadores")
   revalidatePath("/entregadores/entregas-disponiveis")
   revalidatePath(`/entregadores/entregas/${params.assignmentId}`)
@@ -758,6 +764,12 @@ export async function setMyDeliveryAvailabilityAction(status: "available" | "off
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("set_my_delivery_availability", { p_status: status })
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível atualizar sua disponibilidade.") }
+  if (status === "available") {
+    try {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      await getAdminClient().rpc("dispatch_tick")
+    } catch { }
+  }
   revalidatePath("/entregadores")
   return { success: true as const, data }
 }

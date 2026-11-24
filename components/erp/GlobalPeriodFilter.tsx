@@ -212,11 +212,10 @@ export function GlobalPeriodFilter() {
             trigger={
               <button
                 type="button"
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0 transition-colors cursor-pointer ${
-                  compare !== "none"
-                    ? "bg-brand-green/20 text-brand-green dark:bg-brand-green/30"
-                    : "text-brand-dark hover:bg-brand-green-light dark:text-dark-heading dark:hover:bg-dark-border"
-                }`}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0 transition-colors cursor-pointer ${compare !== "none"
+                  ? "bg-brand-green/20 text-brand-green dark:bg-brand-green/30"
+                  : "text-brand-dark hover:bg-brand-green-light dark:text-dark-heading dark:hover:bg-dark-border"
+                  }`}
                 aria-label="Comparar com outro período"
                 title={compare !== "none" ? `Comparando: ${COMPARE_PRESET_LABELS[compare] || compare}` : "Comparar período"}
               >
@@ -235,25 +234,6 @@ export function GlobalPeriodFilter() {
             ))}
           </Dropdown>
         </div>
-
-        {compare !== "none" && (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-green/10 dark:bg-brand-green/20 border border-brand-green/30 text-xs font-semibold text-brand-dark dark:text-dark-heading">
-            <span className="truncate max-w-[220px]">
-              {compare === "custom" && compareFrom && compareTo
-                ? `Vs ${formatYmdBr(compareFrom)} - ${formatYmdBr(compareTo)}`
-                : `Vs ${COMPARE_PRESET_LABELS[compare] || "anterior"}`}
-            </span>
-            <button
-              type="button"
-              onClick={() => updateParams({ compare: "none", compareFrom: "", compareTo: "" })}
-              className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-white transition-colors cursor-pointer p-0.5"
-              aria-label="Remover comparação"
-              title="Remover comparação"
-            >
-              <XIcon size={12} />
-            </button>
-          </div>
-        )}
       </div>
 
       <DefaultModal

@@ -1241,21 +1241,20 @@ const Header: React.FC<HeaderProps> = ({
                                 )
                             })}
 
-                            <div className="flex items-center justify-between px-6 py-3 rounded-xl">
-                                <span className="flex items-center gap-3">
-                                    <MoonIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                    <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">Modo escuro</span>
-                                </span>
-                                <Switch checked={theme === "dark"} onCheckedChange={handleThemeToggle} />
+                            <div className="border-t border-brand-border dark:border-dark-border py-2">
+                                <div className="px-6 py-2.5 flex items-center justify-between">
+                                    <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                                    <Switch checked={theme === "dark"} onCheckedChange={handleThemeToggle} />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="border-t border-gray-100 dark:border-dark-border py-2 mt-2">
+                        <div className="border-t border-brand-border dark:border-dark-border py-2 mt-auto">
                             <div
                                 className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
                                 onClick={handleSignOut}
                             >
-                                <span className="text-[15px] font-normal text-brand-red">Sair da sessão</span>
+                                <span className="text-[14px] font-normal text-brand-red">Sair da sessão</span>
                             </div>
                         </div>
                     </div>

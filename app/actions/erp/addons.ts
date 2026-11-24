@@ -67,6 +67,8 @@ export async function subscribePartnerAddonAction(
   mpPreapprovalId?: string
   alreadyIncluded?: boolean
   alreadyActive?: boolean
+  addedToExistingBundle?: boolean
+  newMonthlyTotal?: number
   error?: string
 }> {
   try {

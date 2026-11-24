@@ -38,7 +38,7 @@ export { formatDocument, getPaymentMethodLabel, getGatewayLabel, getStatusLabel 
 function buildPurchaseTypeLabel(type: string): string {
     const labels: Record<string, string> = {
         subscription: "Assinatura de Plano",
-        addon: "Add-on",
+        addon: "Aplicativos",
         marketplace_feature: "Funcionalidade Marketplace",
         credit_pack: "Pacote de Créditos",
         service: "Serviço",
@@ -46,6 +46,24 @@ function buildPurchaseTypeLabel(type: string): string {
         future: "Compra Futura",
     }
     return labels[type] || type
+}
+
+const DEFAULT_INVOICE_DUE_GRACE_DAYS = 3
+
+function resolveInvoiceDueDate(
+    mainPayment: BillingPayment | undefined,
+    periodStart?: string | null,
+): string | null {
+    if (mainPayment?.expires_at) {
+        return mainPayment.expires_at
+    }
+    if (periodStart) {
+        const start = new Date(periodStart)
+        if (!isNaN(start.getTime())) {
+            return new Date(start.getTime() + DEFAULT_INVOICE_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+        }
+    }
+    return null
 }
 
 export async function generateInvoiceData(
@@ -68,16 +86,31 @@ export async function generateInvoiceData(
     // subscription status (which can be past_due while this cycle is paid).
     const mainPayment = payments.find((p) => p.status === "approved") || payments[0]
 
-    const items: InvoiceItem[] = [
-        {
-            code: purchaseableDetails?.code || null,
-            name: purchaseableDetails?.name || buildPurchaseTypeLabel(purchase.purchase_type),
-            description: purchase.description || purchaseableDetails?.description || null,
-            quantity: 1,
-            unit_price: purchase.amount,
-            total: purchase.amount,
-        },
-    ]
+    const rawAddonItems =
+        purchase.purchase_type === "addon" && Array.isArray(purchase.metadata?.addon_items)
+            ? purchase.metadata.addon_items
+            : null
+
+    const items: InvoiceItem[] =
+        rawAddonItems && rawAddonItems.length > 0
+            ? rawAddonItems.map((item: any) => ({
+                code: item?.code || null,
+                name: item?.name || "Aplicativo",
+                description: item?.description || null,
+                quantity: Number(item?.quantity || 1),
+                unit_price: Number(item?.unit_price ?? item?.total ?? 0),
+                total: Number(item?.total ?? item?.unit_price ?? 0),
+            }))
+            : [
+                {
+                    code: purchaseableDetails?.code || null,
+                    name: purchaseableDetails?.name || buildPurchaseTypeLabel(purchase.purchase_type),
+                    description: purchase.description || purchaseableDetails?.description || null,
+                    quantity: 1,
+                    unit_price: purchase.amount,
+                    total: purchase.amount,
+                },
+            ]
 
     const invoiceData: InvoiceData = {
         invoice_number: invoiceNumber,
@@ -120,6 +153,7 @@ export async function generateInvoiceData(
             // of this cycle is approved (or has a paid_at timestamp).
             status: mainPayment?.status || purchase.status,
             paid_at: mainPayment?.paid_at || null,
+            due_date: resolveInvoiceDueDate(mainPayment, periodStart),
             installments: mainPayment?.payment_method_details?.installments || null,
         },
 

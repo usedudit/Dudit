@@ -31,13 +31,30 @@ interface InvoicePreviewProps {
     printMode?: boolean
 }
 
+function isInvoicePaid(data: InvoiceData): boolean {
+    if (data.status === "cancelled" || data.status === "refunded") return false
+    const payStatus = (data.payment?.status || "").toLowerCase()
+    return !!data.payment?.paid_at ||
+        ["concluído", "aprovado", "approved", "completed"].some((s) => payStatus.includes(s))
+}
+
 function getStatusLabel(data: InvoiceData): string {
     if (data.status === "cancelled") return "Cancelado"
     if (data.status === "refunded") return "Reembolsado"
-    const payStatus = (data.payment?.status || "").toLowerCase()
-    const isPaid = !!data.payment?.paid_at ||
-        ["concluído", "aprovado", "approved", "completed"].some((s) => payStatus.includes(s))
-    return isPaid ? "Pago" : "Não pago"
+    return isInvoicePaid(data) ? "Pago" : "Não pago"
+}
+
+function resolveDisplayDueDate(data: InvoiceData): string {
+    if (data.payment?.due_date) {
+        return data.payment.due_date
+    }
+    const baseIso = data.period?.start || data.created_at
+    const baseDate = new Date(baseIso)
+    if (!isNaN(baseDate.getTime())) {
+        // Default 3-day grace window after cycle start so emission and due date are distinct
+        return new Date(baseDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    return baseIso
 }
 
 function shortInvoiceId(invoiceId?: string): string {
@@ -153,8 +170,14 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                             <span className="font-bold text-sm text-brand-dark">{formatDate(data.created_at)}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
-                                            <span className="font-bold text-sm text-brand-dark">{formatDate(data.period?.start || data.created_at)}</span>
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
+                                                {isInvoicePaid(data) ? "Pago em" : "Vencimento"}
+                                            </span>
+                                            <span className="font-bold text-sm text-brand-dark">
+                                                {isInvoicePaid(data)
+                                                    ? formatDate(data.payment?.paid_at || data.created_at)
+                                                    : formatDate(resolveDisplayDueDate(data))}
+                                            </span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Status</span>

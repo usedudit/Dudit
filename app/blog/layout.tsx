@@ -1,6 +1,5 @@
 import type React from "react"
 import type { Metadata } from "next"
-import BlogHeader from "@/components/blog/BlogHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const metadata: Metadata = {
@@ -20,7 +19,6 @@ export const metadata: Metadata = {
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex min-h-screen flex-col bg-white dark:bg-dark-surface">
-            <BlogHeader />
             <main className="flex-1">{children}</main>
             <MarketplaceFooter />
         </div>

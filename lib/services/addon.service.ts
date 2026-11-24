@@ -183,6 +183,89 @@ export function isValidAddonSlug(slug: string): slug is AddonSlug {
   return VALID_ADDON_SLUGS.has(slug)
 }
 
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+function buildAddonBundleReason(slugs: AddonSlug[]): string {
+  if (slugs.length === 1) {
+    return `Dudit - ${ADDON_REGISTRY[slugs[0]].name}`.slice(0, 60)
+  }
+  return `Dudit - Aplicativos (${slugs.length} ativos)`.slice(0, 60)
+}
+
+async function updateMpAddonBundleAmount(
+  mpPreapprovalId: string,
+  amount: number,
+  reason: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!mpPreapprovalId || !Number.isFinite(amount) || amount <= 0) {
+    return { success: false, error: "Parâmetros inválidos para atualizar assinatura." }
+  }
+
+  try {
+    const accessToken = await getMpPlatformAccessToken()
+    const response = await fetch(`https://api.mercadopago.com/preapproval/${mpPreapprovalId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        reason: reason.slice(0, 60),
+        auto_recurring: {
+          transaction_amount: roundCurrency(amount),
+          currency_id: "BRL",
+        },
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      SecureLogger.error("[addon.service] MP bundle preapproval amount update failed", {
+        mpPreapprovalId,
+        amount,
+        status: response.status,
+        providerError: errorData?.error || errorData?.message || null,
+      })
+      return { success: false, error: `MP ${response.status}` }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    SecureLogger.error("[addon.service] MP bundle preapproval update network error", {
+      mpPreapprovalId,
+      amount,
+      error: err?.message || "Unknown",
+    })
+    return { success: false, error: err?.message || "Unknown" }
+  }
+}
+
+async function getAllPartnerAddonRows(
+  partnerId: string,
+): Promise<Array<StoredAddonRecord & { addon_slug: AddonSlug }>> {
+  const admin = getAdminClient()
+  try {
+    const { data: rows, error } = await admin
+      .from("partner_addons")
+      .select(
+        "addon_slug, is_enabled, subscription_status, mp_preapproval_id, mp_init_point, billing_email, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, settings, updated_at",
+      )
+      .eq("partner_id", partnerId)
+
+    if (!error && rows) {
+      return rows.filter((r: any) => isValidAddonSlug(r.addon_slug)) as Array<
+        StoredAddonRecord & { addon_slug: AddonSlug }
+      >
+    }
+  } catch {
+    // ignore
+  }
+  return []
+}
+
 function hasPaidAddonAccess(record: StoredAddonRecord | null): boolean {
   if (!record) return false
   const status = record.subscription_status || "none"
@@ -447,7 +530,11 @@ export async function setPartnerAddonStatus(
 }
 
 /**
- * Cria uma assinatura mensal recorrente (Mercado Pago Preapproval) para um Add-on.
+ * Cria ou expande a assinatura mensal consolidada de Add-ons (Mercado Pago Preapproval).
+ *
+ * - 1º aplicativo: cria 1 único Preapproval no MP (R$ 4,99/mês).
+ * - 2º+ aplicativo: atualiza o mesmo Preapproval via PUT somando +R$ 4,99/mês,
+ *   liberando o uso na hora e cobrando o total unificado na próxima fatura.
  */
 export async function createAddonMpSubscription(
   partnerId: string,
@@ -459,6 +546,8 @@ export async function createAddonMpSubscription(
   mpPreapprovalId?: string
   alreadyIncluded?: boolean
   alreadyActive?: boolean
+  addedToExistingBundle?: boolean
+  newMonthlyTotal?: number
   error?: string
 }> {
   if (!isValidAddonSlug(addonSlug)) {
@@ -479,25 +568,101 @@ export async function createAddonMpSubscription(
       // ignore
     }
 
-    // 2. Verificar se já tem assinatura ativa paga
+    // 2. Verificar se já tem assinatura ativa (não cancelada) deste add-on
     const existing = await getPartnerAddonRecord(partnerId, addonSlug)
-    if (hasPaidAddonAccess(existing)) {
+    if (
+      existing?.subscription_status === "active" &&
+      !existing.cancel_at_period_end &&
+      hasPaidAddonAccess(existing)
+    ) {
       await persistPartnerAddonRecord(partnerId, addonSlug, { is_enabled: true })
       return { success: true, alreadyActive: true }
     }
 
-    // 3. Cancelar preapproval pendente anterior (se houver) para não acumular cobranças abandonadas
-    if (existing?.subscription_status === "pending" && existing.mp_preapproval_id) {
-      await cancelMpPreapproval(existing.mp_preapproval_id).catch(() => { })
+    // 3. Verificar se já existe uma assinatura consolidada ativa de outros add-ons
+    const allRows = await getAllPartnerAddonRows(partnerId)
+    const activeBundleRows = allRows.filter(
+      (r) =>
+        r.subscription_status === "active" &&
+        !r.cancel_at_period_end &&
+        typeof r.mp_preapproval_id === "string" &&
+        r.mp_preapproval_id.trim().length > 0 &&
+        hasPaidAddonAccess(r),
+    )
+
+    if (activeBundleRows.length > 0) {
+      const donor = activeBundleRows[0]
+      const sharedPreapprovalId = donor.mp_preapproval_id!
+
+      // Collect all active slugs on this shared preapproval + the new slug
+      const bundleSlugs = Array.from(
+        new Set<AddonSlug>([
+          ...activeBundleRows
+            .filter((r) => r.mp_preapproval_id === sharedPreapprovalId)
+            .map((r) => r.addon_slug),
+          addonSlug,
+        ]),
+      )
+
+      const newTotal = roundCurrency(
+        bundleSlugs.reduce((sum, slug) => sum + ADDON_REGISTRY[slug].price, 0),
+      )
+
+      const updateRes = await updateMpAddonBundleAmount(
+        sharedPreapprovalId,
+        newTotal,
+        buildAddonBundleReason(bundleSlugs),
+      )
+
+      if (!updateRes.success) {
+        return {
+          success: false,
+          error: "Não foi possível atualizar sua assinatura de aplicativos no Mercado Pago. Tente novamente.",
+        }
+      }
+
+      const now = new Date()
+      const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+      await persistPartnerAddonRecord(partnerId, addonSlug, {
+        is_enabled: true,
+        subscription_status: "active",
+        mp_preapproval_id: sharedPreapprovalId,
+        mp_init_point: null,
+        billing_email: donor.billing_email || payerEmail,
+        current_period_start: donor.current_period_start || now.toISOString(),
+        current_period_end: donor.current_period_end || nextMonth.toISOString(),
+        cancel_at_period_end: false,
+        cancelled_at: null,
+      })
+
+      return {
+        success: true,
+        addedToExistingBundle: true,
+        mpPreapprovalId: sharedPreapprovalId,
+        newMonthlyTotal: newTotal,
+      }
     }
 
-    // 4. Criar preapproval no Mercado Pago usando as credenciais da plataforma Dudit
+    // 4. Cancelar preapprovals pendentes anteriores (abandonados) para não acumular cobranças
+    const pendingPreapprovalIds = Array.from(
+      new Set(
+        allRows
+          .filter((r) => r.subscription_status === "pending" && r.mp_preapproval_id)
+          .map((r) => r.mp_preapproval_id!),
+      ),
+    )
+    for (const staleId of pendingPreapprovalIds) {
+      await cancelMpPreapproval(staleId).catch(() => {})
+    }
+
+    // 5. Criar 1 único preapproval consolidado no Mercado Pago (1º add-on)
     const accessToken = await getMpPlatformAccessToken()
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br").replace(/\/$/, "")
     const backUrl = `${appUrl}/erp/configuracoes?tab=integracoes&section=aplicativos&addon_checkout=${addonSlug}`
 
     const mpPayload = {
-      reason: `Dudit - ${addon.name}`.slice(0, 60),
+      reason: buildAddonBundleReason([addonSlug]),
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",
@@ -506,7 +671,7 @@ export async function createAddonMpSubscription(
       },
       payer_email: payerEmail,
       back_url: backUrl,
-      external_reference: `addon:${partnerId}:${addonSlug}`,
+      external_reference: `addon_bundle:${partnerId}`,
     }
 
     const response = await fetch("https://api.mercadopago.com/preapproval", {
@@ -568,50 +733,68 @@ export async function createAddonMpSubscription(
 }
 
 /**
- * Sincroniza o estado de uma assinatura de Add-on a partir de um evento do Mercado Pago
- * (webhook `subscription_preapproval` / `subscription_authorized_payment` ou retorno de checkout).
- * Retorna `true` se o recurso pertencia a um Add-on.
+ * Sincroniza o estado da assinatura de Add-ons (consolidada ou legada individual)
+ * a partir de um evento do Mercado Pago (`subscription_preapproval` /
+ * `subscription_authorized_payment` ou retorno de checkout).
+ * Também registra a fatura/pagamento no módulo de billing quando há cobrança real.
+ * Retorna `true` se o recurso pertencia a Add-ons.
  */
 export async function syncAddonSubscriptionFromMp(params: {
   mpPreapprovalId?: string | null
   externalReference?: string | null
   mpStatus?: string | null
+  authorizedPaymentData?: any
 }): Promise<boolean> {
   const admin = getAdminClient()
   const preapprovalId = params.mpPreapprovalId ? String(params.mpPreapprovalId) : null
   const extRef = params.externalReference ? String(params.externalReference) : null
 
   let partnerId: string | null = null
-  let addonSlug: AddonSlug | null = null
+  let targetSlugs: AddonSlug[] = []
 
-  // 1. Parse de external_reference: "addon:<partnerId>:<addonSlug>"
-  if (extRef && extRef.startsWith("addon:")) {
+  // 1. Parse de external_reference:
+  //    - Novo formato consolidado: "addon_bundle:<partnerId>"
+  //    - Formato legado individual: "addon:<partnerId>:<addonSlug>"
+  if (extRef && extRef.startsWith("addon_bundle:")) {
+    const parts = extRef.split(":")
+    if (parts.length >= 2 && parts[1]) {
+      partnerId = parts[1]
+    }
+  } else if (extRef && extRef.startsWith("addon:")) {
     const parts = extRef.split(":")
     if (parts.length === 3 && isValidAddonSlug(parts[2])) {
       partnerId = parts[1]
-      addonSlug = parts[2]
+      targetSlugs = [parts[2]]
     }
   }
 
-  // 2. Fallback: procurar em partner_addons por mp_preapproval_id
-  if ((!partnerId || !addonSlug) && preapprovalId) {
+  // 2. Procurar em partner_addons por mp_preapproval_id (cobre bundle multi-addon e fallback)
+  if (preapprovalId) {
     try {
-      const { data: row } = await admin
+      const { data: rows } = await admin
         .from("partner_addons")
         .select("partner_id, addon_slug")
         .eq("mp_preapproval_id", preapprovalId)
-        .maybeSingle()
 
-      if (row && isValidAddonSlug(row.addon_slug)) {
-        partnerId = row.partner_id
-        addonSlug = row.addon_slug
+      if (rows && rows.length > 0) {
+        if (!partnerId) partnerId = rows[0].partner_id
+        const matchedSlugs = rows
+          .map((r: any) => r.addon_slug)
+          .filter((s: string): s is AddonSlug => isValidAddonSlug(s))
+        if (matchedSlugs.length > 0) {
+          targetSlugs = Array.from(new Set([...targetSlugs, ...matchedSlugs]))
+        }
       }
     } catch {
       // ignore
     }
   }
 
-  if (!partnerId || !addonSlug) {
+  if (!partnerId || targetSlugs.length === 0) {
+    // Recognized bundle external_reference but already detached (e.g. upgraded to Escalar)
+    if (extRef?.startsWith("addon_bundle:")) {
+      return true
+    }
     return false
   }
 
@@ -619,58 +802,110 @@ export async function syncAddonSubscriptionFromMp(params: {
   const now = new Date()
   const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-  const existing = await getPartnerAddonRecord(partnerId, addonSlug)
+  let anyUpdated = false
+  let earliestPeriodStart: Date | null = null
 
-  // Ignore late "cancelled" webhooks from a preapproval that was already detached
-  // or replaced (e.g. cancelled automatically when upgrading to the Escalar plan
-  // or superseded by a newer checkout). Otherwise it could disable an active add-on.
-  if (
-    normalizedStatus === "cancelled" &&
-    preapprovalId &&
-    existing?.mp_preapproval_id !== preapprovalId
-  ) {
-    return true
-  }
+  for (const addonSlug of targetSlugs) {
+    const existing = await getPartnerAddonRecord(partnerId, addonSlug)
 
-  const patch: Partial<StoredAddonRecord> = {
-    ...(preapprovalId ? { mp_preapproval_id: preapprovalId } : {}),
-  }
-
-  if (["authorized", "approved", "processed"].includes(normalizedStatus)) {
-    patch.subscription_status = "active"
-    patch.is_enabled = true
-    patch.mp_init_point = null
-    patch.cancel_at_period_end = false
-    patch.cancelled_at = null
-    patch.current_period_start = now.toISOString()
-    patch.current_period_end = nextMonth.toISOString()
-  } else if (normalizedStatus === "pending" || normalizedStatus === "waiting_for_gateway") {
-    if (existing?.subscription_status !== "active") {
-      patch.subscription_status = "pending"
+    // Ignore late "cancelled" webhooks from a preapproval that was already detached
+    // or replaced (e.g. cancelled automatically when upgrading to the Escalar plan
+    // or detached when another add-on remains active on the bundle).
+    if (
+      normalizedStatus === "cancelled" &&
+      preapprovalId &&
+      existing?.mp_preapproval_id !== preapprovalId
+    ) {
+      continue
     }
-  } else if (normalizedStatus === "paused") {
-    patch.subscription_status = "paused"
-    patch.is_enabled = false
-  } else if (normalizedStatus === "cancelled") {
-    patch.subscription_status = "cancelled"
-    patch.cancel_at_period_end = true
-    patch.cancelled_at = now.toISOString()
-    patch.mp_init_point = null
-    const periodEndMs = existing?.current_period_end
-      ? new Date(existing.current_period_end).getTime()
-      : 0
-    if (!periodEndMs || periodEndMs <= now.getTime()) {
+
+    if (existing?.current_period_start) {
+      const d = new Date(existing.current_period_start)
+      if (!isNaN(d.getTime()) && (!earliestPeriodStart || d < earliestPeriodStart)) {
+        earliestPeriodStart = d
+      }
+    }
+
+    const patch: Partial<StoredAddonRecord> = {
+      ...(preapprovalId ? { mp_preapproval_id: preapprovalId } : {}),
+    }
+
+    if (["authorized", "approved", "processed"].includes(normalizedStatus)) {
+      patch.subscription_status = "active"
+      patch.is_enabled = true
+      patch.mp_init_point = null
+      patch.cancel_at_period_end = false
+      patch.cancelled_at = null
+      patch.current_period_start = now.toISOString()
+      patch.current_period_end = nextMonth.toISOString()
+    } else if (normalizedStatus === "pending" || normalizedStatus === "waiting_for_gateway") {
+      if (existing?.subscription_status !== "active") {
+        patch.subscription_status = "pending"
+      }
+    } else if (normalizedStatus === "paused") {
+      patch.subscription_status = "paused"
       patch.is_enabled = false
+    } else if (normalizedStatus === "cancelled") {
+      patch.subscription_status = "cancelled"
+      patch.cancel_at_period_end = true
+      patch.cancelled_at = now.toISOString()
+      patch.mp_init_point = null
+      const periodEndMs = existing?.current_period_end
+        ? new Date(existing.current_period_end).getTime()
+        : 0
+      if (!periodEndMs || periodEndMs <= now.getTime()) {
+        patch.is_enabled = false
+      }
+    } else if (["rejected", "refunded", "chargeback"].includes(normalizedStatus)) {
+      patch.subscription_status = "past_due"
+      patch.is_enabled = false
+    } else {
+      continue
     }
-  } else if (["rejected", "refunded", "chargeback"].includes(normalizedStatus)) {
-    patch.subscription_status = "past_due"
-    patch.is_enabled = false
-  } else {
-    return true
+
+    await persistPartnerAddonRecord(partnerId, addonSlug, patch)
+    anyUpdated = true
   }
 
-  await persistPartnerAddonRecord(partnerId, addonSlug, patch)
-  return true
+  // 3. Registrar fatura consolidada no módulo de billing quando houver cobrança real
+  if (params.authorizedPaymentData && preapprovalId) {
+    try {
+      const { chargeFromAuthorizedPayment, authorizedPaymentCycleDate } = await import(
+        "@/lib/billing/record-charge"
+      )
+      const { recordAddonBundleCharge } = await import("@/lib/billing/record-addon-charge")
+
+      const charge = chargeFromAuthorizedPayment(params.authorizedPaymentData)
+      const cycleDate = authorizedPaymentCycleDate(params.authorizedPaymentData)
+      const addonItems = targetSlugs.map((slug) => ({
+        code: slug,
+        name: ADDON_REGISTRY[slug].name,
+        description: "Assinatura mensal de aplicativo",
+        quantity: 1,
+        unit_price: ADDON_REGISTRY[slug].price,
+        total: ADDON_REGISTRY[slug].price,
+      }))
+
+      await recordAddonBundleCharge({
+        partnerId,
+        mpPreapprovalId: preapprovalId,
+        addonSlugs: targetSlugs,
+        addonItems,
+        charge,
+        cycleStart: cycleDate,
+        anchorDate: earliestPeriodStart || cycleDate,
+        context: "webhook",
+      })
+    } catch (billErr: any) {
+      SecureLogger.warn("[addon.service] Failed to record add-on bundle billing charge", {
+        partnerId,
+        preapprovalId,
+        error: billErr?.message,
+      })
+    }
+  }
+
+  return anyUpdated || Boolean(preapprovalId)
 }
 
 /**
@@ -716,6 +951,9 @@ export async function verifyAndSyncAddonCheckout(
 
 /**
  * Cancela a assinatura recorrente de um Add-on no Mercado Pago.
+ * Se outros aplicativos compartilharem o mesmo Preapproval consolidado,
+ * apenas reduz o valor mensal no MP e mantém os demais ativos.
+ * Se for o último aplicativo do Preapproval, cancela o Preapproval no MP.
  */
 export async function cancelAddonMpSubscription(
   partnerId: string,
@@ -723,33 +961,79 @@ export async function cancelAddonMpSubscription(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const record = await getPartnerAddonRecord(partnerId, addonSlug)
+    const now = new Date()
+
     if (!record?.mp_preapproval_id) {
       await persistPartnerAddonRecord(partnerId, addonSlug, {
         subscription_status: "cancelled",
         cancel_at_period_end: true,
-        cancelled_at: new Date().toISOString(),
+        cancelled_at: now.toISOString(),
         is_enabled: false,
         mp_init_point: null,
       })
       return { success: true }
     }
 
-    const cancelRes = await cancelMpPreapproval(record.mp_preapproval_id)
-    if (!cancelRes.success) {
-      console.warn("[addon.service] Falha ao cancelar preapproval no MP:", cancelRes.error)
-    }
+    const preapprovalId = record.mp_preapproval_id
+    const allRows = await getAllPartnerAddonRows(partnerId)
+    const remainingOnSameBundle = allRows.filter(
+      (r) =>
+        r.addon_slug !== addonSlug &&
+        r.mp_preapproval_id === preapprovalId &&
+        r.subscription_status === "active" &&
+        !r.cancel_at_period_end,
+    )
 
-    const now = new Date()
     const periodEndMs = record.current_period_end
       ? new Date(record.current_period_end).getTime()
       : 0
     const stillHasPaidTime =
       record.subscription_status === "active" && periodEndMs > now.getTime()
 
+    if (remainingOnSameBundle.length > 0) {
+      // Outros add-ons continuam no mesmo preapproval -> apenas reduzir o valor mensal
+      const remainingSlugs = remainingOnSameBundle.map((r) => r.addon_slug)
+      const newTotal = roundCurrency(
+        remainingSlugs.reduce((sum, slug) => sum + ADDON_REGISTRY[slug].price, 0),
+      )
+
+      const updateRes = await updateMpAddonBundleAmount(
+        preapprovalId,
+        newTotal,
+        buildAddonBundleReason(remainingSlugs),
+      )
+      if (!updateRes.success) {
+        return {
+          success: false,
+          error: "Não foi possível atualizar o valor da assinatura no Mercado Pago. Tente novamente.",
+        }
+      }
+
+      // Desvincula o mp_preapproval_id apenas deste add-on cancelado para que futuras
+      // renovações do bundle não reativem este item.
+      await persistPartnerAddonRecord(partnerId, addonSlug, {
+        subscription_status: "cancelled",
+        cancel_at_period_end: true,
+        cancelled_at: now.toISOString(),
+        mp_preapproval_id: null,
+        mp_init_point: null,
+        is_enabled: stillHasPaidTime ? Boolean(record.is_enabled) : false,
+      })
+
+      return { success: true }
+    }
+
+    // Último add-on do preapproval -> cancelar o preapproval inteiro no Mercado Pago
+    const cancelRes = await cancelMpPreapproval(preapprovalId)
+    if (!cancelRes.success) {
+      console.warn("[addon.service] Falha ao cancelar preapproval no MP:", cancelRes.error)
+    }
+
     await persistPartnerAddonRecord(partnerId, addonSlug, {
       subscription_status: "cancelled",
       cancel_at_period_end: true,
       cancelled_at: now.toISOString(),
+      mp_preapproval_id: null,
       mp_init_point: null,
       is_enabled: stillHasPaidTime ? Boolean(record.is_enabled) : false,
     })
@@ -793,8 +1077,8 @@ export async function cancelPartnerAddonSubscriptionsForPlanInclusion(
     }
 
     // Deduplicate preapproval IDs so shared/consolidated preapprovals are cancelled once.
-    const uniquePreapprovalIds = Array.from(
-      new Set(
+    const uniquePreapprovalIds: string[] = Array.from(
+      new Set<string>(
         activeRows
           .map((r: any) => r.mp_preapproval_id)
           .filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0),

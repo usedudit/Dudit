@@ -9,6 +9,7 @@ import type { BlogPostSummary } from "@/lib/blog/types"
 import BlogCard from "./BlogCard"
 import { BLOG_ACCENT_CLASSES } from "./category-styles"
 import { GridLines } from "../InstitucionalShared"
+import BlogHeader from "./BlogHeader"
 
 interface BlogIndexProps {
     posts: BlogPostSummary[]
@@ -52,6 +53,7 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
 
     return (
         <div className="w-full">
+            <BlogHeader />
             <section className="border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
                 <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
                     <div className="flex items-start gap-8 lg:gap-12">

@@ -115,7 +115,7 @@ export default function PurchasesList({ initialData, initialStats, initialTotalC
             options: ["subscription", "addon", "credit_pack", "order_payment", "service", "marketplace_feature"],
             optionLabels: {
                 subscription: "Assinatura",
-                addon: "Add-on",
+                addon: "Aplicativos",
                 credit_pack: "Pacote de Créditos",
                 order_payment: "Pedido",
                 service: "Serviço",
@@ -378,7 +378,7 @@ export default function PurchasesList({ initialData, initialStats, initialTotalC
                                         const hq = stores.find((s: any) => s.is_headquarters) || stores[0] || {}
                                         const logoUrl = hq.logo_url
                                         const typeLabel = p.purchase_type === "subscription" ? "Assinatura" : 
-                                                          p.purchase_type === "addon" ? "Add-on" :
+                                                          p.purchase_type === "addon" ? "Aplicativos" :
                                                           p.purchase_type === "credit_pack" ? "Créditos" :
                                                           p.purchase_type === "order_payment" ? "Pedido" : p.purchase_type
 

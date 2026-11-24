@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { ChevronLeftIcon, ChevronRightIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from "@/lib/icons"
 import { formatCurrency as brl } from "@/lib/utils"
+import { Badge } from "@/components/reusable"
 
 interface DailyMovement {
     income: number
@@ -126,9 +127,14 @@ export function FinancialCalendarCard({ dailyMovements = {}, className = "" }: F
         <div className={`bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full ${className}`}>
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">
-                    Calendário Financeiro
-                </h3>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+                        <CalendarIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                    </div>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">
+                        Calendário Financeiro
+                    </h3>
+                </div>
 
                 <div className="flex items-center gap-2">
                     <button
@@ -206,14 +212,16 @@ export function FinancialCalendarCard({ dailyMovements = {}, className = "" }: F
                             </span>
 
                             {hasMovement ? (
-                                <span
-                                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap mt-1 ${isPositive
-                                        ? "bg-[#d1fae5] dark:bg-emerald-950/60 text-[#79c325] dark:text-emerald-300"
-                                        : "bg-[#ffe4e6] dark:bg-rose-950/60 text-[#e11d48] dark:text-rose-300"
-                                        }`}
-                                >
-                                    {formatCalendarCompact(net)}
-                                </span>
+                                <>
+                                    <Badge
+                                        variant={isPositive ? "green" : "red"}
+                                        icon={null}
+                                    />
+                                    <span>
+
+                                        {formatCalendarCompact(net)}
+                                    </span>
+                                </>
                             ) : (
                                 <div className="h-[18px]" />
                             )}

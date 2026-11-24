@@ -436,6 +436,7 @@ async function processWebhookWithRetry(
               mpPreapprovalId: preapprovalId.toString(),
               externalReference: authPayData?.external_reference,
               mpStatus: authPayData?.status,
+              authorizedPaymentData: authPayData,
             })
             if (handledAsAddon) {
               console.log(`[WEBHOOK] ✅ Add-on authorized payment for ${preapprovalId} synced (${authPayData?.status})`)

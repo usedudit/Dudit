@@ -167,7 +167,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                     />
                 </Link>
 
-                <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-gray-300 font-medium text-sm">
+                <nav className="hidden xl:flex items-center gap-6 xl:gap-8 text-gray-300 font-medium text-sm">
                     {navItems.map((item) => (
                         <button
                             key={item.page}
@@ -179,7 +179,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                     ))}
                 </nav>
 
-                <div className="hidden lg:block">
+                <div className="hidden xl:block">
                     <Button asChild>
                         <Link href="/auth/login?mode=partner" prefetch={false}>
                             Começar Grátis
@@ -188,7 +188,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                 </div>
 
                 <button
-                    className="lg:hidden text-white p-1"
+                    className="xl:hidden text-white p-1"
                     onClick={() => setMobileOpen(!mobileOpen)}
                     aria-label={mobileOpen ? 'Fechar menu' : 'Abrir menu'}
                     aria-expanded={mobileOpen}
@@ -227,7 +227,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="lg:hidden absolute top-full left-0 w-full bg-brand-dark border-t border-white/10 shadow-lg overflow-hidden"
+                        className="xl:hidden absolute top-full left-0 w-full bg-brand-dark border-t border-white/10 shadow-lg overflow-hidden"
                     >
                         <div className="max-w-[1400px] mx-auto px-4 py-4 flex flex-col gap-1">
                             {navItems.map((item) => (

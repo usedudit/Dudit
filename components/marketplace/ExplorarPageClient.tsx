@@ -1719,6 +1719,15 @@ export function ExplorarPageClient({
 
     const showExploreSections = pageMode === "sections" && !selectedSection
 
+    // Lojas/vitrines exibidas em destaque ou no carrossel de busca (em "tudo",
+    // elas são separadas de `dataToFilter`, então não entram em `filteredResults`).
+    const displayedVitrinesCount =
+        currentType === "tudo" && (!!query || showExploreSections)
+            ? vitrinesDestaque.length
+            : 0
+
+    const totalResultsCount = filteredResults.length + displayedVitrinesCount
+
     // Estado "sem nenhum resultado" da listagem local.
     // NÃO usar `moreDistantItems`/`moreDistantSellers` aqui: o servidor busca esses
     // itens numa query "distante" separada sempre que há busca por cidade, então eles
@@ -1861,7 +1870,7 @@ export function ExplorarPageClient({
                         {!isLandingPage && !isEmptyListing && (
                             <ExplorarHeaderSection
                                 title={pageTitle}
-                                resultsCount={filteredResults.length}
+                                resultsCount={totalResultsCount}
                                 isLoading={isContentLoading}
                                 showBackButton={!!query || !!selectedSection || isCategoryMode}
                                 onBack={() => {
@@ -2020,7 +2029,7 @@ export function ExplorarPageClient({
                                                 </div>
                                             )}
                                         </div>
-                                    ) : rawItems.length > 0 && !hasNextPage && moreDistantItems.length === 0 ? (
+                                    ) : rawItems.length > 0 && displayedVitrinesCount === 0 && !hasNextPage && moreDistantItems.length === 0 ? (
                                         <div className="py-12 flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"

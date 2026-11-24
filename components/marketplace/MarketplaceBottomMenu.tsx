@@ -6,7 +6,10 @@ import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import {
-    HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon, EditIcon, TrashIcon, RepeatIcon
+    HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon, EditIcon, TrashIcon, RepeatIcon,
+    CustomerSupportIcon,
+    NewsIcon,
+    TargetIcon
 } from "@/lib/icons"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
@@ -281,34 +284,15 @@ export function MarketplaceBottomMenu() {
 
                         {/* Navigation Group 1: Activity */}
                         <div className="flex flex-col">
-                            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-heading mb-2 px-2">
                                 Minha atividade
                             </span>
                             <div className="space-y-1">
                                 <MenuItem label="Início" href="/" icon={HomeIcon} onClose={() => setIsMenuOpen(false)} />
                                 <MenuItem
-                                    label="Central de Vendedores"
+                                    label="Central do Vendedor"
                                     href={user ? "/erp/inicio" : "/auth/login?mode=partner"}
                                     icon={StoreIcon}
-                                    onClose={() => setIsMenuOpen(false)}
-                                />
-                                <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} onClose={() => setIsMenuOpen(false)} />
-                                <MenuItem
-                                    label="Favoritos"
-                                    href={user ? "/favoritos" : "/auth/login?next=/favoritos"}
-                                    icon={HeartIcon}
-                                    onClose={() => setIsMenuOpen(false)}
-                                />
-                                <MenuItem
-                                    label="Minhas Assinaturas"
-                                    href={user ? "/assinaturas" : "/auth/login?next=/assinaturas"}
-                                    icon={RepeatIcon}
-                                    onClose={() => setIsMenuOpen(false)}
-                                />
-                                <MenuItem
-                                    label="Minhas avaliações"
-                                    href={user ? "perfil?tab=avaliacoes" : "/auth/login"}
-                                    icon={StarIcon}
                                     onClose={() => setIsMenuOpen(false)}
                                 />
                             </div>
@@ -316,14 +300,15 @@ export function MarketplaceBottomMenu() {
 
                         {/* Navigation Group 2: Institutional */}
                         <div className="flex flex-col mt-6">
-                            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-2">
-                                Institucional
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-heading mb-2 px-2">
+                                A Dudit
                             </span>
                             <div className="space-y-1">
-                                <MenuItem label="Sobre a Dudit" href="/institucional/sobre" icon={InfoIcon} onClose={() => setIsMenuOpen(false)} />
-                                <MenuItem label="Nossos Planos" href="/institucional/planos" icon={MoneyIcon} onClose={() => setIsMenuOpen(false)} />
-                                <MenuItem label="Termos e condições" href="/institucional/termos" icon={FileTextIcon} onClose={() => setIsMenuOpen(false)} />
-                                <MenuItem label="Política de privacidade" href="/institucional/privacidade" icon={ShieldIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Como a Dudit funciona" href="/institucional/inicio" icon={InfoIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Por que a Dudit existe" href="/institucional/sobre" icon={TargetIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Blog do Dino" href="/blog" icon={NewsIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} onClose={() => setIsMenuOpen(false)} />
+                                <MenuItem label="Fale com a gente" href="/institucional/contato" icon={CustomerSupportIcon} onClose={() => setIsMenuOpen(false)} />
                             </div>
                         </div>
 

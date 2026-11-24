@@ -13,13 +13,17 @@ import {
     TwitterIcon,
     UserIcon,
     WhatsappIcon,
+    ShareIcon,
+    XIcon,
 } from "@/lib/icons"
-import { Button } from "@/components/reusable"
+import { Button, Input, DefaultModal, Separator } from "@/components/reusable"
 import { getBlogCategory, BLOG_RELATED_LINKS } from "@/lib/blog/categories"
 import type { BlogPost, BlogPostSummary } from "@/lib/blog/types"
 import type { BlogTocItem } from "@/lib/blog/content"
 import { formatBlogDate, getBlogCategoryUrl, getBlogPostUrl } from "@/lib/blog/utils"
 import BlogCard from "./BlogCard"
+import BlogHeader from "./BlogHeader"
+import { useNotification } from "@/hooks/use-notification"
 
 interface BlogArticleProps {
     post: BlogPost
@@ -36,9 +40,50 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
 
     const [copied, setCopied] = useState(false)
     const [activeId, setActiveId] = useState<string>("")
+    const [showShareModal, setShowShareModal] = useState(false)
+    const [isLinkCopied, setIsLinkCopied] = useState(false)
+    const { success } = useNotification()
 
     const shareUrl = typeof window !== "undefined" ? window.location.href : `https://dudit.com.br${getBlogPostUrl(post.slug)}`
     const shareText = useMemo(() => `${post.title} — Blog do Dino (Dudit)`, [post.title])
+
+    const fullShareMessage = `${shareText}\n${shareUrl}`
+
+    const socials = useMemo(() => [
+        {
+            icon: WhatsappIcon,
+            name: "WhatsApp",
+            color: "bg-[#25D366]",
+            url: `https://api.whatsapp.com/send?text=${encodeURIComponent(fullShareMessage)}`
+        },
+        {
+            icon: TwitterIcon,
+            name: "X",
+            color: "bg-black",
+            url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`
+        },
+        {
+            icon: LinkedinIcon,
+            name: "LinkedIn",
+            color: "bg-[#0A66C2]",
+            url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`
+        }
+    ], [shareText, shareUrl])
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl)
+            setCopied(true)
+            setIsLinkCopied(true)
+            success("Sucesso", "Link copiado para a área de transferência!")
+            setTimeout(() => {
+                setCopied(false)
+                setIsLinkCopied(false)
+            }, 2000)
+        } catch {
+            // Clipboard can be blocked by the browser; sharing still works.
+        }
+    }
 
     useEffect(() => {
         if (toc.length === 0) return
@@ -60,18 +105,8 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
         return () => observer.disconnect()
     }, [toc])
 
-    const copyLink = async () => {
-        try {
-            await navigator.clipboard.writeText(shareUrl)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        } catch {
-            // Clipboard can be blocked by the browser; sharing still works.
-        }
-    }
-
-    const openShare = (url: string) => {
-        window.open(url, "_blank", "noopener,noreferrer,width=720,height=640")
+    const handleShare = () => {
+        setShowShareModal(true)
     }
 
     const coverFigure = post.cover_image_url ? (
@@ -93,9 +128,14 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
 
     return (
         <div className="w-full bg-white dark:bg-dark-surface">
+            <BlogHeader
+                isArticle={true}
+                onBack={() => window.history.back()}
+                onShare={handleShare}
+            />
             <article className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-8 lg:pt-12">
                 <div className="mb-8 flex items-start gap-3">
-                    <Button variant="filled" asChild className="mt-0.5 h-10 w-10 shrink-0 p-0">
+                    <Button variant="filled" asChild className="mt-0.5 h-10 w-10 shrink-0 p-0 xl:hidden">
                         <Link href="/blog" prefetch={false} aria-label="Voltar para o blog">
                             <ChevronLeftIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
                         </Link>
@@ -144,26 +184,10 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                         <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => openShare(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`)}
-                            aria-label="Compartilhar no WhatsApp"
+                            onClick={handleShare}
+                            aria-label="Compartilhar"
                         >
-                            <WhatsappIcon size={15} />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => openShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`)}
-                            aria-label="Compartilhar no X"
-                        >
-                            <TwitterIcon size={15} />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => openShare(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`)}
-                            aria-label="Compartilhar no LinkedIn"
-                        >
-                            <LinkedinIcon size={15} />
+                            <ShareIcon size={15} />
                         </Button>
                     </div>
                 </header>
@@ -323,6 +347,96 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                     </section>
                 )}
             </article>
+
+            {/* Share Modal */}
+            <DefaultModal
+                isOpen={showShareModal}
+                onClose={() => {
+                    setShowShareModal(false)
+                    setIsLinkCopied(false)
+                }}
+                maxWidth="md"
+                hideHeader={true}
+            >
+                <div className="flex flex-col relative">
+                    <button
+                        onClick={() => {
+                            setShowShareModal(false)
+                            setIsLinkCopied(false)
+                        }}
+                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
+                        title="Fechar"
+                    >
+                        <XIcon size={18} />
+                    </button>
+
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
+                        <img
+                            src="https://img.dudit.com.br/static/illustrations/CompartilharItem.png"
+                            alt="Compartilhar Artigo"
+                            className="w-64 h-auto object-contain transform translate-y-7"
+                        />
+                    </div>
+
+                    <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
+                        Gostou? Espalhe a dica!
+                    </h4>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm max-w-sm mx-auto mb-6 text-center leading-relaxed">
+                        Compartilhe com seus amigos e ajude mais pessoas a descobrirem!
+                    </p>
+
+                    <div className="w-full space-y-6">
+                        <div>
+                            <div className="flex gap-2 items-end">
+                                <Input
+                                    label="Link do artigo"
+                                    value={shareUrl}
+                                    readOnly
+                                    className="flex-1"
+                                />
+                                <Button
+                                    variant="outline"
+                                    className="shrink-0 h-[42px] w-[42px] p-0 mb-1 flex items-center justify-center"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(shareUrl)
+                                        setIsLinkCopied(true)
+                                        success("Sucesso", "Link copiado para a área de transferência!")
+                                        setTimeout(() => setIsLinkCopied(false), 2000)
+                                    }}
+                                >
+                                    {isLinkCopied ? <CheckCircleIcon size={20} className="text-brand-green" /> : <CopyIcon size={20} />}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-body truncate block mb-4">
+                                Compartilhar em:
+                            </label>
+                            <div className="flex items-center justify-center gap-4 sm:gap-6 pb-2">
+                                {socials.map((social) => (
+                                    <a
+                                        key={social.name}
+                                        href={social.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex flex-col items-center gap-2 group transition-transform hover:scale-105"
+                                    >
+                                        <div className={`${social.color} w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white transition-all shadow-sm`}>
+                                            <social.icon size={24} />
+                                        </div>
+                                        <span className="text-[10px] sm:text-xs font-medium text-brand-inactive-text dark:text-dark-body group-hover:text-brand-dark dark:text-dark-heading transition-colors">
+                                            {social.name}
+                                        </span>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </DefaultModal>
         </div>
     )
 }

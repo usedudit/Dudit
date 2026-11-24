@@ -74,7 +74,7 @@ function paymentMethodForPurchase(p: PurchaseWithRelations): ResolvedPaymentMeth
 function getTypeLabel(type: string): string {
     const labels: Record<string, string> = {
         subscription: "Assinatura",
-        addon: "Add-on",
+        addon: "Aplicativos",
         marketplace_feature: "Funcionalidade",
         credit_pack: "Créditos",
         service: "Serviço",
@@ -233,7 +233,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 options: ["subscription", "addon", "credit_pack", "order_payment"],
                 optionLabels: {
                     subscription: "Assinatura",
-                    addon: "Add-on",
+                    addon: "Aplicativos",
                     credit_pack: "Pacote de Créditos",
                     order_payment: "Pedido",
                 },

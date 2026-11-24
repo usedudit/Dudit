@@ -42,6 +42,24 @@ export async function countActiveRecurringSubscriptions(partnerId: string): Prom
   return count || 0
 }
 
+export async function countActiveStoreRecurringSubscriptions(
+  partnerId: string,
+  storeId: string,
+): Promise<number> {
+  const admin = getAdminClient()
+  const { count, error } = await admin
+    .from("recurring_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("partner_id", partnerId)
+    .eq("store_id", storeId)
+    .in("status", NON_TERMINAL_STATUSES)
+  if (error) {
+    console.error("[RECURRING_LIMITS] Falha ao contar assinaturas da filial:", error.message)
+    return 0
+  }
+  return count || 0
+}
+
 /** Limite de planos recorrentes ativos (valor proposto = atual + 1). */
 export async function checkRecurringPlanCreateLimit(partnerId: string) {
   const current = await countActiveRecurringPlans(partnerId)
@@ -286,6 +304,43 @@ export async function cancelAllMarketplaceSubscriptions(
     const ok = await cancelSubscriptionForAccountDeletion(
       partnerId,
       sub as { id: string; mp_preapproval_id?: string | null },
+    )
+    if (ok) cancelled++
+    else failed++
+  }
+  return { cancelled, failed }
+}
+
+/**
+ * Cancela em lote todas as assinaturas não terminais de uma filial específica.
+ * Usado pelo modal de exclusão de filial antes de confirmar a remoção.
+ */
+export async function cancelStoreMarketplaceSubscriptions(
+  partnerId: string,
+  storeId: string,
+): Promise<{ cancelled: number; failed: number }> {
+  const admin = getAdminClient()
+
+  const { data: subs, error } = await admin
+    .from("recurring_subscriptions")
+    .select("id, mp_preapproval_id")
+    .eq("partner_id", partnerId)
+    .eq("store_id", storeId)
+    .in("status", NON_TERMINAL_STATUSES)
+
+  if (error) {
+    console.error("[RECURRING_LIMITS] Falha ao buscar assinaturas da filial para cancelar:", error.message)
+    return { cancelled: 0, failed: 0 }
+  }
+  if (!subs || subs.length === 0) return { cancelled: 0, failed: 0 }
+
+  let cancelled = 0
+  let failed = 0
+  for (const sub of subs) {
+    const ok = await cancelSubscriptionForAccountDeletion(
+      partnerId,
+      sub as { id: string; mp_preapproval_id?: string | null },
+      "assinaturas canceladas em lote pelo lojista ao excluir a filial.",
     )
     if (ok) cancelled++
     else failed++
