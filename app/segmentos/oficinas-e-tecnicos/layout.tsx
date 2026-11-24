@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/segmentos/oficinas-e-tecnicos",
     },
-    keywords: [
-        "sistema para oficina mecanica",
-        "ordem de servico celular",
-        "software para auto center",
-        "controle de estoque de peças",
-        "programa para mecanica gratis",
-        "os online whatsapp",
-    ],
 };
 
 export default function OficinasETecnicosLayout({

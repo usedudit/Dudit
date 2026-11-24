@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
-import { Button, Badge, InfoCard, FormSection, ListItem, IconPlaceholder, Input } from "@/components/reusable"
+import { Button, Badge, InfoCard, FormSection, ListItem, IconPlaceholder, Input, Spinner, PhoneInput } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -105,6 +105,11 @@ export function WhatsAppIntegrationPage({
     const [evoIsLoading, setEvoIsLoading] = useState(false)
     const [evoConfigured, setEvoConfigured] = useState<boolean | null>(null)
 
+    // Evolution test-send state
+    const [evoTestPhone, setEvoTestPhone] = useState("")
+    const [evoTestSending, setEvoTestSending] = useState(false)
+    const [evoTestResult, setEvoTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+
     // Keep track of latest evoStatus in a ref for unmount cleanup
     const evoStatusRef = useRef(evoStatus)
     useEffect(() => {
@@ -206,6 +211,14 @@ export function WhatsAppIntegrationPage({
             }
         }
     }, [evoConnection, evoStatus])
+
+    // Prefill the test-send field with the connected number (falls back to what the user typed)
+    useEffect(() => {
+        const connectedPhone = evoPhoneNumber || evoConnection?.phoneNumber
+        if (connectedPhone) {
+            setEvoTestPhone((current) => current || connectedPhone)
+        }
+    }, [evoPhoneNumber, evoConnection?.phoneNumber])
 
     // Polling for connection status when qr_pending or connecting
     useEffect(() => {
@@ -344,6 +357,30 @@ export function WhatsAppIntegrationPage({
         } finally { setEvoIsLoading(false) }
     }
 
+    const handleEvoTest = async () => {
+        const phone = evoTestPhone.trim()
+        if (!phone) { toast.error("Informe um telefone para teste"); return }
+        setEvoTestSending(true)
+        setEvoTestResult(null)
+        try {
+            const res = await testEvolutionConnectionAction(phone, storeId)
+            if (!res.success) {
+                setEvoTestResult({ ok: false, message: res.error })
+                toast.error("Falha no teste de envio")
+                return
+            }
+            const detail = [res.data.instanceName, res.data.apiHost].filter(Boolean).join(" · ")
+            setEvoTestResult({
+                ok: true,
+                message: `Mensagem aceita pela API${detail ? ` (${detail})` : ""}. Confira no WhatsApp.`,
+            })
+            toast.success("Mensagem de teste enviada")
+            await refresh()
+        } finally {
+            setEvoTestSending(false)
+        }
+    }
+
     const handleEvoRefreshStatus = async () => {
         setEvoIsLoading(true)
         try {
@@ -470,6 +507,34 @@ export function WhatsAppIntegrationPage({
                                                                 </div>
                                                             }
                                                         />
+
+                                                        <div className="pt-5 border-t border-brand-border dark:border-dark-border">
+                                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Testar envio</h3>
+                                                            <p className="text-xs text-brand-muted dark:text-dark-body mt-1">
+                                                                Envia uma mensagem real de WhatsApp pelo número conectado. Use o seu próprio número para conferir se a API está funcionando.
+                                                            </p>
+                                                            <div className="flex flex-col sm:flex-row sm:items-start gap-2 mt-3">
+                                                                <PhoneInput
+                                                                    value={evoTestPhone}
+                                                                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setEvoTestPhone(e.target.value)}
+                                                                    disabled={evoTestSending}
+                                                                    placeholder="(11) 99876-5432"
+                                                                />
+                                                                <Button
+                                                                    variant="outline"
+                                                                    onClick={handleEvoTest}
+                                                                    disabled={evoTestSending || !evoTestPhone.trim()}
+                                                                    className="h-[42px] shrink-0"
+                                                                >
+                                                                    {evoTestSending ? "Enviando..." : "Enviar teste"}
+                                                                </Button>
+                                                            </div>
+                                                            {evoTestResult && (
+                                                                <p className={`text-xs mt-2 ${evoTestResult.ok ? "text-brand-green" : "text-brand-red"}`}>
+                                                                    {evoTestResult.message}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                         <div className="md:hidden">
                                                             <Button
                                                                 variant="destructive"
@@ -541,7 +606,7 @@ export function WhatsAppIntegrationPage({
                                                                         </div>
                                                                     ) : (
                                                                         <div className="mt-8 flex flex-col items-center justify-center gap-3 py-10">
-                                                                            <div className="w-8 h-8 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
+                                                                            <Spinner />
                                                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Gerando QR Code...</p>
                                                                         </div>
                                                                     )}

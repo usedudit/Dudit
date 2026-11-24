@@ -39,7 +39,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
         title,
         description,
-        keywords: post.seo_keywords.length > 0 ? post.seo_keywords : post.tags,
         alternates: { canonical },
         openGraph: {
             title,

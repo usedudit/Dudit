@@ -366,6 +366,17 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     const paginatedProducts = products.slice((productsPage - 1) * productsItemsPerPage, productsPage * productsItemsPerPage)
 
     const [isScrolled, setIsScrolled] = useState(false)
+    const [specifications, setSpecifications] = useState<{ name: string; value: string }[]>(() => {
+        const raw = editData?.specifications
+        if (Array.isArray(raw)) return raw
+        if (typeof raw === "string") {
+            try {
+                const parsed = JSON.parse(raw)
+                if (Array.isArray(parsed)) return parsed
+            } catch { }
+        }
+        return []
+    })
     const pendingSpecsRef = useRef<{ name: string; value: string }[] | null>(null)
 
     const handleScroll = useCallback(() => {
@@ -707,7 +718,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
             variant_id: p.variant_id || null
         }))
 
-        const specsPayload = pendingSpecsRef.current || editData?.specifications || undefined
+        const specsPayload = pendingSpecsRef.current ?? (specifications.length > 0 ? specifications : editData?.specifications) ?? undefined
 
         if (editData) {
             if (onSaveOverride) {
@@ -2087,12 +2098,18 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                         <SpecificationsTab
                                             partnerId={partnerId}
                                             serviceOrderId={editData?.id || ""}
-                                            specifications={editData?.specifications || []}
+                                            specifications={specifications}
                                             isEditing={!isFieldLocked("specifications")}
+                                            onChange={(specs) => {
+                                                setSpecifications(specs)
+                                                pendingSpecsRef.current = specs
+                                            }}
                                             onSave={async (specs) => {
+                                                setSpecifications(specs)
                                                 if (editData?.id) {
                                                     const res = await saveServiceOrderSpecificationsAction(partnerId, editData.id, specs)
                                                     if (!res.success) throw new Error(res.error)
+                                                    pendingSpecsRef.current = null
                                                 } else {
                                                     pendingSpecsRef.current = specs
                                                 }

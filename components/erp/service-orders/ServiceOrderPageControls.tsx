@@ -216,7 +216,7 @@ const ServiceOrderPageControls: React.FC<ServiceOrderPageControlsProps> = ({
                             <div className="w-80">
                                 <Input
                                     name="search"
-                                    placeholder="Buscar por nº, título ou cliente..."
+                                    placeholder="Buscar por nº, cliente, item, especificação..."
                                     value={search}
                                     onChange={(e) => onSearchChange(e.target.value)}
                                     className="h-[42px]"

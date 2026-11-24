@@ -319,19 +319,21 @@ export function DrePrintModal({
                       className="m-0 p-0 h-full flex flex-col flex-1 min-h-0 focus-visible:outline-none"
                       forceMount
                     >
-                      <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center">
-                        <DreA4Preview
-                          report={report}
-                          regime={regime}
-                          startDate={startDate}
-                          endDate={endDate}
-                          storeName={storeName}
-                          showSubItems={showSubItems}
-                          showComparison={showComparison}
-                          showKpiSummary={showKpiSummary}
-                          showSignatures={showSignatures}
-              partnerHeader={partnerHeader || undefined}
-                        />
+                      <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center items-start">
+                        <div className="w-full h-full min-h-[400px]">
+                          <DreA4Preview
+                            report={report}
+                            regime={regime}
+                            startDate={startDate}
+                            endDate={endDate}
+                            storeName={storeName}
+                            showSubItems={showSubItems}
+                            showComparison={showComparison}
+                            showKpiSummary={showKpiSummary}
+                            showSignatures={showSignatures}
+                            partnerHeader={partnerHeader || undefined}
+                          />
+                        </div>
                       </div>
                     </TabsContent>
                   </div>

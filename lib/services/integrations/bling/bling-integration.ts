@@ -14,6 +14,7 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import type { PartnerIntegrationRow } from "@/lib/services/integrations/types"
 import { isStoreCreditMethod } from "@/lib/payments/payment-method"
+import { parseDeliveryAddressString } from "@/lib/utils/format-address"
 
 export const BLING_PROVIDER = "bling"
 
@@ -822,21 +823,48 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       addressData = addrRow || null
     }
 
+    const rawDeliveryAddress = String(order.delivery_address || "").trim()
+    const parsedDelivery = parseDeliveryAddressString(rawDeliveryAddress)
+    const breakdown = (order.delivery_breakdown as Record<string, any> | null) || null
+
+    // Endereço de ENTREGA do pedido: prioriza sempre order.delivery_address (pode ser diferente do endereço do cadastro do cliente)
+    const deliveryStreet = parsedDelivery?.street || addressData?.street || (rawDeliveryAddress || undefined)
+    const deliveryNumber = parsedDelivery?.number || (!parsedDelivery?.street ? addressData?.number : undefined) || "S/N"
+    const deliveryComplement = parsedDelivery?.complement || (!parsedDelivery?.street ? addressData?.complement : undefined) || ""
+    const deliveryNeighborhood = parsedDelivery?.neighborhood || (!parsedDelivery?.street ? addressData?.neighborhood : undefined) || ""
+    const deliveryCity = parsedDelivery?.city || addressData?.city || ""
+    const deliveryUf = parsedDelivery?.state || addressData?.state || ""
+    const deliveryCep = (
+      parsedDelivery?.zipCode ||
+      breakdown?.toPostalCode ||
+      addressData?.zip_code ||
+      ""
+    ).replace(/\D/g, "")
+
+    // Endereço cadastral do contato: usa o endereço padrão do cliente, ou o de entrega se o cliente não tiver cadastro
+    const contactStreet = addressData?.street || deliveryStreet
+    const contactNumber = addressData?.number || deliveryNumber
+    const contactComplement = addressData?.complement || deliveryComplement
+    const contactNeighborhood = addressData?.neighborhood || deliveryNeighborhood
+    const contactCity = addressData?.city || deliveryCity
+    const contactUf = addressData?.state || deliveryUf
+    const contactCep = (addressData?.zip_code || deliveryCep || "").replace(/\D/g, "")
+
     const contactId = await client.findOrCreateContact({
       nome: customerName,
       numeroDocumento: customerDocument,
       tipo: isPj ? "J" : "F",
       email: customerEmail,
       telefone: customerPhone,
-      endereco: addressData
+      endereco: contactStreet
         ? {
-          endereco: addressData.street || undefined,
-          numero: addressData.number || undefined,
-          complemento: addressData.complement || undefined,
-          bairro: addressData.neighborhood || undefined,
-          cep: addressData.zip_code?.replace(/\D/g, "") || undefined,
-          municipio: addressData.city || undefined,
-          uf: addressData.state || undefined,
+          endereco: contactStreet,
+          numero: contactNumber || undefined,
+          complemento: contactComplement || undefined,
+          bairro: contactNeighborhood || undefined,
+          cep: contactCep || undefined,
+          municipio: contactCity || undefined,
+          uf: contactUf || undefined,
         }
         : undefined,
     })
@@ -846,7 +874,6 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     const activeShipment = Array.isArray(order.order_shipments)
       ? order.order_shipments.find((s: any) => s.kind !== "return")
       : null
-    const breakdown = (order.delivery_breakdown as Record<string, any> | null) || null
     const isCarrier = Boolean(
       activeShipment?.carrier ||
       breakdown?.source === "superfrete" ||
@@ -929,17 +956,17 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
         fretePorConta: blingFretePorConta,
         frete: deliveryFee > 0 ? deliveryFee : 0,
         ...(carrierName ? { contato: { nome: carrierName } } : {}),
-        ...(addressData?.street
+        ...(!isPickup && deliveryStreet
           ? {
             etiqueta: {
               nome: customerName,
-              endereco: addressData.street,
-              numero: addressData.number || "",
-              complemento: addressData.complement || "",
-              bairro: addressData.neighborhood || "",
-              municipio: addressData.city || "",
-              uf: addressData.state || "",
-              cep: addressData.zip_code?.replace(/\D/g, "") || "",
+              endereco: deliveryStreet,
+              numero: deliveryNumber,
+              complemento: deliveryComplement,
+              bairro: deliveryNeighborhood,
+              municipio: deliveryCity,
+              uf: deliveryUf,
+              cep: deliveryCep,
             },
           }
           : {}),

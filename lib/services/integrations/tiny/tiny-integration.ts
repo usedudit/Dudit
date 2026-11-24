@@ -8,6 +8,7 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import type { PartnerIntegrationRow } from "@/lib/services/integrations/types"
 import { isStoreCreditMethod } from "@/lib/payments/payment-method"
+import { parseDeliveryAddressString } from "@/lib/utils/format-address"
 
 export const TINY_PROVIDER = "tiny"
 
@@ -23,6 +24,8 @@ export interface TinyIntegrationMetadata {
   synced_count?: number
   last_export_at?: string | null
   last_error?: string | null
+  last_webhook_at?: string | null
+  last_webhook_event?: string | null
 }
 
 /**
@@ -913,16 +916,27 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     }
 
     const rawDeliveryAddress = String(order.delivery_address || "").trim()
+    const parsedDelivery = parseDeliveryAddressString(rawDeliveryAddress)
     const cepMatch = rawDeliveryAddress.match(/\b\d{5}-?\d{3}\b/)
     const extractedCep = cepMatch ? cepMatch[0].replace(/\D/g, "") : undefined
 
-    const clientStreet = addressData?.street || rawDeliveryAddress || undefined
-    const clientNumber = addressData?.number || undefined
-    const clientComplement = addressData?.complement || undefined
-    const clientNeighborhood = addressData?.neighborhood || undefined
-    const clientCity = addressData?.city || undefined
-    const clientUf = addressData?.state || undefined
-    const clientCep = addressData?.zip_code?.replace(/\D/g, "") || extractedCep || undefined
+    // Endereço cadastral do cliente (prioriza addresses; fallback para endereço de entrega)
+    const clientStreet = addressData?.street || parsedDelivery?.street || rawDeliveryAddress || undefined
+    const clientNumber = addressData?.number || parsedDelivery?.number || undefined
+    const clientComplement = addressData?.complement || parsedDelivery?.complement || undefined
+    const clientNeighborhood = addressData?.neighborhood || parsedDelivery?.neighborhood || undefined
+    const clientCity = addressData?.city || parsedDelivery?.city || undefined
+    const clientUf = addressData?.state || parsedDelivery?.state || undefined
+    const clientCep = addressData?.zip_code?.replace(/\D/g, "") || parsedDelivery?.zipCode?.replace(/\D/g, "") || extractedCep || undefined
+
+    // Endereço de ENTREGA do pedido (sempre prioriza order.delivery_address, mesmo quando diferente do cadastro do cliente)
+    const deliveryStreet = parsedDelivery?.street || rawDeliveryAddress || addressData?.street || undefined
+    const deliveryNumber = parsedDelivery?.number || (!parsedDelivery?.street ? addressData?.number : undefined) || undefined
+    const deliveryComplement = parsedDelivery?.complement || (!parsedDelivery?.street ? addressData?.complement : undefined) || undefined
+    const deliveryNeighborhood = parsedDelivery?.neighborhood || (!parsedDelivery?.street ? addressData?.neighborhood : undefined) || undefined
+    const deliveryCity = parsedDelivery?.city || addressData?.city || undefined
+    const deliveryUf = parsedDelivery?.state || addressData?.state || undefined
+    const deliveryCep = parsedDelivery?.zipCode?.replace(/\D/g, "") || extractedCep || addressData?.zip_code?.replace(/\D/g, "") || undefined
 
     // Resolve dados de frete e transporte
     const deliveryFee = Number(order.delivery_fee || 0)
@@ -1094,18 +1108,18 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
           uf: clientUf,
           cep: clientCep,
         },
-        endereco_entrega: rawDeliveryAddress
+        endereco_entrega: !isPickup && deliveryStreet
           ? {
             nome_destinatario: customerName,
             tipo_pessoa: isPj ? ("J" as const) : ("F" as const),
             cpf_cnpj: customerDocument,
-            endereco: clientStreet,
-            numero: clientNumber,
-            complemento: clientComplement,
-            bairro: clientNeighborhood,
-            cidade: clientCity,
-            uf: clientUf,
-            cep: clientCep,
+            endereco: deliveryStreet,
+            numero: deliveryNumber,
+            complemento: deliveryComplement,
+            bairro: deliveryNeighborhood,
+            cidade: deliveryCity,
+            uf: deliveryUf,
+            cep: deliveryCep,
             fone: customerPhone,
           }
           : undefined,

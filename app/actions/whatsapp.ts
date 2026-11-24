@@ -47,6 +47,18 @@ function extractErrorMessage(error: unknown): string {
     return "Erro desconhecido"
 }
 
+/** Returns just the host of an Evolution API URL (safe to show in the UI, never includes the API key). */
+function getConnectionHost(apiUrl: string | null | undefined): string | null {
+    if (!apiUrl) return null
+    const trimmed = apiUrl.trim()
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+    try {
+        return new URL(withProtocol).host
+    } catch {
+        return trimmed
+    }
+}
+
 type WhatsappMessageRow = {
     id: string
     phone_number: string
@@ -859,7 +871,15 @@ export async function getEvolutionStatusAction(storeId?: string | null): Promise
     }
 }
 
-export async function testEvolutionConnectionAction(phone: string, storeId?: string | null): Promise<ActionResponse<{ messageId: string | null }>> {
+export async function testEvolutionConnectionAction(phone: string, storeId?: string | null): Promise<
+    ActionResponse<{
+        messageId: string | null
+        providerMessageId: string | null
+        status: string
+        instanceName: string | null
+        apiHost: string | null
+    }>
+> {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const context = await getCurrentPartnerContext()
@@ -871,6 +891,13 @@ export async function testEvolutionConnectionAction(phone: string, storeId?: str
             return { success: false, error: "Integração Evolution não está ativa" }
         }
 
+        const instanceName = connection.instance_name
+        const apiHost = getConnectionHost(connection.api_url)
+        const diagnostic = [
+            instanceName ? `instância ${instanceName}` : null,
+            apiHost ? `servidor ${apiHost}` : null,
+        ].filter(Boolean).join(" · ")
+
         const result = await queueWhatsappMessage({
             partnerId: context.partnerId,
             storeId,
@@ -881,24 +908,54 @@ export async function testEvolutionConnectionAction(phone: string, storeId?: str
             idempotencyKey: `test:evolution:${context.partnerId}:${phone}:${Date.now()}`,
         })
 
-        if (result.messageId) {
-            await processWhatsappMessageById(result.messageId)
+        if (!result.messageId) {
+            const reason = result.reason === "invalid_phone_number"
+                ? "Telefone inválido. Informe DDD + número."
+                : result.reason === "integration_inactive"
+                    ? "Integração inativa para esta loja."
+                    : "Não foi possível preparar a mensagem de teste."
+            return { success: false, error: `${reason}${diagnostic ? ` (${diagnostic})` : ""}` }
+        }
 
-            const admin = getAdminClient()
-            const { data: updatedMsg } = await admin
-                .from("whatsapp_messages")
-                .select("status, error_message")
-                .eq("id", result.messageId)
-                .single()
+        await processWhatsappMessageById(result.messageId)
 
-            if (updatedMsg && updatedMsg.status === "failed") {
-                revalidatePath("/erp/configuracoes")
-                return { success: false, error: updatedMsg.error_message || "Falha ao enviar mensagem de teste" }
+        const admin = getAdminClient()
+        const { data: updatedMsg } = await admin
+            .from("whatsapp_messages")
+            .select("status, error_message, provider_message_id")
+            .eq("id", result.messageId)
+            .single()
+
+        revalidatePath("/erp/configuracoes")
+
+        if (!updatedMsg) {
+            return { success: false, error: `Mensagem de teste criada mas não encontrada${diagnostic ? ` (${diagnostic})` : ""}` }
+        }
+
+        if (updatedMsg.status === "failed") {
+            return {
+                success: false,
+                error: `Falha ao enviar${diagnostic ? ` (${diagnostic})` : ""}: ${updatedMsg.error_message || "erro desconhecido"}`,
             }
         }
 
-        revalidatePath("/erp/configuracoes")
-        return { success: true, data: { messageId: result.messageId } }
+        if (updatedMsg.status === "pending") {
+            return {
+                success: false,
+                error: `Envio falhou e foi reagendado${diagnostic ? ` (${diagnostic})` : ""}: ${updatedMsg.error_message || "erro desconhecido"}`,
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                messageId: result.messageId,
+                providerMessageId: updatedMsg.provider_message_id ?? null,
+                status: updatedMsg.status,
+                instanceName,
+                apiHost,
+            },
+        }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
         console.error("[WhatsApp] testEvolutionConnectionAction error:", msg, error)

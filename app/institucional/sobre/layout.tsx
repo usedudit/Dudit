@@ -32,16 +32,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/institucional/sobre",
     },
-    keywords: [
-        "sobre a dudit",
-        "o que é a dudit",
-        "sistema de gestao comercial",
-        "vender para todo o brasil",
-        "envio transportadora correios",
-        "vitrine digital sem taxa",
-        "pdv balcao",
-        "dudit brasil",
-    ],
 };
 
 export default function InstitucionalSobreLayout({

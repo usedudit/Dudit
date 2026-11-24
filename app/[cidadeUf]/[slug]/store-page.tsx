@@ -7,6 +7,7 @@ import { VendorPageClient } from "@/components/marketplace/VendorPage"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { getStoreUrl } from "@/lib/utils/url-generator"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 
 export async function StorePage({ storeData }: { storeData: any }) {
     const partner = storeData.partners
@@ -95,8 +96,47 @@ export async function StorePage({ storeData }: { storeData: any }) {
         count: reviews?.filter((r: any) => Math.round(r.rating) === star).length || 0,
     }))
 
+    const canonicalUrl = `https://dudit.com.br${getStoreUrl(storeData)}`
+    const storeRating = Number(storeData.rating ?? 0)
+
+    const schemaJsonLd = {
+        "@context": "https://schema.org",
+        "@type": ["Store", "LocalBusiness", "Organization"],
+        name: partnerData.storeName,
+        url: canonicalUrl,
+        image: partnerData.storeImageUrl || "https://img.dudit.com.br/static/Logo.png",
+        description: partnerData.storeDescription || "",
+        address: {
+            "@type": "PostalAddress",
+            streetAddress: partnerData.street || "",
+            addressLocality: partnerData.city || "",
+            addressRegion: partnerData.state || "",
+            postalCode: partnerData.zipCode || "",
+            addressCountry: "BR",
+        },
+        ...(partnerData.phone ? { telephone: partnerData.phone } : {}),
+        ...(partnerData.lat && partnerData.lng ? {
+            geo: {
+                "@type": "GeoCoordinates",
+                latitude: partnerData.lat,
+                longitude: partnerData.lng,
+            },
+        } : {}),
+        ...(storeRating > 0 ? {
+            aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: storeRating.toFixed(1),
+                reviewCount: storeStats.reviewsCount || 1,
+            },
+        } : {}),
+    }
+
     return (
         <div className="min-h-screen bg-white dark:bg-dark-surface w-full max-w-[100vw] overflow-x-hidden flex flex-col">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}
+            />
             <main className="lg:pt-[120px] flex-grow">
                 <VendorPageClient
                     partner={partnerData}

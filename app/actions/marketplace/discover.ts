@@ -153,6 +153,22 @@ function normalizeCitySlug(name: string): string {
         .replace(/(^-|-$)/g, "")
 }
 
+const ESTADO_NAME_TO_UF: Record<string, string> = Object.fromEntries(
+    Object.entries(ESTADOS).map(([uf, name]) => [
+        normalizeCitySlug(name),
+        uf.toLowerCase(),
+    ])
+)
+
+function normalizeStateToUF(value?: string | null): string | null {
+    if (!value) return null
+    const trimmed = value.trim().toLowerCase()
+    if (!trimmed || trimmed === "br" || trimmed === "brasil") return null
+    if (trimmed.length === 2 && ESTADOS[trimmed.toUpperCase()]) return trimmed
+    const slug = normalizeCitySlug(trimmed)
+    return ESTADO_NAME_TO_UF[slug] || trimmed
+}
+
 // ─── Section title/subtitle by scope ───────────────────────────────────────
 
 function sectionDisplay(
@@ -239,13 +255,16 @@ function sectionDisplay(
 
 type WithTier = { _tier: number }
 
-function determineDisplayScope(items: WithTier[], ctx: DiscoverCtx): "city" | "state" | "country" {
-    const cityCount = items.filter(i => i._tier === 0).length
-    const stateCount = items.filter(i => i._tier === 1).length
-
+function determineDisplayScope(_items: WithTier[], ctx: DiscoverCtx): "city" | "state" | "country" {
     if (ctx.scope === "city") return "city"
-    if (ctx.scope === "state" && cityCount + stateCount >= 1) return "state"
+    if (ctx.scope === "state") return "state"
     return "country"
+}
+
+function getScopedPartnerIds(tiers: PartnerTiers, ctx: DiscoverCtx): string[] {
+    if (ctx.scope === "city") return [...tiers.cityIds]
+    if (ctx.scope === "state") return [...tiers.stateIds]
+    return [...tiers.allIds]
 }
 
 // ─── Filter items to match display scope ────────────────────────────────────
@@ -300,8 +319,8 @@ const getCachedPartnerIdsByTier = (
         const stateIds = new Set<string>()
         const stateStoreIds = new Set<string>()
         let statePartnerCount = 0
-        const isCountryScope = !state || state.trim() === "" || state.trim().toUpperCase() === "BR" || state.trim().toLowerCase() === "brasil"
-        const targetState = !isCountryScope ? state.trim().toLowerCase() : null
+        const targetState = normalizeStateToUF(state)
+        const isCountryScope = !targetState
 
         for (const s of stores) {
             const pid = (s as any).partner_id
@@ -310,7 +329,8 @@ const getCachedPartnerIdsByTier = (
             if (storeId) allStoreIds.add(storeId)
 
             const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
-            if (targetState && addr?.state?.toLowerCase() === targetState) {
+            const storeState = normalizeStateToUF(addr?.state)
+            if (targetState && storeState === targetState) {
                 if (pid) stateIds.add(pid)
                 if (storeId) stateStoreIds.add(storeId)
                 statePartnerCount++
@@ -336,7 +356,8 @@ const getCachedPartnerIdsByTier = (
                 const pid = (s as any).partner_id
                 const storeId = (s as any).id
                 const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
-                if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug) {
+                const storeState = normalizeStateToUF(addr?.state)
+                if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug && (!targetState || !storeState || storeState === targetState)) {
                     if (pid) cityIds.add(pid)
                     if (storeId) cityStoreIds.add(storeId)
                     cityPartnerCount++
@@ -355,7 +376,7 @@ const getCachedPartnerIdsByTier = (
             allStoreIds: Array.from(allStoreIds),
         }
     },
-    [`partner-ids-by-tier-${city}-${state}-${stateOnly}`],
+    [`partner-ids-by-tier-v2-${city}-${state}-${stateOnly}`],
     {
         tags: ["partners", "addresses", "stores"],
         revalidate: 60
@@ -409,27 +430,25 @@ function getItemTier(
     const addr = getItemStoreAddress(item)
     const storeCitySlug = addr?.city ? normalizeCitySlug(addr.city) : null
     const targetCitySlug = targetCity ? normalizeCitySlug(targetCity) : null
-    const storeStateNorm = addr?.state ? addr.state.trim().toLowerCase() : null
-    const targetStateNorm = targetState && targetState.toUpperCase() !== "BR" && targetState.toLowerCase() !== "brasil"
-        ? targetState.trim().toLowerCase()
-        : null
+    const storeStateNorm = normalizeStateToUF(addr?.state)
+    const targetStateNorm = normalizeStateToUF(targetState)
 
     // 1. City match by Store ID or Store City
     if (storeId && tiers.cityStoreIds?.has(storeId)) return 0
-    if (targetCitySlug && storeCitySlug && storeCitySlug === targetCitySlug) return 0
+    if (targetCitySlug && storeCitySlug && storeCitySlug === targetCitySlug && (!targetStateNorm || !storeStateNorm || storeStateNorm === targetStateNorm)) return 0
 
     // 2. State match by Store ID or Store State
     if (storeId && tiers.stateStoreIds?.has(storeId)) return 1
     if (targetStateNorm && storeStateNorm && storeStateNorm === targetStateNorm) return 1
 
-    // If store address is explicitly outside target city/state, don't falsely upgrade via partner_id
-    if (storeCitySlug && targetCitySlug && storeCitySlug !== targetCitySlug && storeStateNorm && targetStateNorm && storeStateNorm !== targetStateNorm) {
+    // If store address is explicitly outside target state, don't falsely upgrade via partner_id
+    if (storeStateNorm && targetStateNorm && storeStateNorm !== targetStateNorm) {
         return 2
     }
 
     // 3. Fallback to Partner-level match if store address is not known
     const pid = getPartnerId(item) || (item as any).partner_id
-    if (pid && tiers.cityIds?.has(pid) && !storeCitySlug) return 0
+    if (pid && tiers.cityIds?.has(pid) && !storeCitySlug && !storeStateNorm) return 0
     if (pid && tiers.stateIds?.has(pid) && !storeStateNorm) return 1
 
     return 2
@@ -711,13 +730,13 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
 // ─── 1. 🔥 Bombando na sua região ───────────────────────────────────────────
 
 async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
+    const scopedPartnerIds = getScopedPartnerIds(tiers, ctx)
+    if (scopedPartnerIds.length === 0) {
         dLog(`[Discover] SKIP trending reason=no_partners`)
         return null
     }
 
-    const trendingData = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    const trendingData = await getSharedHomeProductsPool(scopedPartnerIds.join(","), scopedPartnerIds)
 
     if (!trendingData || trendingData.length === 0) {
         dLog(`[Discover] SKIP trending reason=no_products`)
@@ -729,7 +748,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const dbScore = Number((r as any).marketplace_score || 0)
         const trending = calcTrendingScore(r)
         return Math.max(dbScore, trending) + recencyBoost(r.created_at) / 10
-    }, ctx.city, ctx.state)
+    }, ctx.stateOnly ? undefined : ctx.city, ctx.state)
 
     // Mantém todos os candidatos: itens sem sinal de engajamento apenas ranqueiam
     // abaixo, mas precisam continuar aparecendo (produto novo ainda sem views).
@@ -1194,8 +1213,8 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
     }
 
     const supabase = getAdminClient()
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
+    const scopedPartnerIds = getScopedPartnerIds(tiers, ctx)
+    if (scopedPartnerIds.length === 0) {
         dLog(`[Discover] SKIP personalized reason=no_partners`)
         return null
     }
@@ -1267,7 +1286,7 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
         .in("status", ["ativo", "active"])
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
+        .in("partner_id", scopedPartnerIds)
         .in("category_id", preferredCatIds)
         .order("marketplace_score", { ascending: false })
         .limit(60)
@@ -1286,7 +1305,7 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
     const favSet = new Set(favProductIds)
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         return (item as any).marketplace_score ?? 0
-    }, ctx.city, ctx.state)
+    }, ctx.stateOnly ? undefined : ctx.city, ctx.state)
 
     const filtered = tagged.filter(item => !favSet.has((item as RawProduct).id))
     const displayScope = determineDisplayScope(filtered, ctx)
@@ -1565,13 +1584,13 @@ async function fetchThemedSection(
 // ─── 11. 🧰 Serviços (com ou sem coordenadas) ───────────────────────────────
 
 async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
+    const scopedPartnerIds = getScopedPartnerIds(tiers, ctx)
+    if (scopedPartnerIds.length === 0) {
         dLog(`[Discover] SKIP services reason=no_partners`)
         return null
     }
 
-    const data = await getSharedHomeServicesPool(allIds.join(","), allIds)
+    const data = await getSharedHomeServicesPool(scopedPartnerIds.join(","), scopedPartnerIds)
     if (data.length === 0) {
         dLog(`[Discover] SKIP services reason=no_products`)
         return null
@@ -1589,7 +1608,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         })
         const score = Math.max(dbScore, trending)
         return score > 0 ? score : (Number(item.rating || 0) / 5)
-    }, ctx.city, ctx.state)
+    }, ctx.stateOnly ? undefined : ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("services", ctx, displayScope)
@@ -1720,13 +1739,13 @@ function mapVitrineItem(store: any) {
 }
 
 async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
+    const scopedPartnerIds = getScopedPartnerIds(tiers, ctx)
+    if (scopedPartnerIds.length === 0) {
         dLog(`[Discover] SKIP topVitrines reason=no_partners`)
         return null
     }
 
-    const data = await getSharedHomeStoresPool(allIds.join(","), allIds)
+    const data = await getSharedHomeStoresPool(scopedPartnerIds.join(","), scopedPartnerIds)
 
     if (!data || data.length === 0) {
         dLog(`[Discover] SKIP topVitrines reason=no_data`)
@@ -1737,7 +1756,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const rep = Number(item.marketplace_reputation ?? item.partners?.marketplace_reputation ?? 0)
         const rating = Number(item.rating ?? 0) / 5
         return rep > 0 ? (rep * 0.7 + rating * 0.3) : rating
-    }, ctx.city, ctx.state)
+    }, ctx.stateOnly ? undefined : ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topVitrines", ctx, displayScope)
@@ -1764,13 +1783,13 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 // ─── 13. Último recurso: qualquer produto (sem ranking) ──────────────────────
 
 async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    const allIds = [...tiers.allIds]
-    if (allIds.length === 0) {
+    const scopedPartnerIds = getScopedPartnerIds(tiers, ctx)
+    if (scopedPartnerIds.length === 0) {
         dLog(`[Discover] SKIP allProducts reason=no_partners`)
         return null
     }
 
-    const pool = await getSharedHomeProductsPool(allIds.join(","), allIds)
+    const pool = await getSharedHomeProductsPool(scopedPartnerIds.join(","), scopedPartnerIds)
     if (pool.length === 0) {
         dLog(`[Discover] SKIP allProducts reason=no_products`)
         return null
@@ -1780,7 +1799,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         const r = item as RawProduct
         const score = Math.max(Number((r as any).marketplace_score || 0), calcTrendingScore(r))
         return score > 0 ? score : (r.created_at ? new Date(r.created_at).getTime() : 0)
-    }, ctx.city, ctx.state)
+    }, ctx.stateOnly ? undefined : ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const isCountry = displayScope === "country"
@@ -1903,12 +1922,15 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
     }
 
     // 1. Core anchors in parallel
+    // Quando o escopo já é "country" (Brasil), "Destaques em todo o Brasil" seria redundante
+    // com as seções principais ("Produtos na Dudit", "Lojas e vitrines locais").
+    const includeNationalHighlights = ctx.scope !== "country"
     const [trendingRes, vitrinesRes, servicesRes, brasilTodoRes, brasilTodoVitrinesRes] = await Promise.all([
         fetchTrending(tiers, ctx).catch(() => null),
         fetchVitrines(tiers, ctx).catch(() => null),
         fetchServices(tiers, ctx).catch(() => null),
-        fetchBrasilTodo(tiers, ctx).catch(() => null),
-        fetchBrasilTodoVitrines(tiers).catch(() => null),
+        includeNationalHighlights ? fetchBrasilTodo(tiers, ctx).catch(() => null) : Promise.resolve(null),
+        includeNationalHighlights ? fetchBrasilTodoVitrines(tiers).catch(() => null) : Promise.resolve(null),
     ])
 
     // 2. Consolidated Launch Section Layout: Produtos, Serviços, Vitrines, Brasil Todo
@@ -2119,7 +2141,7 @@ const getSharedHomeSections = (
     ctx: DiscoverCtx,
 ) => unstable_cache(
     async () => getHomeSectionsUncached({ ...ctx, userId: null, coords: null }),
-    [`discover:home:shared:${scope}:${citySlug}:${stateOnly ? "state" : "city"}`],
+    [`discover:home:shared:v2:${scope}:${citySlug}:${stateOnly ? "state" : "city"}`],
     {
         revalidate: 300, // Cache for 5 minutes (was 60s)
         tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],

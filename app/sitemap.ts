@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getProductDisplayImages, PLACEHOLDER } from "@/lib/utils/product-display-images"
 import { helpCategories } from "@/lib/help-data"
 import { BLOG_CATEGORIES } from "@/lib/blog/categories"
 import { getPublishedBlogSlugs } from "@/lib/blog/queries"
@@ -135,7 +136,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             // Active stores (excluding admin showcase-suspended stores)
             supabase
                 .from("stores")
-                .select("id, short_id, name, slug, updated_at, created_at, showcase_suspended_at, showcase_suspended_until, partners!inner(showcase_suspended_at, showcase_suspended_until), addresses(city, state)")
+                .select("id, short_id, name, slug, logo_url, updated_at, created_at, showcase_suspended_at, showcase_suspended_until, partners!inner(showcase_suspended_at, showcase_suspended_until), addresses(city, state)")
                 .eq("is_active", true)
                 .is("showcase_suspended_at", null)
                 .is("partners.showcase_suspended_at", null)
@@ -170,17 +171,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
         // --- Products ---
         const products = productsResponse.data || []
-        const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => ({
-            url: `https://dudit.com.br${getProductUrl(prod, {
-                id: prod.partner_id,
-                city: prod.store_city,
-                state: prod.store_state,
-                addresses: [{ city: prod.store_city, state: prod.store_state }],
-            })}`,
-            lastModified: new Date(prod.updated_at || prod.created_at),
-            changeFrequency: "daily",
-            priority: 0.8,
-        }))
+        const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => {
+            const imgs = getProductDisplayImages(prod, "large").filter(
+                (img) => img && img !== PLACEHOLDER && img.startsWith("http")
+            )
+            return {
+                url: `https://dudit.com.br${getProductUrl(prod, {
+                    id: prod.partner_id,
+                    city: prod.store_city,
+                    state: prod.store_state,
+                    addresses: [{ city: prod.store_city, state: prod.store_state }],
+                })}`,
+                lastModified: new Date(prod.updated_at || prod.created_at),
+                changeFrequency: "daily",
+                priority: 0.8,
+                ...(imgs.length > 0 ? { images: imgs.slice(0, 3) } : {}),
+            }
+        })
 
         // --- Services ---
         const services = servicesResponse.data || []
@@ -193,11 +200,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                     addresses: [{ city: srv.store_city, state: srv.store_state }],
                 }],
             }
+            const imgs = (Array.isArray(srv.images) ? srv.images : []).filter(
+                (img: any): img is string => typeof img === "string" && img.startsWith("http") && img !== PLACEHOLDER
+            )
             return {
                 url: `https://dudit.com.br${getServiceUrl(serviceWithPartner)}`,
                 lastModified: new Date(srv.updated_at || srv.created_at),
                 changeFrequency: "daily",
                 priority: 0.8,
+                ...(imgs.length > 0 ? { images: imgs.slice(0, 3) } : {}),
             }
         })
 
@@ -208,6 +219,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             lastModified: new Date(s.updated_at || s.created_at),
             changeFrequency: "daily",
             priority: 0.7,
+            ...(typeof s.logo_url === "string" && s.logo_url.startsWith("http")
+                ? { images: [s.logo_url] }
+                : {}),
         }))
 
         // --- City pages from DB: /explorar/{cidade-uf} ---

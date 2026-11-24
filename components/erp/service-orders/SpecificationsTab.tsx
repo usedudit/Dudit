@@ -44,7 +44,29 @@ interface SpecificationsTabProps {
     serviceOrderId?: string
     specifications?: { name: string; value: string }[]
     isEditing?: boolean
+    onChange?: (specs: { name: string; value: string }[]) => void
     onSave?: (specs: { name: string; value: string }[]) => Promise<void>
+}
+
+function parseSpecsList(specifications: unknown): { name: string; value: string }[] {
+    if (Array.isArray(specifications)) {
+        return specifications.map((s: any) => ({
+            name: typeof s?.name === "string" ? s.name : (typeof s?.label === "string" ? s.label : ""),
+            value: typeof s?.value === "string" ? s.value : "",
+        }))
+    }
+    if (typeof specifications === "string") {
+        try {
+            const parsed = JSON.parse(specifications)
+            if (Array.isArray(parsed)) {
+                return parsed.map((s: any) => ({
+                    name: typeof s?.name === "string" ? s.name : (typeof s?.label === "string" ? s.label : ""),
+                    value: typeof s?.value === "string" ? s.value : "",
+                }))
+            }
+        } catch { }
+    }
+    return []
 }
 
 export default function SpecificationsTab({
@@ -52,41 +74,41 @@ export default function SpecificationsTab({
     serviceOrderId,
     specifications = [],
     isEditing = false,
+    onChange,
     onSave,
 }: SpecificationsTabProps) {
     const { toast } = useToast()
-    const [localSpecs, setLocalSpecs] = useState<{ id: number; name: string; value: string }[]>([])
+    const [localSpecs, setLocalSpecs] = useState<{ id: number; name: string; value: string }[]>(() => {
+        const now = Date.now()
+        return parseSpecsList(specifications).map((s, i) => ({ ...s, id: now + i }))
+    })
     const [saving, setSaving] = useState(false)
     const [showTemplateModal, setShowTemplateModal] = useState(false)
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
     const [templateSpecs, setTemplateSpecs] = useState<{ name: string; value: string }[]>([])
 
     useEffect(() => {
-        let specsArray: any[] = []
-        if (Array.isArray(specifications)) {
-            specsArray = specifications
-        } else if (typeof specifications === "string") {
-            try {
-                const parsed = JSON.parse(specifications)
-                if (Array.isArray(parsed)) {
-                    specsArray = parsed
-                }
-            } catch { }
-        }
-        setLocalSpecs(specsArray.map((s, i) => ({ ...s, id: i + Date.now() })))
+        const now = Date.now()
+        setLocalSpecs(parseSpecsList(specifications).map((s, i) => ({ ...s, id: now + i })))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [serviceOrderId])
+
+    const updateLocalSpecs = (next: { id: number; name: string; value: string }[]) => {
+        setLocalSpecs(next)
+        onChange?.(next.map(({ id: _id, ...rest }) => rest))
+    }
 
     const addAttribute = () => {
         if (localSpecs.length >= 25) return
-        setLocalSpecs([...localSpecs, { id: Date.now(), name: "", value: "" }])
+        updateLocalSpecs([...localSpecs, { id: Date.now(), name: "", value: "" }])
     }
 
     const removeAttribute = (id: number) => {
-        setLocalSpecs(localSpecs.filter((a) => a.id !== id))
+        updateLocalSpecs(localSpecs.filter((a) => a.id !== id))
     }
 
     const updateAttribute = (id: number, field: "name" | "value", newValue: string) => {
-        setLocalSpecs(localSpecs.map((a) => (a.id === id ? { ...a, [field]: newValue } : a)))
+        updateLocalSpecs(localSpecs.map((a) => (a.id === id ? { ...a, [field]: newValue } : a)))
     }
 
     const handleSave = async () => {
@@ -110,7 +132,7 @@ export default function SpecificationsTab({
     const applyTemplate = () => {
         const merged = templateSpecs.map((s, i) => ({ id: Date.now() + i, ...s }))
         const existing = localSpecs.filter((s) => s.name && s.name.trim())
-        setLocalSpecs([...existing, ...merged])
+        updateLocalSpecs([...existing, ...merged])
         setShowTemplateModal(false)
         setSelectedTemplate(null)
     }

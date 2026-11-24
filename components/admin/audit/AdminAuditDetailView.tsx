@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback, useContext } from "react"
 import {
     ChevronLeftIcon,
     ShareIcon,
@@ -30,7 +30,7 @@ import type { AuditLogRow } from "@/lib/admin/types"
 import { ACTION_TYPE_LABELS, TARGET_TYPE_LABELS, getActionBadge } from "./AuditLogListRow"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
-import { useSidebar } from "@/lib/sidebar-context"
+import { SidebarContext } from "@/lib/sidebar-context"
 
 interface AdminAuditDetailViewProps {
     log: AuditLogRow
@@ -45,10 +45,9 @@ export function AdminAuditDetailView({
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
 
-    let sidebarContext: ReturnType<typeof useSidebar> | null = null
-    try {
-        sidebarContext = useSidebar()
-    } catch { }
+    // Read the context directly: useSidebar() throws when there is no provider,
+    // and calling a hook inside try/catch breaks the rules of hooks.
+    const sidebarContext = useContext(SidebarContext)
     const setHeaderOverride = sidebarContext?.setHeaderOverride
 
     useEffect(() => {

@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/ferramentas/calculadora-ponto-equilibrio",
     },
-    keywords: [
-        "calculadora ponto de equilibrio",
-        "break even point",
-        "calcular ponto de equilibrio empresa",
-        "margem de contribuicao",
-        "custos fixos e variaveis",
-        "equilibrio financeiro comercio",
-    ],
 };
 
 export default function CalculadoraPontoEquilibrioLayout({

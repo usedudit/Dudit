@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ServiceDetailsPageClient } from "@/components/marketplace/ServiceDetailsPage"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
@@ -79,9 +79,9 @@ export default async function ServiceDetailsPage({
     const currentPath = `/${currentCidadeUf}/${currentSlug}/s/${id}`
     if (currentPath !== correctUrl) {
         const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
-        const isNewOneGeneric = correctUrl.includes('/vitrine/s/') || correctUrl.includes('/brasil/s/')
+        const isNewOneGeneric = correctUrl.startsWith('/vitrine/') || correctUrl.startsWith('/brasil/')
         if (!(isCurrentlyDetailed && isNewOneGeneric)) {
-            redirect(correctUrl)
+            permanentRedirect(correctUrl)
         }
     }
 

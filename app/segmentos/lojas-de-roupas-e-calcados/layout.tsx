@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/segmentos/lojas-de-roupas-e-calcados",
     },
-    keywords: [
-        "sistema para loja de roupas",
-        "controle de estoque grade cor tamanho",
-        "programa para loja de calcados",
-        "etiquetas codigo de barras roupas",
-        "pdv frente de caixa roupas",
-        "catalogo online moda sem taxa",
-    ],
 };
 
 export default function LojasDeRoupasLayout({

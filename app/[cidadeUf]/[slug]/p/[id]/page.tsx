@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
@@ -9,7 +9,6 @@ import {
   getProductSoldCount,
 } from "@/app/actions/marketplace/products"
 import { getProductUrl } from "@/lib/utils/url-generator"
-import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
@@ -85,10 +84,10 @@ export default async function ProductDetailsPage({
   // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
   // Se a URL atual já tem uma cidade e o sistema quer mandar para o genérico, ignoramos o redirect.
   const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
-  const isNewOneGeneric = correctUrl.includes('/vitrine/p/') || correctUrl.includes('/brasil/p/')
+  const isNewOneGeneric = correctUrl.startsWith('/vitrine/') || correctUrl.startsWith('/brasil/')
 
   if (currentPath !== correctUrl && !(isCurrentlyDetailed && isNewOneGeneric)) {
-    redirect(correctUrl)
+    permanentRedirect(correctUrl)
   }
   // ------------------------------------------
 
@@ -122,19 +121,39 @@ export default async function ProductDetailsPage({
   const address = p?.addresses?.[0] || storeObj?.addresses?.[0] || p?.address || storeObj?.address || p || {}
   const city = address?.city || product.store_city || storeObj?.city || "Brasil"
 
+  const productFullUrl = `https://dudit.com.br${correctUrl}`
+
   const { schemaJsonLd } = buildProductSeo({
     product,
     city,
-    productUrl: `https://dudit.com.br${correctUrl}`,
+    productUrl: productFullUrl,
     minPrice,
     reviews: reviews || [],
   })
+
+  const exploreLocationSlug = currentCidadeUf && currentCidadeUf !== "vitrine"
+    ? currentCidadeUf
+    : "brasil"
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://dudit.com.br" },
+      { "@type": "ListItem", position: 2, name: city, item: `https://dudit.com.br/explorar/${exploreLocationSlug}` },
+      { "@type": "ListItem", position: 3, name: product.name, item: productFullUrl },
+    ],
+  }
 
   return (
     <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(breadcrumbJsonLd) }}
       />
 
       <ProductDetailsPageClient

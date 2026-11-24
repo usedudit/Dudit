@@ -13,6 +13,10 @@ export const INSTITUTIONAL_FAQ: InstitutionalFaqItem[] = [
         answer: "Não. A Dudit opera com 0% de comissão por venda. Diferente dos marketplaces tradicionais que cobram percentuais sobre o seu faturamento, na Dudit o valor das suas vendas fica com você. A plataforma é remunerada pela assinatura do plano."
     },
     {
+        question: "Como vender pelo WhatsApp usando a Dudit?",
+        answer: "Ao criar sua loja gratuita na Dudit, você cadastra seus produtos ou serviços e recebe um link próprio de catálogo digital para compartilhar na bio do Instagram e no WhatsApp. O cliente escolhe itens, variações e entrega direto na vitrine e envia o pedido organizado no seu WhatsApp — ou finaliza pelo checkout integrado — mantendo o seu estoque atualizado automaticamente."
+    },
+    {
         question: "A Dudit é apenas um guia/diretório de lojas ou um sistema de gestão completo?",
         answer: "A Dudit é um ecossistema completo de gestão comercial (ERP e PDV) e vendas. A plataforma oferece frente de caixa (PDV) para vendas no balcão, controle de estoque com variações (cor e tamanho), ordens de serviço (OS) com orçamentos digitais, agendamento de horários para serviços e catálogo online integrado ao WhatsApp e checkout próprio."
     },
@@ -21,8 +25,8 @@ export const INSTITUTIONAL_FAQ: InstitutionalFaqItem[] = [
         answer: "O lojista tem autonomia completa: pode habilitar a retirada no balcão físico, configurar entrega local com cálculo por distância e raio de atendimento, e ativar fretes nacionais com cálculo automático, geração de etiquetas e rastreio integrado via transportadoras e Correios."
     },
     {
-        question: "A Dudit possui integração com sistemas de gestão e ERPs como o Tiny ERP?",
-        answer: "Sim! A Dudit possui integração nativa com o Tiny ERP. Você pode conectar sua conta do Tiny via API para sincronizar o estoque dos seus produtos em tempo real e exportar automaticamente os pedidos realizados na Dudit (com dados fiscais do cliente, itens e frete) direto para o seu Tiny ERP, facilitando a separação e a emissão de notas fiscais (NF-e) sem retrabalho manual e com 0% de comissão por venda."
+        question: "A Dudit possui integração com sistemas de gestão e ERPs como Tiny ERP e Bling?",
+        answer: "Sim! A Dudit possui integração nativa com Tiny ERP e Bling. Você pode conectar sua conta via API para sincronizar o estoque dos seus produtos em tempo real e exportar automaticamente os pedidos realizados na Dudit (com dados fiscais do cliente, itens e frete) direto para o seu ERP, facilitando a separação e a emissão de notas fiscais (NF-e) sem retrabalho manual e com 0% de comissão por venda."
     },
     {
         question: "Quais segmentos de negócios podem utilizar a Dudit?",

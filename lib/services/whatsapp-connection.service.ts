@@ -326,7 +326,7 @@ export async function upsertEvolutionConnection(params: {
 
   let existingQuery = admin
     .from("partner_whatsapp_connections")
-    .select("id, evolution_webhook_secret")
+    .select("id, evolution_webhook_secret, instance_name")
     .eq("partner_id", params.partnerId)
     .eq("provider", "evolution")
 
@@ -356,6 +356,8 @@ export async function upsertEvolutionConnection(params: {
     updated_at: now,
   }
 
+  let saved: PartnerWhatsappConnection
+
   if (existing?.id) {
     const { data, error } = await admin
       .from("partner_whatsapp_connections")
@@ -364,16 +366,18 @@ export async function upsertEvolutionConnection(params: {
       .select("*")
       .single()
     if (error) throw new Error(`Supabase update failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
-    return data as PartnerWhatsappConnection
+    saved = data as PartnerWhatsappConnection
+  } else {
+    const { data, error } = await admin
+      .from("partner_whatsapp_connections")
+      .insert(row)
+      .select("*")
+      .single()
+    if (error) throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
+    saved = data as PartnerWhatsappConnection
   }
 
-  const { data, error } = await admin
-    .from("partner_whatsapp_connections")
-    .insert(row)
-    .select("*")
-    .single()
-  if (error) throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
-  return data as PartnerWhatsappConnection
+  return saved
 }
 
 /**
@@ -405,4 +409,25 @@ export async function updateConnectionStatus(
   }
 
   await query
+}
+
+/**
+ * Updates a single connection by its id.
+ * Used by webhooks so events from a store instance never touch another row
+ * (e.g. the partner-level connection that shares the same partner).
+ */
+export async function updateConnectionStatusById(
+  connectionId: string,
+  status: WhatsappConnectionStatus,
+  extra?: { phone_number?: string; connected_at?: string },
+): Promise<void> {
+  const admin = getAdminClient()
+  await admin
+    .from("partner_whatsapp_connections")
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+      ...extra,
+    })
+    .eq("id", connectionId)
 }

@@ -322,6 +322,25 @@ export async function syncSubscriptionToBilling(
     await supersedeOtherSubscriptions(sub.partner_id, sub.id)
   }
 
+  // The Escalar plan natively includes all add-ons: immediately stop any
+  // standalone add-on recurring charges on Mercado Pago as soon as Escalar is active.
+  if (
+    ["active", "trialing"].includes(String(sub.status)) &&
+    String(sub.plan?.slug || "").toLowerCase() === "escalar"
+  ) {
+    try {
+      const { cancelPartnerAddonSubscriptionsForPlanInclusion } = await import(
+        "@/lib/services/addon.service"
+      )
+      await cancelPartnerAddonSubscriptionsForPlanInclusion(sub.partner_id)
+    } catch (addonCancelErr: any) {
+      console.error(
+        `[BillingSync] Failed to cancel add-on subscriptions after Escalar activation for partner ${sub.partner_id}:`,
+        addonCancelErr?.message,
+      )
+    }
+  }
+
   const periods = computeSubscriptionPeriods(sub)
 
   // ── 2b. Repair corrupted periods (legacy rows written with next_payment_date) ──

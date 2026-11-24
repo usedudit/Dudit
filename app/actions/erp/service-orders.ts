@@ -218,24 +218,116 @@ export async function getERPServiceOrdersPageAction(
       [TAGS.serviceOrders(partnerId)],
       async () => {
         const supabase = getAdminClient()
+
+        let matchedOrderIds: string[] = []
+        let matchedAssignedUserIds: string[] = []
+
+        if (search) {
+          const searchLower = search.toLowerCase()
+          const [svcMatchRes, prodMatchRes, specsMatchRes, profileMatchRes] = await Promise.all([
+            supabase
+              .from("service_order_services")
+              .select("service_order_id, service_orders!inner(id)")
+              .eq("service_orders.partner_id", partnerId)
+              .eq("service_orders.store_id", storeId)
+              .ilike("service_name", `%${search}%`)
+              .limit(100),
+            supabase
+              .from("service_order_products")
+              .select("service_order_id, service_orders!inner(id)")
+              .eq("service_orders.partner_id", partnerId)
+              .eq("service_orders.store_id", storeId)
+              .ilike("product_name", `%${search}%`)
+              .limit(100),
+            supabase
+              .from("service_orders")
+              .select("id, specifications")
+              .eq("partner_id", partnerId)
+              .eq("store_id", storeId)
+              .not("specifications", "is", null)
+              .neq("specifications", "[]")
+              .order("created_at", { ascending: false })
+              .limit(500),
+            supabase
+              .from("user_profiles")
+              .select("user_id")
+              .ilike("full_name", `%${search}%`)
+              .limit(50),
+          ])
+
+          const orderIdSet = new Set<string>()
+          if (!svcMatchRes.error && Array.isArray(svcMatchRes.data)) {
+            for (const row of svcMatchRes.data as any[]) {
+              if (row?.service_order_id) orderIdSet.add(String(row.service_order_id))
+            }
+          }
+          if (!prodMatchRes.error && Array.isArray(prodMatchRes.data)) {
+            for (const row of prodMatchRes.data as any[]) {
+              if (row?.service_order_id) orderIdSet.add(String(row.service_order_id))
+            }
+          }
+          if (!specsMatchRes.error && Array.isArray(specsMatchRes.data)) {
+            for (const row of specsMatchRes.data as any[]) {
+              let specs = row?.specifications
+              if (typeof specs === "string") {
+                try {
+                  specs = JSON.parse(specs)
+                } catch {
+                  specs = null
+                }
+              }
+              if (Array.isArray(specs)) {
+                const hit = specs.some((spec: any) =>
+                  (typeof spec?.name === "string" && spec.name.toLowerCase().includes(searchLower)) ||
+                  (typeof spec?.label === "string" && spec.label.toLowerCase().includes(searchLower)) ||
+                  (typeof spec?.value === "string" && spec.value.toLowerCase().includes(searchLower)),
+                )
+                if (hit && row?.id) orderIdSet.add(String(row.id))
+              }
+            }
+          }
+          matchedOrderIds = Array.from(orderIdSet).slice(0, 100)
+
+          if (!profileMatchRes.error && Array.isArray(profileMatchRes.data)) {
+            matchedAssignedUserIds = Array.from(
+              new Set(
+                (profileMatchRes.data as any[])
+                  .map((p) => p?.user_id)
+                  .filter(Boolean)
+                  .map(String),
+              ),
+            ).slice(0, 50)
+          }
+        }
+
         let q = supabase
           .from("service_orders")
-          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at, diagnosis, description, specifications")
+          .select("id, order_number, title, status, priority, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at, diagnosis, description, internal_notes, coupon_code, payment_method, specifications, service_order_services(service_name), service_order_products(product_name)")
           .eq("partner_id", partnerId)
         if (statuses.length > 0) q = q.in("status", statuses)
         else if (options?.status && options.status !== "all") q = q.eq("status", options.status)
         if (search) {
-          q = q.or(
-            [
-              `order_number.ilike.%${search}%`,
-              `title.ilike.%${search}%`,
-              `customer_snapshot->>name.ilike.%${search}%`,
-              `customer_snapshot->>phone.ilike.%${search}%`,
-              `customer_snapshot->>email.ilike.%${search}%`,
-              `diagnosis.ilike.%${search}%`,
-              `description.ilike.%${search}%`,
-            ].join(",")
-          )
+          const orFilters = [
+            `order_number.ilike.%${search}%`,
+            `title.ilike.%${search}%`,
+            `customer_snapshot->>name.ilike.%${search}%`,
+            `customer_snapshot->>phone.ilike.%${search}%`,
+            `customer_snapshot->>email.ilike.%${search}%`,
+            `customer_snapshot->>city.ilike.%${search}%`,
+            `diagnosis.ilike.%${search}%`,
+            `description.ilike.%${search}%`,
+            `internal_notes.ilike.%${search}%`,
+            `coupon_code.ilike.%${search}%`,
+            `payment_method.ilike.%${search}%`,
+            `priority.ilike.%${search}%`,
+          ]
+          if (matchedOrderIds.length > 0) {
+            orFilters.push(`id.in.(${matchedOrderIds.join(",")})`)
+          }
+          if (matchedAssignedUserIds.length > 0) {
+            orFilters.push(`assigned_user_id.in.(${matchedAssignedUserIds.join(",")})`)
+          }
+          q = q.or(orFilters.join(","))
         }
         q = q.eq("store_id", storeId)
         if (cursor) q = q.or(buildKeysetOrFilter(cursor))

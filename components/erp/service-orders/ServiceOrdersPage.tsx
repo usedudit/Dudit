@@ -266,9 +266,25 @@ export default function ServiceOrdersPage({
     const term = debouncedSearch.toLowerCase()
     const cleanDigits = debouncedSearch.replace(/\D/g, "")
     return (effectiveOrders || []).filter((o: any) => {
-      const specMatch = Array.isArray(o.specifications) && o.specifications.some((spec: any) =>
+      let specsList: any[] = []
+      if (Array.isArray(o.specifications)) {
+        specsList = o.specifications
+      } else if (typeof o.specifications === "string") {
+        try {
+          const parsed = JSON.parse(o.specifications)
+          if (Array.isArray(parsed)) specsList = parsed
+        } catch { }
+      }
+      const specMatch = specsList.some((spec: any) =>
+        (typeof spec?.name === "string" && spec.name.toLowerCase().includes(term)) ||
         (typeof spec?.label === "string" && spec.label.toLowerCase().includes(term)) ||
         (typeof spec?.value === "string" && spec.value.toLowerCase().includes(term))
+      )
+      const serviceMatch = Array.isArray(o.service_order_services) && o.service_order_services.some((s: any) =>
+        typeof s?.service_name === "string" && s.service_name.toLowerCase().includes(term)
+      )
+      const productMatch = Array.isArray(o.service_order_products) && o.service_order_products.some((p: any) =>
+        typeof p?.product_name === "string" && p.product_name.toLowerCase().includes(term)
       )
       const phoneRaw = String(o.customer_snapshot?.phone || "")
       const phoneMatch = phoneRaw.includes(debouncedSearch) || (cleanDigits.length > 2 && phoneRaw.replace(/\D/g, "").includes(cleanDigits))
@@ -278,11 +294,18 @@ export default function ServiceOrdersPage({
         String(o.title || "").toLowerCase().includes(term) ||
         String(o.customer_snapshot?.name || "").toLowerCase().includes(term) ||
         String(o.customer_snapshot?.email || "").toLowerCase().includes(term) ||
+        String(o.customer_snapshot?.city || "").toLowerCase().includes(term) ||
         phoneMatch ||
         String(o.assigned_user_name || "").toLowerCase().includes(term) ||
         String(o.diagnosis || "").toLowerCase().includes(term) ||
         String(o.description || "").toLowerCase().includes(term) ||
-        specMatch
+        String(o.internal_notes || "").toLowerCase().includes(term) ||
+        String(o.coupon_code || "").toLowerCase().includes(term) ||
+        String(o.payment_method || "").toLowerCase().includes(term) ||
+        String(o.priority || "").toLowerCase().includes(term) ||
+        specMatch ||
+        serviceMatch ||
+        productMatch
       )
       const matchesTab = activeTab === "all" ||
         (activeTab === "aberta" && (o.status === "aberta" || o.status === "aguardando_aprovacao" || o.status === "aprovada")) ||

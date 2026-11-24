@@ -151,7 +151,7 @@ export function buildProductSeo({
   } else {
     metaDescription = `Oferta em ${locationLabel}: ${product.name}. ${brandHighlight} ${specsHighlights ? `Especificações: ${specsHighlights}. ` : ""}Compre direto do vendedor pela Dudit com 0% de comissão!`
   }
-  metaDescription = metaDescription.replace(/\s+/g, " ").trim().slice(0, 200)
+  metaDescription = metaDescription.replace(/\s+/g, " ").trim().slice(0, 155)
 
   // 5. Preço formatado
   const activePrice = minPrice ?? product.promotional_price ?? product.price ?? 0
@@ -165,7 +165,6 @@ export function buildProductSeo({
   const metadata: Metadata = {
     title: pageTitle,
     description: metaDescription,
-    keywords,
     robots: {
       index: true,
       follow: true,
@@ -248,10 +247,24 @@ export function buildProductSeo({
       url: productUrl,
       priceCurrency: "BRL",
       price: activePrice,
+      priceValidUntil: `${new Date().getFullYear() + 1}-12-31`,
       availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       itemCondition: product.condition === "used"
         ? "https://schema.org/UsedCondition"
         : "https://schema.org/NewCondition",
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingDestination: {
+          "@type": "DefinedRegion",
+          addressCountry: "BR",
+        },
+      },
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "BR",
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: 7,
+      },
       seller: {
         "@type": "Organization",
         name: storeName,
@@ -341,7 +354,7 @@ export function buildServiceSeo({
   } else {
     metaDescription = `Agende ${service.name} em ${locationLabel}. ${detailsHighlights ? `Detalhes: ${detailsHighlights}. ` : ""}Reserve horários em tempo real direto pela Dudit!`
   }
-  metaDescription = metaDescription.replace(/\s+/g, " ").trim().slice(0, 200)
+  metaDescription = metaDescription.replace(/\s+/g, " ").trim().slice(0, 155)
 
   const pageTitle = isCityBrasil
     ? `${service.name} - Agendar online | Dudit`
@@ -351,7 +364,6 @@ export function buildServiceSeo({
   const metadata: Metadata = {
     title: pageTitle,
     description: metaDescription,
-    keywords,
     robots: {
       index: true,
       follow: true,

@@ -17,12 +17,13 @@ export async function POST(req: Request) {
 
   let payload: any = null
   try {
-    payload = await req.json()
+    const rawText = (await req.text()).trim()
+    if (!rawText || rawText === "{}") {
+      return NextResponse.json({ received: true, event: "ping" })
+    }
+    payload = JSON.parse(rawText)
   } catch (parseErr: any) {
-    return NextResponse.json(
-      { error: `Payload JSON inválido: ${parseErr.message}` },
-      { status: 400 }
-    )
+    return NextResponse.json({ received: true, event: "ping" })
   }
 
   const supabase = getAdminClient()
@@ -159,4 +160,8 @@ export async function GET(req: Request) {
     connected: integration?.status === "connected",
     message: "Endpoint de webhook do Bling ERP validado com sucesso.",
   })
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 200 })
 }

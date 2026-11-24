@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, FormSection, Tooltip, Tabs, TabsList, TabsTrigger, TabsContent, Spinner } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, FormSection, Tooltip, Tabs, TabsList, TabsTrigger, TabsContent, Spinner, PhoneInput } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, InfoIcon, QRCodeIcon, CopyIcon } from "@/lib/icons"
@@ -46,6 +46,7 @@ import {
     getEvolutionStatusAction,
     isEvolutionConfiguredAction,
     resetEvolutionPairingStatusAction,
+    testEvolutionConnectionAction,
     type WhatsappConnectionView,
 } from "@/app/actions/whatsapp"
 import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
@@ -232,7 +233,7 @@ const INTEGRATION_CONNECT_META: Record<ConnectFlowIntegration, IntegrationConnec
         description: "Sincronize catálogo de produtos, saldos de estoque e envie pedidos vendidos na Dudit diretamente para o seu Tiny ERP (Olist).",
         banner: "https://img.dudit.com.br/static/banners/LogoTiny.svg",
         bannerClassName: "w-full h-full object-contain",
-        privacyUrl: "https://olist.com/politica-de-privacidade/",
+        privacyUrl: "https://olist.com/seguranca-e-privacidade/politica-de-privacidade/",
         permissions: [
             {
                 heading: "Sobre os dados da sua loja",
@@ -522,6 +523,9 @@ export const IntegrationsSubPage = ({
     const [evoIsLoading, setEvoIsLoading] = useState(false)
     const [evoConfigured, setEvoConfigured] = useState<boolean | null>(null)
     const [evoConnection, setEvoConnection] = useState<WhatsappConnectionView | null>(null)
+    const [evoTestPhone, setEvoTestPhone] = useState("")
+    const [evoTestSending, setEvoTestSending] = useState(false)
+    const [evoTestResult, setEvoTestResult] = useState<{ ok: boolean; message: string } | null>(null)
     const evoStatusRef = useRef(evoStatus)
     const evoPairingInitiated = useRef(false)
 
@@ -564,6 +568,10 @@ export const IntegrationsSubPage = ({
     useEffect(() => {
         if (evoConnection?.phoneNumber) setEvoPhoneNumber(evoConnection.phoneNumber)
     }, [evoConnection])
+
+    useEffect(() => {
+        if (evoPhoneNumber) setEvoTestPhone((current) => current || evoPhoneNumber)
+    }, [evoPhoneNumber])
 
     useEffect(() => {
         if (evoConnection) {
@@ -659,6 +667,29 @@ export const IntegrationsSubPage = ({
                 }
             }
         } finally { setEvoIsLoading(false) }
+    }
+
+    const handleEvoTest = async () => {
+        const phone = evoTestPhone.trim()
+        if (!phone) { toast.error("Informe um telefone para teste"); return }
+        setEvoTestSending(true)
+        setEvoTestResult(null)
+        try {
+            const res = await testEvolutionConnectionAction(phone, currentStoreId)
+            if (!res.success) {
+                setEvoTestResult({ ok: false, message: res.error })
+                toast.error("Falha no teste de envio")
+                return
+            }
+            const detail = [res.data.instanceName, res.data.apiHost].filter(Boolean).join(" · ")
+            setEvoTestResult({
+                ok: true,
+                message: `Mensagem aceita pela API${detail ? ` (${detail})` : ""}. Confira no WhatsApp.`,
+            })
+            toast.success("Mensagem de teste enviada")
+        } finally {
+            setEvoTestSending(false)
+        }
     }
 
     const handleEvoDisconnect = async () => {
@@ -1283,7 +1314,7 @@ export const IntegrationsSubPage = ({
         },
     ]
 
-    const SF_KNOW_MORE_STEPS: { title: string; description?: string; list?: string[] }[] = [
+    const SF_KNOW_MORE_STEPS: { title: string; description?: React.ReactNode; list?: string[] }[] = [
         {
             title: "O que é a SuperFrete?",
             description: "A SuperFrete é uma plataforma de logística que permite gerar etiquetas de envio com Correios, JadLog, Loggi, J&T e outras transportadoras.\n\nCom ela, você oferece frete grátis ou calculado automaticamente na hora do checkout.\n\nTudo isso com diversas transportadoras em um só lugar.",
@@ -1293,8 +1324,34 @@ export const IntegrationsSubPage = ({
             description: "A integração é rápida e prática. Conecte sua conta informando o token de API gerado no painel da SuperFrete.\n\nDepois, configure o CEP de origem e as dimensões padrão dos seus produtos.\n\nAs etiquetas são geradas automaticamente quando o cliente finaliza a compra.",
         },
         {
-            title: "Como configurar?",
-            description: "Clique em Conectar e cole o token de API gerado no painel da SuperFrete (sandbox.superfrete.com ou web.superfrete.com).\n\nEscolha entre sandbox (teste) e produção, e configure o CEP de origem e dimensões padrão para que os fretes sejam calculados corretamente.",
+            title: "Como obter o Token de API?",
+            description: (
+                <>
+                    O token é gerado na sua própria conta da SuperFrete, em Integrações → API:
+                    {"\n\n"}1. Acesse a{" "}
+                    <a
+                        href="https://web.superfrete.com/#/integrations/select-integration-platform?provider=api"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-brand-green hover:underline"
+                    >
+                        Integração via API da SuperFrete
+                    </a>
+                    {"\n"}2. Preencha os dados do site: URL da sua loja, quantidade média de envios por mês e o estágio atual do seu negócio (ex.: começando agora, já vendendo)
+                    {"\n"}3. Gere e copie o Token de API exibido na tela
+                    {"\n\n"}Para testar, o caminho é o mesmo no sandbox: sandbox.superfrete.com
+                </>
+            ),
+        },
+        {
+            title: "E depois de conectar?",
+            list: [
+                "🚚 Habilite as transportadoras que vai usar (Correios, JadLog, Loggi, J&T...) no painel da SuperFrete",
+                "📍 Cadastre o CEP de origem para ver quais serviços e prazos atendem a sua região",
+                "💰 Confira o preço e o prazo de cada transportadora antes de oferecer no checkout",
+                "⚙️ Na Dudit, ajuste o CEP de origem, as dimensões padrão e o peso dos produtos para o cálculo sair certo",
+                "🏷️ Com tudo configurado, as etiquetas são geradas automaticamente a cada venda",
+            ],
         },
     ]
 
@@ -2136,15 +2193,30 @@ export const IntegrationsSubPage = ({
                                         />
                                     )}
 
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                        Como obter o token:
-
-                                        <ol className="text-xs space-y-1 list-decimal list-inside">
-                                            <li>Acesse sandbox.superfrete.com/#/integrations (teste) ou web.superfrete.com/#/integrations (produção)</li>
-                                            <li>Clique em "Desenvolvedores" → "Integrar"</li>
-                                            <li>Copie o token gerado e cole abaixo</li>
-                                        </ol>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                        Cole o <strong>Token de API</strong> gerado na sua conta da{" "}
+                                        <a
+                                            href="https://web.superfrete.com/#/integrations/select-integration-platform?provider=api"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-semibold text-brand-green hover:underline"
+                                        >
+                                            SuperFrete
+                                        </a>{" "}
+                                        para vincular sua loja.
                                     </p>
+
+                                    <div className="p-3 rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg/40 dark:bg-dark-border/20 space-y-1.5">
+                                        <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                            Como gerar seu Token de API:
+                                        </p>
+                                        <ol className="text-xs text-brand-inactive-text dark:text-dark-body list-decimal list-inside space-y-1 leading-relaxed">
+                                            <li>Abra <strong>Integrações → API</strong> no painel da SuperFrete</li>
+                                            <li>Informe a URL da sua loja, a quantidade média de envios por mês e o estágio atual do seu negócio</li>
+                                            <li>Copie o Token de API gerado e cole no campo abaixo</li>
+                                            <li>Depois, habilite as transportadoras (Correios, JadLog, Loggi...) e cadastre seu CEP de origem para ver os serviços disponíveis na sua região</li>
+                                        </ol>
+                                    </div>
 
                                     <Input
                                         label="Token de API SuperFrete"
@@ -2163,7 +2235,7 @@ export const IntegrationsSubPage = ({
                                         placeholder="Selecione o ambiente"
                                     />
                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
-                                        O token deve ser do mesmo ambiente selecionado. Em Sandbox as etiquetas são apenas para testes.
+                                        O token deve ser do mesmo ambiente selecionado: produção em web.superfrete.com ou teste em sandbox.superfrete.com. Em Sandbox as etiquetas são apenas para testes.
                                     </p>
                                     <div className="flex gap-3 pt-2">
                                         <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
@@ -2604,6 +2676,35 @@ export const IntegrationsSubPage = ({
                                                 </div>
                                             }
                                         />
+
+                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Testar envio</h3>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed">
+                                                Envia uma mensagem real de WhatsApp pelo número conectado. Use o seu próprio número para confirmar que a API está funcionando.
+                                            </p>
+                                            <div className="flex flex-col gap-2 mt-3">
+                                                <PhoneInput
+                                                    value={evoTestPhone}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setEvoTestPhone(e.target.value)}
+                                                    disabled={evoTestSending}
+                                                    placeholder="(11) 99876-5432"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={handleEvoTest}
+                                                    disabled={evoTestSending || !evoTestPhone.trim()}
+                                                    className="w-full h-[42px]"
+                                                >
+                                                    {evoTestSending ? "Enviando..." : "Enviar teste"}
+                                                </Button>
+                                            </div>
+                                            {evoTestResult && (
+                                                <p className={`text-xs mt-2 leading-relaxed ${evoTestResult.ok ? "text-brand-green" : "text-brand-red"}`}>
+                                                    {evoTestResult.message}
+                                                </p>
+                                            )}
+                                        </div>
+
                                         <Button variant="destructive" onClick={() => setConfirmEvoDisconnectOpen(true)} disabled={evoIsLoading} className="w-full h-[42px]">
                                             Desconectar WhatsApp
                                         </Button>
@@ -2641,7 +2742,7 @@ export const IntegrationsSubPage = ({
                                             </div>
                                         ) : (
                                             <div className="mt-8 flex flex-col items-center justify-center gap-3 py-8">
-                                                <div className="w-8 h-8 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
+                                                <Spinner />
                                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body">Gerando QR Code...</p>
                                             </div>
                                         )}
@@ -3063,8 +3164,14 @@ export const IntegrationsSubPage = ({
                                                 <FormSection
                                                     title="Webhook em Tempo Real (Estoque & NF-e)"
                                                     titleRight={
-                                                        <Tooltip text={tinyStatus.webhookUrl ? "Webhook ativo" : "Webhook inativo"}>
-                                                            <Badge variant={tinyStatus.webhookUrl ? "green" : "red"} />
+                                                        <Tooltip
+                                                            text={
+                                                                tinyStatus.metadata?.last_webhook_at
+                                                                    ? `Webhook validado/ativo (último evento: ${new Date(tinyStatus.metadata.last_webhook_at).toLocaleString("pt-BR")})`
+                                                                    : "Aguardando validação — cole a URL no Tiny e salve"
+                                                            }
+                                                        >
+                                                            <Badge variant={tinyStatus.metadata?.last_webhook_at ? "green" : "gray"} />
                                                         </Tooltip>
                                                     }
                                                 >
@@ -3134,7 +3241,15 @@ export const IntegrationsSubPage = ({
                             ) : (
                                 <div className="space-y-4">
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                        Cole o <strong>Token de API</strong> gerado na sua conta do Tiny ERP para vincular sua loja.
+                                        Cole o
+                                        <a
+                                            href="https://erp.olist.com/configuracoes_api_web_services"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-semibold text-brand-green hover:underline"
+                                        >
+                                            Token de API
+                                        </a> gerado na sua conta do Tiny ERP para vincular sua loja.
                                     </p>
 
                                     <Input

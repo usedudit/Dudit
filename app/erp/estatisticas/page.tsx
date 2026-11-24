@@ -1,10 +1,9 @@
-import { Suspense, type ReactNode } from "react"
+import { Suspense } from "react"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ReportsPage } from "@/components/erp/reports/ReportsPage"
 import { ReportsSkeleton } from "@/components/erp/reports/ReportsSkeleton"
-import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import {
     getDashboardFinancialData,
@@ -65,47 +64,26 @@ export default async function ERPEstatisticasPage(props: {
             <ERPPageHeader title="Estatísticas" />
             <FadeIn className="p-4">
                 <DashboardProvider>
-                    <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-                        {/* Desktop: título/subtítulo e filtros na mesma linha */}
-                        <header className="hidden lg:flex items-start justify-between gap-4">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                        Estatísticas
-                                    </h1>
-                                </div>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                    Acompanhe os indicadores e o desempenho do seu negócio.
-                                </p>
+                    <Suspense
+                        key={`${period}-${compare}-${compareFrom}-${compareTo}`}
+                        fallback={
+                            <div className="w-full space-y-6 pt-4 px-4 md:px-8">
+                                <ReportsSkeleton />
                             </div>
-                            <div className="flex items-center gap-3">
-                                <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                                    <GlobalPeriodFilter />
-                                </Suspense>
-                            </div>
-                        </header>
-
-                        <Suspense fallback={<ReportsSkeleton />}>
-                            <ReportsContent
-                                partnerId={partnerId}
-                                activeResources={activeResources}
-                                period={period}
-                                compare={compare}
-                                compareFrom={compareFrom}
-                                compareTo={compareTo}
-                                tab={tab}
-                                planSlug={plan.slug}
-                                permissionContext={context as RbacUserLike}
-                                controls={
-                                    <div className="w-full">
-                                        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                                            <GlobalPeriodFilter />
-                                        </Suspense>
-                                    </div>
-                                }
-                            />
-                        </Suspense>
-                    </div>
+                        }
+                    >
+                        <ReportsContent
+                            partnerId={partnerId}
+                            activeResources={activeResources}
+                            period={period}
+                            compare={compare}
+                            compareFrom={compareFrom}
+                            compareTo={compareTo}
+                            tab={tab}
+                            planSlug={plan.slug}
+                            permissionContext={context as RbacUserLike}
+                        />
+                    </Suspense>
                 </DashboardProvider>
             </FadeIn>
         </>
@@ -122,7 +100,6 @@ async function ReportsContent({
     tab,
     planSlug,
     permissionContext,
-    controls,
 }: {
     partnerId: string
     activeResources: string[]
@@ -133,7 +110,6 @@ async function ReportsContent({
     tab: string
     planSlug: string
     permissionContext: RbacUserLike
-    controls?: ReactNode
 }) {
     const hasProducts = activeResources.includes("products")
     const hasServices = activeResources.includes("services") || activeResources.includes("appointments")
@@ -192,7 +168,6 @@ async function ReportsContent({
             goalData={goalData}
             stockValue={stockValue}
             appointmentsData={appointmentsData}
-            controls={controls}
         />
     )
 }

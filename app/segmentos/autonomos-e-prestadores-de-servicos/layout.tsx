@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/segmentos/autonomos-e-prestadores-de-servicos",
     },
-    keywords: [
-        "sistema para autonomo",
-        "orcamento em pdf",
-        "agenda online prestador de servicos",
-        "vitrine de servicos",
-        "programa para prestador de servicos",
-        "gestao para autonomo gratis",
-    ],
 };
 
 export default function AutonomosEPrestadoresLayout({

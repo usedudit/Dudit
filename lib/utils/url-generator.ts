@@ -2,16 +2,22 @@ import { createSlug } from "@/lib/utils/slugify"
 
 /**
  * Helper para formatar a cidade e estado na URL, de acordo com as regras de SEO
- * Ex: São Paulo, SP -> saopaulo-sp
+ * Ex: São Paulo, SP -> sao-paulo-sp
+ * Fallback sem cidade/estado: "brasil" (elimina o legado "/vitrine/...")
  */
 export function formatCityStateSlug(city?: string, state?: string): string {
     const isMissing = (val?: string) => !val || val.toLowerCase() === "brasil" || val.toLowerCase() === "br"
 
-    if (isMissing(city) && isMissing(state)) return "vitrine"
+    if (isMissing(city) && isMissing(state)) return "brasil"
     if (isMissing(city)) return createSlug(state!)
     if (isMissing(state)) return createSlug(city!)
 
     return `${createSlug(city!)}-${createSlug(state!)}`
+}
+
+function firstOrSelf<T>(value: T | T[] | null | undefined): T | undefined {
+    if (Array.isArray(value)) return value[0]
+    return value ?? undefined
 }
 
 /**
@@ -24,16 +30,14 @@ export function getProductUrl(product: any, partner?: any): string {
     const prodSlug = product.slug || createSlug(product.name || "")
     const prodId = product.short_id || product.id || ""
 
-    // Se não passar partner explicitamente, tenta pegar do próprio produto
-    const p = partner || (Array.isArray(product.partners) ? product.partners[0] : product.partners) || {}
+    // Normaliza partner/partners mesmo quando passado como array (ex: product.partners)
+    const p = firstOrSelf(partner) || firstOrSelf(product.partners) || {}
+    const address = firstOrSelf(p?.addresses) || p?.address || p
+    const storeObj = firstOrSelf(product.stores) || firstOrSelf(product.store) || {}
+    const storeAddr = firstOrSelf(storeObj?.addresses) || storeObj?.address || {}
 
-    // As vezes o endereço está em p.addresses[0], as vezes na raiz (p.address ou p direto se já normalizado)
-    const address = p.addresses?.[0] || p.address || p
-    const storeObj = (Array.isArray(product.stores) ? product.stores[0] : product.stores) || (Array.isArray(product.store) ? product.store[0] : product.store) || {}
-    const storeAddr = (Array.isArray(storeObj?.addresses) ? storeObj?.addresses[0] : storeObj?.addresses) || storeObj?.address || {}
-
-    const city = p.city || address?.city || product.store_city || storeAddr?.city || storeObj?.city
-    const state = p.state || address?.state || product.store_state || storeAddr?.state || storeObj?.state
+    const city = p?.city || address?.city || product.store_city || storeAddr?.city || storeObj?.city || product.city
+    const state = p?.state || address?.state || product.store_state || storeAddr?.state || storeObj?.state || product.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
@@ -80,13 +84,13 @@ export function getServiceUrl(service: any, partner?: any): string {
     const serviceSlug = service.slug || createSlug(service.name || "")
     const serviceId = service.short_id || service.id || ""
 
-    const p = partner || (Array.isArray(service.partners) ? service.partners[0] : service.partners) || {}
-    const address = p.addresses?.[0] || p.address || p
-    const storeObj = (Array.isArray(service.stores) ? service.stores[0] : service.stores) || (Array.isArray(service.store) ? service.store[0] : service.store) || {}
-    const storeAddr = (Array.isArray(storeObj?.addresses) ? storeObj?.addresses[0] : storeObj?.addresses) || storeObj?.address || {}
+    const p = firstOrSelf(partner) || firstOrSelf(service.partners) || {}
+    const address = firstOrSelf(p?.addresses) || p?.address || p
+    const storeObj = firstOrSelf(service.stores) || firstOrSelf(service.store) || {}
+    const storeAddr = firstOrSelf(storeObj?.addresses) || storeObj?.address || {}
 
-    const city = p.city || address?.city || service.store_city || storeAddr?.city || storeObj?.city
-    const state = p.state || address?.state || service.store_state || storeAddr?.state || storeObj?.state
+    const city = p?.city || address?.city || service.store_city || storeAddr?.city || storeObj?.city || service.city
+    const state = p?.state || address?.state || service.store_state || storeAddr?.state || storeObj?.state || service.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
@@ -103,10 +107,10 @@ export function getPlanUrl(plan: any, partner?: any): string {
     const planSlug = createSlug(plan.name || "")
     const planId = plan.short_id || plan.id || ""
 
-    const p = partner || (Array.isArray(plan.partners) ? plan.partners[0] : plan.partners) || plan.partner || {}
-    const address = p.addresses?.[0] || p.address || p
-    const city = p.city || address?.city
-    const state = p.state || address?.state
+    const p = firstOrSelf(partner) || firstOrSelf(plan.partners) || firstOrSelf(plan.partner) || {}
+    const address = firstOrSelf(p?.addresses) || p?.address || p
+    const city = p?.city || address?.city || plan.store_city || plan.city
+    const state = p?.state || address?.state || plan.store_state || plan.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 

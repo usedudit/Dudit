@@ -123,19 +123,6 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         setPage(1)
     }, [targetTab, debouncedSearch, filters.datePeriod])
 
-    // If viewing detail of a specific log (?view=[id])
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentLog = logs.find((l: any) => l.id === entityState.entityId)
-        if (currentLog) {
-            return (
-                <AdminAuditDetailView
-                    log={currentLog}
-                    onBack={closeEntity}
-                />
-            )
-        }
-    }
-
     const actionOptions = Array.from(new Set(logs.map((l: any) => ACTION_TYPE_LABELS[l.action_type] || l.action_type))) as string[]
     const targetTypeOptions = Array.from(new Set(logs.map((l: any) => TARGET_TYPE_LABELS[l.target_type] || l.target_type))) as string[]
 
@@ -216,6 +203,21 @@ export default function AuditLogList({ initialData, initialStats }: AuditLogList
         const start = (page - 1) * ITEMS_PER_PAGE
         return filteredLogs.slice(start, start + ITEMS_PER_PAGE)
     }, [filteredLogs, page])
+
+    // If viewing detail of a specific log (?view=[id])
+    // NOTE: must stay after every hook call, otherwise opening the detail
+    // unmounts hooks on the same component and triggers React error #300.
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        const currentLog = logs.find((l: any) => l.id === entityState.entityId)
+        if (currentLog) {
+            return (
+                <AdminAuditDetailView
+                    log={currentLog}
+                    onBack={closeEntity}
+                />
+            )
+        }
+    }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

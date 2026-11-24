@@ -21,7 +21,7 @@ const DUDIT_ISSUER = {
     name: "Dudit",
     email: "usedudit@gmail.com",
     phone: "(18) 99622-9347",
-    address: "Rua José Canuto Barbosa 286 - Lado Sul, Lucélia/SP - 17781-240",
+    address: "Rua José Canuto Barbosa 286 - Lado Sul, Lucélia/SP - 17783-124",
     logoUrl: "https://img.dudit.com.br/static/Icon.png",
 } as const;
 

@@ -28,13 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/ferramentas/gerador-link-whatsapp",
     },
-    keywords: [
-        "gerador link whatsapp",
-        "link whatsapp bio instagram",
-        "criar link wa me",
-        "link direto whatsapp mensagem",
-        "gerador wa me gratis",
-    ],
 };
 
 export default function GeradorLinkWhatsAppLayout({

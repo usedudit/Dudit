@@ -28,15 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/ferramentas/calculadora-taxas-marketplace",
     },
-    keywords: [
-        "calculadora taxas marketplace",
-        "taxa ifood",
-        "taxa mercado livre",
-        "comissao marketplace",
-        "simulador de taxas delivery",
-        "vender sem comissao",
-        "economizar taxas marketplace",
-    ],
 };
 
 export default function CalculadoraTaxasLayout({

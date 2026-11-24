@@ -10,17 +10,7 @@ const CANONICAL = "https://dudit.com.br/blog"
 export const metadata: Metadata = {
     title: "Blog do Dino | Dicas para vender, cuidar do caixa e crescer",
     description:
-        "Conteúdo prático para pequenos negócios: como evitar golpes, entender e controlar o fluxo de caixa, tirar fotos melhores dos produtos, vender mais e organizar a gestão.",
-    keywords: [
-        "blog pequenos negócios",
-        "dicas para vender mais",
-        "fluxo de caixa",
-        "como evitar golpes",
-        "fotos de produtos",
-        "gestão de negócio",
-        "blog do dino",
-        "dudit",
-    ],
+        "Dicas práticas para pequenos negócios: evitar golpes, controlar o fluxo de caixa, melhorar fotos dos produtos, vender mais e organizar a gestão.",
     alternates: { canonical: CANONICAL },
     openGraph: {
         title: "Blog do Dino | Dicas para pequenos negócios",

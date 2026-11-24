@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/segmentos/saloes-e-barbearias",
     },
-    keywords: [
-        "sistema para salao de beleza",
-        "agendamento online barbearia",
-        "software comissao manicure",
-        "controle de caixa salao",
-        "programa para barbearia gratis",
-        "agenda online profissionais da beleza",
-    ],
 };
 
 export default function SaloesEBarbeariasLayout({

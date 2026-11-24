@@ -14,12 +14,12 @@ import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 
 export const metadata: Metadata = {
     title: {
-        absolute: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
+        absolute: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
     },
-    description: "Descubra produtos e serviços perto de você ou compre de pequenos negócios que enviam para todo o Brasil com 0% de comissão. Plataforma de vendas e gestão para pessoas físicas, autônomos e empresas.",
+    description: "Compre perto de você ou de lojas que enviam para todo o Brasil. Plataforma de vendas e gestão comercial com 0% de comissão para pequenos negócios.",
     openGraph: {
-        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
-        description: "Descubra produtos e serviços perto de você ou compre de pequenos negócios que enviam para todo o Brasil com 0% de comissão. Plataforma de vendas e gestão para pessoas físicas, autônomos e empresas.",
+        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        description: "Compre perto de você ou de lojas que enviam para todo o Brasil. Plataforma de vendas e gestão comercial com 0% de comissão para pequenos negócios.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
@@ -36,8 +36,8 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@usedudit",
         creator: "@usedudit",
-        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
-        description: "Descubra produtos e serviços perto de você ou compre de lojas que enviam para todo o Brasil com 0% de comissão.",
+        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        description: "Compre perto de você ou de lojas que enviam para todo o Brasil com 0% de comissão.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {
@@ -46,16 +46,6 @@ export const metadata: Metadata = {
             "pt-BR": "https://dudit.com.br",
         },
     },
-    keywords: [
-        "comprar online brasil",
-        "produtos perto de mim",
-        "lojas que entregam no brasil",
-        "sistema de vendas sem taxa",
-        "servicos na minha cidade",
-        "comercio local brasil",
-        "catalogo online gratis",
-        "dudit",
-    ],
 }
 
 async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName, savedCitySlug }: any) {
@@ -82,6 +72,8 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         const ctxState = scope === "country" ? "BR" : (isStateScope ? citySlug.replace("estado-", "").toUpperCase() : state)
         const ctxStateOnly = isStateScope
 
+        const ctxCitySlug = scope === "country" ? "brasil" : citySlug
+
         displayCityName = ctxCity
 
         const [sectionsResult, adsResult] = await Promise.all([
@@ -89,7 +81,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
                 city: ctxCity,
                 state: ctxState,
                 stateOnly: ctxStateOnly,
-                citySlug,
+                citySlug: ctxCitySlug,
                 coords,
                 userId: user?.id ?? null,
                 scope,

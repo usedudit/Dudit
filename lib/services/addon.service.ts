@@ -620,6 +620,18 @@ export async function syncAddonSubscriptionFromMp(params: {
   const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
   const existing = await getPartnerAddonRecord(partnerId, addonSlug)
+
+  // Ignore late "cancelled" webhooks from a preapproval that was already detached
+  // or replaced (e.g. cancelled automatically when upgrading to the Escalar plan
+  // or superseded by a newer checkout). Otherwise it could disable an active add-on.
+  if (
+    normalizedStatus === "cancelled" &&
+    preapprovalId &&
+    existing?.mp_preapproval_id !== preapprovalId
+  ) {
+    return true
+  }
+
   const patch: Partial<StoredAddonRecord> = {
     ...(preapprovalId ? { mp_preapproval_id: preapprovalId } : {}),
   }
@@ -746,6 +758,101 @@ export async function cancelAddonMpSubscription(
   } catch (err: any) {
     console.error(`[addon.service] Erro ao cancelar assinatura do addon ${addonSlug}:`, err)
     return { success: false, error: err.message || "Erro ao cancelar assinatura do aplicativo." }
+  }
+}
+
+/**
+ * Cancela imediatamente todas as assinaturas pagas/pendentes de add-ons de um parceiro
+ * no Mercado Pago quando ele passa a ter cobertura inclusa pelo plano (ex: upgrade para Escalar).
+ * Mantém os add-ons já habilitados ativos para não interromper o uso do parceiro.
+ */
+export async function cancelPartnerAddonSubscriptionsForPlanInclusion(
+  partnerId: string,
+): Promise<{ cancelledCount: number; cancelledPreapprovalIds: string[] }> {
+  const admin = getAdminClient()
+  const nowIso = new Date().toISOString()
+
+  try {
+    const { data: rows, error } = await admin
+      .from("partner_addons")
+      .select("addon_slug, is_enabled, subscription_status, mp_preapproval_id")
+      .eq("partner_id", partnerId)
+      .or("mp_preapproval_id.not.is.null,subscription_status.in.(active,pending,paused,past_due)")
+
+    if (error) {
+      SecureLogger.warn("[addon.service] Failed to query partner_addons for Escalar cancellation", {
+        partnerId,
+        error: error.message,
+      })
+      return { cancelledCount: 0, cancelledPreapprovalIds: [] }
+    }
+
+    const activeRows = (rows || []).filter((r: any) => isValidAddonSlug(r.addon_slug))
+    if (activeRows.length === 0) {
+      return { cancelledCount: 0, cancelledPreapprovalIds: [] }
+    }
+
+    // Deduplicate preapproval IDs so shared/consolidated preapprovals are cancelled once.
+    const uniquePreapprovalIds = Array.from(
+      new Set(
+        activeRows
+          .map((r: any) => r.mp_preapproval_id)
+          .filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0),
+      ),
+    )
+
+    // Detach local billing records first so any immediate MP "cancelled" webhook echo
+    // sees mp_preapproval_id === null and does not disable the Escalar-included add-on.
+    for (const row of activeRows as Array<{
+      addon_slug: AddonSlug
+      is_enabled?: boolean
+      subscription_status?: AddonSubscriptionStatus
+    }>) {
+      await persistPartnerAddonRecord(partnerId, row.addon_slug, {
+        subscription_status: "none",
+        mp_preapproval_id: null,
+        mp_init_point: null,
+        cancel_at_period_end: false,
+        cancelled_at: nowIso,
+        current_period_start: null,
+        current_period_end: null,
+        is_enabled: typeof row.is_enabled === "boolean" ? row.is_enabled : true,
+      })
+    }
+
+    const cancelledPreapprovalIds: string[] = []
+    for (const preapprovalId of uniquePreapprovalIds) {
+      const res = await cancelMpPreapproval(preapprovalId).catch((err: any) => ({
+        success: false,
+        error: err?.message || "Unknown error",
+      }))
+      if (res.success) {
+        cancelledPreapprovalIds.push(preapprovalId)
+      } else {
+        SecureLogger.warn("[addon.service] Failed to cancel addon preapproval on Escalar upgrade", {
+          partnerId,
+          preapprovalId,
+          error: res.error,
+        })
+      }
+    }
+
+    SecureLogger.info("[addon.service] Cancelled standalone addon subscriptions after Escalar activation", {
+      partnerId,
+      addonsUpdated: activeRows.length,
+      mpPreapprovalsCancelled: cancelledPreapprovalIds.length,
+    })
+
+    return {
+      cancelledCount: activeRows.length,
+      cancelledPreapprovalIds,
+    }
+  } catch (err: any) {
+    SecureLogger.error("[addon.service] Error cancelling addon subscriptions for plan inclusion", {
+      partnerId,
+      error: err?.message || "Unknown error",
+    })
+    return { cancelledCount: 0, cancelledPreapprovalIds: [] }
   }
 }
 

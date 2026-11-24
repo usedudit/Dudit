@@ -68,78 +68,64 @@ export async function generateMetadata({
     const pathParts = slug.length > 0 ? ["/explorar", ...slug] : ["/explorar"]
     const canonical = `https://dudit.com.br${pathParts.join("/")}`
 
-    // Base site name for OG
+    // Base site name and OG image
     const ogSiteName = "Dudit"
+    const defaultOgImage = "https://img.dudit.com.br/static/og-image.png"
 
-    // --- CASE 1: /explorar (no slug) ---
-    if (!location) {
-        const title = "Explorar - Produtos e serviços perto de você"
-        const description =
-            "Descubra produtos, serviços e negócios perto de você. Explore, compare e compre direto de quem vende na sua cidade."
+    const buildExploreMetadata = (title: string, description: string, ogTitle?: string): Metadata => {
+        const resolvedOgTitle = ogTitle || `${title} | ${ogSiteName}`
         return {
             title,
             description,
             robots: { index: true, follow: true },
             alternates: { canonical },
             openGraph: {
-                title: `Explorar | ${ogSiteName}`,
+                title: resolvedOgTitle,
                 description,
                 url: canonical,
                 siteName: ogSiteName,
+                locale: "pt_BR",
+                type: "website",
+                images: [
+                    {
+                        url: defaultOgImage,
+                        width: 1200,
+                        height: 630,
+                        alt: resolvedOgTitle,
+                    },
+                ],
             },
             twitter: {
                 card: "summary_large_image",
-                title: `Explorar | ${ogSiteName}`,
+                title: resolvedOgTitle,
                 description,
+                images: [defaultOgImage],
             },
         }
+    }
+
+    // --- CASE 1: /explorar (no slug) ---
+    if (!location) {
+        return buildExploreMetadata(
+            "Explorar - Produtos e serviços perto de você",
+            "Descubra produtos, serviços e negócios perto de você. Explore, compare e compre direto de quem vende na sua cidade.",
+            `Explorar | ${ogSiteName}`
+        )
     }
 
     // --- CASE 2: /explorar/brasil or /explorar/brasil/[categoria] ---
     if (location === "brasil") {
         if (categoryName) {
-            const title = `${categoryName} no Brasil inteiro`
-            const description =
+            return buildExploreMetadata(
+                `${categoryName} no Brasil inteiro`,
                 `Encontre ${categoryName.toLowerCase()} em todo o Brasil. Compre direto de quem vende, sem taxa e sem sair de casa.`
-            return {
-                title,
-                description,
-                robots: { index: true, follow: true },
-                alternates: { canonical },
-                openGraph: {
-                    title: `${title} | ${ogSiteName}`,
-                    description,
-                    url: canonical,
-                    siteName: ogSiteName,
-                },
-                twitter: {
-                    card: "summary_large_image",
-                    title: `${title} | ${ogSiteName}`,
-                    description,
-                },
-            }
+            )
         }
 
-        const title = "Comprar no Brasil inteiro - Produtos e serviços"
-        const description =
+        return buildExploreMetadata(
+            "Comprar no Brasil inteiro - Produtos e serviços",
             "Encontre produtos e serviços em todo o Brasil. Compre de quem vende perto de você, direto e sem taxa."
-        return {
-            title,
-            description,
-            robots: { index: true, follow: true },
-            alternates: { canonical },
-            openGraph: {
-                title: `${title} | ${ogSiteName}`,
-                description,
-                url: canonical,
-                siteName: ogSiteName,
-            },
-            twitter: {
-                card: "summary_large_image",
-                title: `${title} | ${ogSiteName}`,
-                description,
-            },
-        }
+        )
     }
 
     // --- CASE 3: /explorar/estado-[uf] or /explorar/estado-[uf]/[categoria] ---
@@ -149,48 +135,16 @@ export async function generateMetadata({
         const estadoNome = ESTADO_MAP[uf] || uf.toUpperCase()
 
         if (categoryName) {
-            const title = `${categoryName} em ${estadoNome}`
-            const description =
+            return buildExploreMetadata(
+                `${categoryName} em ${estadoNome}`,
                 `Encontre ${categoryName.toLowerCase()} em ${estadoNome}. Compre de quem vende perto de você, sem taxa.`
-            return {
-                title,
-                description,
-                robots: { index: true, follow: true },
-                alternates: { canonical },
-                openGraph: {
-                    title: `${title} | ${ogSiteName}`,
-                    description,
-                    url: canonical,
-                    siteName: ogSiteName,
-                },
-                twitter: {
-                    card: "summary_large_image",
-                    title: `${title} | ${ogSiteName}`,
-                    description,
-                },
-            }
+            )
         }
 
-        const title = `Comprar em ${estadoNome} - Produtos e serviços`
-        const description =
+        return buildExploreMetadata(
+            `Comprar em ${estadoNome} - Produtos e serviços`,
             `Encontre produtos e serviços em ${estadoNome}. Compre de quem vende perto de você, direto e sem taxa.`
-        return {
-            title,
-            description,
-            robots: { index: true, follow: true },
-            alternates: { canonical },
-            openGraph: {
-                title: `${title} | ${ogSiteName}`,
-                description,
-                url: canonical,
-                siteName: ogSiteName,
-            },
-            twitter: {
-                card: "summary_large_image",
-                title: `${title} | ${ogSiteName}`,
-                description,
-            },
-        }
+        )
     }
 
     let cidadeDisplay = ""
@@ -208,48 +162,16 @@ export async function generateMetadata({
     }
 
     if (categoryName) {
-        const title = `${categoryName} em ${cidadeDisplay}`
-        const description =
+        return buildExploreMetadata(
+            `${categoryName} em ${cidadeDisplay}`,
             `Encontre ${categoryName.toLowerCase()} em ${cidadeDisplay}. Compre de quem vende perto de você, sem taxa.`
-        return {
-            title,
-            description,
-            robots: { index: true, follow: true },
-            alternates: { canonical },
-            openGraph: {
-                title: `${title} | ${ogSiteName}`,
-                description,
-                url: canonical,
-                siteName: ogSiteName,
-            },
-            twitter: {
-                card: "summary_large_image",
-                title: `${title} | ${ogSiteName}`,
-                description,
-            },
-        }
+        )
     }
 
-    const title = `Comprar em ${cidadeDisplay} - Produtos e serviços`
-    const description =
+    return buildExploreMetadata(
+        `Comprar em ${cidadeDisplay} - Produtos e serviços`,
         `Encontre produtos e serviços em ${cidadeDisplay}. Compre de quem vende perto de você, direto e sem taxa.`
-    return {
-        title,
-        description,
-        robots: { index: true, follow: true },
-        alternates: { canonical },
-        openGraph: {
-            title: `${title} | ${ogSiteName}`,
-            description,
-            url: canonical,
-            siteName: ogSiteName,
-        },
-        twitter: {
-            card: "summary_large_image",
-            title: `${title} | ${ogSiteName}`,
-            description,
-        },
-    }
+    )
 }
 
 export default async function ExplorarPage({

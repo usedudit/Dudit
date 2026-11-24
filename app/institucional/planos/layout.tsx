@@ -28,15 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/institucional/planos",
     },
-    keywords: [
-        "planos dudit",
-        "preços erp",
-        "sistema erp gratuito",
-        "pdv sem comissao",
-        "catalogo online sem taxa",
-        "software gestao pequenos negocios",
-        "sistema para mei barato",
-    ],
 };
 
 export default function InstitucionalPlanosLayout({

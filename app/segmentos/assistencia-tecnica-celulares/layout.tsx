@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/segmentos/assistencia-tecnica-celulares",
     },
-    keywords: [
-        "sistema para assistencia tecnica celular",
-        "ordem de servico com fotos",
-        "programa para conserto de celular",
-        "software os informatica",
-        "controle de estoque peças celular",
-        "orcamento aprovado whatsapp celular",
-    ],
 };
 
 export default function AssistenciaTecnicaLayout({

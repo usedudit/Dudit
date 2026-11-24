@@ -985,7 +985,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
             badgeIcon: undefined,
         },
         crescer: {
-            border: "border-brand-green/ dark:border-brand-green shadow-sm",
+            border: "border-brand-green dark:border-brand-green shadow-sm",
             badgeVariant: "green" as const,
             badgeText: "Mais popular",
             badgeIcon: undefined,
@@ -1093,7 +1093,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">
 
                             {/* Card 1: Current Plan */}
-                            <div className={`rounded-2xl p-6 bg-white dark:bg-dark-surface flex flex-col justify-between relative transition-all duration-300 ${planTheme.border}`}>
+                            <div className={`rounded-2xl p-6 bg-white dark:bg-dark-surface border flex flex-col justify-between relative transition-all duration-300 ${planTheme.border}`}>
                                 <div>
                                     <div className="flex items-center justify-between mb-4 h-9">
                                         <div className="flex items-center gap-2">
@@ -1172,7 +1172,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         </ul>
                                     </div>
 
-                                    <div className="pt-4 border-t border-brand-border/60 dark:border-dark-border/60 flex items-center justify-between gap-3">
+                                    <div className="pt-4 border-t border-brand-border dark:border-dark-border flex items-center justify-between gap-3">
                                         <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">
                                             {displayPlanSlug === "escalar"
                                                 ? "Acesso a todos os recursos liberados"

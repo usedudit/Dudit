@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao",
     },
-    keywords: [
-        "sistema para confeitaria",
-        "cardapio digital doceria",
-        "catalogo online encomendas",
-        "sistema marmitaria sem taxa",
-        "delivery 0 comissao alimentos",
-        "programa para confeiteira gratis",
-    ],
 };
 
 export default function ConfeitariasEAlimentacaoLayout({

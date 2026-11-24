@@ -1,51 +1,67 @@
 # Dudit
 
-> Dudit (https://dudit.com.br) é um ecossistema completo de comércio local brasileiro que une um Marketplace Hiperlocal com 0% de comissão por venda a um Mini-ERP de gestão operacional simples para micro e pequenos negócios, autônomos e prestadores de serviços.
+> A Dudit (https://dudit.com.br) é uma plataforma brasileira de vendas e gestão comercial (ERP, PDV e marketplace) com 0% de comissão por venda para pequenos negócios, autônomos e prestadores de serviços. Ela permite vender no balcão físico, na própria cidade (retirada ou entrega local) e para todo o Brasil via transportadoras e Correios, com catálogo digital integrado ao WhatsApp e sincronização nativa com Tiny ERP e Bling.
+
+> Documentação estendida para LLMs: `https://dudit.com.br/llms-full.txt`
 
 ## Sobre a Plataforma
-A Dudit resolve a dor de taxas abusivas cobradas por grandes marketplaces e a falta de visibilidade digital e ferramentas de gestão acessíveis para pequenos empreendedores brasileiros. A plataforma engloba:
-- **Marketplace Hiperlocal**: Descoberta de produtos, serviços e vitrines comerciais por proximidade geográfica e cidade, com contato direto via WhatsApp e sem taxa de intermediação.
-- **Mini-ERP Integrado**: Gestão completa para pequenas empresas e autônomos - incluindo Ordens de Serviço (OS), Agendamento Online 24h, Orçamentos e Recibos, Frente de Caixa / PDV e Controle de Estoque.
-- **Catálogo Online / Vitrine Digital**: Página própria do estabelecimento com catálogo de produtos/serviços, fotos, horário de funcionamento, localização e botão de pedido direto no WhatsApp.
+A Dudit elimina comissões abusivas (12% a 27%) cobradas por grandes marketplaces e reúne em um só lugar ferramentas de venda e gestão operacional:
+- **Marketplace e Catálogo Digital (0% Comissão)**: Descoberta de produtos, serviços e vitrines comerciais por cidade, estado ou em todo o Brasil, com checkout próprio ou pedido direto no WhatsApp e 0% de taxa sobre as vendas.
+- **Vendas Locais e Envios Nacionais**: Retirada no balcão, entrega local por distância/motoboy e envio para todo o Brasil com cálculo automático de frete, etiquetas e rastreio via transportadoras e Correios.
+- **Gestão Comercial (Mini-ERP + PDV)**: Frente de caixa (PDV), controle de estoque com grade de variações (cor e tamanho), Ordens de Serviço (OS) com fotos e aprovação digital, Agendamento Online 24h, Orçamentos em PDF, Recibos e Controle Financeiro.
+- **Integração Nativa com Tiny ERP e Bling**: Sincronização de estoque em tempo real e envio automático de pedidos para emissão de NF-e sem retrabalho manual.
+
+## Planos e Preços
+- **Começar Grátis**: R$ 0/mês com 0% de comissão por venda.
+- **Crescer**: R$ 29,90/mês com 0% de comissão por venda.
+- **Escalar**: R$ 49,90/mês com 0% de comissão por venda.
+- Detalhes completos: `https://dudit.com.br/institucional/planos`
+
+## Perguntas Frequentes Diretas
+- **A Dudit cobra comissão por venda?** Não. A Dudit opera com 0% de comissão sobre as vendas realizadas; o valor da venda fica com o comerciante e a plataforma é remunerada apenas pela assinatura do plano escolhido.
+- **Como vender pelo WhatsApp na Dudit?** Ao criar sua loja gratuita, você cadastra produtos ou serviços e recebe um link próprio de catálogo digital. Os clientes montam o pedido na vitrine e enviam o resumo estruturado direto para o seu WhatsApp (ou finalizam no checkout integrado), mantendo seu estoque sincronizado.
+- **A Dudit funciona apenas localmente ou em todo o Brasil?** Funciona em todo o Brasil, atendendo tanto vendas locais (balcão, retirada e motoboy) quanto envios nacionais para qualquer CEP via transportadoras e Correios.
+- **A Dudit tem integração com ERP?** Sim, possui integração nativa com Tiny ERP e Bling para sincronizar estoque e exportar pedidos automaticamente.
 
 ## Estrutura de URLs Principais
 - **Página Inicial**: `https://dudit.com.br`
-- **Explorar Marketplace por Cidade**: `https://dudit.com.br/explorar/{cidade-uf}` (ex: `https://dudit.com.br/explorar/franca-sp`)
+- **Institucional / Para Vendedores**: `https://dudit.com.br/institucional/inicio`
+- **Sobre a Dudit**: `https://dudit.com.br/institucional/sobre`
+- **Planos e Preços**: `https://dudit.com.br/institucional/planos`
+- **Explorar por Cidade**: `https://dudit.com.br/explorar/{cidade-uf}` (ex: `https://dudit.com.br/explorar/franca-sp`)
 - **Explorar por Estado**: `https://dudit.com.br/explorar/estado-{uf}` (ex: `https://dudit.com.br/explorar/estado-sp`)
 - **Produtos**: `https://dudit.com.br/{cidade-uf}/{slug-produto}/p/{short_id}`
 - **Serviços**: `https://dudit.com.br/{cidade-uf}/{slug-servico}/s/{short_id}`
 - **Vitrines / Lojas**: `https://dudit.com.br/{cidade-uf}/{slug-loja}/v/{short_id}`
 
-### Soluções por Segmento (Vertical LPs)
-- **Oficinas Mecânicas e Assistências Técnicas**: `https://dudit.com.br/segmentos/oficinas-e-tecnicos` (Gestão de Ordens de Serviço, status via WhatsApp e controle de peças).
-- **Salões de Beleza e Barbearias**: `https://dudit.com.br/segmentos/saloes-e-barbearias` (Agendamento online 24h, lembretes automáticos e catálogo de serviços).
-- **Confeitarias, Docerias e Alimentação**: `https://dudit.com.br/segmentos/confeitarias-e-alimentacao` (Cardápio digital, pedidos via WhatsApp e 0% de comissão).
+### Soluções por Segmento
+- **Visão Geral de Segmentos**: `https://dudit.com.br/institucional/segmentos`
+- **Oficinas Mecânicas e Auto Centers**: `https://dudit.com.br/segmentos/oficinas-e-tecnicos` (Ordens de Serviço com fotos, aprovação no WhatsApp e controle de peças).
+- **Assistências Técnicas de Celulares e TI**: `https://dudit.com.br/segmentos/assistencia-tecnica-celulares` (OS pelo celular com fotos da entrada, baixa de peças e orçamentos no WhatsApp).
+- **Salões de Beleza e Barbearias**: `https://dudit.com.br/segmentos/saloes-e-barbearias` (Agendamento online 24h, comissões de profissionais e caixa).
+- **Confeitarias, Docerias e Alimentação**: `https://dudit.com.br/segmentos/confeitarias-e-alimentacao` (Catálogo digital, encomendas no WhatsApp e 0% de comissão).
+- **Lojas de Roupas e Calçados**: `https://dudit.com.br/segmentos/lojas-de-roupas-e-calcados` (Grade de cor e tamanho, etiquetas com código de barras, PDV e envio nacional).
+- **Autônomos e Prestadores de Serviços**: `https://dudit.com.br/segmentos/autonomos-e-prestadores-de-servicos` (Vitrine de serviços, orçamentos em PDF e agenda online).
 
-### Ferramentas e Calculadoras Gratuitas (Tool SEO)
+### Ferramentas e Calculadoras Gratuitas
 - **Hub de Ferramentas**: `https://dudit.com.br/ferramentas`
-- **Calculadora de Taxas de Marketplace**: `https://dudit.com.br/ferramentas/calculadora-taxas-marketplace` (Simula o impacto de comissões de 12% a 27% vs 0% na Dudit).
+- **Calculadora de Taxas de Marketplace**: `https://dudit.com.br/ferramentas/calculadora-taxas-marketplace`
 - **Calculadora de Margem de Lucro e Preço de Venda (Markup)**: `https://dudit.com.br/ferramentas/calculadora-margem-lucro-preco-venda`
 - **Calculadora de Ponto de Equilíbrio (Break-Even)**: `https://dudit.com.br/ferramentas/calculadora-ponto-equilibrio`
 - **Gerador de Link de WhatsApp**: `https://dudit.com.br/ferramentas/gerador-link-whatsapp`
 
-### Central de Ajuda e Base de Conhecimento (AEO / GEO)
+### Central de Ajuda e Base de Conhecimento
 - **Central de Ajuda**: `https://dudit.com.br/ajuda`
-- Guias detalhados com passo a passo sobre emissão de ordens de serviço, agendamentos, precificação, marketing local e gestão de estoque.
+- Guias práticos sobre ordens de serviço, agendamentos, catálogo digital, WhatsApp, fretes, precificação e controle de estoque.
 
 ### Blog do Dino — Conteúdo Editorial
-- **Blog**: `https://dudit.com.br/blog` (dicas práticas para pequenos negócios)
+- **Blog**: `https://dudit.com.br/blog`
 - **Feed RSS**: `https://dudit.com.br/blog/feed.xml`
-- **Categorias**: `https://dudit.com.br/blog/categoria/{categoria}` — proteção-e-seguranca, gestao-financeira, vendas-e-marketing, fotos-e-anuncios, gestao-do-negocio, dicas-da-plataforma, noticias, geral.
+- **Categorias**: `https://dudit.com.br/blog/categoria/{categoria}` — protecao-e-seguranca, gestao-financeira, vendas-e-marketing, fotos-e-anuncios, gestao-do-negocio, dicas-da-plataforma, noticias, geral.
 - Artigos de referência:
   - `https://dudit.com.br/blog/como-evitar-golpes-ao-vender-pelo-whatsapp`
   - `https://dudit.com.br/blog/fluxo-de-caixa-o-que-e-e-como-controlar`
   - `https://dudit.com.br/blog/como-tirar-fotos-melhores-dos-produtos-com-o-celular`
 
-### Pesquisas e Estatísticas do Mercado
+### Pesquisas e Estatísticas
 - **Estatísticas do Comércio Local e Taxas de Marketplace**: `https://dudit.com.br/institucional/estatisticas`
-
-## Diferenciais e Posicionamento
-- **0% de Comissão por Venda**: O empreendedor não perde margem de lucro com taxas de 12% a 27% por pedido.
-- **Contato e Venda Direta no WhatsApp**: O cliente negocia diretamente com quem vende, sem intermediários.
-- **Foco Hiperlocal**: Conecta compradores a comércios e profissionais do mesmo bairro ou município, reduzindo custos e prazos de frete.
-- **Gestão Simplificada (ERP)**: Ferramentas operacionais nativas sem complexidade excessiva, acessíveis pelo celular ou computador.

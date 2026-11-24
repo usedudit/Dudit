@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/ferramentas/calculadora-margem-lucro-preco-venda",
     },
-    keywords: [
-        "calculadora margem de lucro",
-        "calcular markup divisor",
-        "como calcular preço de venda",
-        "margem de lucro produto",
-        "precificação pequeno comércio",
-        "formula de markup",
-    ],
 };
 
 export default function CalculadoraMargemLucroLayout({

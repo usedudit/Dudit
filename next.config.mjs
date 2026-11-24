@@ -223,8 +223,8 @@ const nextConfig = {
         ],
       },
       {
-        // Public marketplace pages: edge-cacheable
-        source: '/(products|services|partners|produto)(.*)',
+        // Public static/content pages (no server-side auth): edge-cacheable
+        source: '/(institucional|segmentos|ferramentas|blog|ajuda|mapa-do-site)(.*)',
         headers: [
           {
             key: 'Cache-Control',
@@ -268,7 +268,7 @@ const nextConfig = {
   },
 }
 
-export default withSentryConfig(withSerwist(nextConfig), {
+const sentryConfig = withSentryConfig(withSerwist(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
@@ -319,3 +319,19 @@ export default withSentryConfig(withSerwist(nextConfig), {
     },
   },
 });
+
+// Remove tags <meta name="sentry-trace"> e <meta name="baggage"> injetadas
+// automaticamente pelo @sentry/nextjs no <head> do HTML (evita trace_id em HTML cacheado).
+function stripSentryClientTraceMetadata(config) {
+  if (Array.isArray(config?.experimental?.clientTraceMetadata)) {
+    config.experimental.clientTraceMetadata =
+      config.experimental.clientTraceMetadata.filter(
+        (key) => key !== "baggage" && key !== "sentry-trace"
+      );
+  }
+  return config;
+}
+
+export default typeof sentryConfig === "function"
+  ? async (...args) => stripSentryClientTraceMetadata(await sentryConfig(...args))
+  : stripSentryClientTraceMetadata(sentryConfig);

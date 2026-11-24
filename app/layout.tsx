@@ -50,31 +50,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
     metadataBase: new URL("https://dudit.com.br"),
     title: {
-        default: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
+        default: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
         template: "%s | Dudit",
     },
     description:
-        "Sistema de gestão comercial e vendas com 0% de comissão para autônomos e pequenos negócios: integração com Tiny ERP, venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios. Catálogo digital, agendamento, ordens de serviço e controle de estoque na Dudit.",
-    keywords: [
-        "sistema de gestao comercial",
-        "integracao tiny erp",
-        "catalogo integrado tiny erp",
-        "pdv integrado tiny",
-        "tiny erp vendas online",
-        "vender online brasil",
-        "envio nacional transportadora",
-        "frete correios superfrete",
-        "pdv frente de caixa",
-        "vender sem comissao",
-        "catalogo digital whatsapp",
-        "ordem de servico online",
-        "agendamento de servicos",
-        "controle de estoque gratuito",
-        "comercio local e nacional brasil",
-        "produtos perto de mim",
-        "servicos na minha cidade",
-        "dudit",
-    ],
+        "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP e Bling, agendamento, OS e envios locais ou nacionais.",
     authors: [{ name: "Dudit" }],
     creator: "Dudit",
     publisher: "Dudit",
@@ -94,9 +74,9 @@ export const metadata: Metadata = {
         locale: "pt_BR",
         url: "https://dudit.com.br",
         siteName: "Dudit",
-        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
+        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
         description:
-            "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão físico (PDV), online na sua região ou envie para todo o Brasil via transportadoras e Correios.",
+            "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP, agendamento, OS e envios locais ou para todo o Brasil.",
         images: [
             {
                 url: "https://img.dudit.com.br/static/og-image.png",
@@ -110,9 +90,9 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@usedudit",
         creator: "@usedudit",
-        title: "Dudit | Plataforma de Vendas e Gestão Comercial (0% Comissão)",
+        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
         description:
-            "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão físico (PDV), online na sua região ou envie para todo o Brasil via transportadoras e Correios.",
+            "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP, agendamento, OS e envios locais ou para todo o Brasil.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     verification: {
@@ -161,7 +141,7 @@ const jsonLd = {
             },
             knowsAbout: [
                 "Sistema de Gestão Comercial (ERP)",
-                "Integração com Tiny ERP",
+                "Integração com Tiny ERP e Bling",
                 "Sincronização de Estoque e Pedidos via ERP",
                 "PDV Frente de Caixa",
                 "Vendas Online com Envio Nacional",
@@ -225,7 +205,7 @@ const jsonLd = {
             },
             featureList: [
                 "0% de comissão por venda (o valor da venda fica com o comerciante)",
-                "Integração nativa com Tiny ERP para sincronização de estoque e envio automático de pedidos",
+                "Integração nativa com Tiny ERP e Bling para sincronização de estoque e envio automático de pedidos",
                 "Envios para todo o Brasil via transportadoras e Correios integrados",
                 "Vendas locais com entrega própria, retirada no balcão ou motoboy",
                 "PDV balcão para frente de caixa e vendas presenciais",

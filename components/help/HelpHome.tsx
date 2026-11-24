@@ -166,7 +166,7 @@ export default function HelpHome() {
                             <ListItem
                                 title="Recuperar minha senha"
                                 left={<KeyIcon className="text-brand-orange" />}
-                                className="px-4 py-3 border-x-0 border-t-1 border-b-0 rounded-none"
+                                className="px-4 py-3 border-x-0 border-b-0 rounded-none"
                                 onClick={() => window.location.href = "/auth/login?mode=forgot-password"}
                             />
                         </div>
@@ -176,11 +176,6 @@ export default function HelpHome() {
                 {/* FOOTER */}
                 <footer className="pt-12 border-t border-brand-border dark:border-dark-border flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                        <img
-                            src="https://img.dudit.com.br/static/Logo.png"
-                            alt="Dudit"
-                            className="h-6 w-auto"
-                        />
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                             © 2026 Dudit Tecnologia. Todos os direitos reservados.
                         </p>

@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/ferramentas",
     },
-    keywords: [
-        "ferramentas gratuitas para lojistas",
-        "calculadora taxas marketplace",
-        "calculadora margem lucro",
-        "calculadora ponto equilibrio",
-        "gerador link whatsapp",
-        "gestao pequeno negocio ferramentas",
-    ],
 };
 
 export default function FerramentasLayout({

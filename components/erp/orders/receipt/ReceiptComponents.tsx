@@ -34,22 +34,22 @@ export function ReceiptA4Document({
     printClassName = "receipt-a4-print",
     pageClassName,
 }: ReceiptA4DocumentProps) {
+    if (printMode) {
+        return (
+            <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printClassName}`}>
+                <div className="w-full flex flex-col items-center p-0">
+                    {children}
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div
-            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
-                printMode
-                    ? printClassName
-                    : "md:border-l border-brand-border dark:border-dark-border"
-            }`}
-        >
-            <div
-                className={
-                    printMode
-                        ? "w-full flex flex-col items-center p-0"
-                        : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
-                }
-            >
-                {children}
+        <div className="flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden md:border-l border-brand-border dark:border-dark-border">
+            <div className="flex-1 overflow-auto custom-scrollbar absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border">
+                <div className="min-w-full w-fit flex flex-col items-center gap-8 p-4 pt-8 md:p-12">
+                    {children}
+                </div>
             </div>
         </div>
     )

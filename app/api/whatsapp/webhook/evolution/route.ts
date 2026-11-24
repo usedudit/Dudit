@@ -60,7 +60,10 @@ export async function POST(request: NextRequest) {
   if (cid) {
     query = query.eq("id", cid)
   } else {
-    query = query.eq("instance_name", instanceName)
+    query = query
+      .eq("instance_name", instanceName)
+      .order("store_id", { ascending: true, nullsFirst: false })
+      .limit(1)
   }
 
   const { data: connection } = await query.maybeSingle()

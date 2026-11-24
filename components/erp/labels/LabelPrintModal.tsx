@@ -523,14 +523,14 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                             <div
                                 className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"}`}
                             >
-                                <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6">
+                                <div className="flex-1 overflow-auto custom-scrollbar">
                                     {selected.length === 0 ? (
-                                        <div className="h-full flex items-center justify-center text-brand-inactive-text text-sm">
+                                        <div className="h-full flex items-center justify-center text-brand-inactive-text text-sm p-4 md:p-6">
                                             Selecione produtos para visualizar
                                         </div>
                                     ) : (
-                                        <div className="flex justify-center">
-                                            <div className="bg-white shadow-md rounded-sm overflow-hidden">
+                                        <div className="min-w-full w-fit flex justify-center p-4 md:p-6">
+                                            <div className="bg-white shadow-md rounded-sm overflow-hidden shrink-0">
                                                 <LabelSheet
                                                     key={activeTab}
                                                     products={labelProducts}

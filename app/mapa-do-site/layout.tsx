@@ -28,14 +28,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/mapa-do-site",
     },
-    keywords: [
-        "mapa do site dudit",
-        "paginas dudit",
-        "solucoes por segmento",
-        "ferramentas gratuitas dudit",
-        "sistema pequenos negocios brasil",
-        "dudit",
-    ],
 };
 
 export default function MapaDoSiteLayout({

@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const supabase = getAdminClient()
   const { data: integration, error: intErr } = await supabase
     .from("partner_integrations")
-    .select("id, partner_id, provider_slug, status, config")
+    .select("id, partner_id, provider_slug, status, config, metadata")
     .eq("partner_id", partnerId)
     .eq("provider_slug", TINY_PROVIDER)
     .maybeSingle()
@@ -49,40 +49,80 @@ export async function POST(req: Request) {
     )
   }
 
+  const recordWebhookPing = async (eventLabel: string) => {
+    try {
+      await supabase
+        .from("partner_integrations")
+        .update({
+          metadata: {
+            ...((integration.metadata as Record<string, any>) || {}),
+            last_webhook_at: new Date().toISOString(),
+            last_webhook_event: eventLabel,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", integration.id)
+    } catch { }
+  }
+
   let payload: any = null
   const contentType = req.headers.get("content-type") || ""
 
   try {
+    const rawText = (await req.text()).trim()
+
+    // O Tiny envia um POST com corpo vazio (ou "{}") para validar a URL ao salvar o webhook
+    if (!rawText || rawText === "{}") {
+      await recordWebhookPing("ping")
+      return NextResponse.json({
+        received: true,
+        event: "ping",
+        message: "URL de webhook validada com sucesso.",
+      })
+    }
+
     if (contentType.includes("application/json")) {
-      payload = await req.json()
+      payload = JSON.parse(rawText)
     } else if (contentType.includes("application/x-www-form-urlencoded")) {
-      const formData = await req.formData()
-      const dados = formData.get("dados")
-      if (typeof dados === "string") {
+      const params = new URLSearchParams(rawText)
+      const dados = params.get("dados")
+      if (dados && dados.trim()) {
         payload = JSON.parse(dados)
       } else {
-        payload = Object.fromEntries(formData.entries())
+        const obj = Object.fromEntries(params.entries())
+        if (Object.keys(obj).length === 0) {
+          await recordWebhookPing("ping")
+          return NextResponse.json({ received: true, event: "ping" })
+        }
+        payload = obj
       }
     } else {
-      const text = await req.text()
       try {
-        payload = JSON.parse(text)
+        payload = JSON.parse(rawText)
       } catch {
-        // Se vier como dados=...
-        const params = new URLSearchParams(text)
+        const params = new URLSearchParams(rawText)
         const dados = params.get("dados")
-        payload = dados ? JSON.parse(dados) : Object.fromEntries(params.entries())
+        if (dados && dados.trim()) {
+          payload = JSON.parse(dados)
+        } else {
+          payload = Object.fromEntries(params.entries())
+        }
       }
     }
   } catch (parseErr: any) {
-    return NextResponse.json(
-      { error: `Formato de payload inválido: ${parseErr.message}` },
-      { status: 400 }
-    )
+    // Se falhar o parse durante validação do Tiny, responde 200 para ping genérico se não parecer payload real
+    console.warn("[TINY WEBHOOK] Payload não-JSON recebido:", parseErr?.message)
+    await recordWebhookPing("ping")
+    return NextResponse.json({
+      received: true,
+      event: "ping",
+      message: "Endpoint de webhook ativo.",
+    })
   }
 
   try {
     const result = await processTinyWebhook(partnerId, payload)
+    await recordWebhookPing(result.event || "processed")
     return NextResponse.json({
       received: true,
       event: result.event,
@@ -126,4 +166,8 @@ export async function GET(req: Request) {
     connected: integration?.status === "connected",
     message: "Endpoint de webhook do Tiny ERP validado com sucesso.",
   })
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 200 })
 }

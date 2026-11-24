@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
@@ -91,7 +91,7 @@ export default async function VendorPage({
       if (typeof value === "string" && value) preserved.set(key, value)
     }
     const preservedQuery = preserved.toString()
-    redirect(preservedQuery ? `${canonicalUrl}?${preservedQuery}` : canonicalUrl)
+    permanentRedirect(preservedQuery ? `${canonicalUrl}?${preservedQuery}` : canonicalUrl)
   }
 
   const [user, products, services, reviews, statsBase, plan, plansRes, activePromotions] = await Promise.all([

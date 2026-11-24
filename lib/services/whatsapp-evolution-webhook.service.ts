@@ -7,7 +7,7 @@ import { SecureLogger } from "@/lib/secure-logger"
 import { decrypt } from "@/lib/cryptoService"
 import { decryptWhatsappSecret } from "@/lib/whatsapp/secrets"
 import { EvolutionWhatsappClient } from "@/lib/whatsapp/providers/evolution-client"
-import { updateConnectionStatus, getWebhookUrl, EVOLUTION_WEBHOOK_EVENTS } from "./whatsapp-connection.service"
+import { updateConnectionStatusById, getWebhookUrl, EVOLUTION_WEBHOOK_EVENTS } from "./whatsapp-connection.service"
 import type { WhatsappConnectionStatus } from "@/lib/whatsapp/types"
 
 // ─── Webhook Secret Verification ─────────────────────────────────────────────
@@ -87,12 +87,17 @@ async function getConnectionByInstanceName(
   instanceName: string,
 ): Promise<EvolutionWebhookConnection | null> {
   const admin = getAdminClient()
+  // A store-specific connection and a partner-level connection can share the
+  // same Evolution instance, so take a single row (store-specific first)
+  // instead of failing on multiple matches.
   const { data, error } = await admin
     .from("partner_whatsapp_connections")
     .select("id, partner_id, instance_name, is_active, evolution_webhook_secret")
     .eq("instance_name", instanceName)
     .eq("provider", "evolution")
     .eq("is_active", true)
+    .order("store_id", { ascending: true, nullsFirst: false })
+    .limit(1)
     .maybeSingle()
 
   if (error) throw new Error(`Failed to resolve Evolution connection: ${error.message}`)
@@ -187,6 +192,7 @@ async function processEvolutionConnectionEvent(params: {
   data: Record<string, unknown>
   instanceName: string
   partnerId: string
+  connectionId: string
 }): Promise<void> {
   const rawState = String(params.data.state || params.data.status || "")
   const stateLower = rawState.toLowerCase()
@@ -214,8 +220,7 @@ async function processEvolutionConnectionEvent(params: {
   const { data: currentConn } = await admin
     .from("partner_whatsapp_connections")
     .select("status")
-    .eq("partner_id", params.partnerId)
-    .eq("provider", "evolution")
+    .eq("id", params.connectionId)
     .maybeSingle()
 
   if (status === "disconnected") {
@@ -260,7 +265,7 @@ async function processEvolutionConnectionEvent(params: {
     }
   }
 
-  await updateConnectionStatus(params.partnerId, "evolution", status, extra)
+  await updateConnectionStatusById(params.connectionId, status, extra)
 
   SecureLogger.info("[evolution webhook] Connection status changed", {
     instance: params.instanceName,
@@ -322,6 +327,7 @@ export async function handleEvolutionWebhookPayload(
           data,
           instanceName,
           partnerId: connection.partner_id,
+          connectionId: connection.id,
         })
         result.processed++
         break
@@ -329,7 +335,7 @@ export async function handleEvolutionWebhookPayload(
 
       case "qrcode.updated": {
         // QR code events are handled by updating connection status
-        await updateConnectionStatus(connection.partner_id, "evolution", "qr_pending")
+        await updateConnectionStatusById(connection.id, "qr_pending")
         result.processed++
         break
       }

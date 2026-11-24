@@ -70,6 +70,7 @@ async function notifyCustomer(params: {
   partnerId?: string | null
   customerId?: string | null
   phone?: string | null
+  storeId?: string | null
   ctx: Parameters<typeof buildNotificationContent>[2]
   variant?: string
   origin?: "manual" | "automation" | "system"
@@ -86,6 +87,7 @@ async function notifyCustomer(params: {
       ...params.ctx,
       audience: "customer",
       partner_id: params.partnerId,
+      store_id: params.storeId,
       customer_id: params.customerId,
       phone: params.phone,
     },
@@ -265,6 +267,7 @@ export async function runScheduledNotificationJob(job: {
       entityId: appointment.id,
       partnerId: appointment.partner_id as string,
       customerId: appointment.customer_id as string,
+      storeId: appointment.store_id as string | null,
       variant: job.job_type,
       ctx: {
         serviceName: serviceNameFromPayload,
@@ -306,6 +309,7 @@ export async function runScheduledNotificationJob(job: {
     entityId: appointment.id,
     partnerId: appointment.partner_id as string,
     customerId: appointment.customer_id as string,
+    storeId: appointment.store_id as string | null,
     variant: job.job_type,
     ctx: {
       serviceName: appointment.service_name,
@@ -430,6 +434,7 @@ export async function onAppointmentStatusChanged(
         entityId: appointmentId,
         partnerId,
         customerId: appointment.customer_id as string | null | undefined,
+        storeId,
         ctx,
         origin,
       })
@@ -447,6 +452,7 @@ export async function onAppointmentStatusChanged(
         entityId: appointmentId,
         partnerId,
         customerId: appointment.customer_id as string | null | undefined,
+        storeId,
         ctx,
         origin,
       })
@@ -852,6 +858,7 @@ export async function onOrderStatusChanged(
             partnerId,
             customerId: (order.customer_id as string) || (order.buyer_id as string) || undefined,
             phone: (order.buyer_phone as string) || undefined,
+            storeId,
             ctx: { ...ctx, orderNumber },
             origin,
           })
@@ -890,6 +897,7 @@ export async function onOrderStatusChanged(
           partnerId,
           customerId: (order.customer_id as string) || (order.buyer_id as string) || undefined,
           phone: (order.buyer_phone as string) || undefined,
+          storeId,
           ctx: { ...ctx, orderNumber },
           origin,
         })
@@ -935,6 +943,7 @@ export async function notifySubscriptionPriceChangeToCustomer(params: {
     entityId: params.subscriptionId,
     partnerId: params.partnerId,
     customerId: params.customerId,
+    storeId: params.storeId,
     ctx: {
       planName: params.planName,
       storeName: params.storeName || undefined,

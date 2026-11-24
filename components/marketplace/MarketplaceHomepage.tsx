@@ -762,8 +762,8 @@ export default function MarketplaceHome({
                         />
                     )}
 
-                    {/* 4. Seção de Destaques em todo o Brasil */}
-                    {brasilTodoSection && brasilTodoSection.items.length > 0 && (
+                    {/* 4. Seção de Destaques em todo o Brasil (oculta quando já está vendo o Brasil todo) */}
+                    {!isCountryScope && brasilTodoSection && brasilTodoSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={brasilTodoSection.id}
                             title={brasilTodoSection.title}
