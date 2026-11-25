@@ -1284,13 +1284,23 @@ export async function syncDuditStockToBling(params: {
       return { success: false, error: "Produto/variação não encontrado no Bling ERP." }
     }
 
-    // 2. Resolve depósito padrão
+    // 2. Resolve depósito padrão (tenta /depositos; se 403 por falta de escopo Depósitos, faz fallback via /estoques/saldos)
     let depositId = config.default_deposit_id || null
     if (!depositId) {
-      const deposits = await client.listDeposits()
-      const def = deposits.find((d) => d.padrao) || deposits[0]
-      if (def?.id) {
-        depositId = def.id
+      try {
+        const deposits = await client.listDeposits()
+        const def = deposits.find((d) => d.padrao) || deposits[0]
+        if (def?.id) depositId = def.id
+      } catch {
+        // Fallback: /estoques/saldos retorna os IDs dos depósitos vinculados ao produto sem exigir o escopo separado de Depósitos
+        try {
+          const balances = await client.getProductStocks([targetBlingId])
+          const firstDep = balances?.[0]?.depositos?.[0]
+          if (firstDep?.id) depositId = firstDep.id
+        } catch { }
+      }
+
+      if (depositId) {
         await supabase
           .from("partner_integrations")
           .update({ config: { ...config, default_deposit_id: depositId } })

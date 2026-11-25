@@ -132,12 +132,20 @@ describe("BlingClient (API v3)", () => {
         status: 200,
         json: async () => ({ data: [{ id: 777, nome: "João Silva" }] }),
       } as any)
-      // 3. GET /contatos/777 -> missing numeroDocumento and endereco
+      // 3. GET /contatos/777 -> missing numeroDocumento and endereco, has tiposContato
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({
-          data: { id: 777, nome: "João Silva", tipo: "F", situacao: "A", numeroDocumento: "", endereco: { geral: {} } },
+          data: {
+            id: 777,
+            nome: "João Silva",
+            tipo: "F",
+            situacao: "A",
+            numeroDocumento: "",
+            tiposContato: [{ id: 10, descricao: "Desenvolvedor" }],
+            endereco: { geral: {} },
+          },
         }),
       } as any)
       // 4. PUT /contatos/777 -> succeeds
@@ -168,6 +176,7 @@ describe("BlingClient (API v3)", () => {
     expect(putInit?.method).toBe("PUT")
     const putBody = JSON.parse(String(putInit?.body))
     expect(putBody.numeroDocumento).toBe("12345678901")
+    expect(putBody.tiposContato).toEqual([{ id: 10, descricao: "Desenvolvedor" }])
     expect(putBody.endereco.geral.endereco).toBe("Rua das Flores")
     expect(putBody.endereco.geral.cep).toBe("01001000")
     expect(putBody.endereco.geral.uf).toBe("SP")

@@ -315,7 +315,7 @@ export class BlingClient {
           json?.error?.message ||
           json?.message ||
           `HTTP ${response.status} ${response.statusText}`
-        throw new Error(`Bling ERP: ${baseMsg}${fields ? ` (${fields})` : ""}`)
+        throw new Error(`Bling ERP [${method} ${path}]: ${baseMsg}${fields ? ` (${fields})` : ""}`)
       }
 
       return json as T
@@ -467,9 +467,11 @@ export class BlingClient {
         customer.tipo ||
         (finalDoc.length === 14 ? "J" : "F")
 
+      const { id: _ignoredId, ...existingFields } = existing
       await this.request(`/contatos/${contactId}`, {
         method: "PUT",
         body: {
+          ...existingFields,
           nome: existing.nome || customer.nome || "Cliente Dudit",
           tipo: finalTipo,
           situacao: existing.situacao || "A",
