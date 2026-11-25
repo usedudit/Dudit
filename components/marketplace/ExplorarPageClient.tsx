@@ -33,6 +33,9 @@ import { fetchAllMarketplaceCategoriesClient } from "@/lib/data/marketplace-cate
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
+import { SmartSearchIntentBanner, ProximityRingsSection } from "./SmartSearchSections"
+import type { ParsedSearchIntent } from "@/lib/search/intent-parser"
+import type { ProximityRingsResult } from "@/lib/search/proximity-rings"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
 import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES, ESTADO_MAP } from "./explorar-constants"
 import type { SortOption } from "./explorar-constants"
@@ -111,6 +114,8 @@ interface ExplorarPageClientProps {
     initialResults?: any[]
     initialMoreDistantSellers?: any[]
     initialMoreDistantItems?: any[]
+    initialSearchIntent?: ParsedSearchIntent | null
+    initialProximityRings?: ProximityRingsResult<any> | null
     initialSection?: string
     query?: string
     type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos'
@@ -130,6 +135,8 @@ export function ExplorarPageClient({
     initialResults = [],
     initialMoreDistantSellers = [],
     initialMoreDistantItems = [],
+    initialSearchIntent = null,
+    initialProximityRings = null,
     initialSection,
     query = '',
     type = 'tudo',
@@ -223,6 +230,8 @@ export function ExplorarPageClient({
     })
     const [moreDistantSellers, setMoreDistantSellers] = useState<any[]>(initialMoreDistantSellers)
     const [moreDistantItems, setMoreDistantItems] = useState<any[]>(initialMoreDistantItems)
+    const [searchIntent, setSearchIntent] = useState<ParsedSearchIntent | null>(initialSearchIntent)
+    const [proximityRings, setProximityRings] = useState<ProximityRingsResult<any> | null>(initialProximityRings)
 
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [dbServiceCategories, setDbServiceCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
@@ -428,8 +437,10 @@ export function ExplorarPageClient({
             prevQueryKeyRef.current = queryKeyString
             setMoreDistantSellers(initialMoreDistantSellers)
             setMoreDistantItems(initialMoreDistantItems)
+            setSearchIntent(initialSearchIntent)
+            setProximityRings(initialProximityRings)
         }
-    }, [queryKeyString, initialMoreDistantSellers, initialMoreDistantItems])
+    }, [queryKeyString, initialMoreDistantSellers, initialMoreDistantItems, initialSearchIntent, initialProximityRings])
 
     const isLandingPage = false
 
@@ -725,6 +736,8 @@ export function ExplorarPageClient({
             if (!cursor) {
                 setMoreDistantSellers(res.moreDistantSellers || [])
                 setMoreDistantItems(res.moreDistantItems || [])
+                setSearchIntent(res.searchIntent ?? null)
+                setProximityRings(res.proximityRings ?? null)
             }
 
             return res
@@ -1899,6 +1912,16 @@ export function ExplorarPageClient({
                             />
                         )}
 
+                        {!!query && searchIntent && (
+                            <SmartSearchIntentBanner
+                                query={query}
+                                searchIntent={searchIntent}
+                                nearbyCount={rawItems.length}
+                                regionalCount={(proximityRings?.regional.length ?? 0) + (proximityRings?.regionalSellers.length ?? 0)}
+                                nationalShippingCount={proximityRings?.nationalShipping.length ?? 0}
+                            />
+                        )}
+
                         <div
                             key={isContentLoading ? "skeleton" : "content"}
                             style={{ animation: 'fadeIn 0.2s ease-out' }}
@@ -2060,30 +2083,15 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : null}
 
-                                    {/* Itens e Lojas distantes - listados direto, respondendo aos filtros/ordenação da página */}
-                                    {!!query && (moreDistantSellers.length > 0 || filteredDistant.length > 0) && (
-                                        <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
-                                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Um pouco mais distante do seu raio de busca</h2>
-
-                                            {moreDistantSellers.length > 0 && (currentType === 'tudo' || currentType === 'vitrines' || currentType === 'negocios') && (
-                                                <>
-                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Lojas e vitrines</h3>
-                                                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
-                                                        {moreDistantSellers.map((vitrine) => renderDistantItem(vitrine))}
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {filteredDistant.length > 0 && (
-                                                <>
-                                                    {moreDistantSellers.length > 0 && <div className="h-px bg-brand-border dark:border-dark-border my-4" />}
-                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Produtos e serviços</h3>
-                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
-                                                        {filteredDistant.map((item) => renderDistantItem(item))}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
+                                    {/* Anéis de Proximidade: Cidades vizinhas -> Envio nacional CEP -> Outras opções */}
+                                    {!!query && (
+                                        <ProximityRingsSection
+                                            rings={proximityRings}
+                                            currentType={currentType}
+                                            renderDistantItem={renderDistantItem}
+                                            fallbackSellers={moreDistantSellers}
+                                            fallbackItems={filteredDistant}
+                                        />
                                     )}
 
                                     {/* Seção Patrocinados na sua região */}

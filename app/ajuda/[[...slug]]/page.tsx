@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                 type: "website",
                 images: [
                     {
-                        url: "https://img.dudit.com.br/static/og-image.png",
+                        url: "/og-image.png",
                         width: 1200,
                         height: 630,
                         alt: "Central de Ajuda Dudit",
@@ -90,7 +90,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                 type: "article",
                 images: [
                     {
-                        url: "https://img.dudit.com.br/static/og-image.png",
+                        url: "/og-image.png",
                         width: 1200,
                         height: 630,
                         alt: article.title,

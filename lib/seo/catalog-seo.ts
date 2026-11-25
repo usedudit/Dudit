@@ -120,6 +120,19 @@ export function buildProductSeo({
   const categoryName = product.category?.name || product.marketplace_category?.name || ""
   const conditionLabel = product.condition === "used" ? "Usado" : "Novo"
 
+  const rawFulfillmentModes: string[] = Array.isArray(product.fulfillment_modes)
+    ? product.fulfillment_modes
+    : []
+  const hasExplicitModes = rawFulfillmentModes.length > 0
+  const supportsShipping = hasExplicitModes ? rawFulfillmentModes.includes("shipping") : true
+  const supportsDelivery = hasExplicitModes ? rawFulfillmentModes.includes("delivery") : true
+  const supportsPickup = hasExplicitModes ? rawFulfillmentModes.includes("pickup") : true
+
+  const availableDeliveryMethods: string[] = []
+  if (supportsPickup) availableDeliveryMethods.push("http://purl.org/goodrelations/v1#DeliveryModePickUp")
+  if (supportsDelivery) availableDeliveryMethods.push("http://purl.org/goodrelations/v1#DeliveryModeOwnFleet")
+  if (supportsShipping) availableDeliveryMethods.push("http://purl.org/goodrelations/v1#ParcelService")
+
   // 3. Montagem de Keywords para SEO & GEO
   const specKeywords = specs.slice(0, 6).map((s) => `${s.name}: ${s.value}`)
   const keywordsSet = new Set<string>([
@@ -131,12 +144,14 @@ export function buildProductSeo({
     `comprar ${product.name}`,
     `${product.name} em ${locationLabel}`,
     `preço ${product.name}`,
+    ...(supportsShipping ? ["envio para todo o Brasil", "frete para seu CEP"] : []),
+    ...(supportsPickup ? [`retirada em ${locationLabel}`] : []),
     conditionLabel,
     "dudit",
   ])
   const keywords = Array.from(keywordsSet).filter(Boolean)
 
-  // 4. Meta Description otimizada (incluindo marca e specs para snippets ricos)
+  // 4. Meta Description otimizada (incluindo marca, specs e modalidade local/nacional)
   const cleanDesc = product.description
     ? product.description.replace(/<[^>]*>?/gm, "").replace(/\s+/g, " ").trim()
     : ""
@@ -144,12 +159,17 @@ export function buildProductSeo({
 
   const specsHighlights = specs.slice(0, 3).map((s) => `${s.name}: ${s.value}`).join(" | ")
   const brandHighlight = brandName ? `Marca: ${brandName}.` : ""
+  const fulfillmentHighlight = supportsShipping && !isCityBrasil
+    ? `em ${locationLabel} ou com envio para todo o Brasil`
+    : supportsShipping
+      ? "com envio para todo o Brasil"
+      : `em ${locationLabel}`
 
   let metaDescription = ""
   if (descSnippet) {
-    metaDescription = `${descSnippet}... ${brandHighlight} ${specsHighlights ? `[${specsHighlights}]. ` : ""}Compre online em ${locationLabel} pela Dudit com envio seguro!`
+    metaDescription = `${descSnippet}... ${brandHighlight} ${specsHighlights ? `[${specsHighlights}]. ` : ""}Compre ${fulfillmentHighlight} pela Dudit!`
   } else {
-    metaDescription = `Oferta em ${locationLabel}: ${product.name}. ${brandHighlight} ${specsHighlights ? `Especificações: ${specsHighlights}. ` : ""}Compre direto do vendedor pela Dudit com 0% de comissão!`
+    metaDescription = `Oferta ${fulfillmentHighlight}: ${product.name}. ${brandHighlight} ${specsHighlights ? `Especificações: ${specsHighlights}. ` : ""}Compre direto do vendedor pela Dudit com 0% de comissão!`
   }
   metaDescription = metaDescription.replace(/\s+/g, " ").trim().slice(0, 155)
 
@@ -252,13 +272,19 @@ export function buildProductSeo({
       itemCondition: product.condition === "used"
         ? "https://schema.org/UsedCondition"
         : "https://schema.org/NewCondition",
-      shippingDetails: {
-        "@type": "OfferShippingDetails",
-        shippingDestination: {
-          "@type": "DefinedRegion",
-          addressCountry: "BR",
+      ...(availableDeliveryMethods.length > 0 ? { availableDeliveryMethod: availableDeliveryMethods } : {}),
+      areaServed: supportsShipping
+        ? { "@type": "Country", name: "Brasil" }
+        : { "@type": "City", name: locationLabel },
+      ...(supportsShipping ? {
+        shippingDetails: {
+          "@type": "OfferShippingDetails",
+          shippingDestination: {
+            "@type": "DefinedRegion",
+            addressCountry: "BR",
+          },
         },
-      },
+      } : {}),
       hasMerchantReturnPolicy: {
         "@type": "MerchantReturnPolicy",
         applicableCountry: "BR",
@@ -326,6 +352,12 @@ export function buildServiceSeo({
   const tags = normalizeCatalogTags(service.tags)
 
   // 3. Keywords
+  const rawServiceModes: string[] = Array.isArray(service.fulfillment_modes)
+    ? service.fulfillment_modes
+    : []
+  const supportsCustomerLocation = rawServiceModes.includes("customer_location")
+  const supportsOnSite = rawServiceModes.includes("on_site")
+
   const detailKeywords = details.slice(0, 6).map((d) => `${d.name}: ${d.value}`)
   const serviceTypeName = service.service_type || service.name
   const keywordsSet = new Set<string>([
@@ -336,6 +368,8 @@ export function buildServiceSeo({
     `agendar ${service.name}`,
     `serviço de ${service.name}`,
     `${service.name} em ${locationLabel}`,
+    ...(supportsCustomerLocation ? ["atendimento a domicílio", `${service.name} a domicílio`] : []),
+    ...(supportsOnSite ? ["atendimento no local"] : []),
     "agendamento online",
     "dudit",
   ])
@@ -456,11 +490,21 @@ export function buildServiceSeo({
       price: service.price || 0,
       availability: "https://schema.org/InStock",
     },
-    ...(!isCityBrasil ? {
-      areaServed: {
-        "@type": "City",
-        name: city,
-      },
+    ...(!isCityBrasil || (supportsCustomerLocation && address?.latitude && address?.longitude && service.service_max_km) ? {
+      areaServed: (supportsCustomerLocation && address?.latitude && address?.longitude && service.service_max_km)
+        ? {
+            "@type": "GeoCircle",
+            geoMidpoint: {
+              "@type": "GeoCoordinates",
+              latitude: address.latitude,
+              longitude: address.longitude,
+            },
+            geoRadius: Number(service.service_max_km) * 1000,
+          }
+        : {
+            "@type": "City",
+            name: city,
+          },
     } : {}),
     ...(avgRating && reviewCount > 0 ? {
       aggregateRating: {

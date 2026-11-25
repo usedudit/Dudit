@@ -7,8 +7,8 @@
 ## Sobre a Plataforma
 
 A Dudit elimina comissões abusivas (12% a 27%) cobradas por grandes marketplaces e reúne em um só lugar ferramentas de venda e gestão operacional:
-- **Marketplace e Catálogo Digital (0% Comissão)**: Descoberta de produtos, serviços e vitrines comerciais por cidade, estado ou em todo o Brasil, com checkout próprio ou pedido direto no WhatsApp e 0% de taxa sobre as vendas.
-- **Vendas Locais e Envios Nacionais**: Retirada no balcão, entrega local por distância/motoboy e envio para todo o Brasil com cálculo automático de frete, etiquetas e rastreio via transportadoras e Correios.
+- **Marketplace e Busca Inteligente por Proximidade (0% Comissão)**: Descoberta de produtos, serviços e vitrines por necessidade real — priorizando lojas e profissionais na sua cidade, expandindo para cidades vizinhas e vendedores nacionais que enviam para o CEP do comprador, além de verificação de disponibilidade e agendamento online para serviços.
+- **Vendas Locais e Envios Nacionais**: Retirada no balcão, entrega local por distância/motoboy, atendimento a domicílio para serviços e envio para todo o Brasil com cálculo automático de frete, etiquetas e rastreio via transportadoras e Correios.
 - **Gestão Comercial (Mini-ERP + PDV)**: Frente de caixa (PDV), controle de estoque com grade de variações (cor e tamanho), Ordens de Serviço (OS) com fotos e aprovação digital, Agendamento Online 24h, Orçamentos em PDF, Recibos e Controle Financeiro.
 - **Integração Nativa com Tiny ERP e Bling**: Sincronização de estoque em tempo real e envio automático de pedidos para emissão de NF-e sem retrabalho manual.
 

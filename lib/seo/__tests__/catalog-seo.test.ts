@@ -102,6 +102,60 @@ describe("catalog-seo", () => {
     expect(schemaJsonLd.additionalProperty).toEqual([{ "@type": "PropertyValue", name: "Duração", value: "45 min" }])
   })
 
+  it("exposes national shipping vs local-only fulfillment in Product JSON-LD", () => {
+    const national = buildProductSeo({
+      product: {
+        id: "p-nat",
+        name: "Pneu Aro 15",
+        price: 350,
+        fulfillment_modes: ["pickup", "delivery", "shipping"],
+      },
+      city: "Franca",
+      productUrl: "https://dudit.com.br/franca-sp/pneu-aro-15/p/nat",
+    })
+    expect(national.schemaJsonLd.offers.areaServed).toEqual({ "@type": "Country", name: "Brasil" })
+    expect(national.schemaJsonLd.offers.shippingDetails).toBeDefined()
+    expect(national.schemaJsonLd.offers.availableDeliveryMethod).toContain("http://purl.org/goodrelations/v1#ParcelService")
+    expect(national.keywords).toContain("envio para todo o Brasil")
+
+    const localOnly = buildProductSeo({
+      product: {
+        id: "p-loc",
+        name: "Bolo Caseiro",
+        price: 60,
+        fulfillment_modes: ["pickup", "delivery"],
+      },
+      city: "Franca",
+      productUrl: "https://dudit.com.br/franca-sp/bolo-caseiro/p/loc",
+    })
+    expect(localOnly.schemaJsonLd.offers.areaServed).toEqual({ "@type": "City", name: "Franca" })
+    expect(localOnly.schemaJsonLd.offers.shippingDetails).toBeUndefined()
+  })
+
+  it("exposes GeoCircle areaServed for home-visit services with max radius", () => {
+    const { schemaJsonLd, keywords } = buildServiceSeo({
+      service: {
+        id: "s-elec",
+        name: "Eletricista Residencial",
+        price: 120,
+        fulfillment_modes: ["customer_location"],
+        service_max_km: 25,
+        partners: {
+          store_name: "Silva Elétrica",
+          addresses: [{ city: "Franca", state: "SP", latitude: -20.538, longitude: -47.401 }],
+        },
+      },
+      city: "Franca",
+      serviceUrl: "https://dudit.com.br/franca-sp/eletricista/s/elec",
+    })
+    expect(keywords).toContain("atendimento a domicílio")
+    expect(schemaJsonLd.areaServed).toEqual({
+      "@type": "GeoCircle",
+      geoMidpoint: { "@type": "GeoCoordinates", latitude: -20.538, longitude: -47.401 },
+      geoRadius: 25000,
+    })
+  })
+
   it("includes Tiny ERP integration article in help-data and institutional FAQ", async () => {
     const { getArticleBySlug } = await import("@/lib/help-data")
     const { INSTITUTIONAL_FAQ } = await import("@/lib/constants/institutional-faq")

@@ -47,6 +47,7 @@ Apenas acesse a página do portal gestor clicando aqui: https://dudit.com.br/aut
     {
         id: "login-registro",
         title: "Login e Registro",
+        icon: "🔐",
         articles: [
             {
                 id: "acessando-conta",
@@ -193,6 +194,7 @@ Informe o endereço completo. Digite o **CEP** para preenchimento automático.
     {
         id: "vendas",
         title: "Vendas",
+        icon: "🛒",
         articles: [
             {
                 id: "visao-geral-vendas",
@@ -205,9 +207,6 @@ O módulo de **Vendas** é onde você gerencia tudo o que envolve comercializar 
 
 Esta seção reúne **pedidos**, **orçamentos**, **PDV**, **caixa**, **devoluções**, **entregas** e **metas** - tudo em um só lugar.
 
-[IMAGEM: Tela principal do módulo de Vendas com os atalhos para cada subseção]
-Legenda: O menu de vendas dá acesso rápido a todas as operações do dia a dia.
-
 ## Como funciona
 
 Toda venda passa por etapas que se conectam entre si. Veja o fluxo básico:
@@ -216,9 +215,6 @@ Toda venda passa por etapas que se conectam entre si. Veja o fluxo básico:
 2. **A venda acontece** - O pedido é gerado (manual, PDV, orçamento convertido, loja online ou WhatsApp).
 3. **Pós-venda** - O pedido pode ser entregue, faturado e, se necessário, devolvido ou trocado.
 4. **Gestão** - Metas de vendas acompanham o desempenho da equipe. O caixa registra todas as movimentações financeiras do PDV.
-
-[IMAGEM: Fluxograma simples mostrando a jornada: Orçamento → Pedido → Pagamento → Expedição/Entrega → Devolução (opcional)]
-Legenda: Ciclo completo de uma venda na plataforma.
 
 ## O que você encontra nesta seção
 
@@ -269,9 +265,6 @@ A seção de **Pedidos** é onde você acompanha todas as vendas da sua loja, in
 
 Cada pedido reúne as informações completas da venda: itens, cliente, valores, forma de pagamento, endereço de entrega e status.
 
-[IMAGEM: Listagem de pedidos com filtros e busca]
-Legenda: A tela principal mostra todos os pedidos organizados por data.
-
 ## Quando utilizar
 
 - Para registrar uma venda feita por WhatsApp, telefone ou presencialmente (fora do PDV).
@@ -284,15 +277,9 @@ Legenda: A tela principal mostra todos os pedidos organizados por data.
 1. No menu lateral, clique em **Vendas > Pedidos**.
 2. Clique no botão **Novo pedido**.
 
-[IMAGEM: Botão "Novo pedido" destacado no topo da listagem]
-Legenda: O botão fica no canto superior direito da tela.
-
 3. **Selecione o cliente** - Busque por nome, email ou telefone. Se o cliente ainda não estiver cadastrado, você pode criá-lo na hora.
 4. **Adicione os itens** - Busque produtos ou serviços. Para cada item, informe a quantidade. Você também pode aplicar desconto por item se necessário.
 5. **Ajuste os valores** - Configure frete, outros custos e desconto geral (valor fixo ou percentual).
-
-[IMAGEM: Tela de criação de pedido com itens e valores]
-Legenda: Preencha as informações principais antes de salvar o pedido.
 
 6. **Defina a forma de pagamento** - Escolha o método e, se aplicável, divida o pagamento entre múltiplas formas (ex: parte no dinheiro, parte no cartão).
 7. **Configure a entrega** - Escolha entre **Entrega** (com endereço) ou **Retirada** no balcão.
@@ -307,9 +294,6 @@ Clique em qualquer pedido da lista para abrir a tela de detalhes. Lá você enco
 - **Financeiro** - Valores, descontos, forma de pagamento e status (pago, parcial, pendente).
 - **Entrega** - Status atual e data prevista.
 - **Histórico** - Linha do tempo com todas as alterações feitas no pedido.
-
-[IMAGEM: Tela de detalhes do pedido com abas]
-Legenda: As abas organizam as informações para fácil consulta.
 
 ## Como imprimir recibo
 
@@ -375,9 +359,6 @@ Eles aparecem automaticamente na listagem de pedidos com a indicação de que fo
                 content: `
 Todo pedido na plataforma mantém um registro automático de todas as alterações feitas. Isso permite que você acompanhe cada etapa e, se necessário, cancele um pedido de forma segura.
 
-[IMAGEM: Aba de histórico dentro dos detalhes do pedido]
-Legenda: O histórico mostra quem fez cada alteração e quando.
-
 ## Quando utilizar
 
 - Para consultar quando um pedido foi criado, pago ou enviado.
@@ -397,18 +378,12 @@ Cada vez que alguém modifica um pedido (status, itens, valores, endereço), o s
 
 Para visualizar, abra o pedido e clique na aba **Histórico**. As entradas aparecem em ordem cronológica, da mais recente para a mais antiga.
 
-[IMAGEM: Linha do tempo do histórico com entradas detalhadas]
-Legenda: Cada evento é registrado com data, hora e descrição.
-
 ### Cancelamento de pedido
 
 Para cancelar um pedido:
 
 1. Abra o pedido que deseja cancelar.
 2. Clique em **Cancelar pedido**.
-
-[IMAGEM: Botão de cancelamento no topo da tela de detalhes]
-Legenda: O cancelamento fica disponível em pedidos que ainda não foram finalizados.
 
 3. Informe o **motivo do cancelamento** (opcional, mas recomendado para manter o registro).
 4. Confirme o cancelamento.
@@ -462,9 +437,6 @@ O **orçamento** é uma proposta comercial que você envia para o cliente antes 
 
 O cliente pode visualizar o orçamento online, aprovar ou rejeitar, e você pode convertê-lo em pedido com um clique.
 
-[IMAGEM: Tela de criação de orçamento com itens e preview]
-Legenda: Enquanto você monta o orçamento, a prévia é atualizada em tempo real.
-
 ## Quando utilizar
 
 - Quando o cliente pede um "orçamento" antes de decidir comprar.
@@ -477,15 +449,9 @@ Legenda: Enquanto você monta o orçamento, a prévia é atualizada em tempo rea
 1. No menu lateral, clique em **Vendas > Orçamentos**.
 2. Clique em **Novo orçamento**.
 
-[IMAGEM: Botão "Novo orçamento" na listagem]
-Legenda: O botão fica no topo da tela.
-
 3. **Selecione o cliente** - Busque por nome. Se não encontrar, cadastre um novo cliente na hora.
 4. **Adicione produtos ou serviços** - Busque pelo nome. Você pode misturar produtos físicos e serviços no mesmo orçamento.
 5. **Ajuste quantidades e preços** - Para cada item, você pode alterar a quantidade e o preço unitário.
-
-[IMAGEM: Seção de itens do orçamento com campos de quantidade e preço]
-Legenda: Adicione quantos itens precisar.
 
 6. **Configure as condições** - Defina:
    - **Data do orçamento** (geralmente a data de hoje).
@@ -493,9 +459,6 @@ Legenda: Adicione quantos itens precisar.
    - **Descontos** (por item ou geral, em valor fixo ou percentual).
    - **Frete** e **outros custos**, se aplicável.
 7. **Personalize a aparência** - Escolha as cores do tema, o título (ex: "Orçamento", "Proposta Comercial") e decida se quer exibir a decoração visual.
-
-[IMAGEM: Opções de personalização do orçamento]
-Legenda: Deixe o orçamento com a cara da sua loja.
 
 8. Clique em **Salvar**.
 
@@ -506,9 +469,6 @@ Após salvar, você pode:
 - **Visualizar a prévia** - Veja exatamente como o cliente vai receber o orçamento.
 - **Baixar em PDF** - Gere um arquivo PDF para enviar por email ou WhatsApp.
 - **Compartilhar link** - O sistema gera um link único. Envie para o cliente. Ele pode abrir no navegador, visualizar e responder.
-
-[IMAGEM: Opções de compartilhamento na tela de detalhes do orçamento]
-Legenda: Compartilhe por link, PDF ou WhatsApp.
 
 ## Dicas importantes
 
@@ -546,9 +506,6 @@ Sim, você pode editar itens, valores e condições. O link compartilhado sempre
                 content: `
 Depois que você envia um orçamento, o cliente pode interagir com ele online. Você acompanha cada etapa - desde o envio até a aprovação ou rejeição - e, quando chega a hora, converte o orçamento em pedido com um clique.
 
-[IMAGEM: Listagem de orçamentos com indicadores de status]
-Legenda: Cada orçamento mostra seu status atual com cores diferentes.
-
 ## Status do orçamento
 
 Cada orçamento passa por um fluxo de status. Você consegue ver em qual etapa ele está só de olhar na listagem:
@@ -564,16 +521,14 @@ Cada orçamento passa por um fluxo de status. Você consegue ver em qual etapa e
 | **Expirado** | O prazo de validade passou sem resposta. |
 | **Cancelado** | Você cancelou o orçamento. |
 
-> 💡 **Dica:** Orçamentos com status "Aprovado" são os principais candidatos para conversão em pedido.
+> [!TIP]
+> Orçamentos com status "Aprovado" são os principais candidatos para conversão em pedido.
 
 ## Como acompanhar
 
 1. Na listagem de orçamentos, você vê todos os status de uma só vez.
 2. Clique em um orçamento para abrir os detalhes completos.
 3. Na aba **Histórico**, você vê a linha do tempo com todas as interações: quando foi enviado, visualizado, quando o cliente comentou, etc.
-
-[IMAGEM: Aba de histórico do orçamento com interações]
-Legenda: Todas as ações ficam registradas para consulta.
 
 ### Interações com o cliente
 
@@ -601,9 +556,6 @@ Quando o cliente aprova o orçamento (ou quando você decide que está bom para 
 
 1. Abra o orçamento aprovado.
 2. Clique no botão **Converter em pedido**.
-
-[IMAGEM: Botão "Converter em pedido" destacado]
-Legenda: A conversão leva todos os dados do orçamento para o pedido.
 
 3. Pronto. O sistema cria um **pedido** com todos os itens, cliente, valores e condições do orçamento.
 4. Você é redirecionado para o pedido recém-criado, onde pode ajustar detalhes finais (forma de pagamento, endereço de entrega) e finalizar.
@@ -647,9 +599,6 @@ O **caixa** é o controle do dinheiro físico (e dos recebimentos) do seu PDV. A
 
 É como o velho livro-caixa, mas digital: o sistema registra cada movimentação e calcula automaticamente o saldo esperado.
 
-[IMAGEM: Tela principal do caixa com sessão ativa]
-Legenda: Quando o caixa está aberto, você vê o saldo atual e as movimentações.
-
 ## Quando utilizar
 
 - Todo dia útil, antes de começar as vendas presenciais.
@@ -661,9 +610,6 @@ Legenda: Quando o caixa está aberto, você vê o saldo atual e as movimentaçõ
 
 1. No menu lateral, clique em **Vendas > PDV**.
 2. Se não houver um caixa aberto, o sistema exibe a tela de abertura.
-
-[IMAGEM: Tela de abertura de caixa com campo de valor inicial]
-Legenda: Informe o valor em dinheiro que está no caixa no início do dia.
 
 3. Informe o **valor inicial** (troco) - é o dinheiro que você está colocando no caixa para começar o dia.
 4. Opcionalmente, adicione uma **observação** (ex: "Abertura com R$ 200,00 de troco").
@@ -685,9 +631,6 @@ Para registrar:
 2. Informe o **valor** e uma **descrição** (ex: "Pagamento fornecedor X").
 3. Clique em **Confirmar**.
 
-[IMAGEM: Modal de sangria com campos de valor e descrição]
-Legenda: Sempre descreva o motivo para facilitar a conferência no fechamento.
-
 A movimentação aparece automaticamente na lista e o saldo do caixa é atualizado.
 
 ## Como fechar o caixa
@@ -698,9 +641,6 @@ A movimentação aparece automaticamente na lista e o saldo do caixa é atualiza
    - Valor calculado (o que o sistema espera que tenha no caixa).
    - Movimentações (sangrias e reforços).
 3. **Informe a contagem do dinheiro** - Digite quanto tem em cada forma de pagamento (ex: R$ 500,00 em dinheiro, R$ 800,00 em cartão).
-
-[IMAGEM: Tela de fechamento com contagem por método]
-Legenda: Confira cada método de pagamento e informe o valor contado.
 
 4. O sistema calcula a **diferença** entre o valor contado e o valor esperado.
 5. Se houver diferença, você pode adicionar uma observação explicando.
@@ -716,9 +656,6 @@ Você pode consultar todas as sessões de caixa anteriores em **Vendas > Caixa >
 - Quem abriu e quem fechou.
 - Valor inicial, total de vendas, sangrias, reforços.
 - Valor calculado vs. valor contado e diferença.
-
-[IMAGEM: Histórico de sessões de caixa]
-Legenda: Consulte sessões anteriores para conferência ou auditoria.
 
 ## Dicas importantes
 
@@ -761,9 +698,6 @@ O **PDV (Ponto de Venda)** é o balcão digital da sua loja. Ele foi feito para 
 
 Antes de começar, certifique-se de que o **caixa está aberto**. Se não estiver, veja o artigo "Abrindo e fechando o caixa".
 
-[IMAGEM: Tela principal do PDV com carrinho e painel de pagamento]
-Legenda: O PDV é dividido em carrinho (esquerda) e resumo (direita).
-
 ## Quando utilizar
 
 - Vendas presenciais no balcão ou loja física.
@@ -779,9 +713,6 @@ Legenda: O PDV é dividido em carrinho (esquerda) e resumo (direita).
 - **Selecione variações** - Se o produto tem variações (cor, tamanho), uma janela abre para você escolher a opção correta.
 - **Adicione serviços** - Serviços também aparecem na busca e podem ser misturados com produtos no mesmo carrinho.
 - **Ajuste a quantidade** - Use os botões + e - ou digite o número diretamente.
-
-[IMAGEM: Busca de produtos no PDV com sugestões]
-Legenda: A busca encontra produtos e serviços cadastrados.
 
 ### 2. Aplique descontos e cupons
 
@@ -816,9 +747,6 @@ Para isso:
 
 O sistema mostra quanto falta pagar. Você pode finalizar quando o valor total for atingido.
 
-[IMAGEM: Tela de divisão de pagamento com múltiplos métodos]
-Legenda: Divida o pagamento entre dinheiro, cartão, PIX e outros.
-
 ### 5. Finalize a venda
 
 1. Revise o carrinho e os valores.
@@ -831,9 +759,6 @@ Após finalizar:
 - O **estoque** é baixado automaticamente.
 - O **caixa** recebe a movimentação da venda.
 - Um **recibo** pode ser impresso.
-
-[IMAGEM: Tela de finalização com opção de imprimir recibo]
-Legenda: Após finalizar, escolha se quer imprimir o recibo.
 
 ## Como salvar uma pré-venda (rascunho)
 
@@ -884,9 +809,6 @@ Todas as vendas do PDV aparecem automaticamente na listagem de **Pedidos**.
                 content: `
 Além de vender, o PDV tem atalhos para situações do dia a dia. Você pode criar um produto novo sem sair da tela, cadastrar um cliente na hora, retomar vendas salvas como rascunho e aplicar promoções automáticas.
 
-[IMAGEM: PDV com menu de ações rápidas acessível pelo botão "+"]
-Legenda: As ações rápidas ficam disponíveis durante a venda.
-
 ## Quando utilizar
 
 - Quando um produto que o cliente quer ainda não está cadastrado.
@@ -904,9 +826,6 @@ Se o cliente pede um produto que ainda não existe no sistema:
    - **Nome do produto** (obrigatório).
    - **Preço** (obrigatório).
    - **Quantidade em estoque** (opcional - se não informar, fica como 0).
-
-[IMAGEM: Modal de criação rápida de produto]
-Legenda: Apenas o essencial para não atrasar o atendimento.
 
 4. Clique em **Criar**. O produto é cadastrado e já adicionado ao carrinho.
 
@@ -933,9 +852,6 @@ Durante a venda, se o cliente precisa de mais tempo ou você vai atender outra p
 2. Dê um nome ou identificação para o rascunho (opcional).
 3. O carrinho é salvo com todos os itens e configurações.
 
-[IMAGEM: Lista de pré-vendas (rascunhos) na tela inicial do PDV]
-Legenda: Os rascunhos ficam disponíveis para retomada.
-
 **Retomar um rascunho:**
 
 1. Na tela inicial do PDV, localize o rascunho na lista.
@@ -955,9 +871,6 @@ Ao adicionar itens ao carrinho:
 - Descontos promocionais são aplicados automaticamente no item.
 
 Você não precisa fazer nada - as promoções são calculadas em tempo real. Se quiser conferir, veja o resumo do carrinho antes de finalizar.
-
-[IMAGEM: Carrinho com brinde aplicado automaticamente]
-Legenda: Brindes aparecem identificados e com valor zero.
 
 ## Dicas importantes
 
@@ -995,9 +908,6 @@ Sim. A promoção automática é aplicada primeiro. Depois, se o cliente tem um 
                 content: `
 Quando um cliente precisa devolver um produto, trocar por outro ou solicitar reembolso, você cria uma **solicitação de devolução** diretamente pelo pedido. O sistema guia você por todas as etapas: escolha dos itens, motivo, condição do produto e resolução desejada.
 
-[IMAGEM: Tela de criação de solicitação de devolução]
-Legenda: Selecione os itens do pedido que serão devolvidos.
-
 ## Quando utilizar
 
 - O cliente recebeu o produto errado ou com defeito.
@@ -1013,13 +923,7 @@ Legenda: Selecione os itens do pedido que serão devolvidos.
 1. No menu lateral, clique em **Vendas > Devoluções e trocas**.
 2. Clique em **Nova solicitação**.
 
-[IMAGEM: Botão "Nova solicitação" na listagem]
-Legenda: O botão inicia o processo de devolução.
-
 3. **Selecione o pedido** - Busque pelo número do pedido ou localize na lista de pedidos pagos.
-
-[IMAGEM: Busca de pedido para devolução]
-Legenda: Somente pedidos pagos aparecem como elegíveis.
 
 4. **Escolha os itens** - Selecione quais itens do pedido serão devolvidos. Você pode devolver todos ou apenas alguns.
 5. Para cada item, informe:
@@ -1031,9 +935,6 @@ Legenda: Somente pedidos pagos aparecem como elegíveis.
    - **Troca** - O cliente quer outro produto no lugar. É permitida apenas para pedidos já entregues.
    - **Reembolso** - Você vai devolver o valor pago (PIX, cartão ou manual).
    - **Crédito na loja** - O valor vira crédito para o cliente usar em compras futuras.
-
-[IMAGEM: Escolha do tipo de resolução]
-Legenda: Cada tipo de resolução segue um fluxo diferente.
 
 7. **Anexe evidências** (opcional) - Faça upload de fotos que comprovem o estado do produto. Útil para produtos com defeito ou avariados.
 8. Adicione uma **mensagem** com detalhes sobre a solicitação (opcional).
@@ -1051,9 +952,6 @@ Legenda: Cada tipo de resolução segue um fluxo diferente.
 | **Aguardando item** | O cliente precisa devolver o produto primeiro. |
 | **Em processamento** | O reembolso, troca ou crédito está sendo executado. |
 | **Resolvido** | A solicitação foi concluída. |
-
-[IMAGEM: Listagem de solicitações com indicadores de status]
-Legenda: Cada solicitação mostra seu estágio atual.
 
 ## Dicas importantes
 
@@ -1091,9 +989,6 @@ Sim, durante o processamento você pode ajustar a resolução (ex: de troca para
                 content: `
 Depois que uma solicitação de devolução ou troca é criada, cabe à gestão da loja analisar e processar. Esta etapa envolve aprovar ou rejeitar a solicitação, definir valores de reembolso, configurar itens de troca e concluir o processo.
 
-[IMAGEM: Tela de detalhes de uma solicitação de devolução]
-Legenda: Todas as informações da solicitação em um só lugar.
-
 ## Quando utilizar
 
 - Recebeu uma nova solicitação e precisa analisar.
@@ -1113,9 +1008,6 @@ Na tela de detalhes você encontra:
 - **Evidências** - Fotos enviadas pelo cliente (se houver).
 - **Resolução desejada** - O que o cliente espera (troca, reembolso, crédito).
 - **Histórico** - Linha do tempo com eventos da solicitação.
-
-[IMAGEM: Aba de histórico com eventos registrados]
-Legenda: Acompanhe cada etapa do processamento.
 
 ## Como aprovar ou rejeitar
 
@@ -1151,9 +1043,6 @@ Se a resolução for **Troca**, você precisa informar quais produtos serão env
    - Se os itens de troca forem **mais caros**, o cliente pode pagar a diferença (o sistema permite configurar).
    - Se forem **mais baratos**, você pode reembolsar a diferença ou converter em crédito na loja.
 
-[IMAGEM: Configuração de itens de troca com diferença de valor]
-Legenda: O sistema calcula a diferença automaticamente.
-
 ## Como processar reembolso
 
 ### Reembolso manual (PIX, depósito, dinheiro)
@@ -1170,7 +1059,8 @@ Se o pagamento original foi processado pelo Mercado Pago:
 2. Selecione **Mercado Pago** como método de reembolso.
 3. O sistema processa o estorno automático junto ao Mercado Pago. O valor volta para o cliente na forma de pagamento original (cartão ou PIX).
 
-> ⚠️ **Atenção:** O reembolso pelo Mercado Pago está limitado ao valor pago por esse meio. Se o cliente pagou parte no dinheiro e parte no cartão, apenas a parte do cartão pode ser estornada automaticamente.
+> [!IMPORTANT]
+> O reembolso pelo Mercado Pago está limitado ao valor pago por esse meio. Se o cliente pagou parte no dinheiro e parte no cartão, apenas a parte do cartão pode ser estornada automaticamente.
 
 ## Como conceder crédito na loja
 
@@ -1225,9 +1115,6 @@ A seção de **Expedição e entregas** organiza a logística da sua loja. Você
 
 O sistema sugere agrupamentos de pedidos por região (CEP ou bairro) para otimizar as rotas e reduzir o tempo de deslocamento.
 
-[IMAGEM: Tela principal de entregas com listagem de rotas e entregadores]
-Legenda: Visão geral da expedição com entregas ativas.
-
 ## Quando utilizar
 
 - Você tem pedidos com entrega pendente e precisa organizar a logística.
@@ -1242,9 +1129,6 @@ Legenda: Visão geral da expedição com entregas ativas.
 1. No menu lateral, clique em **Vendas > Expedição e entregas**.
 2. Acesse a seção **Entregadores**.
 3. Clique em **Novo entregador**.
-
-[IMAGEM: Formulário de cadastro de entregador]
-Legenda: Informe os dados básicos e o status ativo.
 
 4. Preencha:
    - **Nome** do entregador.
@@ -1276,9 +1160,6 @@ Antes de criar manualmente, veja as **sugestões inteligentes**. O sistema anali
 1. Na tela de entregas, clique em **Sugestões de rota**.
 2. O sistema exibe grupos de pedidos organizados por região.
 
-[IMAGEM: Sugestões inteligentes com pedidos agrupados por região]
-Legenda: Cada sugestão mostra os pedidos, distância total e tempo estimado.
-
 3. Escolha um grupo e clique em **Criar entrega**.
 4. Opcional: ajuste os pedidos incluídos, escolha o entregador e a data/hora de saída.
 5. Confirme.
@@ -1289,9 +1170,6 @@ Se preferir montar a rota você mesmo:
 
 1. Clique em **Nova entrega**.
 2. **Selecione os pedidos** - Busque pelos pedidos com entrega pendente. Eles aparecem com endereço e valor do frete.
-
-[IMAGEM: Seleção de pedidos para compor a entrega]
-Legenda: Selecione um ou mais pedidos para a mesma rota.
 
 3. **Atribua um entregador** (opcional) - Se não atribuir agora, pode fazer depois.
 4. Informe a **data e hora de saída**.
@@ -1308,9 +1186,6 @@ Na tela de detalhes da entrega, você vê:
 - **Mapa** com os pontos de entrega (se o endereço foi geolocalizado).
 - **Distância total** estimada da rota.
 - **Entregador** responsável.
-
-[IMAGEM: Detalhes da entrega com mapa e pontos da rota]
-Legenda: Visualize a rota completa e a ordem das entregas.
 
 ## Dicas importantes
 
@@ -1350,9 +1225,6 @@ Depois que a entrega é criada e o entregador sai para a rota, você acompanha c
 
 Quando todos os pedidos de uma rota são concluídos, a entrega é finalizada automaticamente.
 
-[IMAGEM: Detalhes da entrega com status de cada pedido]
-Legenda: Cada pedido na rota mostra seu status individual.
-
 ## Quando utilizar
 
 - O entregador saiu para a rota e você quer marcar a entrega como "Saiu para entrega".
@@ -1385,9 +1257,6 @@ Cada **pedido dentro da entrega** também tem seu próprio status (Pendente, Sai
    - **Entregue** - Todos os pedidos foram entregues (disponível apenas quando todos estiverem concluídos).
    - **Cancelada** - A entrega não será realizada.
 
-[IMAGEM: Opções de atualização de status da entrega]
-Legenda: O sistema mostra apenas os status disponíveis para a etapa atual.
-
 ### Status por pedido (individual)
 
 Se você precisa atualizar pedidos um a um (útil quando a rota tem múltiplas paradas):
@@ -1396,9 +1265,6 @@ Se você precisa atualizar pedidos um a um (útil quando a rota tem múltiplas p
 2. Localize o pedido na lista.
 3. Clique em **Atualizar status** ao lado do pedido.
 4. Escolha: **Entregue** ou **Falha na entrega**.
-
-[IMAGEM: Atualização de status por pedido individual]
-Legenda: Atualize cada pedido conforme o entregador confirma a entrega.
 
 Quando o último pedido da rota é concluído (entregue ou falha), a entrega é finalizada automaticamente:
 
@@ -1424,9 +1290,6 @@ Na seção de entregas, você encontra um painel com métricas:
 - **Distância total percorrida**.
 - **Média de pedidos por entrega**.
 - **Ranking de entregadores** - Quem entregou mais e o tempo médio de cada um.
-
-[IMAGEM: Painel de métricas de entregas]
-Legenda: Acompanhe o desempenho da sua operação logística.
 
 ## Dicas importantes
 
@@ -1466,9 +1329,6 @@ Com as **metas de vendas**, você define objetivos para sua equipe e acompanha o
 
 O sistema também pode **lançar bônus automaticamente** quando a meta é atingida.
 
-[IMAGEM: Painel de metas com cards de progresso e ranking]
-Legenda: Visão geral das metas ativas e desempenho da equipe.
-
 ## Quando utilizar
 
 - Você quer motivar a equipe com metas claras de vendas.
@@ -1480,9 +1340,6 @@ Legenda: Visão geral das metas ativas e desempenho da equipe.
 
 1. No menu lateral, clique em **Vendas > Metas**.
 2. Clique em **Nova meta**.
-
-[IMAGEM: Botão "Nova meta" no topo da página]
-Legenda: Inicie o cadastro de uma nova meta.
 
 3. Preencha as informações:
 
@@ -1500,9 +1357,6 @@ Legenda: Inicie o cadastro de uma nova meta.
 - **Tipo de bônus** - **Valor fixo** (ex: R$ 500,00) ou **Percentual** (ex: 5% do valor vendido).
 - **Lançamento automático** - Se ativado, quando a meta é atingida o sistema lança o bônus como despesa automaticamente. Você precisa selecionar a **conta financeira** para o lançamento.
 
-[IMAGEM: Formulário de criação de meta completo]
-Legenda: Defina período, valor e bônus da meta.
-
 4. Clique em **Salvar**.
 
 ## Como acompanhar o progresso
@@ -1516,9 +1370,6 @@ Cada meta aparece como um card com:
 - **Valor atual** vs. **valor da meta**.
 - **Status**: "Em andamento", "Concluída" ou "Expirada".
 
-[IMAGEM: Cards de meta com barra de progresso]
-Legenda: Visualize rapidamente o andamento de cada meta.
-
 **Ranking de vendedores:**
 Na seção **Ranking**, os vendedores aparecem ordenados por valor total vendido no período:
 
@@ -1528,9 +1379,6 @@ Na seção **Ranking**, os vendedores aparecem ordenados por valor total vendido
 - **Percentual de progresso** em relação à meta.
 
 Você pode filtrar o ranking por **semana atual**, **mês atual** ou **período personalizado**.
-
-[IMAGEM: Ranking de vendedores com posições e valores]
-Legenda: Veja quem está se destacando no período.
 
 **Resumo:**
 No topo da página, um resumo mostra:
@@ -3117,9 +2965,6 @@ A **Vitrine Online** é a vitrine digital do seu negócio: o espaço onde os cli
 
 Para que os clientes encontrem com facilidade o que procuram, os produtos aparecem em uma **ordem de exibição** calculada automaticamente pelo sistema. Esse cálculo é o que chamamos de **ranqueamento**: uma forma justa e transparente de organizar o catálogo, dando destaque aos produtos mais relevantes para cada cliente, sem depender de intervenção manual.
 
-[IMAGEM: Tela da Vitrine Online mostrando resultados de busca com produtos ordenados]
-Legenda: Os produtos aparecem em uma ordem calculada automaticamente conforme a relevância.
-
 ## Como os produtos são exibidos
 Um produto pode aparecer em diferentes lugares da Vitrine Online, e cada local usa critérios próprios para decidir a ordem:
 
@@ -3190,9 +3035,6 @@ Seguir boas práticas no dia a dia é a forma mais eficaz de melhorar a visibili
 *   Cumpra prazos de entrega e resolva problemas com transparência.
 *   Avaliações positivas e clientes satisfeitos fortalecem a sua loja.
 
-[IMAGEM: Ilustração com os principais fatores que influenciam o ranqueamento de um produto]
-Legenda: Qualidade do cadastro, estoque, preço, vendas, avaliações e reputação trabalham juntos.
-
 ## Dicas importantes
 
 > [!TIP]
@@ -3234,9 +3076,6 @@ Sim. Produto sem estoque não pode ser vendido, perde força no ranqueamento e p
 
 **Todos os produtos têm a mesma chance de aparecer?**
 Todos os produtos ativos, aprovados e com estoque têm a chance de aparecer, mas a posição é proporcional à relevância de cada um: produtos com melhor cadastro e melhor desempenho tendem a ficar mais visíveis.
-
-[IMAGEM: Exemplo de um cadastro de produto completo e bem organizado]
-Legenda: Um bom cadastro combina nome claro, descrição rica, imagens de qualidade e atributos preenchidos.
 
 **Ainda com dúvidas?** Entre em contato com nosso suporte ou consulte os artigos de Produtos e Estoque e Marketing na Central de Ajuda.
 `
@@ -4098,7 +3937,7 @@ Legenda: Aba Dados Gerais com identificação, dados tributários e contatos.
 - Se desmarcar depois, o endereço de cobrança salvo é removido.
 
 > [!IMPORTANT]
-> Endereços são salvos em tabela separada. Um cliente pode ter múltiplos endereços cadastrados via API, mas o formulário mostra/edita apenas o principal e o de cobrança.
+> Um cliente pode ter vários endereços cadastrados, mas a tela mostra e edita apenas o endereço principal e o de cobrança.
 
 ### 4. Aba "Observações"
 
@@ -4325,7 +4164,7 @@ Depende do seu plano. O sistema avisa quando atingir o limite. Clientes arquivad
 Excluído é soft delete (não aparece mais). Para restaurar, contate o suporte técnico.
 
 **A importação atualiza clientes existentes?**
-Não. A importação só **cria novos**. Se encontrar CPF/CNPJ/e-mail já cadastrado, pula (se "Pular duplicatas" ligado) ou dá erro. Para atualizar em massa, edite individualmente ou use API.
+Não. A importação só **cria novos**. Se encontrar CPF/CNPJ/e-mail já cadastrado, pula (se "Pular duplicatas" estiver ligado) ou dá erro. Para atualizar vários clientes de uma vez, é preciso editar um por um.
 
 **Como vejo clientes que não compram há 6 meses?**
 Ordene por **Último Pedido** (ascendente) na aba "Ativo". Os sem data ficam no final. Ou exporte e filtre no Excel.
@@ -4427,7 +4266,7 @@ Tabela com todos os pedidos do cliente (não cancelados), ordenados do mais rece
 - Paginação automática (8 por página)
 
 > [!IMPORTANT]
-> A aba **Pedidos** agrega pedidos feitos pelo \`customer_id\` do ERP **OU** pelo \`user_id\`/\`marketplace_user_id\` vinculados (conta do cliente no marketplace). Por isso, compras feitas pelo cliente logado no site também aparecem aqui.
+> A aba **Pedidos** reúne os pedidos feitos direto no sistema e também os pedidos que o cliente fez comprando logado na sua vitrine ou no marketplace. Por isso, as compras feitas pelo site também aparecem aqui.
 
 ### 4. Aba "Avaliações" - Reviews do Marketplace
 
@@ -4458,7 +4297,7 @@ Se o cliente tem **data de nascimento** cadastrada e o aniversário é **hoje** 
 
 | Problema | Causa | Solução |
 |----------|-------|---------|
-| Pedido não aparece no histórico | Feito com e-mail/CPF diferente do cadastrado | Verifique se \`marketplace_user_id\` ou \`user_id\` estão vinculados no cadastro |
+| Pedido não aparece no histórico | Feito com e-mail/CPF diferente do cadastrado | Confira se a conta do site do cliente está vinculada ao cadastro (veja o e-mail usado na compra) |
 | Vale-compra não aparece | Status "Expirado" ou "Utilizado" integralmente | Filtre por status; expirados não somam no saldo |
 | Aniversário não destaca | Data de nascimento não preenchida | Edite o cliente e preencha a data |
 | KPIs zerados | Cliente nunca fez pedido pelo ERP | Compras só no marketplace antigo podem não agregar; contate suporte |
@@ -4604,7 +4443,7 @@ Tela de sucesso mostra: **X de Y clientes importados**.
 - **Limpe a planilha antes** - remova linhas vazias, corrija CPF/CNPJ inválidos, padronize telefone (DDD + número).
 - **Use "Pular duplicatas"** - evita erro se rodar a importação duas vezes.
 - **CPF/CNPJ são chaves únicas** - o sistema usa eles (e e-mail) para detectar duplicatas.
-- **Importação só CRIA** - não atualiza clientes existentes. Para atualizar em massa, edite individualmente ou use API.
+- **Importação só CRIA** - não atualiza clientes existentes. Para atualizar vários de uma vez, é preciso editar um por um.
 - **Endereços** - a importação cria endereço principal; endereço de cobrança diferente não é suportado na importação (cadastre depois manualmente).
 
 ## Problemas comuns
@@ -4728,7 +4567,7 @@ Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS),
 ## Marketplace / Vitrine
 
 ### Cliente logado no site
-- Quando cliente compra logado na vitrine/marketplace, o sistema **vincula automaticamente** o \`marketplace_user_id\` ao cadastro do cliente (pelo e-mail).
+- Quando o cliente compra logado na vitrine ou no marketplace, o sistema **vincula automaticamente** a conta do site ao cadastro do cliente (pelo e-mail).
 - Pedidos feitos logados aparecem no **histórico do cliente** (aba Pedidos no detalhe).
 - Avaliações (reviews) do cliente aparecem na aba **Avaliações**.
 
@@ -4753,7 +4592,7 @@ Na maioria dos módulos (Vendas, PDV, Orçamentos, Serviços, Agendamentos, OS),
 | Cliente não aparece no seletor | Status Inativo/Bloqueado/Arquivado | Ative/desarquive em Clientes |
 | Cliente rápido não emite nota fiscal | Falta CPF/CNPJ e endereço | Edite o cliente depois e complete dados fiscais |
 | Endereço de entrega não preenche | Cliente sem endereço principal | Cadastre endereço na aba Endereço do cliente |
-| Pedido do site não aparece no histórico | Cliente não logou ou e-mail diferente | Verifique se \`marketplace_user_id\` está vinculado no cadastro |
+| Pedido do site não aparece no histórico | Cliente não logou ou e-mail diferente | Confira se a conta do site está vinculada ao cadastro |
 | Vale-compra não aparece no PDV | Status não é "Disponível" | Confira no detalhe do cliente; só disponíveis somam |
 
 ## Perguntas frequentes
@@ -4768,7 +4607,7 @@ Sim, imediatamente. Status Ativo, tipo Pessoa Física, sem documento/endereço.
 Não há "limite de crédito" nativo. Use **Vales-compra** como crédito pré-pago. Para pós-pago (faturamento), controle externo ou observação interna.
 
 **Como vinculo um cliente do marketplace ao ERP?**
-Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vincula \`marketplace_user_id\`. Se não vinculou, edite o cliente e confira se e-mails batem.
+Automático: se o e-mail do pedido for igual ao e-mail do cliente no sistema, a conta do site é vinculada sozinha. Se não vinculou, edite o cliente e confira se os e-mails batem.
 
 **Posso ter preços diferentes por cliente?**
 Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
@@ -4846,7 +4685,7 @@ Não na importação padrão. Importe o endereço principal; depois edite cada c
 Não. Só pedidos com situação diferente de "cancelado".
 
 **Pedidos feitos no site (marketplace) aparecem no histórico?**
-Sim, se o cliente fez login e o e-mail bate com o cadastro do ERP. O sistema vincula automaticamente via \`marketplace_user_id\`.
+Sim, se o cliente fez login e o e-mail bate com o cadastro. O sistema faz esse vínculo sozinho.
 - **Cliente rápido = complete depois** - nome+e-mail+telefone resolve na hora; volte em Clientes para por CPF, endereço, dados fiscais.
 - **Fixados** - marque clientes frequentes como fixados (estrela no seletor) para aparecerem no topo.
 - **Consumidor final** - use só para vendas rápidas de balcão sem nota fiscal nominal.
@@ -4859,7 +4698,7 @@ Sim, se o cliente fez login e o e-mail bate com o cadastro do ERP. O sistema vin
 | Cliente não aparece no seletor | Status Inativo/Bloqueado/Arquivado | Ative/desarquive em Clientes |
 | Cliente rápido não emite nota fiscal | Falta CPF/CNPJ e endereço | Edite o cliente depois e complete dados fiscais |
 | Endereço de entrega não preenche | Cliente sem endereço principal | Cadastre endereço na aba Endereço do cliente |
-| Pedido do site não aparece no histórico | Cliente não logou ou e-mail diferente | Verifique se \`marketplace_user_id\` está vinculado no cadastro |
+| Pedido do site não aparece no histórico | Cliente não logou ou e-mail diferente | Confira se a conta do site está vinculada ao cadastro |
 | Vale-compra não aparece no PDV | Status não é "Disponível" | Confira no detalhe do cliente; só disponíveis somam |
 
 ## Perguntas frequentes
@@ -4874,7 +4713,7 @@ Sim, imediatamente. Status Ativo, tipo Pessoa Física, sem documento/endereço.
 Não há "limite de crédito" nativo. Use **Vales-compra** como crédito pré-pago. Para pós-pago (faturamento), controle externo ou observação interna.
 
 **Como vinculo um cliente do marketplace ao ERP?**
-Automático: se e-mail do pedido logado = e-mail do cliente no ERP, o sistema vincula \`marketplace_user_id\`. Se não vinculou, edite o cliente e confira se e-mails batem.
+Automático: se o e-mail do pedido for igual ao e-mail do cliente no sistema, a conta do site é vinculada sozinha. Se não vinculou, edite o cliente e confira se os e-mails batem.
 
 **Posso ter preços diferentes por cliente?**
 Não há tabela de preços por cliente nativa. Use **cupons personalizados** ou **observação interna** com "Preço especial: X%".
@@ -5153,6 +4992,7 @@ Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor
 - **Parceiro** - terceiros estratégicos ou pessoa física/jurídica com quem transaciona de forma eventual (ex.: tiozão do zap, sócio, contador).
 - **Outro** - demais pessoas ou empresas que não se encaixam acima.
 
+> [!NOTE]
 > Clientes, fornecedores e funcionários são selecionados diretamente da lista do respectivo módulo ao lançar uma receita ou despesa - não precisam ser cadastrados como contato financeiro.
 
 ## Como criar um contato
@@ -7512,7 +7352,7 @@ Para que um pedido possa ser despachado por um entregador parceiro em motociclet
   * **Altura:** Até 35 cm
 * **Tolerância máxima:** Nenhum dos lados pode exceder **50 cm** e a soma das três dimensões (Comprimento + Largura + Altura) não deve ultrapassar **130 cm**.
 
-> [!WARNING]
+> [!IMPORTANT]
 > Cargas que ultrapassem 15 kg ou 60 litros não podem ser transportadas com segurança em motos. O entregador tem o direito e a orientação de **recusar o pacote** caso constate que as medidas ou peso reais excedem esses limites.
 
 ---
@@ -7606,8 +7446,6 @@ Não. Conforme os Termos de Uso, a plataforma Dudit atua como facilitadora tecno
 
 A Dudit oferece integração nativa com o **Tiny ERP**, um dos principais sistemas de gestão empresarial e emissão fiscal do Brasil. Com essa integração, você pode vender online no seu catálogo digital, na sua cidade ou para todo o Brasil pela Dudit com **0% de comissão por venda**, enquanto toda a sua operação de separação, controle de estoque centralizado e emissão de notas fiscais (NF-e) continua acontecendo perfeitamente dentro do Tiny ERP.
 
-![Integração Tiny ERP e Dudit](https://img.dudit.com.br/static/og-image.png)
-
 ## Vantagens da integração
 
 *   **0% de comissão nas vendas:** Venda pelo catálogo da Dudit sem pagar porcentagens sobre seus pedidos.
@@ -7671,7 +7509,7 @@ Para que alterações de estoque feitas no Tiny (por compras de fornecedores ou 
 Quando um cliente compra pelo seu catálogo ou vitrine na Dudit:
 
 1.  O pedido é criado com status aprovado/pago na Dudit.
-2.  A Dudit envia um payload seguro via API para o endpoint de inclusão de pedidos do Tiny.
+2.  A Dudit envia os dados do pedido com segurança, direto para a lista de pedidos do Tiny.
 3.  O pedido aparece em **Vendas > Pedidos de Venda** no Tiny ERP.
 4.  O Tiny faz a reserva do estoque correspondente e permite que você gere a etiqueta de envio e emita a Nota Fiscal Eletrônica (NF-e).
 

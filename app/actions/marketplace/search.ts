@@ -11,6 +11,10 @@ import { getUserSessionData } from "@/lib/data/user"
 import { enrichMarketplaceDistance, calculateDistance } from "@/lib/services/location.service"
 import { resolveCityAndStateFromSlug } from "./products"
 import { normalizeSearchQuery } from "@/lib/search/normalize"
+import { parseSearchIntent, type ParsedSearchIntent } from "@/lib/search/intent-parser"
+import { buildProximityRings, type ProximityRingsResult } from "@/lib/search/proximity-rings"
+import { enrichServicesWithAvailability } from "@/lib/search/service-availability"
+import { resolveAiSearchIntent } from "@/lib/search/ai-intent-fallback"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 import { recordMarketplaceSearchTelemetry } from "@/lib/services/analytics.service"
 
@@ -355,7 +359,17 @@ export const searchMarketplaceDirectFull = cache(async (
     } = {}
 ) => {
     const isCity = limits.cidade && limits.cidade !== "brasil" && !limits.cidade.startsWith("estado-")
-    const shouldFetchDistant = isCity && !limits.cursor && !limits.lastId && query && query.trim() !== ""
+    const isFirstPage = !limits.cursor && !limits.lastId
+    const hasTextQuery = Boolean(query && query.trim() !== "")
+    const shouldFetchDistant = isCity && isFirstPage && hasTextQuery
+
+    // Fase 1 + Fase 3: Interpretação determinística (0ms) + IA cirúrgica (Redis 30d) só quando necessário
+    let searchIntent: ParsedSearchIntent | null = hasTextQuery ? parseSearchIntent(query) : null
+    if (searchIntent && isFirstPage && searchIntent.needsAiFallback) {
+        searchIntent = await resolveAiSearchIntent(query, searchIntent)
+    }
+
+    const effectiveQuery = searchIntent?.cleanQuery || query
 
     // Coordenadas conhecidas sem rede (repassadoras pelo cliente ou coordenadas de cidade já resolvidas)
     const immediateCoords = limits.centerCoords || (limits.latitude && limits.longitude
@@ -376,17 +390,17 @@ export const searchMarketplaceDirectFull = cache(async (
     })()
 
     const localPromise = limits.radius
-        ? sessionCoordsPromise.then((finalCoords) => _searchMarketplaceCore(query, type, {
+        ? sessionCoordsPromise.then((finalCoords) => _searchMarketplaceCore(effectiveQuery, type, {
             ...limits,
             centerCoords: finalCoords
         }))
-        : _searchMarketplaceCore(query, type, {
+        : _searchMarketplaceCore(effectiveQuery, type, {
             ...limits,
             centerCoords: immediateCoords
         })
 
     const distantPromise = shouldFetchDistant
-        ? _searchMarketplaceCore(query, type, {
+        ? _searchMarketplaceCore(effectiveQuery, type, {
             vitrines: type === 'vitrines' || type === 'tudo' ? 20 : 0,
             produtos: type === 'produtos' || type === 'tudo' ? 20 : 0,
             servicos: type === 'servicos' || type === 'tudo' ? 20 : 0,
@@ -400,12 +414,44 @@ export const searchMarketplaceDirectFull = cache(async (
         ? resolveCityAndStateFromSlug(limits.cidade)
         : Promise.resolve(null)
 
-    const [finalCoords, localRes, distantRes, localScopeCity] = await Promise.all([
+    let [finalCoords, localRes, distantRes, localScopeCity] = await Promise.all([
         sessionCoordsPromise,
         localPromise,
         distantPromise,
         localScopePromise,
     ])
+
+    // Fase 3 (Zero-result fallback): se a busca limpa não encontrou nada, consulta IA + cache e tenta 1x com o termo sugerido
+    if (
+        hasTextQuery &&
+        isFirstPage &&
+        searchIntent &&
+        searchIntent.source === "rules" &&
+        (localRes.results?.length ?? 0) === 0 &&
+        (distantRes.results?.length ?? 0) === 0
+    ) {
+        const aiIntent = await resolveAiSearchIntent(query, searchIntent, { forceOnZeroResults: true })
+        if (aiIntent.cleanQuery && aiIntent.cleanQuery !== effectiveQuery) {
+            searchIntent = aiIntent
+            const [retryLocal, retryDistant] = await Promise.all([
+                _searchMarketplaceCore(aiIntent.cleanQuery, type, {
+                    ...limits,
+                    centerCoords: finalCoords,
+                }),
+                shouldFetchDistant
+                    ? _searchMarketplaceCore(aiIntent.cleanQuery, type, {
+                        vitrines: type === 'vitrines' || type === 'tudo' ? 20 : 0,
+                        produtos: type === 'produtos' || type === 'tudo' ? 20 : 0,
+                        servicos: type === 'servicos' || type === 'tudo' ? 20 : 0,
+                        planos: type === 'planos' || type === 'tudo' ? 20 : 0,
+                        geral: 40,
+                    })
+                    : Promise.resolve({ results: [] }),
+            ])
+            localRes = retryLocal
+            distantRes = retryDistant
+        }
+    }
 
     const localResults = (localRes.results || []).filter((item: any) =>
         isItemWithinSearchScope(item, {
@@ -416,7 +462,23 @@ export const searchMarketplaceDirectFull = cache(async (
         })
     )
 
-    const resultsWithDistance = enrichMarketplaceDistance(localResults, finalCoords)
+    let resultsWithDistance = enrichMarketplaceDistance(localResults, finalCoords)
+
+    // Fase 2: Quando a intenção é serviço (ou há janela de horário), prioriza serviços e checa disponibilidade real nos top 20
+    if (searchIntent && (searchIntent.intent === "service" || searchIntent.timeWindow)) {
+        if (type === "tudo" && resultsWithDistance.length > 1) {
+            resultsWithDistance = [
+                ...resultsWithDistance.filter((r: any) => r.itemType === "servico"),
+                ...resultsWithDistance.filter((r: any) => r.itemType !== "servico"),
+            ]
+        }
+        const supabase = getAdminClient()
+        resultsWithDistance = await enrichServicesWithAvailability(
+            resultsWithDistance,
+            searchIntent.timeWindow,
+            supabase,
+        )
+    }
 
     let moreDistantSellers: any[] = []
     let moreDistantItems: any[] = []
@@ -433,6 +495,15 @@ export const searchMarketplaceDirectFull = cache(async (
         moreDistantItems = sortDistantByRankAndDistance(
             enrichedDistant.filter((r: any) => r.itemType !== 'loja')
         ).slice(0, 20)
+
+        if (searchIntent && (searchIntent.intent === "service" || searchIntent.timeWindow) && moreDistantItems.length > 0) {
+            const supabase = getAdminClient()
+            moreDistantItems = await enrichServicesWithAvailability(
+                moreDistantItems,
+                searchIntent.timeWindow,
+                supabase,
+            )
+        }
     }
 
     let finalResults = resultsWithDistance
@@ -457,7 +528,7 @@ export const searchMarketplaceDirectFull = cache(async (
     }
 
     // Registra telemetria de busca apenas na 1ª página (sem cursor/lastId) para termos reais
-    if (query && query.trim().length >= 2 && !limits.cursor && !limits.lastId) {
+    if (query && query.trim().length >= 2 && isFirstPage) {
         const hasResults = Boolean(finalResults && finalResults.length > 0)
         recordMarketplaceSearchTelemetry({
             query: query.trim(),
@@ -469,14 +540,24 @@ export const searchMarketplaceDirectFull = cache(async (
     }
 
     const [decoratedResults, decoratedDistantItems] = await Promise.all([
-        decorateExploreItems(finalResults, { includePromotions: !limits.cursor && !limits.lastId }),
+        decorateExploreItems(finalResults, { includePromotions: isFirstPage }),
         decorateExploreItems(moreDistantItems),
     ])
+
+    // Fase 1: Anéis de proximidade (Perto de você -> Cidades vizinhas -> Envio nacional CEP)
+    const proximityRings: ProximityRingsResult<any> | null = hasTextQuery && isFirstPage
+        ? buildProximityRings(decoratedResults, decoratedDistantItems, moreDistantSellers, {
+            intent: searchIntent?.intent ?? "mixed",
+            localState: localScopeCity?.state ?? null,
+        })
+        : null
 
     return {
         results: decoratedResults,
         moreDistantSellers,
-        moreDistantItems: decoratedDistantItems
+        moreDistantItems: decoratedDistantItems,
+        searchIntent,
+        proximityRings,
     }
 })
 
@@ -515,7 +596,7 @@ export const searchMarketplace = async (
     const lastId = cursor?.id || undefined
     const cursorRank = typeof cursor?.rank === "number" ? cursor.rank : undefined
 
-    const { results, moreDistantSellers, moreDistantItems } = await searchMarketplaceDirectFull(query, type, {
+    const { results, moreDistantSellers, moreDistantItems, searchIntent, proximityRings } = await searchMarketplaceDirectFull(query, type, {
         vitrines: limits.vitrines,
         produtos: limits.produtos,
         servicos: limits.servicos,
@@ -554,7 +635,7 @@ export const searchMarketplace = async (
                         : (limits.servicos ?? 20)
 
     const hasMore = items.length >= limitCount && !!nextCursor
-    return { items, nextCursor, hasMore, moreDistantSellers, moreDistantItems }
+    return { items, nextCursor, hasMore, moreDistantSellers, moreDistantItems, searchIntent, proximityRings }
 }
 
 let localGlobalVersion = 1
@@ -716,6 +797,7 @@ async function hydrateMarketplaceSearchHits(
         promises.push(
             supabase.from("products").select(`
                 id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
+                fulfillment_modes,
                 sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
@@ -735,6 +817,7 @@ async function hydrateMarketplaceSearchHits(
         promises.push(
             supabase.from("services").select(`
                 id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, video_thumbnail, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                fulfillment_modes, service_max_km, service_travel_fee_mode, service_free_travel_km, service_travel_flat_fee, service_travel_per_km, service_enforce_area,
                 marketplace_score, views_count, bookings_last_30_days, favorites_count,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id),

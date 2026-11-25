@@ -946,7 +946,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                     {/* --- 1. CUSTOMER CARD --- */}
                     {!isQuickMode && (
-                        <div>
+                        <div className="mb-6">
                             {selectedCustomer ? (
                                 <CustomerCard
                                     customer={selectedCustomer}

@@ -94,7 +94,7 @@ export default function HelpHome() {
                             description="Adicione produtos ou serviços com fotos e descrições atraentes."
                             className="px-6 py-5"
                             showChevron
-                            onClick={() => window.location.href = "/ajuda/gestao/produtos"}
+                            onClick={() => window.location.href = "/ajuda/produtos-estoque/como-cadastrar-produto"}
                         />
                         <ListItem
                             icon={<TruckIcon className="text-purple-500" />}

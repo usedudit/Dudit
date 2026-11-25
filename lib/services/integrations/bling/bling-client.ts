@@ -86,6 +86,13 @@ export interface BlingDeposit {
   padrao?: boolean
 }
 
+export interface BlingPaymentMethod {
+  id: number
+  descricao: string
+  tipoPagamento?: number // 1=Dinheiro, 2=Cheque, 3=Crédito, 4=Débito, 5=Crédito Loja, 15=Boleto, 16=Depósito, 17=PIX, 18=Transferência, 99=Outros
+  situacao?: number
+}
+
 export interface BlingOrderParcela {
   dataVencimento: string // YYYY-MM-DD
   valor: number
@@ -99,6 +106,7 @@ export interface BlingOrderPayload {
   numeroLoja?: string
   data: string // YYYY-MM-DD
   dataSaida?: string
+  dataPrevista?: string
   contato: {
     id: number
   }
@@ -114,6 +122,7 @@ export interface BlingOrderPayload {
     unidade?: string
     quantidade: number
     valor: number
+    desconto?: number
     descricao: string
     produto?: {
       id: number
@@ -380,6 +389,20 @@ export class BlingClient {
   async listDeposits(): Promise<BlingDeposit[]> {
     const res = await this.request<{ data?: BlingDeposit[] }>("/depositos")
     return Array.isArray(res?.data) ? res.data : []
+  }
+
+  /**
+   * Lista formas de pagamento ativas cadastradas na conta do Bling (Pix, Dinheiro, Boleto, Cartão, etc.)
+   */
+  async listPaymentMethods(): Promise<BlingPaymentMethod[]> {
+    try {
+      const res = await this.request<{ data?: BlingPaymentMethod[] }>("/formas-pagamentos", {
+        query: { situacao: 1, limite: 100 },
+      })
+      return Array.isArray(res?.data) ? res.data : []
+    } catch {
+      return []
+    }
   }
 
   /**

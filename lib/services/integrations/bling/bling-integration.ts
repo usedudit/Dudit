@@ -8,6 +8,7 @@ import {
   type BlingClient,
   type BlingOrderPayload,
   type BlingOrderParcela,
+  type BlingPaymentMethod,
 } from "./bling-client"
 import { resolveOrderBuyerFiscal } from "@/lib/orders/buyer-fiscal"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
@@ -185,18 +186,92 @@ function addDays(baseDate: Date, days: number): Date {
   return result
 }
 
+function normalizeMethodText(raw: string): string {
+  return String(raw || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
+/**
+ * Faz o de-para entre o meio de pagamento da Dudit e as formas cadastradas no Bling (GET /formas-pagamentos)
+ */
+export function matchBlingPaymentMethodId(
+  methodLabel: string,
+  paymentMethods: BlingPaymentMethod[],
+  isStoreCredit = false
+): number | undefined {
+  if (!Array.isArray(paymentMethods) || paymentMethods.length === 0) return undefined
+  const active = paymentMethods.filter((m) => m?.id && m.situacao !== 0)
+  if (active.length === 0) return undefined
+
+  const norm = normalizeMethodText(methodLabel)
+  const findByDesc = (preds: string[]) =>
+    active.find((m) => {
+      const d = normalizeMethodText(m.descricao)
+      return preds.some((p) => d.includes(p))
+    })?.id
+  const findByType = (types: number[]) =>
+    active.find((m) => m.tipoPagamento !== undefined && types.includes(Number(m.tipoPagamento)))?.id
+
+  if (isStoreCredit || norm.includes("credito de loja") || norm.includes("carteira") || norm.includes("vale")) {
+    return findByDesc(["vale", "credito loja", "credito de loja", "crediario"]) ?? findByType([5])
+  }
+  if (norm.includes("pix")) {
+    return findByDesc(["pix"]) ?? findByType([17])
+  }
+  if (norm.includes("dinheiro") || norm.includes("cash") || norm.includes("especie")) {
+    return findByDesc(["dinheiro"]) ?? findByType([1])
+  }
+  if (norm.includes("boleto")) {
+    return findByDesc(["boleto"]) ?? findByType([15])
+  }
+  if (norm.includes("debito") || norm.includes("debit")) {
+    return findByDesc(["debito"]) ?? findByType([4])
+  }
+  if (norm.includes("credito") || norm.includes("credit") || norm.includes("cartao") || norm.includes("mercado pago")) {
+    return (
+      active.find((m) => {
+        const d = normalizeMethodText(m.descricao)
+        return (d.includes("credito") || d.includes("cartao")) && !d.includes("loja") && !d.includes("debito")
+      })?.id ?? findByType([3])
+    )
+  }
+  if (norm.includes("cheque")) {
+    return findByDesc(["cheque"]) ?? findByType([2])
+  }
+  if (norm.includes("deposito") || norm.includes("transfer") || norm.includes("ted") || norm.includes("doc")) {
+    return findByDesc(["deposito", "transfer"]) ?? findByType([16, 18])
+  }
+  if (norm.includes("crediario") || norm.includes("fiado") || norm.includes("a prazo")) {
+    return findByDesc(["crediario", "credito loja"]) ?? findByType([5])
+  }
+
+  // Fallback: match direto por substring da descrição
+  if (norm) {
+    const direct = active.find((m) => normalizeMethodText(m.descricao) === norm)
+    if (direct?.id) return direct.id
+  }
+
+  return undefined
+}
+
 /**
  * Constrói a grade de parcelas para o Bling ERP v3 (cartão parcelado, múltiplos meios,
- * crédito de loja e saldo pendente a receber)
+ * crédito de loja e saldo pendente a receber), vinculando formaPagamento.id quando encontrado
  */
-export function buildBlingOrderParcelas(order: {
-  total_amount?: number | null
-  paid_amount?: number | null
-  payment_method?: string | null
-  payment_breakdown?: any[] | null
-  store_credit_amount?: number | null
-  created_at?: string | null
-}): BlingOrderParcela[] {
+export function buildBlingOrderParcelas(
+  order: {
+    total_amount?: number | null
+    paid_amount?: number | null
+    payment_method?: string | null
+    payment_breakdown?: any[] | null
+    store_credit_amount?: number | null
+    created_at?: string | null
+  },
+  paymentMethods: BlingPaymentMethod[] = []
+): BlingOrderParcela[] {
   const totalAmount = Math.max(0, Number(order.total_amount || 0))
   const storeCredit = Math.max(0, Number(order.store_credit_amount || 0))
   const baseDate = order.created_at ? new Date(order.created_at) : new Date()
@@ -261,10 +336,12 @@ export function buildBlingOrderParcelas(order: {
           ? `Parcela ${k + 1}/${n} - ${leg.method}`
           : leg.method
 
+      const matchedFormaId = matchBlingPaymentMethodId(leg.method, paymentMethods, leg.isStoreCredit)
       parcelas.push({
         dataVencimento: formatBlingDate(addDays(baseDate, days)),
         valor: val,
         observacoes: obs,
+        ...(matchedFormaId ? { formaPagamento: { id: matchedFormaId } } : {}),
       })
       allocated = Number((allocated + val).toFixed(2))
     }
@@ -749,6 +826,8 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
         variant_id,
         product_name,
         product_price,
+        original_price,
+        discount_amount,
         quantity,
         subtotal,
         products (
@@ -960,11 +1039,26 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
           ? Number(prod.external_id)
           : undefined
 
+      const qty = Math.max(1, Number(it.quantity || 1))
+      const netUnitPrice = Number(it.product_price || 0)
+      const origPrice = Number(it.original_price || 0)
+      const itemDiscAmt = Math.max(0, Number(it.discount_amount || 0))
+      const inferredOrig = origPrice > netUnitPrice
+        ? origPrice
+        : itemDiscAmt > 0
+          ? netUnitPrice + itemDiscAmt / qty
+          : 0
+      const itemDiscountPct =
+        inferredOrig > netUnitPrice && inferredOrig > 0
+          ? Number(Math.min(100, ((inferredOrig - netUnitPrice) / inferredOrig) * 100).toFixed(2))
+          : 0
+
       return {
         codigo,
         unidade: "UN",
-        quantidade: Number(it.quantity || 1),
-        valor: Number(it.product_price || 0),
+        quantidade: qty,
+        valor: netUnitPrice,
+        ...(itemDiscountPct > 0 ? { desconto: itemDiscountPct } : {}),
         descricao,
         ...(blingProdId ? { produto: { id: blingProdId } } : {}),
       }
@@ -989,8 +1083,30 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     const impliedExtra = Math.max(0, Number((orderTotal + totalDiscount - itemsTotal - deliveryFee).toFixed(2)))
     const totalOutrasDespesas = Math.max(explicitExtra, impliedExtra)
 
-    const parcelas = buildBlingOrderParcelas(order)
+    // Busca formas de pagamento cadastradas no Bling para vincular formaPagamento.id (Pix, Dinheiro, Boleto, Cartão, etc.)
+    const blingPaymentMethods = await client.listPaymentMethods()
+    const parcelas = buildBlingOrderParcelas(order, blingPaymentMethods)
     const baseDate = order.created_at ? new Date(order.created_at) : new Date()
+    const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
+    const isAlreadyDispatched =
+      deliveryStatus === "delivered" ||
+      deliveryStatus === "sent" ||
+      Boolean((order as any).inventory_deducted)
+
+    // Prazo de entrega (em dias) -> dataPrevista no Bling (o Bling calcula "Prazo de entrega" automaticamente a partir de dataPrevista)
+    const rawDeliveryDays =
+      breakdown?.deliveryTime ??
+      breakdown?.delivery_time ??
+      breakdown?.deadline ??
+      breakdown?.prazo ??
+      breakdown?.estimatedDays ??
+      null
+    const parsedDeliveryDays = rawDeliveryDays !== null && rawDeliveryDays !== undefined ? Number(rawDeliveryDays) : NaN
+    const dataPrevista = Number.isFinite(parsedDeliveryDays) && parsedDeliveryDays >= 0
+      ? formatBlingDate(addDays(baseDate, Math.ceil(parsedDeliveryDays)))
+      : formatBlingDate(baseDate)
+    const dataSaida = isAlreadyDispatched ? formatBlingDate(new Date()) : undefined
+
     const exchangeNote = order.exchange_return_request_id
       ? ` [Troca ref. Devolução #${order.exchange_return_request_id}]`
       : ""
@@ -998,6 +1114,8 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     const payload: BlingOrderPayload = {
       numeroLoja: order.order_number || String(order.id),
       data: formatBlingDate(baseDate),
+      ...(dataSaida ? { dataSaida } : {}),
+      dataPrevista,
       contato: { id: contactId },
       itens: items,
       ...(totalDiscount > 0.009 ? { desconto: { valor: Number(totalDiscount.toFixed(2)), unidade: "REAL" } } : {}),
@@ -1039,12 +1157,8 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
 
     // Atualiza a situação do pedido no Bling se já estiver pago, enviado ou entregue/retirado
     // (o Bling cria sempre como "Em aberto" por padrão no POST /pedidos/vendas)
-    const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
     const orderSituation = String((order as any).situation || "").toLowerCase()
-    const isDeliveredOrDeducted =
-      deliveryStatus === "delivered" ||
-      deliveryStatus === "sent" ||
-      Boolean((order as any).inventory_deducted)
+    const isDeliveredOrDeducted = isAlreadyDispatched
 
     const initialBlingSit: "entregue" | "enviado" | "aprovado" | null =
       deliveryStatus === "delivered"

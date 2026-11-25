@@ -517,7 +517,7 @@ export const getCachedExploreProducts = async (
   section?: string,
   coords?: { lat: number; lng: number } | null
 ) => {
-  const { results, moreDistantSellers, moreDistantItems } = await searchMarketplaceDirectFull(query, type, {
+  const { results, moreDistantSellers, moreDistantItems, searchIntent, proximityRings } = await searchMarketplaceDirectFull(query, type, {
     vitrines: type === 'vitrines' ? 40 : 4,
     produtos: 40,
     servicos: 40,
@@ -529,7 +529,7 @@ export const getCachedExploreProducts = async (
     longitude: coords?.lng,
     centerCoords: coords,
   })
-  return { items: results, moreDistantSellers, moreDistantItems }
+  return { items: results, moreDistantSellers, moreDistantItems, searchIntent, proximityRings }
 }
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {

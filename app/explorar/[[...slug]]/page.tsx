@@ -450,10 +450,18 @@ export default async function ExplorarPage({
             items: fetched.items || [],
             moreDistantSellers: fetched.moreDistantSellers || [],
             moreDistantItems: fetched.moreDistantItems || [],
+            searchIntent: fetched.searchIntent ?? null,
+            proximityRings: fetched.proximityRings ?? null,
         }))
         .catch((err) => {
             console.error("[ExplorarPage] Error fetching explore products:", err)
-            return { items: [] as any[], moreDistantSellers: [] as any[], moreDistantItems: [] as any[] }
+            return {
+                items: [] as any[],
+                moreDistantSellers: [] as any[],
+                moreDistantItems: [] as any[],
+                searchIntent: null,
+                proximityRings: null,
+            }
         })
 
     const cityPromise: Promise<{ city: string; state: string } | null> = isSpecificCityRoute
@@ -651,6 +659,8 @@ export default async function ExplorarPage({
                     initialResults={productsWithDistance}
                     initialMoreDistantSellers={moreDistantSellersWithDistance}
                     initialMoreDistantItems={moreDistantItemsWithDistance}
+                    initialSearchIntent={fetched.searchIntent}
+                    initialProximityRings={fetched.proximityRings}
                     initialSection={section}
                     query={query}
                     type={type}

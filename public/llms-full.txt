@@ -20,10 +20,13 @@ Marketplaces e aplicativos tradicionais costumam cobrar comissões entre 12% e 2
 
 ## Funcionalidades Principais
 
-### 1. Catálogo Digital e Marketplace
+### 1. Catálogo Digital, Marketplace e Busca Inteligente por Proximidade
 - Vitrine online própria com URL amigável (`https://dudit.com.br/{cidade-uf}/{slug-loja}/v/{short_id}`), fotos, descrição, horário de funcionamento, avaliações e localização.
 - Produtos com grade de variações (cor, tamanho e atributos personalizados), promoções e estoque sincronizado.
 - Pedidos integrados ao WhatsApp (resumo estruturado enviado diretamente para o WhatsApp do vendedor) e checkout próprio integrado.
+- **Busca por Necessidade e Anéis de Proximidade**:
+  - Para **produtos** (ex.: "preciso de um pneu aro 15"), organiza os resultados em camadas: 1) lojas e vitrines próximas com retirada/entrega local, 2) lojas em cidades vizinhas/região, e 3) vendedores de todo o Brasil que enviam para o CEP do comprador.
+  - Para **serviços** (ex.: "preciso de um eletricista amanhã de manhã"), prioriza profissionais próximos (respeitando o raio de atendimento a domicílio ou no local), verifica disponibilidade na agenda, exibe avaliações, preço ou orçamento e permite agendamento direto.
 - Descoberta orgânica de produtos, serviços e lojas por cidade, estado ou Brasil inteiro.
 
 ### 2. Logística Local e Envios Nacionais

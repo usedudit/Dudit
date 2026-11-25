@@ -134,24 +134,17 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                 onShare={handleShare}
             />
             <article className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-8 lg:pt-12">
-                <div className="mb-8 flex items-start gap-3">
-                    <Button variant="filled" asChild className="mt-0.5 h-10 w-10 shrink-0 p-0 xl:hidden">
-                        <Link href="/blog" prefetch={false} aria-label="Voltar para o blog">
-                            <ChevronLeftIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
-                        </Link>
-                    </Button>
-                    <div className="min-w-0">
-                        <h1 className="text-xl font-bold leading-snug tracking-tight text-brand-dark dark:text-dark-heading md:text-2xl lg:text-3xl">
-                            {post.title}
-                        </h1>
-                        <Link
-                            href={getBlogCategoryUrl(category.id)}
-                            prefetch={false}
-                            className="mt-1 inline-block text-xs font-semibold uppercase tracking-wider text-brand-green hover:underline"
-                        >
-                            {category.label}
-                        </Link>
-                    </div>
+                <div className="mb-8">
+                    <h1 className="text-xl font-bold leading-snug tracking-tight text-brand-dark dark:text-dark-heading md:text-2xl lg:text-3xl">
+                        {post.title}
+                    </h1>
+                    <Link
+                        href={getBlogCategoryUrl(category.id)}
+                        prefetch={false}
+                        className="mt-1 inline-block text-xs font-semibold uppercase tracking-wider text-brand-green hover:underline"
+                    >
+                        {category.label}
+                    </Link>
                 </div>
 
                 <header className="max-w-4xl">

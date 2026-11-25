@@ -22,7 +22,7 @@ const categoryGroups: CategoryGroup[] = [
         title: "Gestão",
         icon: "📊",
         categories: helpCategories.filter(cat =>
-            ["vendas", "produtos-estoque", "servicos", "financeiro", "clientes", "marketing"].includes(cat.id)
+            ["vendas", "produtos-estoque", "servicos", "financeiro", "clientes", "marketing", "integracoes"].includes(cat.id)
         )
     },
     {

@@ -50,23 +50,35 @@ describe("Bling Integration", () => {
     vi.clearAllMocks()
   })
 
-  it("maps split payment (Pix + 2x Credit Card) + store credit into Bling parcelas", () => {
-    const parcelas = buildBlingOrderParcelas({
-      total_amount: 300,
-      store_credit_amount: 50,
-      payment_breakdown: [
-        { method: "Pix", amount: 100, installmentNumber: 1 },
-        { method: "Cartão de Crédito", amount: 150, installmentNumber: 2 },
-      ],
-      created_at: "2026-11-22T12:00:00Z",
-    })
+  it("maps split payment (Pix + 2x Credit Card) + store credit into Bling parcelas with formaPagamento.id", () => {
+    const blingMethods = [
+      { id: 101, descricao: "Pix", tipoPagamento: 17, situacao: 1 },
+      { id: 102, descricao: "Cartão de Crédito", tipoPagamento: 3, situacao: 1 },
+      { id: 103, descricao: "Vale-Troca", tipoPagamento: 5, situacao: 1 },
+    ]
+    const parcelas = buildBlingOrderParcelas(
+      {
+        total_amount: 300,
+        store_credit_amount: 50,
+        payment_breakdown: [
+          { method: "Pix", amount: 100, installmentNumber: 1 },
+          { method: "Cartão de Crédito", amount: 150, installmentNumber: 2 },
+        ],
+        created_at: "2026-11-22T12:00:00Z",
+      },
+      blingMethods
+    )
 
     expect(parcelas).toHaveLength(4)
     expect(parcelas[0].valor).toBe(100)
+    expect(parcelas[0].formaPagamento).toEqual({ id: 101 })
     expect(parcelas[1].valor).toBe(75)
+    expect(parcelas[1].formaPagamento).toEqual({ id: 102 })
     expect(parcelas[2].valor).toBe(75)
+    expect(parcelas[2].formaPagamento).toEqual({ id: 102 })
     expect(parcelas[3].valor).toBe(50)
     expect(parcelas[3].observacoes).toBe("Crédito de Loja / Carteira")
+    expect(parcelas[3].formaPagamento).toEqual({ id: 103 })
   })
 
   it("handles partially paid order with pending balance parcela", () => {

@@ -59,9 +59,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, 
                 {`DVL-${returnRequest.id.slice(0, 6).toUpperCase()}`}
               </h3>
               <Tooltip text={`Status: ${statusMeta.label}`}>
-                <Badge variant={statusMeta.variant} className="whitespace-nowrap">
-                  {statusMeta.label}
-                </Badge>
+                <Badge variant={statusMeta.variant} className="whitespace-nowrap"></Badge>
               </Tooltip>
             </div>
           </div>

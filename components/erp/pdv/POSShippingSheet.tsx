@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { XIcon, TruckIcon } from "@/lib/icons"
-import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard, ListItem, FormDropdown } from "@/components/reusable"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard, ListItem, FormDropdown, RadioButton } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -92,7 +92,7 @@ interface POSShippingSheetProps {
     /** Status de entrega/envio atual (edição de pedido). */
     initialDeliveryStatus?: string | null
     /** Itens do pedido para cálculo exato de cubagem e peso via product_logistics. */
-    items?: Array<{ productId?: string | null; product_id?: string | null; id?: string | null; quantity?: number; [key: string]: any }>
+    items?: Array<{ productId?: string | null; product_id?: string | null; id?: string | null; quantity?: number;[key: string]: any }>
 }
 
 export default function POSShippingSheet({
@@ -493,7 +493,6 @@ export default function POSShippingSheet({
                                         {destinationCep.length === 8 && (
                                             <Button
                                                 variant="link"
-                                                type="button"
                                                 className="shrink-0"
                                                 onClick={() => {
                                                     carrierFetchedCepRef.current = null
@@ -512,10 +511,7 @@ export default function POSShippingSheet({
                                         <ListItem
                                             key={opt.serviceId}
                                             onClick={() => setSelectedCarrierServiceId(opt.serviceId)}
-                                            className={`px-4 py-3 ${isSelected
-                                                ? "border-brand-green ring-1 ring-brand-green/40"
-                                                : "hover:border-brand-green/60 dark:hover:border-brand-green/40"
-                                                }`}
+                                            className="px-4 py-3"
                                             left={(
                                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
                                                     <img
@@ -532,11 +528,11 @@ export default function POSShippingSheet({
                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(opt.price)}
                                                     </span>
-                                                    <span
-                                                        className={`h-4 w-4 rounded-full border transition-colors ${isSelected
-                                                            ? "border-brand-green bg-brand-green"
-                                                            : "border-brand-border dark:border-dark-border"
-                                                            }`}
+                                                    <RadioButton
+                                                        name="carrierFreightOption"
+                                                        value={String(opt.serviceId)}
+                                                        checked={isSelected}
+                                                        onChange={() => setSelectedCarrierServiceId(opt.serviceId)}
                                                     />
                                                 </div>
                                             )}

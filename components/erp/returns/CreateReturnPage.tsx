@@ -32,7 +32,7 @@ import {
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, XIcon, PrinterIcon, TruckIcon, StoreIcon, ReturnIcon, ThreeDotsIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, XIcon, PrinterIcon, TruckIcon, StoreIcon, ReturnIcon, ThreeDotsIcon, ShoppingCartIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction, saveReturnEvidenceAction } from "@/app/actions/erp/returns"
 import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
@@ -135,12 +135,6 @@ type ReplacementItemState = {
     quantity: number
     variantId?: string | null
     variantName?: string | null
-}
-
-function getOrderPreviewImage(order?: any | null) {
-    const firstItem = (order?.order_items || order?.items)?.find((item: any) => item?.products?.images?.[0] || item?.products?.video_thumbnail)
-    const firstItemImage = firstItem?.products?.images?.[0] || firstItem?.products?.video_thumbnail || null
-    return getR2ImageUrl(firstItemImage || null, "thumb")
 }
 
 function mapToLegacyCondition(condition: string): "aberto" | "lacrado" | "danificado" {
@@ -291,11 +285,6 @@ export default function CreateReturnPage({
         return !!(returnRequest?.source === "marketplace")
     }, [returnRequest])
 
-    const showReturnShippingButton = useMemo(() => {
-        if (mode === "create" || !returnRequest) return false
-        return ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(returnStatus) || Boolean(returnShipping)
-    }, [mode, returnRequest, returnStatus, returnShipping])
-
     const isMercadoPagoOrder = useMemo(() => {
         if (!selectedOrder) return false
         const provider = String(selectedOrder.payment_provider || selectedOrder.paymentProvider || "").toLowerCase()
@@ -399,6 +388,23 @@ export default function CreateReturnPage({
 
     const hasServices = useMemo(() => returnItems.some(item => item.lineType === "service_booking"), [returnItems])
     const hasOnlyServices = useMemo(() => returnItems.length > 0 && returnItems.every(item => item.lineType === "service_booking"), [returnItems])
+
+    const isPickupOrder = useMemo(() => {
+        const dt = String(
+            selectedOrder?.delivery_type ||
+            rawReturnRequestData?.deliveryType ||
+            returnRequest?.deliveryType ||
+            ""
+        ).toLowerCase()
+        return dt === "pickup"
+    }, [selectedOrder?.delivery_type, rawReturnRequestData?.deliveryType, returnRequest?.deliveryType])
+
+    const showReturnShippingButton = useMemo(() => {
+        if (mode === "create" || !returnRequest) return false
+        const hasActiveReturnShipping = Boolean(returnShipping && returnShipping.status !== "cancelled")
+        if ((isPickupOrder || hasOnlyServices) && !hasActiveReturnShipping) return false
+        return ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(returnStatus) || hasActiveReturnShipping
+    }, [mode, returnRequest, isPickupOrder, hasOnlyServices, returnStatus, returnShipping])
 
     const hasStagedEvidence = useMemo(
         () => evidenceImages.some((img) => img instanceof File) || evidenceUploads.some((u: any) => u?.file instanceof File),
@@ -1391,23 +1397,34 @@ export default function CreateReturnPage({
 
                                     {/* Desktop action buttons only */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={handleBack} disabled={isSaving || isUploading}>
-                                            {isViewOnly ? "Voltar" : "Cancelar"}
-                                        </Button>
-                                        {showReturnShippingButton && (
-                                            <Button variant="outline" onClick={handleOpenReturnShipping} leftIcon={<TruckIcon size={18} />}>
-                                                Etiqueta de devolução
-                                            </Button>
-                                        )}
-                                        {isViewOnly && returnRequest && (
-                                            <Button variant="outline" onClick={() => setIsPrintModalOpen(true)} leftIcon={<PrinterIcon size={18} />}>
-                                                Imprimir
-                                            </Button>
-                                        )}
-                                        {!isViewOnly && (
-                                            <Button onClick={handleFormSubmit} disabled={isSaveDisabled} leftIcon={<SaveIcon size={18} />}>
-                                                {isSaving || isUploading ? "Salvando..." : "Salvar"}
-                                            </Button>
+                                        {isViewOnly ? (
+                                            (showReturnShippingButton || returnRequest) && (
+                                                <ActionsDropdown
+                                                    onPrint={returnRequest ? () => setIsPrintModalOpen(true) : undefined}
+                                                >
+                                                    {showReturnShippingButton && (
+                                                        <DropdownItem onClick={handleOpenReturnShipping}>
+                                                            <TruckIcon size={18} /> Etiqueta de devolução
+                                                        </DropdownItem>
+                                                    )}
+                                                </ActionsDropdown>
+                                            )
+                                        ) : (
+                                            <>
+                                                <Button variant="outline" onClick={handleBack} disabled={isSaving || isUploading}>
+                                                    Cancelar
+                                                </Button>
+                                                {showReturnShippingButton && (
+                                                    <ActionsDropdown>
+                                                        <DropdownItem onClick={handleOpenReturnShipping}>
+                                                            <TruckIcon size={18} /> Etiqueta de devolução
+                                                        </DropdownItem>
+                                                    </ActionsDropdown>
+                                                )}
+                                                <Button onClick={handleFormSubmit} disabled={isSaveDisabled} leftIcon={<SaveIcon size={18} />}>
+                                                    {isSaving || isUploading ? "Salvando..." : "Salvar"}
+                                                </Button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -1527,12 +1544,8 @@ export default function CreateReturnPage({
                                                                                     setReturnItems(mappedItems)
                                                                                 }}
                                                                             >
-                                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                    <img
-                                                                                        src={getOrderPreviewImage(order)}
-                                                                                        alt={order.displayId}
-                                                                                        className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                                                                    />
+                                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                    <ShoppingCartIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                                                                                 </div>
 
                                                                                 <div className="min-w-0 flex-1">
@@ -1574,20 +1587,13 @@ export default function CreateReturnPage({
                                                         <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
                                                             <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
                                                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                                                    <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center gap-1">
                                                                         <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                                                             Pedido:
                                                                         </span>
                                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                             {selectedOrder.displayId || selectedOrder.order_number}
                                                                         </span>
-                                                                    </div>
-
-                                                                    <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body md:text-right">
-                                                                        Cliente:{" "}
-                                                                        <strong className="text-brand-dark dark:text-dark-heading">
-                                                                            {selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente"}
-                                                                        </strong>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2627,46 +2633,49 @@ export default function CreateReturnPage({
             </div >
 
             {/* Mobile Bottom Action Bar */}
-            <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3" >
-                {isViewOnly ? (
-                    <ActionsDropdown
-                        fullWidth
-                        trigger={
-                            <Button variant="outline" className="w-full h-12" leftIcon={<ThreeDotsIcon size={18} />}>
-                                Opções
+            {(!isViewOnly || showReturnShippingButton || Boolean(returnRequest)) && (
+                <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3" >
+                    {isViewOnly ? (
+                        <ActionsDropdown
+                            fullWidth
+                            onPrint={returnRequest ? () => setIsPrintModalOpen(true) : undefined}
+                            trigger={
+                                <Button variant="outline" className="w-full h-12" leftIcon={<ThreeDotsIcon size={18} />}>
+                                    Opções
+                                </Button>
+                            }
+                        >
+                            {showReturnShippingButton && (
+                                <DropdownItem onClick={handleOpenReturnShipping}>
+                                    <TruckIcon size={18} /> Etiqueta de devolução
+                                </DropdownItem>
+                            )}
+                        </ActionsDropdown>
+                    ) : (
+                        <>
+                            <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
+                                Cancelar
                             </Button>
-                        }
-                    >
-                        {showReturnShippingButton && (
-                            <DropdownItem onClick={handleOpenReturnShipping}>
-                                <TruckIcon size={16} /> Etiqueta de devolução
-                            </DropdownItem>
-                        )}
-                        {returnRequest && (
-                            <DropdownItem onClick={() => setIsPrintModalOpen(true)}>
-                                <PrinterIcon size={16} /> Imprimir
-                            </DropdownItem>
-                        )}
-                        <DropdownItem onClick={handleBack}>
-                            <ChevronLeftIcon size={16} /> Voltar
-                        </DropdownItem>
-                    </ActionsDropdown>
-                ) : (
-                    <>
-                        <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
-                            Cancelar
-                        </Button>
-                        {showReturnShippingButton && (
-                            <Button variant="outline" onClick={handleOpenReturnShipping} className="flex-1" leftIcon={<TruckIcon size={18} />}>
-                                Etiqueta de devolução
+                            {showReturnShippingButton && (
+                                <ActionsDropdown
+                                    trigger={
+                                        <Button variant="outline" className="h-12 px-4" leftIcon={<ThreeDotsIcon size={18} />}>
+                                            Opções
+                                        </Button>
+                                    }
+                                >
+                                    <DropdownItem onClick={handleOpenReturnShipping}>
+                                        <TruckIcon size={18} /> Etiqueta de devolução
+                                    </DropdownItem>
+                                </ActionsDropdown>
+                            )}
+                            <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
+                                {isSaving || isUploading ? "Salvando..." : "Salvar"}
                             </Button>
-                        )}
-                        <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
-                            {isSaving || isUploading ? "Salvando..." : "Salvar"}
-                        </Button>
-                    </>
-                )}
-            </div >
+                        </>
+                    )}
+                </div >
+            )}
 
             <DefaultModal
                 isOpen={isReturnShippingOpen}

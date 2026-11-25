@@ -422,7 +422,7 @@ export async function getReturnRequestsPageAction(
         refund_payment_method, exchange_order_id, exchange_substatus, exchange_shortfall_amount, exchange_surplus_amount, exchange_items_snapshot, exchange_balance_resolution,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
         eligibility_status, eligibility_details, policy_snapshot, sla_due_at, sla_status, sla_expired_at, reported_to_dudit_at, dudit_report_id,
-        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer_id, payment_provider, mp_payment_id),
+        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_type, delivery_address, buyer_id, payment_provider, mp_payment_id),
         return_items!return_items_return_request_id_fkey(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
