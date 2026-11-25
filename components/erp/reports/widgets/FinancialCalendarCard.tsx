@@ -212,16 +212,7 @@ export function FinancialCalendarCard({ dailyMovements = {}, className = "" }: F
                             </span>
 
                             {hasMovement ? (
-                                <>
-                                    <Badge
-                                        variant={isPositive ? "green" : "red"}
-                                        icon={null}
-                                    />
-                                    <span>
-
-                                        {formatCalendarCompact(net)}
-                                    </span>
-                                </>
+                                <Badge variant={isPositive ? "green" : "red"} icon={null}>{formatCalendarCompact(net)}</Badge>
                             ) : (
                                 <div className="h-[18px]" />
                             )}

@@ -113,13 +113,25 @@ export async function GET(request: NextRequest) {
       )
 
     const existing = await findBlingIntegration(supabase, partnerId)
-    const { clientId, clientSecret } = resolveBlingOAuthAppCredentials(existing)
+    const { clientId, clientSecret, source: credSource } = resolveBlingOAuthAppCredentials(existing)
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(`${appUrl}/erp/configuracoes?tab=integracoes&bling_error=missing_credentials`)
     }
 
-    const tokenData = await exchangeBlingAuthCode({ clientId, clientSecret, code })
+    let tokenData
+    try {
+      tokenData = await exchangeBlingAuthCode({ clientId, clientSecret, code })
+    } catch (exchangeErr: any) {
+      console.error("[BLING OAuth callback] token exchange failed:", {
+        source: credSource,
+        clientIdPrefix: clientId.slice(0, 6),
+        clientIdLen: clientId.length,
+        clientSecretLen: clientSecret.length,
+        error: exchangeErr?.message,
+      })
+      throw exchangeErr
+    }
     const nowIso = new Date().toISOString()
     const expiresAtIso = new Date(Date.now() + Number(tokenData.expires_in || 21600) * 1000).toISOString()
 

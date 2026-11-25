@@ -173,7 +173,7 @@ export async function exchangeBlingAuthCode(params: {
   clientSecret: string
   code: string
 }): Promise<BlingTokenResponse> {
-  const basicAuth = Buffer.from(`${params.clientId}:${params.clientSecret}`).toString("base64")
+  const basicAuth = Buffer.from(`${params.clientId.trim()}:${params.clientSecret.trim()}`).toString("base64")
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code: params.code,

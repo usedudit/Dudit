@@ -38,12 +38,11 @@ export function NotificationBell({
 
   return (
     <div className={className}>
-      <Button
-        variant="outline"
+      <button
         className={cn(
-          "rounded-full w-9 h-9 p-0 flex items-center justify-center relative",
+          "w-10 h-10 rounded-full border flex items-center justify-center transition-all group",
           variant === "marketplace" &&
-          "border border-white/10 hover:bg-white/5 hover:border-white/30 text-gray-400 dark:text-dark-body group-hover:text-white transition-all group",
+          "border border-white/10 hover:bg-white/5 hover:border-white/30 text-gray-400 dark:text-dark-body group-hover:text-white",
           buttonClassName,
         )}
         aria-label="Notificações"
@@ -58,7 +57,7 @@ export function NotificationBell({
           )}
         />
         {badge}
-      </Button>
+      </button>
       <NotificationsSheet
         isOpen={panelOpen}
         onClose={() => setPanelOpen(false)}

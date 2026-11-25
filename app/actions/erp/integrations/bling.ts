@@ -160,6 +160,8 @@ export async function disconnectBlingAction(): Promise<{ success: boolean; error
     const creds = { ...((existing.credentials as Record<string, any>) || {}) }
     delete creds.refresh_token_encrypted
     delete creds.token_expires_at
+    delete creds.client_id_encrypted
+    delete creds.client_secret_encrypted
 
     const { error } = await supabase
       .from("partner_integrations")

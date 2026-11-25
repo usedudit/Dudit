@@ -55,30 +55,45 @@ export async function findBlingIntegration(
 }
 
 /**
- * Resolve Client ID e Client Secret (prioriza credenciais privadas do parceiro; fallback para app público global em env)
+ * Resolve Client ID e Client Secret (prioriza app oficial em env BLING_CLIENT_ID / BLING_CLIENT_SECRET;
+ * fallback para credenciais privadas salvas no banco apenas quando as envs globais não estão definidas)
  */
 export function resolveBlingOAuthAppCredentials(integration?: PartnerIntegrationRow | null): {
   clientId: string | null
   clientSecret: string | null
+  source: "env" | "custom" | "none"
 } {
+  const envClientId = process.env.BLING_CLIENT_ID?.trim() || null
+  const envClientSecret = process.env.BLING_CLIENT_SECRET?.trim() || null
+  if (envClientId && envClientSecret) {
+    return {
+      clientId: envClientId,
+      clientSecret: envClientSecret,
+      source: "env",
+    }
+  }
+
   const creds = (integration?.credentials as Record<string, any>) || {}
   let customClientId: string | null = null
   let customClientSecret: string | null = null
 
   if (creds.client_id_encrypted) {
     try {
-      customClientId = decrypt(creds.client_id_encrypted, BLING_PROVIDER)
+      customClientId = decrypt(creds.client_id_encrypted, BLING_PROVIDER).trim() || null
     } catch { }
   }
   if (creds.client_secret_encrypted) {
     try {
-      customClientSecret = decrypt(creds.client_secret_encrypted, BLING_PROVIDER)
+      customClientSecret = decrypt(creds.client_secret_encrypted, BLING_PROVIDER).trim() || null
     } catch { }
   }
 
+  const clientId = envClientId || customClientId || null
+  const clientSecret = envClientSecret || customClientSecret || null
   return {
-    clientId: customClientId || process.env.BLING_CLIENT_ID || null,
-    clientSecret: customClientSecret || process.env.BLING_CLIENT_SECRET || null,
+    clientId,
+    clientSecret,
+    source: clientId && clientSecret ? (customClientId || customClientSecret ? "custom" : "env") : "none",
   }
 }
 
