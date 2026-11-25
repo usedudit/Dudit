@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     LOJA_SEM_CATEGORIA,
     OUTROS_CATEGORY,
+    getExplorePathParts,
     getItemDistanceKm,
     isItemUncategorized,
     itemMatchesCategory,
@@ -13,6 +14,7 @@ import {
     matchesShippingFilter,
     mergeCategoryLists,
     parseFiltersFromParams,
+    resolveExploreRouteParts,
     serializeFiltersToParams,
     type CategoryLists,
 } from "./explorar-filters"
@@ -198,5 +200,31 @@ describe("sincronização com a URL", () => {
         expect(parsed.maxDistanceKm).toBeNull()
         expect(parsed.delivery).toBe("")
         expect(parsed.showcaseOnly).toBe(false)
+    })
+
+    it("extrai cidade e categoria da URL viva de /explorar", () => {
+        expect(getExplorePathParts("/explorar")).toEqual({ city: null, category: null })
+        expect(getExplorePathParts("/explorar/bauru-sp")).toEqual({ city: "bauru-sp", category: null })
+        expect(getExplorePathParts("/explorar/bauru-sp/alimentacao")).toEqual({ city: "bauru-sp", category: "alimentacao" })
+        expect(getExplorePathParts("/produto/item-1")).toBeNull()
+    })
+
+    it("não ressuscita categoria antiga do slug quando ela foi removida da URL viva", () => {
+        // Simula o estado após remover "alimentacao" via pushState:
+        // URL viva virou /explorar/bauru-sp, mas params.slug ainda tem ["bauru-sp", "alimentacao"].
+        expect(
+            resolveExploreRouteParts("/explorar/bauru-sp", ["bauru-sp", "alimentacao"])
+        ).toEqual({ city: "bauru-sp", category: null })
+
+        // E também quando a URL viva volta para /explorar sem cidade nem categoria:
+        expect(
+            resolveExploreRouteParts("/explorar", ["bauru-sp", "alimentacao"])
+        ).toEqual({ city: null, category: null })
+    })
+
+    it("usa o slug de fallback apenas quando não há URL viva (SSR)", () => {
+        expect(
+            resolveExploreRouteParts(null, ["bauru-sp", "alimentacao"])
+        ).toEqual({ city: "bauru-sp", category: "alimentacao" })
     })
 })

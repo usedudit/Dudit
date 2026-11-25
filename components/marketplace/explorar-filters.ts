@@ -344,6 +344,46 @@ export function matchesBrandFilter(item: any, brands: string[]): boolean {
     return brands.includes(brand)
 }
 
+export interface ExplorePathParts {
+    city: string | null
+    category: string | null
+}
+
+/**
+ * Extrai cidade e categoria do caminho vivo da URL (`/explorar/[cidade]/[categoria]`).
+ * Retorna `null` quando o pathname não pertence à rota `/explorar`.
+ */
+export function getExplorePathParts(pathname: string | null | undefined): ExplorePathParts | null {
+    const parts = (pathname || "").split("/").filter(Boolean)
+    if (parts[0] !== "explorar") return null
+    return {
+        city: parts[1] || null,
+        category: parts[2] || null,
+    }
+}
+
+/**
+ * Resolve cidade e categoria da rota priorizando a URL viva do browser.
+ *
+ * Depois de um `history.pushState` (ex.: remover a categoria em
+ * `/explorar/cidade/alimentacao` -> `/explorar/cidade`), o `useParams()` do
+ * App Router mantém o `slug` da árvore RSC anterior (`["cidade", "alimentacao"]`).
+ * Usar `live.category || slug[1]` ressuscitava a categoria removida sempre que
+ * `searchParams` mudava. Quando a URL viva está em `/explorar`, ela é a única
+ * fonte de verdade (inclusive quando `category` é `null`).
+ */
+export function resolveExploreRouteParts(
+    livePathname: string | null | undefined,
+    fallbackSlug: readonly string[] = []
+): ExplorePathParts {
+    const live = getExplorePathParts(livePathname)
+    if (live) return live
+    return {
+        city: fallbackSlug[0] || null,
+        category: fallbackSlug[1] || null,
+    }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Serialização (URL)                                                          */
 /* -------------------------------------------------------------------------- */

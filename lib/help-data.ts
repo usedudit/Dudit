@@ -143,51 +143,50 @@ Certifique-se de que o *Caps Lock* não está ativado. Se persistir, utilize a o
             },
             {
                 id: "criando-conta",
-                title: "Criando uma conta de usuário",
-                description: "Cadastro inicial para clientes e novos parceiros.",
+                title: "Criando sua conta para comprar",
+                description: "Como se cadastrar na Dudit como cliente para comprar produtos e serviços.",
                 slug: "criando-conta",
                 category: "login-registro",
                 content: `
 ## Visão geral
-Seja você um cliente em busca de produtos locais ou um empreendedor pronto para abrir seu negócio, o primeiro passo é criar sua conta na Dudit. O processo é simples e focado na segurança dos seus dados.
+Para comprar na Dudit, você precisa de uma conta. O cadastro é rápido, seguro e gratuito.
 
-![Tela de Cadastro](https://img.dudit.com.br/static/screens/Cadastro.png)
+## Como criar sua conta
 
-## O que é possível fazer
-*   Criar uma conta nova usando seu e-mail.
-*   Utilizar sua conta Google para cadastro instantâneo.
-*   Visualizar a força da sua senha em tempo real.
-*   Aceitar os Termos de Uso e Políticas da plataforma.
+1. Acesse https://dudit.com.br/auth/login
+2. Clique em **Crie a sua**.
+3. Escolha como quer se cadastrar:
+   - **Com e-mail e senha:** digite seu e-mail, escolha uma senha forte e aceite os termos.
+   - **Com Google:** clique em **Entrar com Google** e escolha a conta. É mais rápido e você não precisa decorar senha.
 
-## Como usar
-1. Na página de login, clique em **Crie a sua** (abaixo do formulário).
-2. Insira um e-mail válido.
-3. Escolha uma senha segura. O medidor abaixo do campo ajudará você a criar uma combinação forte.
-4. Marque a caixa **"Aceito os Termos"**.
-5. Clique em **Criar Conta**.
-6. **Importante:** Você receberá um e-mail de confirmação. Clique no link enviado para ativar sua conta.
+4. Clique em **Criar Conta**.
+5. Confira seu e-mail e clique no link de confirmação que a Dudit enviar.
 
-## Campos e opções
+## O que você precisa
+- Um e-mail que você usa sempre.
+- Uma senha (se não usar o Google).
+- Aceitar os Termos de Uso e a Política de Privacidade.
 
-| Campo | Requisito / Descrição |
-| :--- | :--- |
-| **E-mail** | Deve ser um e-mail válido que você tenha acesso. |
-| **Senha** | Deve ser classificada como "Média" ou "Forte" pelo sistema. |
-| **Aceito os Termos** | Obrigatório para prosseguir com o cadastro. |
-| **Medidor de Senha** | Indica visualmente a segurança da senha escolhida. |
+> [!TIP]
+> A barra abaixo do campo de senha mostra a força em tempo real. Tente chegar em "Média" ou "Forte".
 
-## Regras e comportamentos
-*   **Validação de Senha:** O sistema não permite a criação de contas com senhas fracas. Recomendamos o uso de letras, números e símbolos.
-*   **E-mail Duplicado:** Se você tentar se cadastrar com um e-mail já existente, o sistema informará o erro.
-*   **Confirmação Obrigatória:** Sem a confirmação por e-mail, algumas funcionalidades podem ficar restritas.
-
-## Dicas
-> [!IMPORTANT]
-> Ao criar a conta com Google, seu nome é importado automaticamente. Para alterar depois, acesse **Perfil e Configurações**.
+## Depois de confirmar o e-mail
+Você já pode:
+- Comprar produtos e serviços de lojas da sua região.
+- Favoritar itens e lojas.
+- Acompanhar seus pedidos.
+- Usar cupons de desconto.
 
 ## Problemas comuns
+
 **"Não recebi o e-mail de confirmação"**
-Aguarde alguns minutos. Verifique o **Spam**. Tente "Reenviar e-mail" após 60 segundos.
+Aguarde alguns minutos. Verifique a pasta **Spam** ou **Lixo eletrônico**. Se não chegar, na tela de login clique em **Reenviar e-mail** (aparece depois de 60 segundos).
+
+**"Diz que o e-mail já existe"**
+Você já tem conta. Tente entrar com **Entrar com Google** (se cadastrou com Google) ou use **Esqueci minha senha** para criar uma nova senha.
+
+**"Quero vender, não comprar"**
+Este artigo é para quem quer comprar. Se você quer abrir uma loja, veja **[Cadastro de Parceiro (Loja)](/ajuda/login-registro/cadastro-parceiro)**.
 `
             },
             {
@@ -3062,15 +3061,114 @@ Depende do seu plano. Se você tentar cadastrar e atingir o limite, o sistema av
         articles: [
             {
                 id: "visao-geral-vitrine-online",
-                title: "Visão geral da Vitrine Online",
-                description: "Entenda como os produtos são ranqueados na Vitrine Online, quais fatores influenciam a posição e como melhorar a visibilidade.",
+                title: "Como configurar sua Vitrine Online",
+                description: "Onde ficam o banner, a logo, as fotos, o endereço e o fluxo de pedidos da sua vitrine.",
                 slug: "visao-geral-vitrine-online",
                 category: "vitrine-online",
                 content: `
-## Visão geral
-A **Vitrine Online** é a vitrine digital do seu negócio: o espaço onde os clientes encontram seus produtos e serviços, tanto na loja da sua marca quanto nas páginas de busca e exploração da Dudit.
+## O que é a Vitrine Online
+A **Vitrine Online** é a página da sua loja dentro da Dudit. É por ela que o cliente conhece o seu negócio, vê os produtos e serviços e faz o pedido.
 
-Para que os clientes encontrem com facilidade o que procuram, os produtos aparecem em uma **ordem de exibição** calculada automaticamente pelo sistema. Esse cálculo é o que chamamos de **ranqueamento**: uma forma justa e transparente de organizar o catálogo, dando destaque aos produtos mais relevantes para cada cliente, sem depender de intervenção manual.
+Existem duas coisas diferentes aqui:
+
+- **A vitrine em si**: a página da loja, com banner, logo, fotos e endereço. É o que este artigo ensina a configurar.
+- **A ordem dos produtos nas buscas**: em que posição cada produto aparece quando alguém procura. Isso tem um artigo próprio, indicado no fim desta página.
+
+## Onde configurar
+
+1. No painel, clique em **Configurações**.
+2. Clique em **Minha Vitrine**.
+
+A tela tem três abas: **Geral**, **Endereço** e a **Galeria de Fotos**.
+
+## Aba Geral
+
+### Status da Vitrine
+- **Vitrine Ativa**: seus anúncios aparecem e podem ser comprados normalmente.
+- **Vitrine Inativa**: seus anúncios ficam ocultos por um tempo. Útil quando você vai parar por alguns dias.
+
+> [!NOTE]
+> Se aparecer o aviso **Vitrine Online Desativada pela Administração**, quem ocultou a vitrine foi a equipe da Dudit, não você. O aviso mostra o motivo e até quando vale. O ERP continua funcionando normalmente. Para entender o caso, fale com o suporte.
+
+### Banner da Vitrine
+É a faixa larga que fica no topo da página da loja.
+
+| Item | Recomendação |
+| :--- | :--- |
+| Tamanho | **1400 x 300 pixels** |
+| Peso máximo | **3 MB** |
+| Formatos | PNG, JPG, WEBP ou AVIF |
+
+Passe o mouse sobre o banner e clique em **Trocar Banner**. Antes de salvar, você pode ajustar o corte da imagem.
+
+### Logo / Imagem de Perfil
+É o círculo que aparece ao lado do nome da loja.
+
+- Peso máximo: **3 MB**.
+- Formatos: PNG, JPG ou WEBP.
+- Clique no círculo para trocar a imagem. Para apagar, use o ícone de lixeira.
+
+### Pedidos fora do horário de funcionamento
+- **Receber pedidos normalmente**: o cliente pode comprar a qualquer hora, mesmo com a loja fechada.
+- **Bloquear pedidos com loja fechada**: o cliente só consegue comprar dentro do horário de funcionamento.
+
+> [!TIP]
+> O horário de funcionamento fica em **Configurações > Dados do Negócio**. Se você escolheu bloquear pedidos fora do horário, confira se os horários estão certos.
+
+### Fluxo operacional dos pedidos
+Aqui você escolhe como o pedido chega até você:
+
+| Opção | Como funciona | Combina com |
+| :--- | :--- | :--- |
+| **Gerenciar tudo na Dudit** | O cliente paga pelo checkout da Dudit e você acompanha pedido e pagamento pelo painel. | Quem quer controlar pedidos, estoque e financeiro em um lugar só. |
+| **Receber apenas pelo WhatsApp** | O cliente monta o pedido e é levado para o seu WhatsApp com a mensagem já escrita. | Quem prefere fechar a venda na conversa. |
+
+## Aba Endereço
+Digite o **CEP** e o endereço é preenchido sozinho. Confira rua, número, complemento, bairro e cidade antes de salvar.
+
+O endereço aparece para o cliente e ajuda a sua loja a ser encontrada por quem procura perto.
+
+## Galeria de Fotos
+Fotos do seu espaço, da sua equipe ou dos produtos. A quantidade de fotos depende do seu plano, e a própria tela mostra o limite.
+
+A primeira foto é a principal e aparece em destaque. Você pode trocar a ordem e remover fotos quando quiser.
+
+## Dicas para uma vitrine que vende
+- **Use um banner com a sua cara.** É a primeira coisa que o cliente vê.
+- **Deixe a logo nítida.** Imagem borrada passa impressão de descuido.
+- **Capriche nas fotos da galeria.** Mostre o ambiente, a equipe e os produtos.
+- **Mantenha o endereço certo.** É o que garante que você apareça nas buscas por perto.
+- **Escolha o fluxo de pedidos que você consegue atender.** Se ninguém fica de olho no WhatsApp, prefira o checkout da Dudit.
+
+## Problemas comuns
+
+**"Meu banner não sobe."**
+Confira o peso (até 3 MB) e o formato (PNG, JPG, WEBP ou AVIF). Imagens muito grandes precisam ser reduzidas antes.
+
+**"Mudei tudo, mas a página continua igual."**
+As alterações só valem depois de clicar em **Salvar**. Se você tentar sair sem salvar, o sistema avisa.
+
+**"Minha vitrine não aparece nas buscas da Dudit."**
+Confira se o status está **Vitrine Ativa** e se o endereço está preenchido. Vitrine inativa não aparece para os clientes.
+
+**"O cliente diz que não consegue finalizar o pedido."**
+Veja se a vitrine está ativa e, se você escolheu bloquear pedidos fora do horário, se o cliente não está tentando comprar fora do horário de funcionamento.
+
+## Quer saber por que um produto aparece em tal posição?
+A ordem dos produtos nas buscas é calculada pela própria plataforma. Para entender os critérios e melhorar a visibilidade, leia **[Por que meu produto aparece em tal posição](/ajuda/vitrine-online/ranqueamento-vitrine-online)**.
+`
+            },
+            {
+                id: "ranqueamento-vitrine-online",
+                title: "Por que meu produto aparece em tal posição",
+                description: "Entenda como os produtos são ranqueados na Vitrine Online, quais fatores influenciam a posição e como melhorar a visibilidade.",
+                slug: "ranqueamento-vitrine-online",
+                category: "vitrine-online",
+                content: `
+## Antes de começar
+Este artigo explica a **ordem** em que os produtos aparecem para quem procura na Dudit.
+
+Para personalizar a página da sua loja (banner, logo, fotos e pedidos), veja **[Como configurar sua Vitrine Online](/ajuda/vitrine-online/visao-geral-vitrine-online)**.
 
 ## Como os produtos são exibidos
 Um produto pode aparecer em diferentes lugares da Vitrine Online, e cada local usa critérios próprios para decidir a ordem:
@@ -4412,7 +4510,7 @@ Se o cliente tem **data de nascimento** cadastrada e o aniversário é **hoje** 
 ## Perguntas frequentes
 
 **Posso ver agendamentos e ordens de serviço do cliente aqui?**
-Não diretamente nesta tela. Em **Serviços > Agendamentos** ou **Ordens de Serviço**, use a busca pelo nome do cliente para filtrar os dele.
+Não diretamente nesta tela. Em **Serviços > Ordens de Serviço**, use a busca pelo nome do cliente para filtrar os dele.
 
 **O "Total Gasto" inclui pedidos cancelados?**
 Não. Só pedidos com situação diferente de "cancelado".
@@ -7544,97 +7642,86 @@ Não. Conforme os Termos de Uso, a plataforma Dudit atua como facilitadora tecno
         articles: [
             {
                 id: "como-integrar-tiny-erp-dudit",
-                title: "Como integrar o Tiny ERP com a Dudit (Estoque, Catálogo e Pedidos)",
-                description: "Aprenda a conectar sua conta do Tiny ERP à Dudit: sincronize estoque em tempo real, exporte pedidos automaticamente e emita notas fiscais com 0% de comissão.",
+                title: "Como conectar o Tiny ERP na Dudit",
+                description: "Passo a passo para ligar seu Tiny ERP à Dudit: estoque sincronizado, pedidos no Tiny e nota fiscal sem comissão.",
                 slug: "como-integrar-tiny-erp-dudit",
                 category: "integracoes",
                 content: `
-## Visão geral
+## O que faz essa integração
+O **Tiny ERP** é um sistema de gestão e emissão de nota fiscal muito usado no Brasil. Conectando ele na Dudit, você vende pelo seu catálogo ou vitrine (com **0% de comissão**) e o pedido cai direto no Tiny para você separar, emitir a nota e enviar.
 
-A Dudit oferece integração nativa com o **Tiny ERP**, um dos principais sistemas de gestão empresarial e emissão fiscal do Brasil. Com essa integração, você pode vender online no seu catálogo digital, na sua cidade ou para todo o Brasil pela Dudit com **0% de comissão por venda**, enquanto toda a sua operação de separação, controle de estoque centralizado e emissão de notas fiscais (NF-e) continua acontecendo perfeitamente dentro do Tiny ERP.
+Em resumo:
+- Venda na Dudit → pedido aparece no Tiny.
+- Estoque no Tiny → atualiza na Dudit (para não vender o que não tem).
+- Nota fiscal → você emite no Tiny com um clique.
 
-## Vantagens da integração
-
-*   **0% de comissão nas vendas:** Venda pelo catálogo da Dudit sem pagar porcentagens sobre seus pedidos.
-*   **Exportação automática de pedidos:** Cada venda aprovada na Dudit é enviada imediatamente para o Tiny ERP com dados completos do comprador (nome, CPF/CNPJ, endereço, telefone, itens comprados e valor do frete).
-*   **Emissão simplificada de NF-e:** Como os pedidos entram automaticamente no Tiny, você emite a nota fiscal eletrônica com um clique.
-*   **Sincronização de estoque:** O estoque dos seus produtos pode ser atualizado via webhooks ou sincronização periódica, evitando que você venda um produto esgotado.
-*   **Sincronização de status:** Se um pedido for cancelado ou alterado, a integração comunica o status entre as plataformas.
-
----
-
-## O que é necessário para integrar?
-
-1.  Uma conta ativa na Dudit com plano com acesso ao ERP.
-2.  Uma conta ativa no **Tiny ERP** (com módulo de API/Integrações disponível no seu plano do Tiny).
-3.  O **Token de API** gerado no painel do Tiny ERP.
+## O que você precisa antes de começar
+1. Conta na Dudit com **plano que tenha ERP** (Crescer ou Escalar).
+2. Conta ativa no **Tiny ERP** (o plano do Tiny precisa liberar o módulo de API/Integrações).
+3. O **Token de API** do Tiny (a "senha" que permite a Dudit falar com o Tiny).
 
 ---
 
-## Passo a passo para configurar a integração
+## Passo a passo
 
-### 1. Obter o Token de API no Tiny ERP
-
-1.  Acesse sua conta no [Tiny ERP](https://tiny.com.br).
-2.  No menu superior, vá em **Configurações** (ícone de engrenagem) > aba **Geral** > **API**.
-3.  Se ainda não houver um token gerado, clique em **Gerar Token**.
-4.  Copie o código do token de API exibido.
+### 1. Pegue o Token de API no Tiny
+1. Entre no [Tiny ERP](https://tiny.com.br).
+2. No menu superior, clique em **Configurações** (ícone de engrenagem) → aba **Geral** → **API**.
+3. Se não tiver token, clique em **Gerar Token**.
+4. **Copie** o código que aparecer.
 
 > [!IMPORTANT]
-> O Token de API é a chave de acesso do seu Tiny ERP. Mantenha-o em segurança e nunca compartilhe publicamente. Na Dudit, seu token é armazenado com criptografia de ponta a ponta.
+> Esse token é como uma senha do seu Tiny. Não compartilhe. Na Dudit ele fica guardado com criptografia.
 
-### 2. Conectar o Tiny ERP na Dudit
+### 2. Conecte na Dudit
+1. No painel da Dudit, vá em **ERP > Configurações > Integrações**.
+2. Ache o card do **Tiny ERP** e clique em **Conectar**.
+3. Cole o token que você copiou.
+4. Clique em **Salvar e Testar Conexão**. A Dudit verifica na hora se o token está válido.
 
-1.  Acesse o painel gestor da Dudit em **ERP > Configurações > Integrações**.
-2.  Localize o card do **Tiny ERP** e clique em **Conectar**.
-3.  Cole o **Token de API** que você copiou do Tiny ERP.
-4.  Clique em **Salvar e Testar Conexão**. O sistema fará uma validação imediata com os servidores do Tiny para confirmar que o token está ativo.
+### 3. Escolha o que sincronizar
+Depois de conectado, você verá três chaves liga/desliga:
 
-### 3. Configurar as opções de sincronização
-
-Após a conexão ser estabelecida, você pode ajustar as preferências de funcionamento:
-
-| Opção | Como funciona |
+| Opção | O que faz |
 | :--- | :--- |
-| **Sincronizar Estoque** | Atualiza automaticamente a quantidade em estoque na Dudit com base no saldo registrado no Tiny ERP. |
-| **Exportação Automática de Pedidos** | Envia novos pedidos confirmados na Dudit diretamente para a fila de pedidos do Tiny ERP sem necessidade de clique manual. |
-| **Depósito Padrão** | Permite escolher de qual depósito físico cadastrado no Tiny será considerada a contagem de estoque. |
+| **Sincronizar Estoque** | O saldo do Tiny passa a valer na Dudit. Se acaba no Tiny, fica indisponível aqui. |
+| **Exportar Pedidos Pagos** | Cada pedido aprovado na Dudit vai direto para a lista de pedidos do Tiny. |
+| **Depósito Padrão** | Se você tem vários depósitos no Tiny, escolha qual deles conta o estoque para a Dudit. |
 
-### 4. Configurar Webhooks de Estoque no Tiny ERP (Tempo Real)
+### 4. (Opcional) Estoque em tempo real com Webhook
+O webhook avisa a Dudit **na mesma hora** que o estoque muda no Tiny (compra de fornecedor, venda em outro canal, ajuste manual).
 
-Para que alterações de estoque feitas no Tiny (por compras de fornecedores ou vendas em outros canais) reflitam instantaneamente na Dudit:
+1. Na tela do Tiny na Dudit, copie a **URL de Webhook de Estoque**.
+2. No Tiny, vá em **Configurações > E-commerce > Webhooks**.
+3. Clique em adicionar webhook, escolha o evento **Estoque / Atualização de saldo de produto**.
+4. Cole a URL da Dudit e salve.
 
-1.  Na página de configuração do Tiny na Dudit, copie a **URL de Webhook de Estoque**.
-2.  No painel do Tiny, acesse **Configurações > E-commerce > Webhooks**.
-3.  Adicione um novo webhook para o evento **Estoque / Atualização de saldo de produto**.
-4.  Cole a URL fornecida pela Dudit e salve.
-
----
-
-## Como os pedidos chegam no Tiny ERP?
-
-Quando um cliente compra pelo seu catálogo ou vitrine na Dudit:
-
-1.  O pedido é criado com status aprovado/pago na Dudit.
-2.  A Dudit envia os dados do pedido com segurança, direto para a lista de pedidos do Tiny.
-3.  O pedido aparece em **Vendas > Pedidos de Venda** no Tiny ERP.
-4.  O Tiny faz a reserva do estoque correspondente e permite que você gere a etiqueta de envio e emita a Nota Fiscal Eletrônica (NF-e).
+> [!NOTE]
+> Sem o webhook, a Dudit ainda sincroniza o estoque, mas de tempos em tempos (não na hora). O webhook é só para quem precisa de tempo real.
 
 ---
 
-## Perguntas frequentes (FAQ)
+## O que acontece quando o cliente compra
+1. O pedido entra como **aprovado/pago** na Dudit.
+2. A Dudit manda os dados (cliente, itens, frete, endereço) para o Tiny.
+3. No Tiny, o pedido aparece em **Vendas > Pedidos de Venda**.
+4. O Tiny reserva o estoque e você já pode imprimir a etiqueta e emitir a **NF-e**.
 
-**A Dudit cobra taxa adicional para usar a integração com o Tiny ERP?**  
-Não. A integração com o Tiny ERP é nativa e está inclusa nos planos da Dudit, sem custo por transação e com 0% de comissão sobre os pedidos exportados.
+---
 
-**O que acontece se o cliente cancelar o pedido na Dudit?**  
-Se o pedido for cancelado na Dudit antes do faturamento, o status correspondente é atualizado no Tiny ERP para que o estoque reservado seja liberado.
+## Perguntas frequentes
 
-**Consigo importar meus produtos do Tiny ERP para a Dudit?**  
-Sim. A integração oferece suporte para carregar seu catálogo de produtos cadastrados no Tiny direto para a sua loja na Dudit, incluindo descrição, preço, SKU e fotos.
+**A Dudit cobra taxa extra para usar o Tiny?**
+Não. A integração já vem no plano da Dudit, sem custo por pedido e com **0% de comissão**.
 
-**Posso usar o PDV da Dudit e o Tiny ERP juntos?**  
-Sim! Você pode realizar vendas presenciais no PDV frente de caixa da Dudit no balcão e sincronizar o estoque com o Tiny, mantendo tudo integrado em um único lugar.
+**E se o cliente cancelar o pedido na Dudit?**
+Se ainda não faturou no Tiny, o status é atualizado lá e o estoque volta a ficar livre.
+
+**Consigo trazer meus produtos do Tiny para a Dudit?**
+Sim. Na tela de integração tem o botão **Sincronizar Produtos Agora**. Ele puxa nome, descrição, preço, SKU e fotos do Tiny para o seu catálogo.
+
+**Posso usar o PDV da Dudit (venda no balcão) junto com o Tiny?**
+Sim. Venda no PDV da Dudit e o estoque sincroniza com o Tiny. Tudo junto no mesmo lugar.
 `
             }
         ]

@@ -55,6 +55,7 @@ import {
     EMPTY_FILTER_STATE,
     LOJA_SEM_CATEGORIA,
     OUTROS_CATEGORY,
+    getExplorePathParts,
     getItemDistanceKm,
     getItemRating,
     isItemUncategorized,
@@ -68,6 +69,7 @@ import {
     matchesShippingFilter,
     mergeCategoryLists,
     parseFiltersFromParams,
+    resolveExploreRouteParts,
     serializeFiltersToParams,
     type CategoryLists,
     type DeliveryFilter,
@@ -84,22 +86,6 @@ const CATEGORY_GROUPS = [
     { name: "Serviços", groupType: "servicos", icon_url: null },
     { name: "Lojas", groupType: "vitrines", icon_url: null },
 ]
-
-/**
- * Extrai cidade e categoria do caminho vivo da URL (/explorar/[cidade]/[categoria]).
- *
- * O `useParams`/`usePathname` do App Router podem ficar defasados depois de um
- * pushState (eles refletem a árvore/RSC anterior). A URL do browser é sempre a
- * fonte mais atual, então a sincronia de estado usa ela como base.
- */
-function getLocationPartsFromPath(pathname: string): { city: string | null; category: string | null } {
-    const parts = (pathname || "").split("/").filter(Boolean)
-    if (parts[0] !== "explorar") return { city: null, category: null }
-    return {
-        city: parts[1] || null,
-        category: parts[2] || null,
-    }
-}
 
 /** UF (estado) de um slug de cidade ("sao-paulo-sp" -> "sp") ou "brasil". */
 function getStateFromCitySlug(citySlug: string | null | undefined): string {
@@ -533,16 +519,19 @@ export function ExplorarPageClient({
     }, [])
 
     useEffect(() => {
+        const livePathname = typeof window !== "undefined" ? window.location.pathname : null
+        if (livePathname !== null && !getExplorePathParts(livePathname)) {
+            return
+        }
+
         const urlType = searchParams.get("type") || "tudo"
         setCurrentType(urlType as any)
 
         // URL viva > params do router: os params podem estar defasados depois
         // de um pushState (o App Router mantém a árvore da rota anterior).
-        const live = typeof window !== "undefined"
-            ? getLocationPartsFromPath(window.location.pathname)
-            : { city: null, category: null }
-
-        const pathCity = live.city || slug[0] || null
+        // Quando a URL viva é uma rota /explorar, nunca fazer fallback para
+        // slug[0]/slug[1] — se a categoria foi removida, ela precisa ficar null.
+        const { city: pathCity, category: pathCategorySlug } = resolveExploreRouteParts(livePathname, slug)
         const urlCity = pathCity || searchParams.get("cidade") || null
         if (urlCity) {
             if (urlCity !== selectedCitySlug) {
@@ -555,7 +544,6 @@ export function ExplorarPageClient({
         const urlSection = searchParams.get("section")
         setSelectedSection(urlSection || null)
 
-        const pathCategorySlug = live.category || slug[1] || null
         const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : null
 
         let nextCats: string[] = []
@@ -580,17 +568,18 @@ export function ExplorarPageClient({
             prevParamsKeyRef.current = currentFilterKey
             triggerFilterLoading()
         }
-    }, [searchParams, params, triggerFilterLoading, applyFiltersFromUrl])
+    }, [pathname, searchParams, params, triggerFilterLoading, applyFiltersFromUrl])
 
     // Popstate listener to guarantee 0ms responsive Back/Forward sync with window.history.pushState
     useEffect(() => {
         const onPopState = () => {
             if (typeof window === "undefined") return
+            const live = getExplorePathParts(window.location.pathname)
+            if (!live) return
             triggerFilterLoading()
             const url = new URL(window.location.href)
-            const pathnameParts = url.pathname.replace(/^\/explorar\/?/, "").split("/").filter(Boolean)
-            const pCity = pathnameParts[0] || null
-            const pCatSlug = pathnameParts[1] || null
+            const pCity = live.city
+            const pCatSlug = live.category
             const pCat = pCatSlug ? (CATEGORY_SLUG_MAP[pCatSlug] || pCatSlug) : null
 
             const typeParam = url.searchParams.get("type") || "tudo"
