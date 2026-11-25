@@ -801,6 +801,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       notes,
       external_order_id,
       external_order_number,
+      external_provider,
       external_sync_status,
       order_items (
         id,
@@ -843,8 +844,12 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     return { success: false, error: orderErr?.message || "Pedido não encontrado" }
   }
 
-  // Se já foi exportado com sucesso, não duplica
-  if (order.external_sync_status === "synced" && order.external_order_id) {
+  // Se já foi exportado com sucesso para o Tiny, não duplica
+  if (
+    order.external_sync_status === "synced" &&
+    order.external_order_id &&
+    (!order.external_provider || order.external_provider === TINY_PROVIDER)
+  ) {
     return {
       success: true,
       tinyOrderId: order.external_order_id,

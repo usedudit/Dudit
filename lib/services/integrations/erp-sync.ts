@@ -22,12 +22,11 @@ export async function exportOrderToConnectedErps(orderId: string): Promise<void>
   const supabase = createAdminClient()
   const { data: order } = await supabase
     .from("orders")
-    .select("partner_id, external_sync_status, external_order_id")
+    .select("partner_id, external_provider, external_sync_status, external_order_id")
     .eq("id", orderId)
     .maybeSingle()
 
   if (!order?.partner_id) return
-  if (order.external_sync_status === "synced" && order.external_order_id) return
 
   const { data: activeIntegrations } = await supabase
     .from("partner_integrations")
@@ -38,15 +37,35 @@ export async function exportOrderToConnectedErps(orderId: string): Promise<void>
 
   const providers = new Set((activeIntegrations || []).map((r: any) => r.provider_slug))
 
-  if (providers.has(TINY_PROVIDER)) {
-    await exportDuditOrderToTiny(orderId).catch((err) => {
-      console.error("[erp-sync] Tiny export failed:", err)
-    })
+  const alreadySyncedTiny =
+    order.external_sync_status === "synced" &&
+    Boolean(order.external_order_id) &&
+    order.external_provider === TINY_PROVIDER
+
+  const alreadySyncedBling =
+    order.external_sync_status === "synced" &&
+    Boolean(order.external_order_id) &&
+    order.external_provider === BLING_PROVIDER
+
+  if (providers.has(TINY_PROVIDER) && !alreadySyncedTiny) {
+    try {
+      const res = await exportDuditOrderToTiny(orderId)
+      if (!res.success && res.error) {
+        console.error(`[erp-sync] Tiny export failed for order ${orderId}:`, res.error)
+      }
+    } catch (err) {
+      console.error(`[erp-sync] Tiny export exception for order ${orderId}:`, err)
+    }
   }
-  if (providers.has(BLING_PROVIDER)) {
-    await exportDuditOrderToBling(orderId).catch((err) => {
-      console.error("[erp-sync] Bling export failed:", err)
-    })
+  if (providers.has(BLING_PROVIDER) && !alreadySyncedBling) {
+    try {
+      const res = await exportDuditOrderToBling(orderId)
+      if (!res.success && res.error) {
+        console.error(`[erp-sync] Bling export failed for order ${orderId}:`, res.error)
+      }
+    } catch (err) {
+      console.error(`[erp-sync] Bling export exception for order ${orderId}:`, err)
+    }
   }
 }
 

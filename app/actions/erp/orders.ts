@@ -7040,9 +7040,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
       successfullyUpdatedOrderIds.add(String(order.id));
       deliveryProcessedCount += 1;
 
-      // Atualiza situação (enviado/entregue) e sincroniza estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling)
+      // Garante exportação do pedido (caso ainda não tenha sido enviado ao ERP), atualiza situação (enviado/entregue)
+      // e sincroniza estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling)
       import("@/lib/services/integrations/erp-sync")
-        .then(async ({ updateOrderStatusOnConnectedErps, syncStockToConnectedErps }) => {
+        .then(async ({ exportOrderToConnectedErps, updateOrderStatusOnConnectedErps, syncStockToConnectedErps }) => {
+          await exportOrderToConnectedErps(order.id);
           const erpSit = payload.statusValue === "delivered" ? "entregue" : "enviado";
           await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit });
           for (const it of order.order_items || []) {

@@ -1419,12 +1419,12 @@ async function processWebhookWithRetry(
         console.error("[WEBHOOK] Error creating transaction:", txErr.message)
       }
 
-      // ── Export order to Tiny ERP if configured ──
+      // ── Export order to connected ERPs (Tiny / Bling) if configured ──
       try {
-        const { exportDuditOrderToTiny } = await import("@/lib/services/integrations/tiny/tiny-integration")
-        await exportDuditOrderToTiny(orderId)
-      } catch (tinyErr: any) {
-        console.warn("[WEBHOOK] Tiny ERP export skipped or failed:", tinyErr?.message)
+        const { exportOrderToConnectedErps } = await import("@/lib/services/integrations/erp-sync")
+        await exportOrderToConnectedErps(orderId)
+      } catch (erpErr: any) {
+        console.warn("[WEBHOOK] ERP export skipped or failed:", erpErr?.message)
       }
     }
 
