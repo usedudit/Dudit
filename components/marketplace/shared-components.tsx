@@ -53,7 +53,7 @@ export const HeroBanner: React.FC<{ height?: number; href?: string }> = ({ href 
 
     return (
         <section className="mt-4 sm:mt-6 mb-8 sm:mb-12 px-4 lg:px-0 group flex justify-center w-full">
-            <IntentPrefetchLink href={href} className="cursor-pointer">
+            <IntentPrefetchLink href={href} aria-label="Explorar produtos na Dudit" className="cursor-pointer block w-full max-w-[1400px]">
                 {content}
             </IntentPrefetchLink>
         </section>
@@ -647,7 +647,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] text-white font-semibold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                 <span>{pricing.discountPercent}% OFF</span>
                             </div>
                         )}
@@ -1007,6 +1007,7 @@ export const HorizontalCarousel = ({
                             {showLeftArrow && (
                                 <Button
                                     onClick={() => scroll('left')}
+                                    aria-label="Anterior"
                                     variant="filled"
                                     size="icon"
                                     className="!w-8 !h-8"
@@ -1017,6 +1018,7 @@ export const HorizontalCarousel = ({
                             {showRightArrow && (
                                 <Button
                                     onClick={() => scroll('right')}
+                                    aria-label="Próximo"
                                     variant="filled"
                                     size="icon"
                                     className="!w-8 !h-8"

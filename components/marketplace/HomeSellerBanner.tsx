@@ -23,7 +23,7 @@ export function HomeSellerBanner() {
                             Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda com 0% de comissão. Sem taxas por pedido ou surpresas no fim do mês.
                         </p>
                         <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
-                            <Button asChild className="h-11">
+                            <Button asChild className="h-11 text-brand-dark font-bold">
                                 <Link href="/auth/login?mode=partner" prefetch={false}>
                                     Começar grátis
                                 </Link>
@@ -36,6 +36,10 @@ export function HomeSellerBanner() {
                         <img
                             src="https://img.dudit.com.br/static/mascots/Carousel2.png"
                             alt="Venda na Dudit"
+                            width={220}
+                            height={220}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-auto object-contain select-none"
                         />
                     </div>

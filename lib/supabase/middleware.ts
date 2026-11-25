@@ -504,6 +504,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
   response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(self), payment=()")
   response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
 
 
@@ -575,6 +576,7 @@ export async function middleware(request: NextRequest) {
             response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
             response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(self), payment=()")
             response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+            response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
             // Re-apply Cache-Control for private pages
             response.headers.set("Cache-Control", "private, no-store")
             response.headers.set("CDN-Cache-Control", "no-store")

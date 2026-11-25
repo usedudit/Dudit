@@ -1,4 +1,5 @@
 import MarketplaceHome from "@/components/marketplace/MarketplaceHomepage"
+import { HeroBanner } from "@/components/marketplace/shared-components"
 import { getHomeSections, type HomeSection } from "@/app/actions/marketplace/discover"
 import { resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { getCurrentUser } from "@/lib/auth/authorization"
@@ -113,12 +114,10 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
     )
 }
 
-function HomeFeedSkeleton() {
+function HomeFeedSkeleton({ exploreHref }: { exploreHref: string }) {
     return (
-        <div className="w-full bg-white flex-grow dark:bg-dark-surface">
-            <section className="mt-4 sm:mt-6 mb-8 sm:mb-12 px-4 lg:px-0 flex justify-center w-full">
-                <div className="w-full max-w-[1400px] rounded-xl lg:rounded-2xl bg-gray-100 animate-pulse aspect-[1400/300] dark:bg-dark-border/50 shadow-xs" />
-            </section>
+        <div className="w-full min-h-screen bg-white flex-grow dark:bg-dark-surface pb-28 lg:pb-12">
+            <HeroBanner href={exploreHref} />
             <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10 pb-12">
                 <div className="space-y-4">
                     <div className="h-6 w-48 bg-gray-200 rounded animate-pulse dark:bg-dark-border" />
@@ -227,24 +226,29 @@ export default async function HomePage() {
         } : null)
 
     const cartCount = sessionData?.cartCount || 0
+    const exploreHref = (isDefaultStateSP || citySlug === "brasil")
+        ? "/explorar/brasil"
+        : (citySlug ? `/explorar/${citySlug}` : "/explorar")
 
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[80px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading overflow-x-clip">
-            <h1 className="sr-only">
-                Dudit | Compre perto de você e receba de qualquer lugar do Brasil com 0% de comissão
-            </h1>
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 
-            <Suspense fallback={<HomeFeedSkeleton />}>
-                <ProductFeedWrapper
-                    user={user}
-                    userProfile={userProfile}
-                    cartCount={cartCount}
-                    citySlug={citySlug}
-                    cityName={cityName}
-                    savedCitySlug={savedCitySlug}
-                />
-            </Suspense>
+            <main className="flex-grow flex flex-col">
+                <h1 className="sr-only">
+                    Dudit | Compre perto de você e receba de qualquer lugar do Brasil com 0% de comissão
+                </h1>
+                <Suspense fallback={<HomeFeedSkeleton exploreHref={exploreHref} />}>
+                    <ProductFeedWrapper
+                        user={user}
+                        userProfile={userProfile}
+                        cartCount={cartCount}
+                        citySlug={citySlug}
+                        cityName={cityName}
+                        savedCitySlug={savedCitySlug}
+                    />
+                </Suspense>
+            </main>
 
             <MarketplaceFooter />
         </div>

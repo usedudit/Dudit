@@ -202,37 +202,37 @@ export function MarketplaceBottomMenu() {
                 >
                     <IntentPrefetchLink
                         href="/"
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-[#0d5e49] dark:text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
+                        <HomeIcon size={22} className={isHomeActive ? "text-[#0d5e49] dark:text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Início</span>
                     </IntentPrefetchLink>
 
                     <IntentPrefetchLink
                         href={explorePath}
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-[#0d5e49] dark:text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
+                        <SearchIcon size={22} className={isExploreActive ? "text-[#0d5e49] dark:text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Explorar</span>
                     </IntentPrefetchLink>
 
                     <IntentPrefetchLink
                         href="/pedidos"
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-[#0d5e49] dark:text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
+                        <Package size={22} className={isOrdersActive ? "text-[#0d5e49] dark:text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Pedidos</span>
                     </IntentPrefetchLink>
 
                     <button
                         onClick={() => setIsMenuOpen(true)}
-                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
+                        className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isMenuOpen ? "text-[#0d5e49] dark:text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
-                        <MenuIcon size={22} className={isMenuOpen ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
+                        <MenuIcon size={22} className={isMenuOpen ? "text-[#0d5e49] dark:text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Menu</span>
                     </button>
                 </nav>

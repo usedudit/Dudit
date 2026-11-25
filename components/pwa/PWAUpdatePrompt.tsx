@@ -22,11 +22,30 @@ export function PWAUpdatePrompt() {
       return
     }
 
-    navigator.serviceWorker
-      .register("/sw.js", { updateViaCache: "none" })
-      .catch((error) => {
-        console.error("[PWA] Service worker registration failed:", error)
-      })
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        // Verifica se /sw.js existe como script JS antes de registrar.
+        // Quando DISABLE_PWA ou BUILD_FOR_RENDER está ativo, o arquivo não é
+        // gerado e /sw.js responde HTML 404, gerando SecurityError no console.
+        const probe = await fetch("/sw.js", { method: "HEAD", cache: "no-store" })
+        const contentType = probe.headers.get("content-type") || ""
+        if (cancelled || !probe.ok || !contentType.includes("javascript")) {
+          return
+        }
+
+        await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })
+      } catch (error) {
+        if (!cancelled) {
+          console.error("[PWA] Service worker registration failed:", error)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [pathname])
 
   return null

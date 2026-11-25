@@ -1011,7 +1011,11 @@ const Header: React.FC<HeaderProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <IntentPrefetchLink href="/sacola" className="shrink-0 relative text-white p-1 flex items-center justify-center cursor-pointer">
+                                    <IntentPrefetchLink
+                                        href="/sacola"
+                                        aria-label={cartCount > 0 ? `Sacola (${cartCount} itens)` : "Sacola"}
+                                        className="shrink-0 relative text-white p-1 flex items-center justify-center cursor-pointer"
+                                    >
                                         <ShoppingBagIcon size={18} strokeWidth={2} />
                                         {cartCount > 0 && (
                                             <span className="absolute -top-1 -right-1 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
@@ -1086,6 +1090,7 @@ const Header: React.FC<HeaderProps> = ({
                             >
                                 <button
                                     type="submit"
+                                    aria-label="Buscar"
                                     className="text-brand-green dark:text-brand-green shrink-0 p-1 mr-1 hover:opacity-80 transition-opacity"
                                     title="Buscar"
                                 >
@@ -1294,9 +1299,10 @@ const Header: React.FC<HeaderProps> = ({
                         <img
                             src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                             alt="Dudit"
-                            width={140}
+                            width={120}
                             height={40}
-                            className="h-10 w-auto object-contain"
+                            fetchPriority="high"
+                            className="h-10 w-[120px] object-contain"
                         />
                     </IntentPrefetchLink>
 
@@ -1338,6 +1344,7 @@ const Header: React.FC<HeaderProps> = ({
 
                             <Button
                                 type="submit"
+                                aria-label="Buscar"
                                 onClick={() => handleSearch()}
                                 className="h-[34px] w-[34px] p-0 flex items-center justify-center mr-1 rounded-full bg-brand-green hover:bg-brand-green/90"
                             >

@@ -18,6 +18,7 @@ import {
 } from "@/lib/moderation/image-cache"
 import { decideImageStatus } from "@/lib/moderation/image-decision"
 import { Buffer } from "buffer"
+import sharp from "sharp"
 
 const ALLOWED_UPLOAD_MIME_TYPES: readonly string[] = [
   "image/png",
@@ -271,12 +272,46 @@ async function handleUpload(request: NextRequest) {
       return NextResponse.json({ error: decision.message }, { status: 400 })
     }
 
+    const isDirect = request.nextUrl.searchParams.get("directUpload") === "true"
+
+    // =============================
+    // Otimização server-side com sharp (WebP + redimensionamento por tipo)
+    // Reduz peso no R2 sem consumir cota de transformações da Cloudflare.
+    // Mantém o buffer original intacto em directUpload (o cliente faz o PUT direto).
+    // =============================
+    let uploadBuffer = buffer
+    let uploadMimeType = mimeType
+    let uploadExtension = extension
+
+    if (!isDirect) {
+      const resizeLimits: Record<string, { width: number; height: number }> = {
+        "partner-logo": { width: 256, height: 256 },
+        "partner-banner": { width: 1200, height: 400 },
+        "products": { width: 1200, height: 1200 },
+      }
+      const limits = resizeLimits[uploadType] || resizeLimits.products
+      try {
+        uploadBuffer = await sharp(buffer)
+          .rotate()
+          .resize(limits.width, limits.height, {
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .webp({ quality: 82 })
+          .toBuffer()
+        uploadMimeType = "image/webp"
+        uploadExtension = "webp"
+      } catch (optError) {
+        console.warn("[upload-image] Falha ao otimizar com sharp, mantendo original:", optError)
+      }
+    }
+
     // =============================
     // Nome seguro (server-generated, ignoring client name)
     // =============================
     const timestamp = Date.now()
     const random = Math.random().toString(36).substring(2, 8)
-    const filename = `${timestamp}-${random}.${extension}`
+    const filename = `${timestamp}-${random}.${uploadExtension}`
 
     // =============================
     // Determinar prefixo da pasta
@@ -295,7 +330,7 @@ async function handleUpload(request: NextRequest) {
     try {
       signedUrl = await generateSignedUploadUrl({
         fileName: filename,
-        fileType: mimeType,
+        fileType: uploadMimeType,
         userId: userId,
         prefix: prefix,
         expiresIn: 120, // 2 minutes - enough for server-side upload
@@ -307,12 +342,6 @@ async function handleUpload(request: NextRequest) {
         { status: 500 }
       )
     }
-
-    // =============================
-    // Upload - set correct Content-Type for browser safety
-    // if directUpload is requested (or universally for direct upload mode), return the uploadUrl
-    // =============================
-    const isDirect = request.nextUrl.searchParams.get("directUpload") === "true"
 
     // Registra status da imagem em cache de chave/URL (apenas se moderação foi executada com sucesso)
     if (!moderationUnavailable) {
@@ -345,9 +374,9 @@ async function handleUpload(request: NextRequest) {
       method: "PUT",
       headers: {
         "Content-Type": signedUrl.contentType,
-        "Content-Length": buffer.length.toString(),
+        "Content-Length": uploadBuffer.length.toString(),
       },
-      body: new Uint8Array(buffer),
+      body: new Uint8Array(uploadBuffer),
     })
 
     if (!uploadResponse.ok) {

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { getAvatarColor, getUserInitials } from "@/lib/utils/avatar"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -23,16 +24,24 @@ export function UserProfileImage({
   imageUrl?: string | null
   style?: React.CSSProperties
 }) {
+  const [imageError, setImageError] = useState(false)
   const initials = getUserInitials(fullName)
   const backgroundColor = getAvatarColor(fullName)
   const rawImageUrl = typeof imageUrl === "string" ? imageUrl.trim() : ""
-  const hasImage = rawImageUrl.length > 0 && !rawImageUrl.includes("Placeholder.png")
+  const hasImage = !imageError && rawImageUrl.length > 0 && !rawImageUrl.includes("Placeholder.png")
   const normalizedImageUrl = hasImage ? getR2ImageUrl(rawImageUrl) : ""
 
   if (hasImage) {
     return (
       <div className={`overflow-hidden rounded-full ${className}`} style={style} title={fullName}>
-        <img src={normalizedImageUrl} alt={fullName} className="h-full w-full object-cover" />
+        <img
+          src={normalizedImageUrl}
+          alt={fullName}
+          loading="lazy"
+          decoding="async"
+          onError={() => setImageError(true)}
+          className="h-full w-full object-cover"
+        />
       </div>
     )
   }

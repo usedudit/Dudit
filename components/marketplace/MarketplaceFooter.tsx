@@ -37,11 +37,13 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
                     <div className="md:w-1/3">
                         <Link href="/" prefetch={false} className="inline-block mb-6">
                             <img
-                                src="https://img.dudit.com.br/static/Logo.png"
+                                src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                                 alt="Dudit"
-                                width={140}
+                                width={120}
                                 height={40}
-                                className="h-10 w-auto object-contain"
+                                loading="lazy"
+                                decoding="async"
+                                className="h-10 w-[120px] object-contain"
                             />
                         </Link>
                         <p className="text-gray-400 dark:text-dark-body text-sm leading-relaxed max-w-sm">
@@ -76,7 +78,7 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
 
                         {/* Coluna 1: Comprar e Vender */}
                         <div>
-                            <h4 className="text-sm font-semibold text-white mb-6">Comprar e Vender</h4>
+                            <h2 className="text-sm font-semibold text-white mb-6">Comprar e Vender</h2>
                             <ul className="space-y-3">
                                 <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar produtos e cidades</Link></li>
                                 <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Criar minha loja grátis</Link></li>
@@ -88,7 +90,7 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
 
                         {/* Coluna 2: Calculadoras para Negócios */}
                         <div>
-                            <h4 className="text-sm font-semibold text-white mb-6">Calculadoras do Negócio</h4>
+                            <h2 className="text-sm font-semibold text-white mb-6">Calculadoras do Negócio</h2>
                             <ul className="space-y-3">
                                 <li><Link href="/ferramentas/calculadora-taxas-marketplace" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Calculadora de Taxas</Link></li>
                                 <li><Link href="/ferramentas/calculadora-margem-lucro-preco-venda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Preço de Venda & Markup</Link></li>
@@ -100,7 +102,7 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
 
                         {/* Coluna 3: A Dudit */}
                         <div>
-                            <h4 className="text-sm font-semibold text-white mb-6">A Dudit</h4>
+                            <h2 className="text-sm font-semibold text-white mb-6">A Dudit</h2>
                             <ul className="space-y-3">
                                 <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Como a Dudit funciona</Link></li>
                                 <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Por que a Dudit existe</Link></li>
