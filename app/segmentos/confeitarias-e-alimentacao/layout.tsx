@@ -10,7 +10,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Sistema Dudit para Confeitarias e Alimentação",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Sistema para Confeitarias e Pequena Alimentação | Dudit",
         description: "Catálogo de encomendas, controle de estoque e vendas sem comissão.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao",

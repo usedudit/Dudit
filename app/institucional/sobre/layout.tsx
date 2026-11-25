@@ -14,7 +14,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Sobre a Dudit - Sistema de Gestão e Vendas",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Sobre a Dudit | Sistema de Gestão e Vendas Locais e Nacionais",
         description: "Conheça a Dudit: plataforma brasileira de gestão comercial e vendas com 0% de taxa. Venda na sua região com entrega local ou para todo o Brasil via transportadoras e Correios.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/institucional/sobre",

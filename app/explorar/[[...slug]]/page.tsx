@@ -70,7 +70,7 @@ export async function generateMetadata({
 
     // Base site name and OG image
     const ogSiteName = "Dudit"
-    const defaultOgImage = "https://img.dudit.com.br/static/og-image.png"
+    const defaultOgImage = "https://dudit.com.br/og-image.png"
 
     const buildExploreMetadata = (title: string, description: string, ogTitle?: string): Metadata => {
         const resolvedOgTitle = ogTitle || `${title} | ${ogSiteName}`

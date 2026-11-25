@@ -13,7 +13,7 @@ import BlogArticle from "@/components/blog/BlogArticle"
 export const revalidate = 300
 
 const BASE_URL = "https://dudit.com.br"
-const DEFAULT_OG_IMAGE = "https://img.dudit.com.br/static/og-image.png"
+const DEFAULT_OG_IMAGE = "https://dudit.com.br/og-image.png"
 
 type Props = {
     params: Promise<{ slug: string }>

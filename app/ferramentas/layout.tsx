@@ -10,7 +10,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Ferramentas Gratuitas Dudit",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Ferramentas Gratuitas para Lojistas e MEIs | Dudit",
         description: "Calculadoras de taxas, markup, ponto de equilíbrio e gerador de link wa.me para pequenos comerciantes.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/ferramentas",

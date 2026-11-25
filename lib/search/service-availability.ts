@@ -31,6 +31,33 @@ export interface ServiceAttendanceRule {
 
 const MAX_SERVICES_TO_CHECK = 20
 const CANCELLED_STATUSES = new Set(["cancelado", "cancelled", "canceled", "no-show", "no_show", "recusado"])
+const MIN_LEAD_TIME_MINUTES = 15
+
+function getBrazilNowInfo(now: Date): { todayYmd: string; currentMinutes: number } {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(now)
+  const year = parts.find((p) => p.type === "year")?.value ?? String(now.getUTCFullYear())
+  const month = parts.find((p) => p.type === "month")?.value ?? String(now.getUTCMonth() + 1).padStart(2, "0")
+  const day = parts.find((p) => p.type === "day")?.value ?? String(now.getUTCDate()).padStart(2, "0")
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0)
+  return {
+    todayYmd: `${year}-${month}-${day}`,
+    currentMinutes: hour * 60 + minute,
+  }
+}
+
+function roundUpToInterval(minutes: number, interval: number): number {
+  return Math.ceil(minutes / interval) * interval
+}
 
 function formatMinutesToTime(totalMinutes: number): string {
   const clamped = Math.max(0, Math.min(23 * 60 + 59, Math.round(totalMinutes)))
@@ -117,9 +144,11 @@ export function computeWindowAvailability(params: {
   bookedIntervals: BookedInterval[]
   timeWindow: ParsedTimeWindow
   durationMinutes?: number | null
+  now?: Date
 }): Pick<ServiceAvailabilityInfo, "status" | "label" | "availableSlots"> {
   const { openingHours, bookedIntervals, timeWindow } = params
   const duration = Math.max(30, Math.min(180, Number(params.durationMinutes) || 60))
+  const now = params.now ?? new Date()
 
   if (!openingHours || typeof openingHours !== "object") {
     return {
@@ -157,13 +186,22 @@ export function computeWindowAvailability(params: {
     }
   }
 
-  const windowStart = Math.max(openFrom, timeWindow.startMinutes)
+  let windowStart = Math.max(openFrom, timeWindow.startMinutes)
   const windowEnd = Math.min(openTo, timeWindow.endMinutes)
+
+  // Se a data alvo é hoje (horário de Brasília), nunca sugerir horários que já passaram
+  const { todayYmd, currentMinutes } = getBrazilNowInfo(now)
+  if (timeWindow.targetDate === todayYmd) {
+    const earliestToday = roundUpToInterval(currentMinutes + MIN_LEAD_TIME_MINUTES, 30)
+    windowStart = Math.max(windowStart, earliestToday)
+  }
 
   if (windowEnd - windowStart < 30) {
     return {
-      status: "closed",
-      label: `Fechado ${timeWindow.label}`,
+      status: timeWindow.targetDate === todayYmd ? "busy" : "closed",
+      label: timeWindow.targetDate === todayYmd
+        ? `Sem mais horários ${timeWindow.label}`
+        : `Fechado ${timeWindow.label}`,
       availableSlots: [],
     }
   }

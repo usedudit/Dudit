@@ -22,7 +22,7 @@ export const metadata: Metadata = {
         type: "website",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Blog do Dino — Dudit",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
         title: "Blog do Dino | Dicas para pequenos negócios",
         description:
             "Dicas práticas de segurança, finanças, fotos e gestão para quem toca um pequeno negócio no Brasil.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
 }
 
@@ -68,7 +68,7 @@ export default async function BlogPage({ searchParams }: Props) {
                     headline: post.title,
                     description: post.excerpt || post.subtitle || post.title,
                     url: `${CANONICAL}/${post.slug}`,
-                    image: post.cover_image_url || "https://img.dudit.com.br/static/og-image.png",
+                    image: post.cover_image_url || "https://dudit.com.br/og-image.png",
                     datePublished: post.published_at,
                     dateModified: post.updated_at,
                     author: {

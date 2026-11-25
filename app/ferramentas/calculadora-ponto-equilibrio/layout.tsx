@@ -10,7 +10,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Calculadora de Ponto de Equilíbrio",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Calculadora de Ponto de Equilíbrio | Dudit",
         description: "Calcule o ponto de equilíbrio financeiro do seu negócio gratuitamente.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/ferramentas/calculadora-ponto-equilibrio",

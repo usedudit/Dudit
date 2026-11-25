@@ -67,6 +67,35 @@ describe("computeWindowAvailability", () => {
     })
     expect(res.status).toBe("consult")
   })
+
+  it("nunca retorna horários passados quando a data alvo é hoje", () => {
+    // 25/11/2026 às 14:13 BRT (17:13 UTC)
+    const nowAt1413 = new Date("2026-11-25T17:13:00Z")
+    const todayAny: ParsedTimeWindow = {
+      targetDate: "2026-11-25",
+      dayOfWeekKey: "wednesday",
+      period: "any",
+      startMinutes: 8 * 60,
+      endMinutes: 18 * 60,
+      label: "hoje",
+    }
+
+    const res = computeWindowAvailability({
+      openingHours: {
+        wednesday: { enabled: true, from: "08:00", to: "18:00" },
+      },
+      bookedIntervals: [],
+      timeWindow: todayAny,
+      durationMinutes: 60,
+      now: nowAt1413,
+    })
+
+    expect(res.status).toBe("available")
+    // 14:13 + 15min = 14:28 -> arredonda para 14:30 (nunca 13:00 ou 14:00!)
+    expect(res.availableSlots[0]).toBe("14:30")
+    expect(res.availableSlots).not.toContain("13:00")
+    expect(res.availableSlots).not.toContain("14:00")
+  })
 })
 
 describe("evaluateServiceAttendance", () => {

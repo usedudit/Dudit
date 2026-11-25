@@ -66,6 +66,8 @@ CROSS JOIN (
     ('automotive_services', 'oficina mecanica'),
     ('automotive_services', 'mecanico'),
     ('automotive_services', 'autocenter'),
+    ('automotive_services', 'auto center'),
+    ('automotive_services', 'automotivo'),
     ('automotive_services', 'alinhamento'),
     ('automotive_services', 'balanceamento'),
     ('automotive_services', 'troca de oleo'),

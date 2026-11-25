@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { Button, Badge } from "@/components/reusable"
 import { FilterIcon } from "@/lib/icons"
 import { X, ListOrdered } from "lucide-react"
@@ -17,6 +18,7 @@ interface ExplorarViewControlsProps {
     onOpenSort: () => void
     hasActiveFilters: boolean
     activeFilterChips?: ActiveFilterChip[]
+    leadingBadge?: React.ReactNode
 }
 
 export function ExplorarViewControls({
@@ -24,6 +26,7 @@ export function ExplorarViewControls({
     onOpenSort,
     hasActiveFilters,
     activeFilterChips = [],
+    leadingBadge,
 }: ExplorarViewControlsProps) {
     return (
         <div className="flex items-center justify-between gap-4 mb-6">
@@ -48,13 +51,14 @@ export function ExplorarViewControls({
                     Ordenar
                 </Button>
 
-                {hasActiveFilters && (
+                {(hasActiveFilters || Boolean(leadingBadge)) && (
                     <div className="h-8 w-px bg-gray-100 dark:bg-dark-border/50 shrink-0" />
                 )}
 
                 {/* Active filter badges (horizontal scroll) */}
                 <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
                     <div className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full">
+                        {leadingBadge}
                         <AnimatePresence>
                             {activeFilterChips.map((chip) => (
                                 <motion.div

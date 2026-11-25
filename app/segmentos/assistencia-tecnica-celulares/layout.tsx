@@ -10,7 +10,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Sistema Dudit para Assistência Técnica",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Sistema para Assistência Técnica de Celulares e TI | Dudit",
         description: "OS com fotos no celular, aprovação no WhatsApp e controle de peças sem taxas.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/segmentos/assistencia-tecnica-celulares",

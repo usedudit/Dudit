@@ -25,7 +25,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
             },
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
         creator: "@usedudit",
         title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
         description: "Compre perto de você ou de lojas que enviam para todo o Brasil com 0% de comissão.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br",

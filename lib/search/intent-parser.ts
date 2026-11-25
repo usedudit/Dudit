@@ -173,13 +173,13 @@ const PRODUCT_PATTERNS: RegExp[] = [
  * Funciona em 0ms sem IA e complementa `marketplace_synonym_groups` no Postgres.
  */
 const DOMAIN_ASSOCIATIONS: Record<string, string[]> = {
-  pneu: ["borracharia", "autocenter", "oficina mecanica", "automotivo"],
-  pneus: ["borracharia", "autocenter", "oficina mecanica", "automotivo"],
-  bateria: ["autoeletrica", "autocenter", "oficina mecanica", "automotivo"],
-  oleo: ["oficina mecanica", "autocenter", "troca de oleo", "automotivo"],
-  freio: ["oficina mecanica", "autocenter", "automotivo"],
-  pastilha: ["oficina mecanica", "autocenter", "automotivo"],
-  amortecedor: ["oficina mecanica", "autocenter", "automotivo"],
+  pneu: ["borracharia", "auto center", "autocenter", "oficina mecanica", "automotivo"],
+  pneus: ["borracharia", "auto center", "autocenter", "oficina mecanica", "automotivo"],
+  bateria: ["autoeletrica", "auto center", "autocenter", "oficina mecanica", "automotivo"],
+  oleo: ["oficina mecanica", "auto center", "autocenter", "troca de oleo", "automotivo"],
+  freio: ["oficina mecanica", "auto center", "autocenter", "automotivo"],
+  pastilha: ["oficina mecanica", "auto center", "autocenter", "automotivo"],
+  amortecedor: ["oficina mecanica", "auto center", "autocenter", "automotivo"],
   chuveiro: ["eletricista", "materiais eletricos", "hidraulica"],
   tomada: ["eletricista", "materiais eletricos"],
   disjuntor: ["eletricista", "materiais eletricos"],

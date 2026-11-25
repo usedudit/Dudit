@@ -1095,6 +1095,12 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
 
     // Prazo de entrega (em dias) -> dataPrevista no Bling (o Bling calcula "Prazo de entrega" automaticamente a partir de dataPrevista)
     const rawDeliveryDays =
+      breakdown?.deliveryMaxDays ??
+      breakdown?.delivery_max_days ??
+      breakdown?.deliveryMinDays ??
+      breakdown?.delivery_min_days ??
+      breakdown?.deliveryDays ??
+      breakdown?.delivery_days ??
       breakdown?.deliveryTime ??
       breakdown?.delivery_time ??
       breakdown?.deadline ??

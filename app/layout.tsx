@@ -79,7 +79,7 @@ export const metadata: Metadata = {
             "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP, agendamento, OS e envios locais ou para todo o Brasil.",
         images: [
             {
-                url: "/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Dudit - Gestão Comercial e Vendas Locais e Nacionais",
@@ -93,7 +93,7 @@ export const metadata: Metadata = {
         title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
         description:
             "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP, agendamento, OS e envios locais ou para todo o Brasil.",
-        images: ["/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     verification: {
         google: "hXFfOouvlwKXKhn4_MYJofV6FPW6",

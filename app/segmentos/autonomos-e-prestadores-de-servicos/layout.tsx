@@ -10,7 +10,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Sistema Dudit para Autônomos e Prestadores de Serviços",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Sistema para Autônomos e Prestadores de Serviços | Dudit",
         description: "Orçamentos em PDF, agenda online, vitrine de serviços e clientes organizados.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/segmentos/autonomos-e-prestadores-de-servicos",

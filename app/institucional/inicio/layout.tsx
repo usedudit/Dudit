@@ -14,7 +14,7 @@ export const metadata: Metadata = {
         siteName: "Dudit",
         images: [
             {
-                url: "https://img.dudit.com.br/static/og-image.png",
+                url: "https://dudit.com.br/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Dudit - Gestão Comercial e Vendas Locais e Nacionais",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Taxa)",
         description: "Sistema de vendas e gestão com 0% de comissão: PDV, Tiny ERP e Bling, catálogo digital, agendamento, OS e envios locais ou nacionais.",
-        images: ["https://img.dudit.com.br/static/og-image.png"],
+        images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/institucional/inicio",

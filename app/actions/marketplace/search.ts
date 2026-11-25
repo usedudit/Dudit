@@ -462,6 +462,72 @@ export const searchMarketplaceDirectFull = cache(async (
         })
     )
 
+    // Fase 1 (Associação produto <-> vitrines): ex. "pneu" traz borracharias / auto centers / oficinas relacionadas
+    if (
+        hasTextQuery &&
+        isFirstPage &&
+        searchIntent &&
+        searchIntent.relatedTerms.length > 0 &&
+        (type === "tudo" || type === "vitrines")
+    ) {
+        const existingLocalStoreIds = new Set(
+            localResults.filter((r: any) => r.itemType === "loja").map((r: any) => String(r.id))
+        )
+        const existingDistantStoreIds = new Set(
+            (distantRes.results || []).filter((r: any) => r.itemType === "loja").map((r: any) => String(r.id))
+        )
+        const relatedStoreTerms = searchIntent.relatedTerms.slice(0, 4)
+
+        const [relatedLocalBatches, relatedDistantBatches] = await Promise.all([
+            existingLocalStoreIds.size < 4
+                ? Promise.all(
+                    relatedStoreTerms.map((term) =>
+                        _searchMarketplaceCore(term, "vitrines", {
+                            ...limits,
+                            vitrines: 4,
+                            centerCoords: finalCoords,
+                        }).catch(() => ({ results: [] }))
+                    )
+                )
+                : Promise.resolve([]),
+            shouldFetchDistant && existingDistantStoreIds.size < 4
+                ? Promise.all(
+                    relatedStoreTerms.map((term) =>
+                        _searchMarketplaceCore(term, "vitrines", {
+                            vitrines: 6,
+                        }).catch(() => ({ results: [] }))
+                    )
+                )
+                : Promise.resolve([]),
+        ])
+
+        for (const batch of relatedLocalBatches) {
+            for (const store of batch.results || []) {
+                if (store.itemType !== "loja") continue
+                const sid = String(store.id)
+                if (existingLocalStoreIds.has(sid)) continue
+                if (!isItemWithinSearchScope(store, {
+                    city: localScopeCity?.city ?? null,
+                    state: localScopeCity?.state ?? null,
+                    center: finalCoords,
+                    radius: limits.radius ?? null,
+                })) continue
+                existingLocalStoreIds.add(sid)
+                localResults.push(store)
+            }
+        }
+
+        for (const batch of relatedDistantBatches) {
+            for (const store of batch.results || []) {
+                if (store.itemType !== "loja") continue
+                const sid = String(store.id)
+                if (existingLocalStoreIds.has(sid) || existingDistantStoreIds.has(sid)) continue
+                existingDistantStoreIds.add(sid)
+                distantRes.results = [...(distantRes.results || []), store]
+            }
+        }
+    }
+
     let resultsWithDistance = enrichMarketplaceDistance(localResults, finalCoords)
 
     // Fase 2: Quando a intenção é serviço (ou há janela de horário), prioriza serviços e checa disponibilidade real nos top 20

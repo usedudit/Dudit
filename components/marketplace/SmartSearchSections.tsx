@@ -1,11 +1,12 @@
 "use client"
 
 import React from "react"
-import { Calendar, Clock, MapPin, Package, Sparkles, Truck } from "lucide-react"
+import { MapPin, Sparkles, Truck } from "lucide-react"
+import { Badge, Tooltip } from "@/components/reusable"
 import type { ParsedSearchIntent } from "@/lib/search/intent-parser"
 import type { ProximityRingsResult } from "@/lib/search/proximity-rings"
 
-interface SmartSearchIntentBannerProps {
+interface SmartSearchBadgeProps {
   query: string
   searchIntent: ParsedSearchIntent | null
   nearbyCount: number
@@ -14,10 +15,10 @@ interface SmartSearchIntentBannerProps {
 }
 
 /**
- * Faixa contextual leve exibida quando a busca detecta intenção em linguagem natural,
- * janela de horário/agendamento (serviços) ou anéis de proximidade/envio nacional.
+ * Badge verde compacta (apenas ícone Sparkles) para a barra de filtros,
+ * exibindo os detalhes da busca inteligente apenas no Tooltip ao passar o mouse.
  */
-export const SmartSearchIntentBanner: React.FC<SmartSearchIntentBannerProps> = ({
+export const SmartSearchBadge: React.FC<SmartSearchBadgeProps> = ({
   query,
   searchIntent,
   nearbyCount,
@@ -36,60 +37,39 @@ export const SmartSearchIntentBanner: React.FC<SmartSearchIntentBannerProps> = (
     return null
   }
 
-  return (
-    <div className="mb-4 rounded-xl border border-brand-border/80 dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/20 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
-      <div className="flex flex-wrap items-center gap-2 text-brand-dark dark:text-dark-heading">
+  const tooltipContent = (
+    <div className="space-y-1.5 text-left">
+      <div className="font-semibold">
         {isServiceMode ? (
-          <Calendar className="w-3.5 h-3.5 text-brand-green shrink-0" />
+          <>
+            Busca inteligente · Modo serviço ({searchIntent.cleanQuery})
+            {searchIntent.timeWindow ? ` · ${searchIntent.timeWindow.label}` : ""}
+          </>
         ) : (
-          <Sparkles className="w-3.5 h-3.5 text-brand-green shrink-0" />
+          <>Busca inteligente por proximidade ({searchIntent.cleanQuery})</>
         )}
-        <span className="font-medium">
-          {isServiceMode ? (
-            <>
-              Modo serviço para <strong className="font-bold">{searchIntent.cleanQuery}</strong>
-              {searchIntent.timeWindow ? (
-                <>
-                  {" "}
-                  · <span className="text-brand-green font-semibold">{searchIntent.timeWindow.label}</span>
-                </>
-              ) : null}
-            </>
-          ) : (
-            <>
-              Buscando <strong className="font-bold">{searchIntent.cleanQuery}</strong> por proximidade
-            </>
-          )}
-        </span>
       </div>
-
-      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-brand-inactive-text dark:text-dark-body">
-        {nearbyCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-background border border-brand-border dark:border-dark-border px-2 py-0.5">
-            <MapPin className="w-3 h-3 text-brand-green" />
-            {nearbyCount} perto de você
-          </span>
-        )}
-        {regionalCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-background border border-brand-border dark:border-dark-border px-2 py-0.5">
-            <Package className="w-3 h-3 text-brand-dark/70 dark:text-dark-body" />
-            {regionalCount} na região
-          </span>
-        )}
-        {nationalShippingCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-background border border-brand-border dark:border-dark-border px-2 py-0.5">
-            <Truck className="w-3 h-3 text-brand-green" />
-            {nationalShippingCount} enviam p/ seu CEP
-          </span>
-        )}
+      <div className="opacity-85 space-y-0.5 text-[11px]">
+        {nearbyCount > 0 && <div>• {nearbyCount} resultado(s) perto de você</div>}
+        {regionalCount > 0 && <div>• {regionalCount} em cidades vizinhas</div>}
+        {nationalShippingCount > 0 && <div>• {nationalShippingCount} enviam para o seu CEP</div>}
         {isServiceMode && searchIntent.timeWindow && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-brand-green/10 text-brand-green font-medium px-2 py-0.5">
-            <Clock className="w-3 h-3" />
-            Agenda verificada
-          </span>
+          <div>• Horários futuros verificados na agenda</div>
         )}
       </div>
     </div>
+  )
+
+  return (
+    <Tooltip text={tooltipContent}>
+      <span
+        tabIndex={0}
+        aria-label="Detalhes da busca inteligente"
+        className="inline-flex shrink-0 cursor-default outline-none"
+      >
+        <Badge variant="green" icon={<Sparkles />} className="w-7 h-7 p-1.5" />
+      </span>
+    </Tooltip>
   )
 }
 

@@ -6,7 +6,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
 import type { LocationContext } from "@/lib/utils/location-label"
-import { IconPlaceholder, DefaultModal, SkeletonLoader, ListItem, Input, RadioButton, Button, ThreeDotsLoader } from "@/components/reusable"
+import { IconPlaceholder, DefaultModal, ListItem, Input, RadioButton, Button, ThreeDotsLoader } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
@@ -33,7 +33,7 @@ import { fetchAllMarketplaceCategoriesClient } from "@/lib/data/marketplace-cate
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
-import { SmartSearchIntentBanner, ProximityRingsSection } from "./SmartSearchSections"
+import { SmartSearchBadge, ProximityRingsSection } from "./SmartSearchSections"
 import type { ParsedSearchIntent } from "@/lib/search/intent-parser"
 import type { ProximityRingsResult } from "@/lib/search/proximity-rings"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
@@ -1909,16 +1909,17 @@ export function ExplorarPageClient({
                                 onOpenSort={handleOpenSort}
                                 hasActiveFilters={activeFiltersCount > 0}
                                 activeFilterChips={activeFilterChips}
-                            />
-                        )}
-
-                        {!!query && searchIntent && (
-                            <SmartSearchIntentBanner
-                                query={query}
-                                searchIntent={searchIntent}
-                                nearbyCount={rawItems.length}
-                                regionalCount={(proximityRings?.regional.length ?? 0) + (proximityRings?.regionalSellers.length ?? 0)}
-                                nationalShippingCount={proximityRings?.nationalShipping.length ?? 0}
+                                leadingBadge={
+                                    !!query && searchIntent ? (
+                                        <SmartSearchBadge
+                                            query={query}
+                                            searchIntent={searchIntent}
+                                            nearbyCount={rawItems.length}
+                                            regionalCount={(proximityRings?.regional.length ?? 0) + (proximityRings?.regionalSellers.length ?? 0)}
+                                            nationalShippingCount={proximityRings?.nationalShipping.length ?? 0}
+                                        />
+                                    ) : null
+                                }
                             />
                         )}
 

@@ -27,19 +27,59 @@ export const helpCategories: HelpCategory[] = [
                 slug: "acessando-sistema",
                 category: "boas-vindas",
                 content: `
-## Como fazer login na plataforma pela primeira vez?
+## Primeira vez na Dudit?
 
-![Primeiro acesso ao Portal](https://img.dudit.com.br/static/Help_Login_FirstAccess.png)
+Bem-vindo(a)! 👋
 
-### Primeiro acesso ao Portal
+Existem dois caminhos diferentes, e o primeiro passo é saber qual é o seu:
 
-Se este é o seu primeiro acesso, você precisará criar uma senha.
+- Você **já tem uma conta** (recebeu um convite da equipe, da loja ou já se cadastrou antes) e só precisa entrar.
+- Você **ainda não tem conta** e vai criar agora, do zero.
 
-Não se preocupe, é simples! 🤩
+## Caminho 1: já tenho conta, mas nunca acessei
 
-Apenas acesse a página do portal gestor clicando aqui: https://dudit.com.br/auth/login
+Se a sua conta foi criada por outra pessoa (por exemplo, o dono da loja te convidou para a equipe) e você nunca entrou, o caminho é este:
 
-* Na página de login, clique em "ESQUECI MINHA SENHA".
+1. Acesse https://dudit.com.br/auth/login
+2. Clique em **Esqueci minha senha**.
+3. Digite o e-mail que está cadastrado.
+4. Você recebe um e-mail com um link. Clique nele.
+5. Crie uma senha e confirme.
+
+Depois disso, é só entrar normalmente com o e-mail e a senha nova.
+
+> [!TIP]
+> Não achou o e-mail? Olhe na caixa de spam e no lixo eletrônico. O link costuma chegar em poucos minutos.
+
+## Caminho 2: quero criar uma conta nova
+
+Se você nunca teve conta na Dudit:
+
+1. Acesse https://dudit.com.br/auth/login
+2. Clique em **Crie a sua**.
+3. Preencha e-mail e senha, e aceite os termos.
+4. Confirme o e-mail que a Dudit enviar.
+5. Pronto, você já pode entrar.
+
+Para vender, depois de criar a conta você escolhe o formato do seu negócio. Veja o guia **Cadastro de Parceiro (Loja)**.
+
+## Entrar com Google
+
+O jeito mais rápido: clique em **Entrar com Google** e escolha a sua conta. Você não precisa criar nem lembrar de senha.
+
+> [!IMPORTANT]
+> Use sempre o mesmo e-mail. Se você entrar com um Google diferente do e-mail da sua conta, o sistema pode criar uma conta nova em vez de abrir a que você já tinha.
+
+## Problemas comuns
+
+**"Diz que meu e-mail ou senha estão errados."**
+Confira se não sobrou espaço no começo ou no fim do e-mail. Se continuar, use **Esqueci minha senha**.
+
+**"Não recebi o e-mail."**
+Veja spam e lixo eletrônico. Se a conta foi criada pelo Google, não existe senha para recuperar: entre pelo botão **Entrar com Google**.
+
+**"A página pede uma verificação."**
+É a proteção contra robôs. Basta marcar a caixinha que aparece antes de entrar.
 `
             }
         ]
@@ -158,35 +198,101 @@ Aguarde alguns minutos. Verifique o **Spam**. Tente "Reenviar e-mail" após 60 s
                 category: "login-registro",
                 content: `
 ## Visão geral
-O **Assistente de Cadastro de Parceiro** guia você por 4 etapas simples para configurar sua vitrine e painel de gestão.
 
-![Wizard de Cadastro](https://img.dudit.com.br/static/Help_PartnerWizard.png)
+Na Dudit você pode entrar como **cliente** (para comprar) ou como **lojista** (para vender).
+Este guia é sobre o cadastro de lojista: o caminho para criar sua vitrine e começar a vender.
 
-## Como usar (Passo a Passo)
+O cadastro é rápido. Dependendo do que você escolher, são **3 ou 5 passos**.
 
-### Etapa 1: Criar sua conta
-Se você ainda não tem conta, começará informando seu e-mail e criando uma senha forte.
+## Antes de começar
 
-### Etapa 2: Sobre seu negócio
-*   **Logo:** Escolha uma imagem quadrada.
-*   **Nome da Loja:** Como seus clientes te encontrarão.
-*   **WhatsApp:** O número principal para contato.
-*   **Descrição:** Conte sobre o que você oferece.
+Tenha em mãos:
 
-### Etapa 3: Como seu negócio funciona?
-1.  **O que você oferece:** "Produtos", "Serviços" ou ambos.
-2.  **Modo de uso:** "Anunciar Rápido" ou "Gerenciar meu negócio (ERP)".
+- Um e-mail que você usa sempre.
+- O **WhatsApp** que seus clientes vão usar para falar com você.
+- O **endereço** do seu negócio (ou só a sua cidade, se for vender desapegos).
+- Uma **foto ou logo** da sua loja (opcional).
 
-### Etapa 4: Onde fica seu negócio?
-Informe o endereço completo. Digite o **CEP** para preenchimento automático.
+## Como fazer
 
-## Regras e comportamentos
-*   **Validação de Imagem:** Logos maiores que 3MB serão bloqueadas.
-*   **Finalização:** Você será redirecionado para o Dashboard.
+### Passo 1: Criar sua conta
 
-## Dicas
-> [!TIP]
-> No campo **Descrição**, use palavras-chave que seus clientes usariam para buscar seus produtos.
+Você pode criar a conta de duas formas:
+
+- **Com e-mail e senha:** digite o e-mail, escolha uma senha e aceite os termos.
+- **Com Google:** clique em **Entrar com Google** e escolha a conta. É mais rápido e você não precisa decorar mais uma senha.
+
+Se você já está logado na Dudit, esse passo é pulado.
+
+### Passo 2: Como você quer começar?
+
+Aqui você escolhe o formato do seu negócio. Essa escolha define quais ferramentas aparecem no seu painel:
+
+| Opção | Para quem é | O que você ganha |
+| :--- | :--- | :--- |
+| **Anúncio Rápido / Desapego** | Quem quer vender itens usados ou poucos produtos, sem complicação | Uma página simples para anunciar e receber contato pelo WhatsApp |
+| **Vitrine Online** | Quem quer uma loja com a sua marca | Vitrine personalizada, produtos, pedidos e cupons |
+| **Gerenciar meu negócio** | Quem precisa de controle completo | Tudo da vitrine, mais financeiro, estoque, equipe e relatórios |
+
+Escolha a opção mais parecida com o que você precisa hoje. Depois você pode ligar ou desligar ferramentas em **Configurações > Gerenciar recursos**.
+
+### Passo 3 (Desapego): seus dados de contato
+
+Se você escolheu **Anúncio Rápido / Desapego**, o cadastro termina aqui. Informe:
+
+- Seu nome de vendedor.
+- Seu **WhatsApp**.
+- **CEP**, cidade e bairro (é assim que os compradores da sua região te encontram).
+
+Pronto: sua página de anúncios já está no ar.
+
+### Passo 3 (Vitrine e Gerenciar): sobre seu negócio
+
+Se você escolheu **Vitrine Online** ou **Gerenciar meu negócio**, informe:
+
+- **Logo ou foto de perfil** (opcional, até 3 MB).
+- **Nome da loja ou marca.**
+- **WhatsApp comercial.**
+- **Descrição curta** da loja: o que você vende e para quem.
+
+### Passo 4: qual a categoria do seu negócio?
+
+Escolha a categoria principal e a subcategoria (por exemplo, "Confeitaria" ou "Assistência técnica"). É isso que ajuda os clientes a te encontrarem nas buscas.
+
+### Passo 5: onde fica seu negócio?
+
+Digite o **CEP** e o endereço é preenchido sozinho. Confira rua, número, complemento, bairro, cidade e estado antes de finalizar.
+
+## Depois de finalizar
+
+Você vai direto para a tela **Início**. Lá aparece um guia rápido perguntando o que você quer fazer primeiro — por exemplo, vender no balcão, controlar estoque ou receber pedidos pela internet.
+
+Suas respostas ligam as ferramentas certas no menu, então você não precisa procurar nada.
+
+## Problemas comuns
+
+**"Minha logo não sobe."**
+A imagem precisa ter no máximo **3 MB** e estar em PNG, JPG, WEBP ou AVIF.
+
+**"Não consigo avançar de etapa."**
+Confira os campos com asterisco (*). Nome da loja e WhatsApp são obrigatórios.
+
+**"Escolhi a opção errada."**
+Não tem problema. Vá em **Configurações > Gerenciar recursos** e ative ou desative as ferramentas que quiser usar.
+
+**"Esqueci qual e-mail usei."**
+Tente entrar com o Google. Se a conta foi criada com o Google, é só clicar em **Entrar com Google**.
+
+## Perguntas frequentes
+
+**Preciso pagar para criar minha loja?**
+Não. A conta e a vitrine são gratuitas. Os planos pagos liberam recursos extras, como financeiro completo, relatórios, comissões e várias lojas.
+
+**Posso vender produto e serviço ao mesmo tempo?**
+Sim. Você cadastra os dois, e cada um aparece na área certa para o cliente.
+
+**Uso a mesma conta para comprar e vender?**
+Sim. A mesma conta serve para as duas coisas.
 `
             }
         ]
@@ -274,7 +380,7 @@ Cada pedido reúne as informações completas da venda: itens, cliente, valores,
 
 ## Como criar um pedido
 
-1. No menu lateral, clique em **Vendas > Pedidos**.
+1. No menu lateral, clique em **Vendas > Pedidos e Vendas**.
 2. Clique no botão **Novo pedido**.
 
 3. **Selecione o cliente** - Busque por nome, email ou telefone. Se o cliente ainda não estiver cadastrado, você pode criá-lo na hora.
@@ -608,8 +714,9 @@ O **caixa** é o controle do dinheiro físico (e dos recebimentos) do seu PDV. A
 
 ## Como abrir o caixa
 
-1. No menu lateral, clique em **Vendas > PDV**.
-2. Se não houver um caixa aberto, o sistema exibe a tela de abertura.
+1. Abra o **PDV** (menu **Vendas > PDV (Frente de Caixa)**).
+2. Clique no **ícone de caixa** no topo da tela, do lado direito. Ele só aparece quando você está dentro do PDV.
+3. Se não houver um caixa aberto, a tela **Controle de Caixa** aparece com o botão **Abrir Caixa**.
 
 3. Informe o **valor inicial** (troco) - é o dinheiro que você está colocando no caixa para começar o dia.
 4. Opcionalmente, adicione uma **observação** (ex: "Abertura com R$ 200,00 de troco").
@@ -650,7 +757,7 @@ Após fechar, o caixa não pode mais ser usado. Uma nova sessão precisará ser 
 
 ## Histórico de sessões
 
-Você pode consultar todas as sessões de caixa anteriores em **Vendas > Caixa > Histórico**. Lá encontra:
+Na mesma tela do **Controle de Caixa**, logo abaixo dos botões, fica a lista com todas as sessões anteriores. Lá você encontra:
 
 - Data e hora de abertura e fechamento.
 - Quem abriu e quem fechou.
@@ -920,7 +1027,7 @@ Quando um cliente precisa devolver um produto, trocar por outro ou solicitar ree
 
 ## Como criar uma solicitação
 
-1. No menu lateral, clique em **Vendas > Devoluções e trocas**.
+1. No menu lateral, clique em **Vendas > Devoluções**.
 2. Clique em **Nova solicitação**.
 
 3. **Selecione o pedido** - Busque pelo número do pedido ou localize na lista de pedidos pagos.
@@ -998,7 +1105,7 @@ Depois que uma solicitação de devolução ou troca é criada, cabe à gestão 
 
 ## Como analisar uma solicitação
 
-1. No menu lateral, clique em **Vendas > Devoluções e trocas**.
+1. No menu lateral, clique em **Vendas > Devoluções**.
 2. Localize a solicitação com status **Pendente análise** ou **Em análise**.
 3. Clique para abrir os detalhes.
 
@@ -1126,7 +1233,7 @@ O sistema sugere agrupamentos de pedidos por região (CEP ou bairro) para otimiz
 
 ### Cadastrar um entregador
 
-1. No menu lateral, clique em **Vendas > Expedição e entregas**.
+1. No menu lateral, clique em **Vendas > Expedição e Entregas**.
 2. Acesse a seção **Entregadores**.
 3. Clique em **Novo entregador**.
 
@@ -1338,7 +1445,7 @@ O sistema também pode **lançar bônus automaticamente** quando a meta é ating
 
 ## Como criar uma meta
 
-1. No menu lateral, clique em **Vendas > Metas**.
+1. No menu lateral, clique em **Desempenho > Metas**.
 2. Clique em **Nova meta**.
 
 3. Preencha as informações:
@@ -1393,7 +1500,7 @@ Quando você ativa o **lançamento automático** na criação da meta:
 
 1. O sistema monitora o progresso continuamente.
 2. Assim que o valor da meta é atingido, o bônus é lançado como uma **despesa financeira** na conta selecionada.
-3. O lançamento aparece na seção **Financeiro > Transações** com a descrição "Bônus por meta atingida".
+3. O lançamento aparece na seção **Financeiro > Movimentações** com a descrição "Bônus por meta atingida".
 
 Isso elimina a necessidade de calcular e lançar manualmente o bônus de cada vendedor no fim do mês.
 
@@ -1411,7 +1518,7 @@ Isso elimina a necessidade de calcular e lançar manualmente o bônus de cada ve
 As vendas precisam estar com status **Pago** ou **Parcialmente pago** para contar na meta. Verifique o status dos pedidos.
 
 **"Não consigo ativar o lançamento automático."**
-Você precisa ter uma **conta financeira do tipo caixa** configurada em **Financeiro > Contas**. Crie uma conta e depois edite a meta para ativar o lançamento automático.
+Você precisa ter uma **conta financeira do tipo caixa** configurada em **Financeiro > Cadastros financeiros**. Crie uma conta e depois edite a meta para ativar o lançamento automático.
 
 ## Perguntas frequentes
 
@@ -7070,7 +7177,7 @@ Antes de criar sua primeira entrega, verifique se está tudo certo:
 
 ### Como cadastrar
 
-1. Acesse **Vendas > Expedição e entregas**
+1. Acesse **Vendas > Expedição e Entregas**
 2. Clique em **Entregadores**
 3. Clique em **Novo entregador**
 4. Preencha:
@@ -7109,7 +7216,7 @@ Você pode oferecer entrega gratuita:
 - **Sempre** - Defina a taxa como R$ 0
 
 Para configurar entrega grátis acima de um valor:
-1. Vá em **Configurações > Entregas**
+1. Vá em **Configurações > Logística e Entrega**
 2. Preencha **"Limite para entrega grátis"** (ex: 50)
 3. Salve
 

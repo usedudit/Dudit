@@ -241,51 +241,6 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                     />
                                                 </div>
                                             </div>
-
-                                            <div className="hidden lg:flex gap-3 pt-2">
-                                                <Button className="flex-1 h-12" onClick={onEdit} leftIcon={<EditIcon size={18} />}>
-                                                    Editar
-                                                </Button>
-                                                <Dropdown
-                                                    trigger={
-                                                        <Button variant="outline" className="flex-1 h-12">
-                                                            <ThreeDotsIcon size={18} />
-                                                        </Button>
-                                                    }
-                                                    align="right"
-                                                    showChevron={false}
-                                                >
-                                                    <DropdownItem onClick={handlePrint}>
-                                                        <PrinterIcon size={14} /> Imprimir
-                                                    </DropdownItem>
-                                                    <DropdownItem onClick={handleDownloadPdf} disabled={isDownloading}>
-                                                        <DownloadIcon size={14} /> {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
-                                                    </DropdownItem>
-                                                </Dropdown>
-                                            </div>
-                                        </div>
-
-                                        {/* Mobile footer actions */}
-                                        <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
-                                            <Button className="flex-1 h-12" onClick={onEdit} leftIcon={<EditIcon size={18} />}>
-                                                Editar
-                                            </Button>
-                                            <Dropdown
-                                                trigger={
-                                                    <Button variant="outline" className="flex-1 h-12">
-                                                        <ThreeDotsIcon size={18} />
-                                                    </Button>
-                                                }
-                                                align="right"
-                                                showChevron={false}
-                                            >
-                                                <DropdownItem onClick={handlePrint}>
-                                                    <PrinterIcon size={14} /> Imprimir
-                                                </DropdownItem>
-                                                <DropdownItem onClick={handleDownloadPdf} disabled={isDownloading}>
-                                                    <DownloadIcon size={14} /> {isDownloading ? "Gerando..." : "PDF"}
-                                                </DropdownItem>
-                                            </Dropdown>
                                         </div>
                                     </div>
 
