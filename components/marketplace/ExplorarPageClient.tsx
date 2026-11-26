@@ -6,34 +6,28 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
 import type { LocationContext } from "@/lib/utils/location-label"
-import { IconPlaceholder, DefaultModal, ListItem, Input, RadioButton, Button, ThreeDotsLoader } from "@/components/reusable"
+import { IconPlaceholder, DefaultModal, ThreeDotsLoader } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
-import {
-    MapPin,
-    Check,
-    ChevronDown,
-    Globe,
-} from "lucide-react"
+import { Check } from "lucide-react"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 import { applyVendorUrgencyBadges } from "@/lib/marketplace/badges"
-import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch } from "@/app/actions/marketplace/search"
+import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { pushUrl } from "@/lib/navigation/history"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
-import { SearchIcon, XIcon } from "@/lib/icons"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
-import { getCitiesData } from "@/lib/data/cities-loader"
 import { fetchAllMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
 import { SmartSearchBadge, ProximityRingsSection } from "./SmartSearchSections"
+import { ExplorarCityModal, ExplorarDemandModal } from "./ExplorarModals"
 import type { ParsedSearchIntent } from "@/lib/search/intent-parser"
 import type { ProximityRingsResult } from "@/lib/search/proximity-rings"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
@@ -76,7 +70,6 @@ import {
     type ExploreFilterState,
 } from "./explorar-filters"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
-import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
 import { trackEvent } from "@/lib/analytics"
 
 // Navegação por grupo na página inicial de Explorar (modo "Tudo").
@@ -102,6 +95,11 @@ interface ExplorarPageClientProps {
     initialMoreDistantItems?: any[]
     initialSearchIntent?: ParsedSearchIntent | null
     initialProximityRings?: ProximityRingsResult<any> | null
+    initialCategories?: {
+        products: { id?: string; name: string; icon_url: string | null }[]
+        services: { id?: string; name: string; icon_url: string | null }[]
+        partners: { id?: string; name: string; icon_url: string | null }[]
+    }
     initialSection?: string
     query?: string
     type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos'
@@ -123,6 +121,7 @@ export function ExplorarPageClient({
     initialMoreDistantItems = [],
     initialSearchIntent = null,
     initialProximityRings = null,
+    initialCategories,
     initialSection,
     query = '',
     type = 'tudo',
@@ -219,9 +218,15 @@ export function ExplorarPageClient({
     const [searchIntent, setSearchIntent] = useState<ParsedSearchIntent | null>(initialSearchIntent)
     const [proximityRings, setProximityRings] = useState<ProximityRingsResult<any> | null>(initialProximityRings)
 
-    const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
-    const [dbServiceCategories, setDbServiceCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
-    const [dbPartnerCategories, setDbPartnerCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
+    const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>(
+        () => initialCategories?.products || []
+    )
+    const [dbServiceCategories, setDbServiceCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>(
+        () => initialCategories?.services || []
+    )
+    const [dbPartnerCategories, setDbPartnerCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>(
+        () => initialCategories?.partners || []
+    )
 
     const locationContext = useMemo<LocationContext | null>(() => {
         const currentCity = selectedCitySlug || pathCity || null
@@ -269,7 +274,12 @@ export function ExplorarPageClient({
         return found?.name || value
     }, [dbCategories, dbServiceCategories, dbPartnerCategories])
 
-    const categoriesLoadedRef = useRef(false)
+    const categoriesLoadedRef = useRef(
+        Boolean(
+            initialCategories &&
+            (initialCategories.products.length > 0 || initialCategories.services.length > 0 || initialCategories.partners.length > 0)
+        )
+    )
 
     useEffect(() => {
         if (categoriesLoadedRef.current) return
@@ -282,17 +292,14 @@ export function ExplorarPageClient({
         })
     }, [])
 
-    // Modal states
+    // Modal states (os estados internos de digitação dos modais de cidade e demanda ficam isolados em ExplorarModals)
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
-    const [showStateList, setShowStateList] = useState(false)
-    const [showStateDropdown, setShowStateDropdown] = useState(false)
-    const [selectedStateFilter, setSelectedStateFilter] = useState<string>(() => getStateFromCitySlug(cidade || pathCity || null))
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-    const stateDropdownRef = useRef<HTMLDivElement>(null)
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [hasMountedFilters, setHasMountedFilters] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
     const [hasMountedSort, setHasMountedSort] = useState(false)
+    const [isDemandModalOpen, setIsDemandModalOpen] = useState(false)
 
     const handleOpenFilters = useCallback(() => {
         setHasMountedFilters(true)
@@ -312,54 +319,9 @@ export function ExplorarPageClient({
         if (isSortBottomSheetOpen && !hasMountedSort) setHasMountedSort(true)
     }, [isSortBottomSheetOpen, hasMountedSort])
 
-    // Demand modal states
-    const [isDemandModalOpen, setIsDemandModalOpen] = useState(false)
-    const [isDemandThankYouOpen, setIsDemandThankYouOpen] = useState(false)
-    const [selectedDemandType, setSelectedDemandType] = useState<string>("comprar")
-    const [demandTerm, setDemandTerm] = useState("")
-    const [isSubmittingDemand, setIsSubmittingDemand] = useState(false)
-    const isSubmittingDemandRef = useRef(false)
-
-    // City search input
-    const [citySearchText, setCitySearchText] = useState("")
-    const [citiesData, setCitiesData] = useState<string[]>([])
-
-    // Resolve city accents from DB when modal opens
-    const cityAccentFetchDoneRef = useRef(false)
-    useEffect(() => {
-        if (!isCityModalOpen) return
-        getCitiesData().then((cities) => {
-            setCitiesData(cities)
-            if (!cityAccentFetchDoneRef.current) {
-                cityAccentFetchDoneRef.current = true
-                resolveCityAccentBatch(cities.slice(0, 200)).then((resolved) => {
-                    if (Object.keys(resolved).length > 0) {
-                        setCityAccentCache((prev) => ({ ...prev, ...resolved }))
-                    }
-                }).catch(() => { })
-            }
-        }).catch(() => { })
-    }, [isCityModalOpen])
-
-    // Close state dropdown on outside click
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (stateDropdownRef.current && !stateDropdownRef.current.contains(e.target as Node)) {
-                setShowStateDropdown(false)
-            }
-        }
-        if (showStateDropdown) {
-            document.addEventListener("mousedown", handleClickOutside)
-            return () => document.removeEventListener("mousedown", handleClickOutside)
-        }
-    }, [showStateDropdown])
-
-    // Reset dropdown when modal closes
-    useEffect(() => {
-        if (!isCityModalOpen) {
-            setShowStateDropdown(false)
-        }
-    }, [isCityModalOpen])
+    const handleCityAccentsResolved = useCallback((resolved: Record<string, string>) => {
+        setCityAccentCache((prev) => ({ ...prev, ...resolved }))
+    }, [])
 
     // Filters state
     const [promoOn, setPromoOn] = useState(false)
@@ -757,7 +719,8 @@ export function ExplorarPageClient({
         threshold: 0,
     })
 
-    const normalizedInitialResults = useMemo(() => {
+    const normalizeMarketplaceItems = useCallback((items: any[]) => {
+        if (!Array.isArray(items) || items.length === 0) return []
         const userId = userProfile?.userId || null
 
         const normalizeItemType = (item: any) => {
@@ -773,7 +736,7 @@ export function ExplorarPageClient({
             return rawType
         }
 
-        const normalized = rawItems.map((item: any) => {
+        const normalized = items.map((item: any) => {
             const itemType = normalizeItemType(item)
             if (itemType === "loja") {
                 // Vitrine sem categoria cadastrada chega do servidor com o rótulo
@@ -800,9 +763,18 @@ export function ExplorarPageClient({
             }
         })
 
-        // Apply urgency badges (Destaque, Últimos X) to products
-        return applyVendorUrgencyBadges(normalized, userId)
-    }, [rawItems, userProfile?.userId])
+        // Apply urgency & merit-based highlight badges (respecting server-assigned badges)
+        return applyVendorUrgencyBadges(normalized, userId, {
+            maxHighlights: 4,
+            maxHighlightRatio: 0.05,
+            onePerStore: true,
+        })
+    }, [userProfile?.userId])
+
+    const normalizedInitialResults = useMemo(
+        () => normalizeMarketplaceItems(rawItems),
+        [normalizeMarketplaceItems, rawItems]
+    )
 
     const productCategories = useMemo(
         () => (dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES),
@@ -830,30 +802,30 @@ export function ExplorarPageClient({
         return itemMatchesCategory(item, activeCat)
     }, [selectedCategories, isUncategorized])
 
-    const { vitrinesDestaque, dataToFilter } = useMemo(() => {
+    const { rawVitrinesDestaque, dataToFilter } = useMemo(() => {
         if (currentType === 'vitrines') {
             const list = normalizedInitialResults.filter(r => r.itemType === 'loja')
-            return { vitrinesDestaque: [], dataToFilter: list }
+            return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'produtos') {
             const list = normalizedInitialResults.filter(r => r.itemType === 'produto')
-            return { vitrinesDestaque: [], dataToFilter: list }
+            return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'servicos') {
             const list = normalizedInitialResults.filter(r => r.itemType === 'servico')
-            return { vitrinesDestaque: [], dataToFilter: list }
+            return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'planos') {
             const list = normalizedInitialResults.filter(r => r.itemType === 'plano')
-            return { vitrinesDestaque: [], dataToFilter: list }
+            return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'negocios') {
             const list = normalizedInitialResults.filter(r => r.itemType === 'loja')
-            return { vitrinesDestaque: [], dataToFilter: list }
+            return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'bem-avaliados') {
@@ -861,12 +833,12 @@ export function ExplorarPageClient({
             const sortedItems = [...allItems]
                 .sort((a, b) => (b.rating || 0) - (a.rating || 0))
                 .slice(0, 20)
-            return { vitrinesDestaque: [], dataToFilter: sortedItems }
+            return { rawVitrinesDestaque: [], dataToFilter: sortedItems }
         }
 
         if (currentType === 'em-oferta') {
             const list = normalizedInitialResults.filter(r => r.itemType !== 'loja' && r.originalPrice !== undefined && r.originalPrice > r.price)
-            return { vitrinesDestaque: [], dataToFilter: list }
+            return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'em-alta') {
@@ -874,7 +846,7 @@ export function ExplorarPageClient({
             const sortedItems = [...allItems]
                 .sort((a, b) => (b.sales_last_30_days || 0) - (a.sales_last_30_days || 0))
                 .slice(0, 20)
-            return { vitrinesDestaque: [], dataToFilter: sortedItems }
+            return { rawVitrinesDestaque: [], dataToFilter: sortedItems }
         }
 
         if (currentType === 'novos-anunciados') {
@@ -886,25 +858,22 @@ export function ExplorarPageClient({
                     return dateB.getTime() - dateA.getTime()
                 })
                 .slice(0, 20)
-            return { vitrinesDestaque: [], dataToFilter: sortedItems }
+            return { rawVitrinesDestaque: [], dataToFilter: sortedItems }
         }
 
         if (currentType === 'tudo') {
-            // As vitrines em destaque também respeitam a categoria selecionada
-            // (inclusive "Outros", que mostra as lojas sem categoria).
             const vitrines = normalizedInitialResults
                 .filter(r => r.itemType === 'loja')
-                .filter(matchesSelectedCategory)
             const sortedVitrines = [...vitrines]
                 .sort((a, b) => (b.rating || 0) - (a.rating || 0))
                 .slice(0, 20)
             const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
-            return { vitrinesDestaque: sortedVitrines, dataToFilter: list }
+            return { rawVitrinesDestaque: sortedVitrines, dataToFilter: list }
         }
 
         const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
-        return { vitrinesDestaque: [], dataToFilter: list }
-    }, [normalizedInitialResults, currentType, matchesSelectedCategory])
+        return { rawVitrinesDestaque: [], dataToFilter: list }
+    }, [normalizedInitialResults, currentType])
 
     // Categorias oferecidas no filtro. Em "Tudo" mostramos a união das três
     // listas (produtos + serviços + lojas), sem duplicar nomes.
@@ -933,7 +902,42 @@ export function ExplorarPageClient({
         [currentType, activeCategoriesList]
     )
 
-    // In-memory filters for advanced filters (aplicados às listas local e distante)
+    const pageMode = useMemo((): PageMode => {
+        if (query || (currentType !== 'tudo' && currentType !== 'em-alta' && currentType !== 'novos-anunciados')) return "search"
+        if (selectedSection) return "section-detail"
+        if (selectedCategories.length > 0) return "category"
+        return "sections"
+    }, [query, currentType, selectedSection, selectedCategories])
+
+    const filterConfig = useMemo(() => {
+        return getFilterConfig(selectedSection, pageMode, currentType)
+    }, [selectedSection, pageMode, currentType])
+
+    const contextualSortOptions = useMemo(() => {
+        return getSortOptionsForMode(pageMode, selectedSection, currentType)
+    }, [pageMode, selectedSection, currentType])
+
+    const hasPriceFilter = useMemo(() => {
+        const minNum = minPrice !== "" && minPrice !== null && minPrice !== undefined ? Number(minPrice) : null
+        const maxNum = maxPrice !== "" && maxPrice !== null && maxPrice !== undefined ? Number(maxPrice) : null
+        return (minNum !== null && Number.isFinite(minNum) && minNum > 0) ||
+            (maxNum !== null && Number.isFinite(maxNum) && maxNum > 0)
+    }, [minPrice, maxPrice])
+
+    const hasProductOnlyFilterInTudo =
+        currentType === "tudo" &&
+        (onlyShipping || promoOn || Boolean(selectedCondition) || hasPriceFilter)
+
+    const matchesCurrentItemType = useCallback((item: any) => {
+        if (currentType === "produtos") return item.itemType === "produto"
+        if (currentType === "servicos") return item.itemType === "servico"
+        if (currentType === "vitrines" || currentType === "negocios") return item.itemType === "loja"
+        if (currentType === "planos") return item.itemType === "plano"
+        if (currentType === "em-oferta") return item.itemType !== "loja" && isPromoItem(item)
+        return true
+    }, [currentType])
+
+    // In-memory filters for advanced filters (aplicados às listas local, vitrines e anéis distantes)
     const applyBrowseFilters = useCallback((source: any[], opts?: { preserveOrder?: boolean }) => {
         let filtered = [...source]
         if (selectedCategories.length > 0) {
@@ -949,25 +953,26 @@ export function ExplorarPageClient({
 
         // Preço: vitrines não têm preço próprio e itens "sob consulta" não são
         // descartados (antes eles sumiam da listagem inteira).
-        const min = minPrice ? Number(minPrice) : null
-        const max = maxPrice ? Number(maxPrice) : null
-        if (min !== null || max !== null) {
+        const minRaw = minPrice !== "" && minPrice !== null && minPrice !== undefined ? Number(minPrice) : null
+        const maxRaw = maxPrice !== "" && maxPrice !== null && maxPrice !== undefined ? Number(maxPrice) : null
+        const min = minRaw !== null && Number.isFinite(minRaw) && minRaw > 0 ? minRaw : null
+        const max = maxRaw !== null && Number.isFinite(maxRaw) && maxRaw > 0 ? maxRaw : null
+        if ((min !== null || max !== null) && filterConfig.showPrice !== false) {
             filtered = filtered.filter((p) => matchesPriceRange(p, min, max))
         }
 
-        // Promoção: só produtos/serviços tem promoção - vitrines não são
-        // eliminadas pelo filtro (antes a lista de lojas ficava vazia).
-        if (promoOn) {
-            filtered = filtered.filter((p) => p.itemType === 'loja' ? true : isPromoItem(p))
+        // Promoção: só produtos/planos têm promoção quando o filtro está ativo.
+        if (promoOn && filterConfig.showPromo !== false) {
+            filtered = filtered.filter((p) => isPromoItem(p))
         }
 
         // Filtragem por Condição (Novos / Usados / Desapegos)
-        if (selectedCondition) {
-            filtered = filtered.filter((p) => matchesConditionFilter(p, selectedCondition))
+        if (selectedCondition && filterConfig.showCondition !== false) {
+            filtered = filtered.filter((p) => p.itemType === "produto" && matchesConditionFilter(p, selectedCondition))
         }
 
         // Filtragem por Envio nacional (transportadora)
-        if (onlyShipping) {
+        if (onlyShipping && filterConfig.showShipping !== false) {
             filtered = filtered.filter((p) => matchesShippingFilter(p))
         }
 
@@ -1029,7 +1034,12 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, selectedSection, isUncategorized, userCoords])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, selectedSection, isUncategorized, userCoords, filterConfig])
+
+    const vitrinesDestaque = useMemo(() => {
+        if (rawVitrinesDestaque.length === 0 || hasProductOnlyFilterInTudo) return []
+        return applyBrowseFilters(rawVitrinesDestaque, { preserveOrder: true })
+    }, [rawVitrinesDestaque, hasProductOnlyFilterInTudo, applyBrowseFilters])
 
     const filteredResults = useMemo(
         () => applyBrowseFilters(dataToFilter),
@@ -1054,29 +1064,57 @@ export function ExplorarPageClient({
         })
     }, [query, currentType, selectedCitySlug, rawItems.length, isLoading])
 
-    // Apply urgency badges to more distant items
-    const moreDistantItemsWithBadges = useMemo(() => {
-        return applyVendorUrgencyBadges(moreDistantItems, userProfile?.userId || null)
-    }, [moreDistantItems, userProfile?.userId])
-
-    // Itens distantes: listados direto na página, respondendo aos mesmos filtros/ordenação.
-    // A ordem de relevância (texto + marketplace_score + distância) vem do servidor e é preservada.
+    // Itens e lojas distantes (fallback sem anéis): normalizados e filtrados.
     const filteredDistant = useMemo(() => {
-        if (!query || moreDistantItemsWithBadges.length === 0) return []
-        const typeFiltered = moreDistantItemsWithBadges.filter((item: any) => {
-            if (currentType === "produtos") return item.itemType === "produto"
-            if (currentType === "servicos") return item.itemType === "servico"
-            if (currentType === "vitrines" || currentType === "negocios") return item.itemType === "loja"
-            if (currentType === "planos") return item.itemType === "plano"
-            return true
-        })
+        if (!query || moreDistantItems.length === 0) return []
+        const normalized = normalizeMarketplaceItems(moreDistantItems)
+        const typeFiltered = normalized.filter(matchesCurrentItemType)
         return applyBrowseFilters(typeFiltered, { preserveOrder: true })
-    }, [query, moreDistantItemsWithBadges, currentType, applyBrowseFilters])
+    }, [query, moreDistantItems, normalizeMarketplaceItems, matchesCurrentItemType, applyBrowseFilters])
+
+    const filteredDistantSellers = useMemo(() => {
+        if (!query || moreDistantSellers.length === 0 || hasProductOnlyFilterInTudo) return []
+        const showVitrines = currentType === "tudo" || currentType === "vitrines" || currentType === "negocios"
+        if (!showVitrines) return []
+        const normalized = normalizeMarketplaceItems(moreDistantSellers)
+        return applyBrowseFilters(normalized, { preserveOrder: true })
+    }, [query, moreDistantSellers, hasProductOnlyFilterInTudo, currentType, normalizeMarketplaceItems, applyBrowseFilters])
+
+    // Anéis de proximidade (Cidades vizinhas, Envio nacional CEP, Outras opções):
+    // todos passam pela mesma normalização, filtro de tipo, filtros avançados e ordenação.
+    const filteredProximityRings = useMemo<ProximityRingsResult<any> | null>(() => {
+        if (!query || !proximityRings) return null
+        const showVitrines =
+            (currentType === "tudo" || currentType === "vitrines" || currentType === "negocios") &&
+            !hasProductOnlyFilterInTudo
+
+        const filterRingItems = (list: any[]) => {
+            if (!list || list.length === 0) return []
+            const normalized = normalizeMarketplaceItems(list)
+            const typeFiltered = normalized.filter(matchesCurrentItemType)
+            return applyBrowseFilters(typeFiltered, { preserveOrder: true })
+        }
+
+        const filterRingSellers = (list: any[]) => {
+            if (!showVitrines || !list || list.length === 0) return []
+            const normalized = normalizeMarketplaceItems(list)
+            return applyBrowseFilters(normalized, { preserveOrder: true })
+        }
+
+        return {
+            nearby: filterRingItems(proximityRings.nearby),
+            regional: filterRingItems(proximityRings.regional),
+            regionalSellers: filterRingSellers(proximityRings.regionalSellers),
+            nationalShipping: filterRingItems(proximityRings.nationalShipping),
+            otherDistant: filterRingItems(proximityRings.otherDistant),
+            otherDistantSellers: filterRingSellers(proximityRings.otherDistantSellers),
+        }
+    }, [query, proximityRings, currentType, hasProductOnlyFilterInTudo, normalizeMarketplaceItems, matchesCurrentItemType, applyBrowseFilters])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
         if (selectedCategories.length > 0) count++
-        if (minPrice || maxPrice) count++
+        if (hasPriceFilter) count++
         if (promoOn) count++
         if (selectedCondition) count++
         if (onlyShipping) count++
@@ -1087,22 +1125,7 @@ export function ExplorarPageClient({
         if (sortBy !== "relevancia") count++
         if (currentType !== "tudo") count++
         return count
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType])
-
-    const pageMode = useMemo((): PageMode => {
-        if (query || (currentType !== 'tudo' && currentType !== 'em-alta' && currentType !== 'novos-anunciados')) return "search"
-        if (selectedSection) return "section-detail"
-        if (selectedCategories.length > 0) return "category"
-        return "sections"
-    }, [query, currentType, selectedSection, selectedCategories])
-
-    const filterConfig = useMemo(() => {
-        return getFilterConfig(selectedSection, pageMode, currentType)
-    }, [selectedSection, pageMode, currentType])
-
-    const contextualSortOptions = useMemo(() => {
-        return getSortOptionsForMode(pageMode, selectedSection, currentType)
-    }, [pageMode, selectedSection, currentType])
+    }, [selectedCategories, hasPriceFilter, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType])
 
     const isCategoryMode = pageMode === "category" && selectedCategories.length === 1
     const categoryName = isCategoryMode ? selectedCategories[0] : null
@@ -1177,37 +1200,8 @@ export function ExplorarPageClient({
             } catch { }
         }
         setSelectedCitySlug(citySlug)
-        setCitySearchText("")
-        // O seletor de estado do modal acompanha a localidade atual
-        setSelectedStateFilter(getStateFromCitySlug(citySlug))
         updateUrl(citySlug, selectedCategories, query, currentType, selectedSection)
     }
-
-    // Filter cities list by search input
-    const filteredCitiesSuggestions = useMemo(() => {
-        if (!citySearchText) return []
-        const q = citySearchText
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[-\s]+/g, " ")
-            .trim()
-        return citiesData
-            .filter((slug: string) => {
-                // Filter by selected state if not "brasil"
-                if (selectedStateFilter !== "brasil") {
-                    const cityState = slug.split("-").pop()?.toLowerCase()
-                    if (cityState !== selectedStateFilter) return false
-                }
-                const norm = slug
-                    .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/[-\s]+/g, " ")
-                return norm.includes(q)
-            })
-            .slice(0, 5)
-    }, [citySearchText, citiesData, selectedStateFilter])
 
     const pageTitle = useMemo(() => {
         const citySuffix = selectedCitySlug
@@ -1372,54 +1366,16 @@ export function ExplorarPageClient({
     }, [selectedCitySlug, query, selectedCategories])
 
     const handleOpenDemandModal = useCallback(() => {
-        const defaultTerm = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
-        setDemandTerm(defaultTerm)
-        if (currentType === "servicos") {
-            setSelectedDemandType("contratar")
-        } else if (currentType === "vitrines" || currentType === "negocios") {
-            setSelectedDemandType("loja")
-        } else {
-            setSelectedDemandType("comprar")
-        }
         setIsDemandModalOpen(true)
-    }, [query, selectedCategories, currentType])
+    }, [])
 
-    const handleSubmitDemand = useCallback(async () => {
-        const term = demandTerm.trim()
-        if (!term || isSubmittingDemandRef.current) return
-
-        isSubmittingDemandRef.current = true
-        setIsSubmittingDemand(true)
-        const demandTypeLabels: Record<string, string> = {
-            comprar: "Quero comprar",
-            contratar: "Quero contratar",
-            loja: "Quero encontrar loja",
-            encontrar: "Quero encontrar loja",
-        }
-
-        try {
-            await trackExplicitDemandAction(
-                demandTypeLabels[selectedDemandType] || "Quero comprar",
-                term,
-                selectedCitySlug || undefined
-            )
-            trackEvent("search_zero_results", {
-                term,
-                demand_type: demandTypeLabels[selectedDemandType] || "Quero comprar",
-                city: selectedCitySlug,
-            })
-            setDemandTerm("")
-            setIsDemandModalOpen(false)
-            setIsDemandThankYouOpen(true)
-        } catch (err) {
-            console.error("[DEMAND_SUBMIT] Erro ao enviar demanda:", err)
-        } finally {
-            setIsSubmittingDemand(false)
-            setTimeout(() => {
-                isSubmittingDemandRef.current = false
-            }, 800)
-        }
-    }, [demandTerm, selectedDemandType, selectedCitySlug])
+    const demandDefaultTerm = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
+    const demandDefaultType: "comprar" | "contratar" | "loja" =
+        currentType === "servicos"
+            ? "contratar"
+            : (currentType === "vitrines" || currentType === "negocios")
+                ? "loja"
+                : "comprar"
 
     /**
      * Aplica um patch nos filtros (usado pelos chips de filtro ativo e pelo
@@ -1728,18 +1684,45 @@ export function ExplorarPageClient({
             ? vitrinesDestaque.length
             : 0
 
-    const totalResultsCount = filteredResults.length + displayedVitrinesCount
+    const hasRawDistantResults = useMemo(() => {
+        if (!query) return false
+        if (moreDistantItems.length > 0 || moreDistantSellers.length > 0) return true
+        if (!proximityRings) return false
+        return (
+            proximityRings.regional.length > 0 ||
+            proximityRings.regionalSellers.length > 0 ||
+            proximityRings.nationalShipping.length > 0 ||
+            proximityRings.otherDistant.length > 0 ||
+            proximityRings.otherDistantSellers.length > 0
+        )
+    }, [query, moreDistantItems.length, moreDistantSellers.length, proximityRings])
 
-    // Estado "sem nenhum resultado" da listagem local.
-    // NÃO usar `moreDistantItems`/`moreDistantSellers` aqui: o servidor busca esses
-    // itens numa query "distante" separada sempre que há busca por cidade, então eles
-    // existem mesmo com 0 resultados locais e fariam a condição nunca ser verdadeira
-    // (mantendo título, contador, filtros e badge de localidade na tela).
+    const filteredDistantTotalCount = useMemo(() => {
+        if (!query) return 0
+        if (filteredProximityRings) {
+            return (
+                filteredProximityRings.regional.length +
+                filteredProximityRings.regionalSellers.length +
+                filteredProximityRings.nationalShipping.length +
+                filteredProximityRings.otherDistant.length +
+                filteredProximityRings.otherDistantSellers.length
+            )
+        }
+        return filteredDistant.length + filteredDistantSellers.length
+    }, [query, filteredProximityRings, filteredDistant.length, filteredDistantSellers.length])
+
+    const hasAnyRawResults = rawItems.length > 0 || hasRawDistantResults
+
+    const totalResultsCount = filteredResults.length + displayedVitrinesCount + filteredDistantTotalCount
+
+    // Estado "sem nenhum resultado" (nem local, nem em cidades vizinhas / envio nacional / Brasil).
+    // Quando há resultados distantes/anéis em uma busca, mantemos título, contador,
+    // filtros, ordenação e badge de busca inteligente visíveis para o usuário filtrar.
     const isEmptyListing = useMemo(() => {
         if (isContentLoading) return false
         if (isCategoryMode) return false
-        return rawItems.length === 0 && filteredResults.length === 0
-    }, [isContentLoading, isCategoryMode, rawItems.length, filteredResults.length])
+        return !hasAnyRawResults && filteredResults.length === 0
+    }, [isContentLoading, isCategoryMode, hasAnyRawResults, filteredResults.length])
 
     // ─── Themed rotating sections (desativadas temporariamente no lançamento) ───
     const themedSections: any[] = []
@@ -1781,7 +1764,7 @@ export function ExplorarPageClient({
                 `}</style>
 
                 {/* MOBILE CONTROLS (Sticky bar with Filters & Sort buttons) */}
-                {rawItems.length > 0 && (
+                {hasAnyRawResults && (
                     <ExplorarMobileControls
                         activeFiltersCount={activeFiltersCount}
                         onOpenFilters={handleOpenFilters}
@@ -1790,7 +1773,7 @@ export function ExplorarPageClient({
                 )}
 
                 {/* Always reserve space for sticky mobile controls */}
-                {rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
+                {hasAnyRawResults && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 lg:mt-8 px-4">
@@ -1903,9 +1886,9 @@ export function ExplorarPageClient({
                                         <SmartSearchBadge
                                             query={query}
                                             searchIntent={searchIntent}
-                                            nearbyCount={rawItems.length}
-                                            regionalCount={(proximityRings?.regional.length ?? 0) + (proximityRings?.regionalSellers.length ?? 0)}
-                                            nationalShippingCount={proximityRings?.nationalShipping.length ?? 0}
+                                            nearbyCount={filteredResults.length + displayedVitrinesCount}
+                                            regionalCount={(filteredProximityRings?.regional.length ?? 0) + (filteredProximityRings?.regionalSellers.length ?? 0)}
+                                            nationalShippingCount={filteredProximityRings?.nationalShipping.length ?? 0}
                                         />
                                     ) : null
                                 }
@@ -1935,7 +1918,7 @@ export function ExplorarPageClient({
                                         }}
                                     />
                                 </div>
-                            ) : rawItems.length === 0 && !isCategoryMode && moreDistantItems.length === 0 && moreDistantSellers.length === 0 ? (
+                            ) : !hasAnyRawResults && !isCategoryMode ? (
                                 <div className="flex justify-center">
                                     <IconPlaceholder
                                         placeholderType="image"
@@ -1970,8 +1953,8 @@ export function ExplorarPageClient({
                                 </div>
                             ) : (
                                 <>
-                                    {/* Empty state with action buttons when no local results found in city/radius */}
-                                    {rawItems.length === 0 && !isCategoryMode && (
+                                    {/* Empty state with action buttons when no local results found in city/radius (but distant results exist) */}
+                                    {rawItems.length === 0 && !isCategoryMode && filteredDistantTotalCount > 0 && (
                                         <div className="flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
@@ -2042,7 +2025,7 @@ export function ExplorarPageClient({
                                                 </div>
                                             )}
                                         </div>
-                                    ) : rawItems.length > 0 && displayedVitrinesCount === 0 && !hasNextPage && moreDistantItems.length === 0 ? (
+                                    ) : hasAnyRawResults && displayedVitrinesCount === 0 && !hasNextPage && filteredDistantTotalCount === 0 ? (
                                         <div className="py-12 flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
@@ -2050,25 +2033,40 @@ export function ExplorarPageClient({
                                                 imageAlt="Não temos nada assim ainda!"
                                                 title="Não temos nada assim ainda!"
                                                 subtitle="Ainda não temos itens nessa cidade ou com essa combinação de filtros. Que tal limpar os filtros?"
-                                                buttons={[
-                                                    {
-                                                        text: "Eu vendo",
-                                                        action: () => {
-                                                            router.push(userProfile ? "/erp/inicio" : "/auth/login?mode=partner")
-                                                        },
-                                                        variant: "default"
-                                                    },
-                                                    {
-                                                        text: "Conheço quem vende",
-                                                        action: handleInvite,
-                                                        variant: "outline"
-                                                    },
-                                                    {
-                                                        text: "Estou procurando isso",
-                                                        action: handleOpenDemandModal,
-                                                        variant: "outline"
-                                                    }
-                                                ]}
+                                                buttons={
+                                                    activeFiltersCount > 0
+                                                        ? [
+                                                            {
+                                                                text: "Limpar filtros",
+                                                                action: clearFilters,
+                                                                variant: "default"
+                                                            },
+                                                            {
+                                                                text: "Estou procurando isso",
+                                                                action: handleOpenDemandModal,
+                                                                variant: "outline"
+                                                            }
+                                                        ]
+                                                        : [
+                                                            {
+                                                                text: "Eu vendo",
+                                                                action: () => {
+                                                                    router.push(userProfile ? "/erp/inicio" : "/auth/login?mode=partner")
+                                                                },
+                                                                variant: "default"
+                                                            },
+                                                            {
+                                                                text: "Conheço quem vende",
+                                                                action: handleInvite,
+                                                                variant: "outline"
+                                                            },
+                                                            {
+                                                                text: "Estou procurando isso",
+                                                                action: handleOpenDemandModal,
+                                                                variant: "outline"
+                                                            }
+                                                        ]
+                                                }
                                             />
                                         </div>
                                     ) : null}
@@ -2076,10 +2074,10 @@ export function ExplorarPageClient({
                                     {/* Anéis de Proximidade: Cidades vizinhas -> Envio nacional CEP -> Outras opções */}
                                     {!!query && (
                                         <ProximityRingsSection
-                                            rings={proximityRings}
+                                            rings={filteredProximityRings}
                                             currentType={currentType}
                                             renderDistantItem={renderDistantItem}
-                                            fallbackSellers={moreDistantSellers}
+                                            fallbackSellers={filteredDistantSellers}
                                             fallbackItems={filteredDistant}
                                         />
                                     )}
@@ -2143,167 +2141,18 @@ export function ExplorarPageClient({
                 />
             )}
 
-            {/* 1. CITY SELECTOR MODAL */}
-            {isCityModalOpen && (
-                <DefaultModal
-                    isOpen={isCityModalOpen}
-                    onClose={() => setIsCityModalOpen(false)}
-                    maxWidth="md"
-                    hideHeader={true}
-                >
-                    <div className="flex flex-col relative text-[#003229]">
-                        <button
-                            onClick={() => setIsCityModalOpen(false)}
-                            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-                            title="Fechar"
-                        >
-                            <XIcon size={16} />
-                        </button>
-
-                        {/* Header with gradient and mascot */}
-                        <div
-                            className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
-                            style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
-                        >
-                            <img
-                                src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                                alt="Onde você está?"
-                                className="w-48 h-auto object-contain transform translate-y-4"
-                            />
-                        </div>
-
-                        <h4 className="text-xl font-bold text-brand-dark mb-4 text-center dark:text-dark-heading">Onde você está?</h4>
-                        <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed dark:text-dark-body">
-                            Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
-                        </p>
-
-                        <div className="space-y-4">
-                            {/* Location scope selector: Brasil / Estado */}
-                            <div className="relative" ref={stateDropdownRef}>
-                                <button
-                                    onClick={() => setShowStateDropdown(!showStateDropdown)}
-                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg border border-brand-border dark:border-dark-border"
-                                >
-                                    <span className="flex items-center gap-3">
-                                        {selectedStateFilter === "brasil" ? (
-                                            <Globe className="w-4 h-4 text-brand-green" />
-                                        ) : (
-                                            <MapPin className="w-4 h-4 text-brand-green" />
-                                        )}
-                                        <span>
-                                            {selectedStateFilter === "brasil" ? "Brasil" : ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}
-                                        </span>
-                                    </span>
-                                    <ChevronDown className={`w-4 h-4 text-brand-inactive-text transition-transform ${showStateDropdown ? 'rotate-180' : ''}`} />
-                                </button>
-
-                                {showStateDropdown && (
-                                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedStateFilter("brasil")
-                                                setShowStateDropdown(false)
-                                                setCitySearchText("")
-                                                handleSelectCity("brasil")
-                                                setIsCityModalOpen(false)
-                                            }}
-                                            className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
-                                        >
-                                            <Globe className="w-4 h-4 text-brand-green" />
-                                            <span>Brasil (todos os estados)</span>
-                                            {selectedStateFilter === "brasil" && <Check className="w-4 h-4 text-brand-green ml-auto" />}
-                                        </button>
-                                        {Object.entries(ESTADO_MAP).map(([uf, name]) => (
-                                            <button
-                                                key={uf}
-                                                onClick={() => {
-                                                    setSelectedStateFilter(uf)
-                                                    setShowStateDropdown(false)
-                                                    setCitySearchText("")
-                                                    handleSelectCity(`estado-${uf}`)
-                                                    setIsCityModalOpen(false)
-                                                }}
-                                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
-                                            >
-                                                <span className="flex items-center gap-3">
-                                                    <MapPin className="w-4 h-4 text-brand-green" />
-                                                    {name}
-                                                </span>
-                                                {selectedStateFilter === uf && <Check className="w-4 h-4 text-brand-green" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* City search - filters by selected state */}
-                            <div className="relative">
-                                <Input
-                                    placeholder={selectedStateFilter === "brasil" ? "Buscar por cidade... (ex: São Paulo, Bauru)" : `Buscar cidade em ${ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}...`}
-                                    value={citySearchText}
-                                    onChange={(e) => setCitySearchText(e.target.value)}
-                                    className="h-[42px] w-full"
-                                    variant="full-rounded"
-                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                />
-                                {filteredCitiesSuggestions.length > 0 && (
-                                    <div className="flex flex-col gap-1 border-t pt-2">
-                                        {filteredCitiesSuggestions.map((slug) => (
-                                            <button
-                                                key={slug}
-                                                onClick={() => {
-                                                    handleSelectCity(slug)
-                                                    setIsCityModalOpen(false)
-                                                }}
-                                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
-                                            >
-                                                <span>{formatCitySlug(slug)}</span>
-                                                {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                                {citySearchText.trim().length >= 2 && filteredCitiesSuggestions.length === 0 && citiesData.length > 0 && (
-                                    <p className="text-center text-xs text-brand-inactive-text py-3">
-                                        Nenhuma cidade encontrada{selectedStateFilter !== "brasil" ? ` em ${ESTADO_MAP[selectedStateFilter]}` : ""}
-                                    </p>
-                                )}
-                            </div>
-
-                            <Button
-                                onClick={() => {
-                                    requestLocation()
-                                    setIsCityModalOpen(false)
-                                }}
-                                variant="outline"
-                                className="w-full"
-                            >
-                                <MapPin className="w-4 h-4" />
-                                <span>Usar minha localização</span>
-                            </Button>
-
-                            {/* Only show login link when user is NOT logged in */}
-                            {!userProfile && (
-                                <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Já tem uma conta cadastrada com endereço salvo?
-                                    </p>
-                                    <Button
-                                        onClick={() => {
-                                            setIsCityModalOpen(false)
-                                            router.push("/auth/login")
-                                        }}
-                                        variant="link"
-                                        className="text-sm mt-1 inline-block"
-                                    >
-                                        Entrar na minha conta
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </DefaultModal>
-            )}
+            {/* 1. CITY SELECTOR MODAL (isolado para não re-renderizar a grade ao digitar) */}
+            <ExplorarCityModal
+                isOpen={isCityModalOpen}
+                onClose={() => setIsCityModalOpen(false)}
+                selectedCitySlug={selectedCitySlug}
+                formatCitySlug={formatCitySlug}
+                onSelectCity={handleSelectCity}
+                onRequestLocation={requestLocation}
+                onLoginClick={() => router.push("/auth/login")}
+                isLoggedIn={Boolean(userProfile)}
+                onAccentsResolved={handleCityAccentsResolved}
+            />
 
             {/* 2. CATEGORY MODAL (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
             {isCategoryModalOpen && (
@@ -2338,134 +2187,14 @@ export function ExplorarPageClient({
                 </DefaultModal>
             )}
 
-            {/* 3. DEMAND MODAL - "Estou procurando isso" */}
-            {isDemandModalOpen && (
-                <DefaultModal
-                    isOpen={isDemandModalOpen}
-                    onClose={() => setIsDemandModalOpen(false)}
-                    title="O que você está procurando?"
-                    maxWidth="md"
-                >
-                    <div className="flex flex-col gap-4 py-2">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Selecione o tipo de demanda e digite o que precisa. Vamos tentar encontrar alguém que possa ajudar!
-                        </p>
-
-                        <div className="flex flex-col gap-2.5">
-                            <ListItem
-                                title="Quero comprar"
-                                description="Produtos, peças, eletrônicos, roupas ou itens físicos"
-                                className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "comprar"
-                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                    : ""
-                                    }`}
-                                onClick={() => setSelectedDemandType("comprar")}
-                                right={
-                                    <RadioButton
-                                        name="demandType"
-                                        value="comprar"
-                                        checked={selectedDemandType === "comprar"}
-                                        onChange={() => setSelectedDemandType("comprar")}
-                                    />
-                                }
-                            />
-
-                            <ListItem
-                                title="Quero contratar"
-                                description="Serviços, profissionais, reformas, assistências ou diárias"
-                                className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "contratar"
-                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                    : ""
-                                    }`}
-                                onClick={() => setSelectedDemandType("contratar")}
-                                right={
-                                    <RadioButton
-                                        name="demandType"
-                                        value="contratar"
-                                        checked={selectedDemandType === "contratar"}
-                                        onChange={() => setSelectedDemandType("contratar")}
-                                    />
-                                }
-                            />
-
-                            <ListItem
-                                title="Quero encontrar loja ou empresa"
-                                description="Estabelecimentos comerciais, empresas locais ou pontos de atendimento"
-                                className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "loja" || selectedDemandType === "encontrar"
-                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                    : ""
-                                    }`}
-                                onClick={() => setSelectedDemandType("loja")}
-                                right={
-                                    <RadioButton
-                                        name="demandType"
-                                        value="loja"
-                                        checked={selectedDemandType === "loja" || selectedDemandType === "encontrar"}
-                                        onChange={() => setSelectedDemandType("loja")}
-                                    />
-                                }
-                            />
-                        </div>
-
-                        <div className="pt-1">
-                            <Input
-                                label="O que você precisa?"
-                                placeholder={
-                                    selectedDemandType === "comprar"
-                                        ? "Ex: pneu goodyear, notebook dell, camiseta..."
-                                        : selectedDemandType === "contratar"
-                                            ? "Ex: encanador, eletricista, fotógrafo..."
-                                            : "Ex: conserto de ar condicionado, autopeças, pet shop..."
-                                }
-                                value={demandTerm}
-                                onChange={(e) => setDemandTerm(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !isSubmittingDemand && demandTerm.trim()) {
-                                        e.preventDefault()
-                                        handleSubmitDemand()
-                                    }
-                                }}
-                                disabled={isSubmittingDemand}
-                                autoFocus
-                            />
-                        </div>
-
-                        <Button
-                            variant="default"
-                            className="w-full font-bold"
-                            onClick={handleSubmitDemand}
-                            disabled={!demandTerm.trim() || isSubmittingDemand}
-                            isLoading={isSubmittingDemand}
-                        >
-                            {isSubmittingDemand ? "Enviando..." : "Enviar"}
-                        </Button>
-                    </div>
-                </DefaultModal>
-            )}
-
-            {/* 4. DEMAND THANK YOU MODAL */}
-            {isDemandThankYouOpen && (
-                <DefaultModal
-                    isOpen={isDemandThankYouOpen}
-                    onClose={() => setIsDemandThankYouOpen(false)}
-                    title=""
-                    maxWidth="sm"
-                    hideHeader
-                >
-                    <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/Feedback.png"
-                        imageAlt="Obrigado pelo seu feedback!"
-                        title="Obrigado!"
-                        subtitle="Recebemos sua demanda! Vamos tentar encontrar alguém que possa te ajudar com isso. Fique de olho nas novidades da Dudit!"
-                        itemButton={{
-                            text: "Entendido",
-                            action: () => setIsDemandThankYouOpen(false),
-                            variant: "default"
-                        }}
-                    />
-                </DefaultModal>
-            )}
+            {/* 3. DEMAND MODAL & THANK YOU MODAL (isolados para não re-renderizar a grade ao digitar) */}
+            <ExplorarDemandModal
+                isOpen={isDemandModalOpen}
+                onClose={() => setIsDemandModalOpen(false)}
+                defaultTerm={demandDefaultTerm}
+                defaultType={demandDefaultType}
+                selectedCitySlug={selectedCitySlug}
+            />
         </>
     )
 }

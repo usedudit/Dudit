@@ -374,8 +374,9 @@ export default function POSShippingSheet({
     const destinationCep = String(activeAddress?.zipCode || "").replace(/\D/g, "")
     useEffect(() => {
         if (!isOpen || !hasSelectedCustomer || !activeHasStreet) return
-        if (carrierFetchedCepRef.current === destinationCep && !carrierError) return
-        carrierFetchedCepRef.current = destinationCep
+        const fetchKey = `${destinationCep}:${Math.round(orderSubtotalNumber * 100)}`
+        if (carrierFetchedCepRef.current === fetchKey && !carrierError) return
+        carrierFetchedCepRef.current = fetchKey
         const fetchId = ++carrierFetchIdRef.current
 
         setCarrierOptions([])
@@ -389,8 +390,10 @@ export default function POSShippingSheet({
             }))
             quoteCarrierFreightAction({
                 partnerId,
+                storeId: storeId || null,
                 toPostalCode: destinationCep,
                 items: carrierItems,
+                orderSubtotal: orderSubtotalNumber,
             })
                 .then((res) => {
                     if (carrierFetchIdRef.current !== fetchId) return
@@ -525,9 +528,20 @@ export default function POSShippingSheet({
                                             description={formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
                                             right={(
                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(opt.price)}
-                                                    </span>
+                                                    {opt.isFreeShipping || Number(opt.price) === 0 ? (
+                                                        <span className="flex items-center gap-1.5">
+                                                            {opt.originalPrice != null && Number(opt.originalPrice) > 0 && (
+                                                                <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">
+                                                                    {formatCurrency(Number(opt.originalPrice))}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-sm font-bold text-brand-green">Grátis</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(opt.price)}
+                                                        </span>
+                                                    )}
                                                     <RadioButton
                                                         name="carrierFreightOption"
                                                         value={String(opt.serviceId)}

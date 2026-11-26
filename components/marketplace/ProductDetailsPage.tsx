@@ -786,18 +786,17 @@ export function ProductDetailsPageClient({
         }
     }, [selectedAddress, partner.partner_id, partner.id, partner.store_id, product.store_id, pricing.total])
 
-    // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
+    // Automatically calculate delivery when CEP becomes 8 digits (when no saved address is selected)
     useEffect(() => {
-        if (userId) return // If logged in, use selectedAddress useEffect
+        if (selectedAddress) return // If a saved address is selected, use selectedAddress useEffect
         const cleanedCep = cep.replace(/\D/g, "")
         if (cleanedCep.length !== 8) {
-            if (cleanedCep.length === 0) {
-                setDeliveryFee(null)
-                setDeliveryError(null)
-                setDeliveryOutsideRadius(false)
-                setCalculatedAddress(null)
-                setShippingState("initial")
-            }
+            setDeliveryFee(null)
+            setDeliveryBreakdown(null)
+            setDeliveryError(null)
+            setDeliveryOutsideRadius(false)
+            setCalculatedAddress(null)
+            setShippingState("initial")
             return
         }
 
@@ -813,22 +812,32 @@ export function ProductDetailsPageClient({
                 const data = await response.json()
                 if (!active) return
 
-                if (data.erro || data.error) {
+                if (!response.ok || data.erro || data.error) {
                     setDeliveryError("CEP não encontrado.")
                     setDeliveryOutsideRadius(false)
                     setDeliveryFee(null)
+                    setDeliveryBreakdown(null)
                     setCalculatedAddress(null)
                     return
                 }
 
-                const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
-                setCalculatedAddress(`${data.localidade} - ${data.uf}`)
+                const city = data.localidade || data.municipio || "Cidade"
+                const uf = data.uf || "UF"
+                const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${city} - ${uf}, ${cleanedCep}`
+                setCalculatedAddress(`${city} - ${uf}`)
                 setShippingState("calculated")
+
+                const parsedLat = data.latitude != null ? Number(data.latitude) : NaN
+                const parsedLng = data.longitude != null ? Number(data.longitude) : NaN
+                const destinationCoords = Number.isFinite(parsedLat) && Number.isFinite(parsedLng)
+                    ? { lat: parsedLat, lng: parsedLng }
+                    : null
 
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: targetPartnerId,
                     storeId: partner.store_id || (product as any)?.store_id || (product as any)?.stores?.id || null,
                     destinationAddress: addressStr,
+                    destinationCoords,
                     orderSubtotal: pricing.total,
                 })
                 if (!active) return
@@ -847,6 +856,7 @@ export function ProductDetailsPageClient({
                 if (active) {
                     setDeliveryError("Erro ao calcular a entrega.")
                     setDeliveryFee(null)
+                    setDeliveryBreakdown(null)
                     setCalculatedAddress(null)
                 }
             } finally {
@@ -858,14 +868,14 @@ export function ProductDetailsPageClient({
             active = false
             clearTimeout(timer)
         }
-    }, [cep, partner.partner_id, partner.id, partner.store_id, product.store_id, userId, pricing.total])
+    }, [cep, partner.partner_id, partner.id, partner.store_id, product.store_id, selectedAddress, pricing.total])
 
-    // Destination CEP for carrier freight quotes (logged in: saved address, logged out: CEP input)
+    // Destination CEP for carrier freight quotes (saved address if selected, otherwise CEP input)
     const carrierDestinationCep = useMemo(() => {
-        const raw = userId ? (selectedAddress?.zip_code || "") : cep
+        const raw = selectedAddress?.zip_code || cep
         const digits = String(raw).replace(/\D/g, "")
         return digits.length === 8 ? digits : ""
-    }, [userId, selectedAddress?.zip_code, cep])
+    }, [selectedAddress?.zip_code, cep])
 
     // Modalidades declaradas pelo produto. O envio nacional (transportadora) só
     // existe quando o produto realmente oferece "shipping" - nunca é inferido da
@@ -890,7 +900,8 @@ export function ProductDetailsPageClient({
             setCarrierError(null)
             return
         }
-        const dedupeKey = `${targetPartnerId}:${carrierDestinationCep}:${product.id}:${quantity}`
+        const productSubtotal = pricing.total || Number(product.price || 0) * quantity
+        const dedupeKey = `${targetPartnerId}:${carrierDestinationCep}:${product.id}:${quantity}:${Math.round(productSubtotal * 100)}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
         let completed = false
@@ -902,8 +913,10 @@ export function ProductDetailsPageClient({
                 try {
                     const res = await quoteCarrierFreightAction({
                         partnerId: targetPartnerId,
+                        storeId: product.store_id || partner.store_id || null,
                         toPostalCode: carrierDestinationCep,
                         items: [{ productId: product.id, quantity }],
+                        orderSubtotal: productSubtotal,
                     })
                     if (!active) return
                     if (res.success && res.options.length > 0) {
@@ -2039,9 +2052,11 @@ export function ProductDetailsPageClient({
                                                                         </span>
                                                                     </span>
                                                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                        {isFreeByThreshold ? (
+                                                                        {opt.isFreeShipping || Number(opt.price) === 0 ? (
                                                                             <span className="flex items-center gap-1.5 justify-end">
-                                                                                <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(opt.price))}</span>
+                                                                                {opt.originalPrice != null && Number(opt.originalPrice) > 0 && (
+                                                                                    <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(opt.originalPrice))}</span>
+                                                                                )}
                                                                                 <span className="text-brand-green font-bold">Grátis</span>
                                                                             </span>
                                                                         ) : (

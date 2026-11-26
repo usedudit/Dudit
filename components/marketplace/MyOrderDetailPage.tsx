@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
     ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon,
-    WhatsappIcon, TruckIcon, ReturnIcon, RepeatIcon
+    WhatsappIcon, TruckIcon, ReturnIcon, RepeatIcon, MotorbikeIcon
 } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal, FormTextarea } from '@/components/reusable';
@@ -26,7 +26,13 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
-import { canReportReturnToDudit } from '@/lib/returns/policy';
+import { MarketplaceExchangeProductPicker, type MarketplaceSelectedExchangeItem } from '@/components/marketplace/MarketplaceExchangeProductPicker';
+import { canReportReturnToDudit, getShippingPayerLabel } from '@/lib/returns/policy';
+import {
+    getReverseLogisticsMethodLabel,
+    getReverseLogisticsStatusLabel,
+    getReverseLogisticsCustomerDescription,
+} from '@/lib/returns/types';
 import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal, type OrderDepositSummary } from '@/lib/payments/order-financial-state';
 import {
     DeliveryStatusTimeline,
@@ -873,6 +879,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
     }, [resolutionOptions, returnResolution]);
 
+    const [selectedExchangeItems, setSelectedExchangeItems] = useState<MarketplaceSelectedExchangeItem[]>([]);
+
+    const selectedReturnCreditAmount = useMemo(() => {
+        const itemsList = Array.isArray(order?.order_items) ? order.order_items : [];
+        return Object.entries(returnItems).reduce((sum, [orderItemId, qty]) => {
+            const count = Number(qty || 0);
+            if (count <= 0) return sum;
+            const oi = itemsList.find((i: any) => i.id === orderItemId);
+            if (!oi) return sum;
+            const unitPrice = Number(oi.product_price || 0);
+            return sum + unitPrice * count;
+        }, 0);
+    }, [returnItems, order?.order_items]);
+
     if (!order) return null;
 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
@@ -1575,12 +1595,25 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     reason: item.reason,
                     condition: item.condition || "opened",
                 })),
+                exchangeItems: returnResolution === "exchange" && selectedExchangeItems.length > 0
+                    ? selectedExchangeItems.map((ei) => ({
+                        product_id: ei.product_id,
+                        variant_id: ei.variant_id || null,
+                        quantity: ei.quantity,
+                        unit_price: ei.unit_price,
+                        product_name: ei.product_name,
+                        sku: ei.sku,
+                        image: ei.image,
+                    }))
+                    : undefined,
                 evidence: uploadedEvidence,
                 idempotencyKey: `marketplace:${order.id}:${Date.now()}`,
             });
             if (!result.success) throw new Error(result.error);
             toast({ title: "Solicitação enviada", description: "A loja recebeu seu pedido de troca ou devolução." });
+            setSelectedExchangeItems([]);
             setIsReturnModalOpen(false);
+            router.refresh();
         } catch (err: any) {
             toast({ title: "Erro ao enviar", description: err.message || "Tente novamente.", variant: "destructive" });
         } finally {
@@ -1754,6 +1787,18 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             resolutionType === "exchange" ? "Troca" :
                 resolutionType === "store_credit" ? "Vale-compra" : "Sem resolução";
         const isResolved = activeReturnRequest.status === "RESOLVED" || activeReturnRequest.status === "APPROVED";
+        const reverseMethod = activeReturnRequest.reverse_logistics_method || null;
+        const reverseStatus = activeReturnRequest.reverse_logistics_status || null;
+        const reverseFreightPayer = activeReturnRequest.return_freight_payer || null;
+        const reverseTracking = activeReturnRequest.reverse_logistics_tracking_code || null;
+        const reverseNotes = activeReturnRequest.reverse_logistics_notes || null;
+        const reverseDesc = getReverseLogisticsCustomerDescription(reverseMethod);
+        const returnShipment = Array.isArray(order.order_shipments)
+            ? order.order_shipments.find((s: any) => s.kind === "return" && s.status !== "cancelled")
+            : null;
+        const exchangeItemsSnap = Array.isArray(activeReturnRequest.exchange_items_snapshot)
+            ? activeReturnRequest.exchange_items_snapshot
+            : [];
 
         return (
             <InfoCard
@@ -1765,6 +1810,43 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         {isResolved && resolutionType && (
                             <span className="block mt-1">
                                 <strong className="font-medium">Tipo de resolução:</strong> {resolutionLabel}
+                            </span>
+                        )}
+                        {exchangeItemsSnap.length > 0 && (
+                            <span className="block mt-1.5">
+                                <strong className="font-medium">Produtos selecionados na troca:</strong>{" "}
+                                {exchangeItemsSnap
+                                    .map((ei: any) => `${ei.product_name || "Produto"} (${ei.quantity || 1}x${Number(ei.unit_price || 0) > 0 ? ` - ${formatCurrency(Number(ei.unit_price))}` : ""})`)
+                                    .join(", ")}
+                            </span>
+                        )}
+                        {reverseMethod && (
+                            <span className="block mt-1.5">
+                                <strong className="font-medium">Devolução do item:</strong> {getReverseLogisticsMethodLabel(reverseMethod)}
+                                {reverseMethod !== "not_required" && reverseStatus ? ` (${getReverseLogisticsStatusLabel(reverseStatus)})` : ""}
+                                {reverseDesc ? ` — ${reverseDesc}` : ""}
+                            </span>
+                        )}
+                        {reverseFreightPayer && reverseMethod && reverseMethod !== "not_required" && reverseMethod !== "in_person" && (
+                            <span className="block mt-1">
+                                <strong className="font-medium">Frete da devolução:</strong> {getShippingPayerLabel(reverseFreightPayer)}
+                            </span>
+                        )}
+                        {(returnShipment?.tracking_number || reverseTracking) && (
+                            <span className="block mt-1">
+                                <strong className="font-medium">Rastreio / referência:</strong>{" "}
+                                {returnShipment?.tracking_url ? (
+                                    <a href={returnShipment.tracking_url} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                                        {returnShipment.tracking_number || "Acompanhar envio"}
+                                    </a>
+                                ) : (
+                                    returnShipment?.tracking_number || reverseTracking
+                                )}
+                            </span>
+                        )}
+                        {reverseNotes && (
+                            <span className="block mt-1">
+                                <strong className="font-medium">Instruções da loja:</strong> {reverseNotes}
                             </span>
                         )}
                         {isResolved && Number(activeReturnRequest.refund_amount || 0) > 0 && (
@@ -2252,46 +2334,62 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     {/* Section 4: Entregador */}
                                     {isDelivery && order.delivery_driver && (
                                         <FormSection title="Entregador">
-                                            <ListItem
-                                                title={
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                            {order.delivery_driver.name || "Entregador"}
-                                                        </span>
-                                                        <Tooltip text="Entregador da Rede Dudit">
-                                                            <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
-                                                        </Tooltip>
-                                                    </div>
-                                                }
-                                                description={
-                                                    <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                        {order.delivery_driver.totalDeliveries && order.delivery_driver.totalDeliveries > 0 && <span>{order.delivery_driver.totalDeliveries} entregas realizadas</span>}
-                                                        {order.delivery_driver.vehicleType && <span>• {order.delivery_driver.vehicleType}</span>}
-                                                    </div>
-                                                }
-                                                left={
-                                                    <UserProfileImage
-                                                        fullName={order.delivery_driver.name || "Entregador"}
-                                                        imageUrl={order.delivery_driver.avatarUrl}
-                                                        className="w-10 h-10"
-                                                    />
-                                                }
-                                                right={
-                                                    order.delivery_driver.phone &&
-                                                        ["sent", "out_for_delivery", "assigned", "accepted"].includes(
-                                                            order.delivery_driver.driverStatus || order.delivery_status
-                                                        ) ? (
-                                                        <a href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                                                            <Button
-                                                                variant="outline"
-                                                                leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}
-                                                            >
-                                                            </Button>
-                                                        </a>
-                                                    ) : null
-                                                }
-                                                className="px-4 py-3"
-                                            />
+                                            {order.delivery_driver.isPlatformDriver ? (
+                                                <ListItem
+                                                    title={
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                {order.delivery_driver.name || "Entregador"}
+                                                            </span>
+                                                            <Tooltip text="Entregador da Rede Dudit">
+                                                                <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                                                            </Tooltip>
+                                                        </div>
+                                                    }
+                                                    description={
+                                                        <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                            {Number(order.delivery_driver.totalDeliveries || 0) > 0 && (
+                                                                <span>{order.delivery_driver.totalDeliveries} entregas realizadas</span>
+                                                            )}
+                                                            {order.delivery_driver.vehicleType && (
+                                                                <span>
+                                                                    {Number(order.delivery_driver.totalDeliveries || 0) > 0 ? "• " : ""}
+                                                                    {order.delivery_driver.vehicleType}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    }
+                                                    left={
+                                                        <UserProfileImage
+                                                            fullName={order.delivery_driver.name || "Entregador"}
+                                                            imageUrl={order.delivery_driver.avatarUrl}
+                                                            className="w-10 h-10"
+                                                        />
+                                                    }
+                                                    right={
+                                                        order.delivery_driver.phone &&
+                                                            ["sent", "out_for_delivery", "assigned", "accepted"].includes(
+                                                                order.delivery_driver.driverStatus || order.delivery_status
+                                                            ) ? (
+                                                            <a href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}
+                                                                >
+                                                                </Button>
+                                                            </a>
+                                                        ) : null
+                                                    }
+                                                    className="px-4 py-3"
+                                                />
+                                            ) : (
+                                                <ListItem
+                                                    icon={<MotorbikeIcon />}
+                                                    title="Entregador da loja"
+                                                    description="Entregador próprio do estabelecimento"
+                                                    className="px-4 py-3"
+                                                />
+                                            )}
                                         </FormSection>
                                     )}
 
@@ -2907,6 +3005,22 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         options={resolutionOptions}
                                     />
                                 </div>
+
+                                {returnResolution === "exchange" && (
+                                    <MarketplaceExchangeProductPicker
+                                        orderId={order.id}
+                                        orderProductIds={Array.from(
+                                            new Set(
+                                                (order.order_items || [])
+                                                    .map((i: any) => i.product_id)
+                                                    .filter(Boolean)
+                                            )
+                                        )}
+                                        creditAmount={selectedReturnCreditAmount}
+                                        selectedItems={selectedExchangeItems}
+                                        onChange={setSelectedExchangeItems}
+                                    />
+                                )}
 
                                 <FormTextarea
                                     label="Mensagem opcional"

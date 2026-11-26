@@ -507,11 +507,13 @@ export function CheckoutFulfillmentPanel({
                   className="px-4 py-3"
                   right={
                     <div className="flex items-center gap-3 shrink-0">
-                      {deliveryFree ? (
+                      {deliveryFree || opt.isFreeShipping || Number(opt.price) === 0 ? (
                         <span className="flex items-center gap-1.5 justify-end">
-                          <span className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">
-                            {formatCurrency(Number(opt.price))} |
-                          </span>
+                          {(opt.originalPrice ?? Number(opt.price)) > 0 && (
+                            <span className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">
+                              {formatCurrency(Number(opt.originalPrice ?? opt.price))} |
+                            </span>
+                          )}
                           <span className="text-sm font-bold text-brand-green">Grátis</span>
                         </span>
                       ) : (

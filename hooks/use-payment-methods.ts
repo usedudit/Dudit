@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
-import { useStore } from "@/lib/store-context"
+import { useStoreOrNull } from "@/lib/store-context"
 
 const PAYMENT_METHODS_KEY = (partnerId: string, storeKey: string) => ["erp-payment-methods", partnerId, storeKey] as const
 
@@ -11,12 +11,17 @@ function resolveStoreKey(storeId?: string | null): string {
     return storeId || "__global__"
 }
 
-export function usePaymentMethods(partnerId: string, storeId?: string | null) {
+export function usePaymentMethods(
+    partnerId: string,
+    storeId?: string | null,
+    options?: { enabled?: boolean },
+) {
     const queryClient = useQueryClient()
-    const storeContext = useStore()
+    const storeContext = useStoreOrNull()
 
-    const effectiveStoreId = storeId ?? storeContext.selectedStore?.id ?? null
+    const effectiveStoreId = storeId ?? storeContext?.selectedStore?.id ?? null
     const storeKey = resolveStoreKey(effectiveStoreId)
+    const isEnabled = (options?.enabled ?? true) && Boolean(partnerId && partnerId.trim().length > 0)
 
     const { data, isLoading, error } = useQuery({
         queryKey: PAYMENT_METHODS_KEY(partnerId, storeKey),
@@ -26,7 +31,7 @@ export function usePaymentMethods(partnerId: string, storeId?: string | null) {
         },
         staleTime: 5 * 60_000,
         refetchOnWindowFocus: false,
-        enabled: Boolean(partnerId && partnerId.trim().length > 0),
+        enabled: isEnabled,
         retry: 1,
     })
 

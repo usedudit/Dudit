@@ -5154,6 +5154,24 @@ export async function updateERPOrderAction(
 
       if ("error" in movementResult) return { error: movementResult.error };
     }
+
+    const editedStockDeltaItems = [...delta.incoming, ...delta.outgoing];
+    if (editedStockDeltaItems.length > 0) {
+      import("@/lib/services/integrations/erp-sync")
+        .then(({ syncItemsStockToConnectedErps }) =>
+          syncItemsStockToConnectedErps({
+            partnerId: data.partnerId,
+            items: editedStockDeltaItems
+              .filter((it: any) => it?.product_id)
+              .map((it: any) => ({
+                productId: it.product_id,
+                variantId: it.variant_id || null,
+              })),
+            reason: `Edição de pedido Dudit #${currentOrder.order_number || orderId}`,
+          })
+        )
+        .catch(() => {});
+    }
   } else if (capabilities.hasStockMovements) {
     if (delta.incoming.length > 0) {
       const releaseResult = await releaseOrderInventory({
@@ -5225,37 +5243,46 @@ export async function updateERPOrderAction(
         .eq("id", orderId)
         .eq("partner_id", data.partnerId);
 
+      // Captura snapshot do estoque físico recém-baixado na Dudit ANTES de chamar o ERP
+      // (evita race condition onde webhook do ERP sobrescreva temporariamente o saldo antes do balanço)
+      const stockSnapshots: Array<{ productId: string; variantId?: string | null; newStock: number }> = [];
+      for (const it of stockItems) {
+        if (!it.product_id) continue;
+        if (it.variant_id) {
+          const { data: vRow } = await supabase
+            .from("product_variants")
+            .select("stock_quantity")
+            .eq("id", it.variant_id)
+            .maybeSingle();
+          stockSnapshots.push({
+            productId: it.product_id,
+            variantId: it.variant_id,
+            newStock: Math.max(0, Number(vRow?.stock_quantity || 0)),
+          });
+        } else {
+          const { data: pRow } = await supabase
+            .from("products")
+            .select("stock_quantity")
+            .eq("id", it.product_id)
+            .maybeSingle();
+          stockSnapshots.push({
+            productId: it.product_id,
+            variantId: null,
+            newStock: Math.max(0, Number(pRow?.stock_quantity || 0)),
+          });
+        }
+      }
+
       // Atualiza situação e estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling)
       import("@/lib/services/integrations/erp-sync")
-        .then(async ({ updateOrderStatusOnConnectedErps, syncStockToConnectedErps }) => {
+        .then(async ({ updateOrderStatusOnConnectedErps, syncItemsStockToConnectedErps }) => {
           const erpSit = data.deliveryStatus === "delivered" ? "entregue" : "enviado";
           await updateOrderStatusOnConnectedErps({ orderId, situacao: erpSit });
-          for (const it of stockItems) {
-            if (!it.product_id) continue;
-            let newStock = 0;
-            if (it.variant_id) {
-              const { data: vRow } = await supabase
-                .from("product_variants")
-                .select("stock_quantity")
-                .eq("id", it.variant_id)
-                .maybeSingle();
-              newStock = Number(vRow?.stock_quantity || 0);
-            } else {
-              const { data: pRow } = await supabase
-                .from("products")
-                .select("stock_quantity")
-                .eq("id", it.product_id)
-                .maybeSingle();
-              newStock = Number(pRow?.stock_quantity || 0);
-            }
-            await syncStockToConnectedErps({
-              partnerId: data.partnerId,
-              productId: it.product_id,
-              variantId: it.variant_id || undefined,
-              newStock,
-              reason: `Baixa entrega pedido #${currentOrder.order_number || orderId}`,
-            });
-          }
+          await syncItemsStockToConnectedErps({
+            partnerId: data.partnerId,
+            items: stockSnapshots,
+            reason: `Baixa entrega pedido #${currentOrder.order_number || orderId}`,
+          });
         })
         .catch(() => {});
     }
@@ -6272,6 +6299,22 @@ export async function updateOrdersStatusInBatchAction(payload: {
             orderWarnings.push(
               `Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`,
             );
+          } else {
+            // Sincroniza o estoque físico restaurado com ERPs conectados (Tiny / Bling)
+            import("@/lib/services/integrations/erp-sync")
+              .then(({ syncItemsStockToConnectedErps }) =>
+                syncItemsStockToConnectedErps({
+                  partnerId: payload.partnerId,
+                  items: (order.order_items || [])
+                    .filter((it: any) => it?.product_id)
+                    .map((it: any) => ({
+                      productId: it.product_id,
+                      variantId: it.variant_id || null,
+                    })),
+                  reason: `Estorno cancelamento pedido Dudit #${order.order_number || order.id}`,
+                })
+              )
+              .catch(() => {});
           }
         } else if (!order.inventory_deducted) {
           const releaseResult = await releaseOrderInventory({
@@ -7040,39 +7083,52 @@ export async function updateOrdersStatusInBatchAction(payload: {
       successfullyUpdatedOrderIds.add(String(order.id));
       deliveryProcessedCount += 1;
 
+      // Captura snapshot do estoque físico recém-baixado na Dudit ANTES de chamar o ERP
+      // (evita race condition onde webhook do Bling/Tiny sobrescreva o saldo com o valor pré-baixa
+      // antes de enviarmos o balanço físico)
+      const deliveryStockSnapshots: Array<{ productId: string; variantId?: string | null; newStock: number }> = [];
+      for (const it of order.order_items || []) {
+        if (!it.product_id) continue;
+        if (it.variant_id) {
+          const { data: vRow } = await supabase
+            .from("product_variants")
+            .select("stock_quantity")
+            .eq("id", it.variant_id)
+            .maybeSingle();
+          deliveryStockSnapshots.push({
+            productId: it.product_id,
+            variantId: it.variant_id,
+            newStock: Math.max(0, Number(vRow?.stock_quantity || 0)),
+          });
+        } else {
+          const { data: pRow } = await supabase
+            .from("products")
+            .select("stock_quantity")
+            .eq("id", it.product_id)
+            .maybeSingle();
+          deliveryStockSnapshots.push({
+            productId: it.product_id,
+            variantId: null,
+            newStock: Math.max(0, Number(pRow?.stock_quantity || 0)),
+          });
+        }
+      }
+
       // Garante exportação do pedido (caso ainda não tenha sido enviado ao ERP), atualiza situação (enviado/entregue)
-      // e sincroniza estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling)
+      // e sincroniza estoque físico (balanço idempotente) no ERP conectado (Tiny / Bling) sem duplicar baixa
       import("@/lib/services/integrations/erp-sync")
-        .then(async ({ exportOrderToConnectedErps, updateOrderStatusOnConnectedErps, syncStockToConnectedErps }) => {
-          await exportOrderToConnectedErps(order.id);
+        .then(async ({ exportOrderToConnectedErps, updateOrderStatusOnConnectedErps, syncItemsStockToConnectedErps }) => {
+          const exportRes = await exportOrderToConnectedErps(order.id);
           const erpSit = payload.statusValue === "delivered" ? "entregue" : "enviado";
-          await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit });
-          for (const it of order.order_items || []) {
-            if (!it.product_id) continue;
-            let newStock = 0;
-            if (it.variant_id) {
-              const { data: vRow } = await supabase
-                .from("product_variants")
-                .select("stock_quantity")
-                .eq("id", it.variant_id)
-                .maybeSingle();
-              newStock = Number(vRow?.stock_quantity || 0);
-            } else {
-              const { data: pRow } = await supabase
-                .from("products")
-                .select("stock_quantity")
-                .eq("id", it.product_id)
-                .maybeSingle();
-              newStock = Number(pRow?.stock_quantity || 0);
-            }
-            await syncStockToConnectedErps({
-              partnerId: payload.partnerId,
-              productId: it.product_id,
-              variantId: it.variant_id || undefined,
-              newStock,
-              reason: `Baixa entrega pedido #${order.order_number || order.id}`,
-            });
+          if (!exportRes.exportedProviders.length) {
+            await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit });
           }
+          await syncItemsStockToConnectedErps({
+            partnerId: payload.partnerId,
+            items: deliveryStockSnapshots,
+            reason: `Baixa entrega pedido #${order.order_number || order.id}`,
+            excludeProviders: exportRes.syncedStockProviders,
+          });
         })
         .catch(() => {});
     }

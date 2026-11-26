@@ -166,6 +166,7 @@ export default function DeliveryPageControls({
 }: DeliveryPageControlsProps) {
     const hookIsTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const isTabletOrMobile = propIsTabletOrMobile ?? hookIsTabletOrMobile
+    const isDelivery = String(userRole || "").toLowerCase() === "delivery"
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
 
@@ -187,32 +188,34 @@ export default function DeliveryPageControls({
     return (
         <>
             {/* --- TABS --- */}
-            <div className="mb-6 px-4 md:px-8">
-                <Tabs
-                    value={mode}
-                    onValueChange={(val) => setMode(val as "deliveries" | "carriers")}
-                >
-                    <TabsList className="px-0">
-                        {(
-                            ["deliveries", "carriers"] as const
-                        ).map((tab) => {
-                            const config = TAB_CONFIG[tab]
-                            const Icon = config.icon
-                            const countKey = tab === "deliveries" ? "Delivery" : "Transportadora"
-                            return (
-                                <TabsTrigger
-                                    key={tab}
-                                    value={tab}
-                                    icon={Icon}
-                                    badge={tabCounts && <TabCountBadge count={tabCounts[countKey as keyof typeof tabCounts]} variant={config.variant} />}
-                                >
-                                    {config.label}
-                                </TabsTrigger>
-                            )
-                        })}
-                    </TabsList>
-                </Tabs>
-            </div>
+            {!isDelivery && (
+                <div className="mb-6 px-4 md:px-8">
+                    <Tabs
+                        value={mode}
+                        onValueChange={(val) => setMode(val as "deliveries" | "carriers")}
+                    >
+                        <TabsList className="px-0">
+                            {(
+                                ["deliveries", "carriers"] as const
+                            ).map((tab) => {
+                                const config = TAB_CONFIG[tab]
+                                const Icon = config.icon
+                                const countKey = tab === "deliveries" ? "Delivery" : "Transportadora"
+                                return (
+                                    <TabsTrigger
+                                        key={tab}
+                                        value={tab}
+                                        icon={Icon}
+                                        badge={tabCounts && <TabCountBadge count={tabCounts[countKey as keyof typeof tabCounts]} variant={config.variant} />}
+                                    >
+                                        {config.label}
+                                    </TabsTrigger>
+                                )
+                            })}
+                        </TabsList>
+                    </Tabs>
+                </div>
+            )}
 
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
@@ -258,7 +261,7 @@ export default function DeliveryPageControls({
                             </DropdownItem>
                         </Dropdown>
                     )}
-                    {userRole !== "delivery" && mode === "deliveries" && (
+                    {!isDelivery && mode === "deliveries" && (
                         <Dropdown
                             trigger={
                                 <Button variant="outline" className="w-[42px] h-[42px] p-0">
@@ -274,7 +277,7 @@ export default function DeliveryPageControls({
                             </DropdownItem>
                         </Dropdown>
                     )}
-                    {userRole !== "delivery" && mode === "deliveries" && (
+                    {!isDelivery && mode === "deliveries" && (
                         <Button
                             onClick={onAdd}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"

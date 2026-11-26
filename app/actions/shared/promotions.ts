@@ -1160,11 +1160,14 @@ export async function listActivePromotionsForPartnersAction(partnerIds: string[]
   const promoMap = new Map<string, PricingPromotion[]>()
   if (!partnerIds || partnerIds.length === 0) return promoMap
 
-  const eligiblePartnerIds: string[] = []
-  for (const partnerId of Array.from(new Set(partnerIds))) {
-    const capabilities = await resolveMarketplaceCapabilities(partnerId)
-    if (capabilities.campaignsEnabled) eligiblePartnerIds.push(partnerId)
-  }
+  const uniquePartnerIds = Array.from(new Set(partnerIds))
+  const capabilityChecks = await Promise.all(
+    uniquePartnerIds.map(async (partnerId) => {
+      const capabilities = await resolveMarketplaceCapabilities(partnerId)
+      return capabilities.campaignsEnabled ? partnerId : null
+    })
+  )
+  const eligiblePartnerIds = capabilityChecks.filter((id): id is string => id !== null)
   if (eligiblePartnerIds.length === 0) return promoMap
 
   const supabase = getAdminClient()

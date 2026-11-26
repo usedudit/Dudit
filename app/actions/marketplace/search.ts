@@ -34,43 +34,41 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
 }
 
 // ─── Badges de vitrine (Últimos N / Destaque / promoções) ──────────────────
-// Mesma lógica da homepage (discover.ts applyUrgencyBadges) para que o
-// ItemCard renderize os badges no /explorar exatamente como no home.
+// Mesma lógica centralizada em lib/marketplace/badges.ts para que o ItemCard
+// renderize badges consistentes no /explorar, na home e nas lojas.
 
-async function decorateExploreItems(items: any[], options: { includePromotions?: boolean } = {}): Promise<any[]> {
+async function decorateExploreItems(
+    items: any[],
+    options: { includePromotions?: boolean; userId?: string | null } = {}
+): Promise<any[]> {
     if (!Array.isArray(items) || items.length === 0) return items
 
     // Clona produtos: os arrays podem ser compartilhados com o searchMemoryCache
     // e não podem ser mutados com badges de um usuário específico.
-    const decorated = items.map((item) => (item && item.itemType === "produto" ? { ...item } : item))
-
-    let userId: string | null = null
-    try {
-        const user = await getCurrentUser()
-        userId = user?.id ?? null
-    } catch { }
-
-    const seed = `dudit-${userId ?? "anon"}-${new Date().toDateString()}`
-    for (const item of decorated) {
-        if (!item || item.itemType !== "produto") continue
-        if (item._sales === undefined) item._sales = Number(item.sales_last_30_days ?? 0) || 0
-        if (item._stock === undefined) item._stock = Number(item.stock_quantity ?? item.stock_available ?? 0) || 0
-        if (item._badgeLabel) continue
-
-        let h = 0
-        const s = `${seed}-${item.id}-launch-badge`
-        for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i)
-        const bucket = Math.abs(h) % 100
-        const stock = item._stock
-
-        if (stock > 0 && stock <= 5 && bucket < 45) {
-            item._badgeLabel = `Últimos ${stock}`
-            item._badgeVariant = "red"
-        } else if (bucket >= 75 && bucket < 90) {
-            item._badgeLabel = "Destaque"
-            item._badgeVariant = "purple"
+    const cloned = items.map((item) => {
+        if (!item || item.itemType !== "produto") return item
+        return {
+            ...item,
+            _sales: item._sales !== undefined ? item._sales : (Number(item.sales_last_30_days ?? 0) || 0),
+            _stock: item._stock !== undefined ? item._stock : (Number(item.stock_quantity ?? item.stock_available ?? 0) || 0),
         }
+    })
+
+    let userId: string | null = options.userId !== undefined ? options.userId : null
+    if (options.userId === undefined) {
+        try {
+            const user = await getCurrentUser()
+            userId = user?.id ?? null
+        } catch { }
     }
+
+    const { applyMarketplaceBadges } = await import("@/lib/marketplace/badges")
+    const decorated = applyMarketplaceBadges(cloned, {
+        userId,
+        maxHighlights: 4,
+        maxHighlightRatio: 0.05,
+        onePerStore: true,
+    })
 
     if (options.includePromotions) {
         try {
@@ -356,6 +354,7 @@ export const searchMarketplaceDirectFull = cache(async (
         longitude?: number;
         centerCoords?: { lat: number; lng: number } | null;
         section?: string;
+        userId?: string | null;
     } = {}
 ) => {
     const isCity = limits.cidade && limits.cidade !== "brasil" && !limits.cidade.startsWith("estado-")
@@ -378,24 +377,46 @@ export const searchMarketplaceDirectFull = cache(async (
 
     // Sessão/coords só são obrigatórias antes da busca quando há filtro de raio
     // (o cálculo de distância usa o resultado ao final, não o início).
-    const sessionCoordsPromise = (async () => {
-        if (immediateCoords) return immediateCoords
-        const user = await getCurrentUser()
-        const sessionData = user ? await getUserSessionData(user.id) : null
-        if (sessionData?.profile?.latitude && sessionData?.profile?.longitude) {
-            return { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
+    const sessionCoordsPromise = (async (): Promise<{ coords: { lat: number; lng: number } | null; userId: string | null }> => {
+        if (immediateCoords && limits.userId !== undefined) {
+            return { coords: immediateCoords, userId: limits.userId }
         }
-        if (limits.cidade) return await resolveCityCoordsFromSlug(limits.cidade)
-        return null
+        const user = limits.userId !== undefined ? null : await getCurrentUser()
+        const resolvedUserId = limits.userId !== undefined ? limits.userId : (user?.id ?? null)
+        if (immediateCoords) {
+            return { coords: immediateCoords, userId: resolvedUserId }
+        }
+        const sessionData = resolvedUserId ? await getUserSessionData(resolvedUserId) : null
+        if (sessionData?.profile?.latitude && sessionData?.profile?.longitude) {
+            return {
+                coords: { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude },
+                userId: resolvedUserId,
+            }
+        }
+        if (limits.cidade) {
+            return { coords: await resolveCityCoordsFromSlug(limits.cidade), userId: resolvedUserId }
+        }
+        return { coords: null, userId: resolvedUserId }
     })()
 
+    const extraStoreTerms =
+        hasTextQuery &&
+        isFirstPage &&
+        searchIntent &&
+        searchIntent.relatedTerms.length > 0 &&
+        (type === "tudo" || type === "vitrines")
+            ? searchIntent.relatedTerms.slice(0, 6)
+            : undefined
+
     const localPromise = limits.radius
-        ? sessionCoordsPromise.then((finalCoords) => _searchMarketplaceCore(effectiveQuery, type, {
+        ? sessionCoordsPromise.then(({ coords }) => _searchMarketplaceCore(effectiveQuery, type, {
             ...limits,
-            centerCoords: finalCoords
+            extraStoreTerms,
+            centerCoords: coords
         }))
         : _searchMarketplaceCore(effectiveQuery, type, {
             ...limits,
+            extraStoreTerms,
             centerCoords: immediateCoords
         })
 
@@ -406,6 +427,7 @@ export const searchMarketplaceDirectFull = cache(async (
             servicos: type === 'servicos' || type === 'tudo' ? 20 : 0,
             planos: type === 'planos' || type === 'tudo' ? 20 : 0,
             geral: 40,
+            extraStoreTerms,
         })
         : Promise.resolve({ results: [] })
 
@@ -414,12 +436,14 @@ export const searchMarketplaceDirectFull = cache(async (
         ? resolveCityAndStateFromSlug(limits.cidade)
         : Promise.resolve(null)
 
-    let [finalCoords, localRes, distantRes, localScopeCity] = await Promise.all([
+    let [sessionInfo, localRes, distantRes, localScopeCity] = await Promise.all([
         sessionCoordsPromise,
         localPromise,
         distantPromise,
         localScopePromise,
     ])
+    const finalCoords = sessionInfo.coords
+    const resolvedUserId = sessionInfo.userId
 
     // Fase 3 (Zero-result fallback): se a busca limpa não encontrou nada, consulta IA + cache e tenta 1x com o termo sugerido
     if (
@@ -433,9 +457,14 @@ export const searchMarketplaceDirectFull = cache(async (
         const aiIntent = await resolveAiSearchIntent(query, searchIntent, { forceOnZeroResults: true })
         if (aiIntent.cleanQuery && aiIntent.cleanQuery !== effectiveQuery) {
             searchIntent = aiIntent
+            const aiExtraStoreTerms =
+                aiIntent.relatedTerms.length > 0 && (type === "tudo" || type === "vitrines")
+                    ? aiIntent.relatedTerms.slice(0, 6)
+                    : undefined
             const [retryLocal, retryDistant] = await Promise.all([
                 _searchMarketplaceCore(aiIntent.cleanQuery, type, {
                     ...limits,
+                    extraStoreTerms: aiExtraStoreTerms,
                     centerCoords: finalCoords,
                 }),
                 shouldFetchDistant
@@ -445,6 +474,7 @@ export const searchMarketplaceDirectFull = cache(async (
                         servicos: type === 'servicos' || type === 'tudo' ? 20 : 0,
                         planos: type === 'planos' || type === 'tudo' ? 20 : 0,
                         geral: 40,
+                        extraStoreTerms: aiExtraStoreTerms,
                     })
                     : Promise.resolve({ results: [] }),
             ])
@@ -462,89 +492,7 @@ export const searchMarketplaceDirectFull = cache(async (
         })
     )
 
-    // Fase 1 (Associação produto <-> vitrines): ex. "pneu" traz borracharias / auto centers / oficinas relacionadas
-    if (
-        hasTextQuery &&
-        isFirstPage &&
-        searchIntent &&
-        searchIntent.relatedTerms.length > 0 &&
-        (type === "tudo" || type === "vitrines")
-    ) {
-        const existingLocalStoreIds = new Set(
-            localResults.filter((r: any) => r.itemType === "loja").map((r: any) => String(r.id))
-        )
-        const existingDistantStoreIds = new Set(
-            (distantRes.results || []).filter((r: any) => r.itemType === "loja").map((r: any) => String(r.id))
-        )
-        const relatedStoreTerms = searchIntent.relatedTerms.slice(0, 4)
-
-        const [relatedLocalBatches, relatedDistantBatches] = await Promise.all([
-            existingLocalStoreIds.size < 4
-                ? Promise.all(
-                    relatedStoreTerms.map((term) =>
-                        _searchMarketplaceCore(term, "vitrines", {
-                            ...limits,
-                            vitrines: 4,
-                            centerCoords: finalCoords,
-                        }).catch(() => ({ results: [] }))
-                    )
-                )
-                : Promise.resolve([]),
-            shouldFetchDistant && existingDistantStoreIds.size < 4
-                ? Promise.all(
-                    relatedStoreTerms.map((term) =>
-                        _searchMarketplaceCore(term, "vitrines", {
-                            vitrines: 6,
-                        }).catch(() => ({ results: [] }))
-                    )
-                )
-                : Promise.resolve([]),
-        ])
-
-        for (const batch of relatedLocalBatches) {
-            for (const store of batch.results || []) {
-                if (store.itemType !== "loja") continue
-                const sid = String(store.id)
-                if (existingLocalStoreIds.has(sid)) continue
-                if (!isItemWithinSearchScope(store, {
-                    city: localScopeCity?.city ?? null,
-                    state: localScopeCity?.state ?? null,
-                    center: finalCoords,
-                    radius: limits.radius ?? null,
-                })) continue
-                existingLocalStoreIds.add(sid)
-                localResults.push(store)
-            }
-        }
-
-        for (const batch of relatedDistantBatches) {
-            for (const store of batch.results || []) {
-                if (store.itemType !== "loja") continue
-                const sid = String(store.id)
-                if (existingLocalStoreIds.has(sid) || existingDistantStoreIds.has(sid)) continue
-                existingDistantStoreIds.add(sid)
-                distantRes.results = [...(distantRes.results || []), store]
-            }
-        }
-    }
-
     let resultsWithDistance = enrichMarketplaceDistance(localResults, finalCoords)
-
-    // Fase 2: Quando a intenção é serviço (ou há janela de horário), prioriza serviços e checa disponibilidade real nos top 20
-    if (searchIntent && (searchIntent.intent === "service" || searchIntent.timeWindow)) {
-        if (type === "tudo" && resultsWithDistance.length > 1) {
-            resultsWithDistance = [
-                ...resultsWithDistance.filter((r: any) => r.itemType === "servico"),
-                ...resultsWithDistance.filter((r: any) => r.itemType !== "servico"),
-            ]
-        }
-        const supabase = getAdminClient()
-        resultsWithDistance = await enrichServicesWithAvailability(
-            resultsWithDistance,
-            searchIntent.timeWindow,
-            supabase,
-        )
-    }
 
     let moreDistantSellers: any[] = []
     let moreDistantItems: any[] = []
@@ -561,15 +509,27 @@ export const searchMarketplaceDirectFull = cache(async (
         moreDistantItems = sortDistantByRankAndDistance(
             enrichedDistant.filter((r: any) => r.itemType !== 'loja')
         ).slice(0, 20)
+    }
 
-        if (searchIntent && (searchIntent.intent === "service" || searchIntent.timeWindow) && moreDistantItems.length > 0) {
-            const supabase = getAdminClient()
-            moreDistantItems = await enrichServicesWithAvailability(
-                moreDistantItems,
-                searchIntent.timeWindow,
-                supabase,
-            )
+    // Fase 2: Quando a intenção é serviço (ou há janela de horário), prioriza serviços e checa
+    // disponibilidade real em um único batch (locais + distantes juntos) para evitar 2 roundtrips.
+    if (searchIntent && (searchIntent.intent === "service" || searchIntent.timeWindow)) {
+        if (type === "tudo" && resultsWithDistance.length > 1) {
+            resultsWithDistance = [
+                ...resultsWithDistance.filter((r: any) => r.itemType === "servico"),
+                ...resultsWithDistance.filter((r: any) => r.itemType !== "servico"),
+            ]
         }
+        const supabase = getAdminClient()
+        const localLen = resultsWithDistance.length
+        const combined = [...resultsWithDistance, ...moreDistantItems]
+        const enrichedCombined = await enrichServicesWithAvailability(
+            combined,
+            searchIntent.timeWindow,
+            supabase,
+        )
+        resultsWithDistance = enrichedCombined.slice(0, localLen)
+        moreDistantItems = enrichedCombined.slice(localLen)
     }
 
     let finalResults = resultsWithDistance
@@ -606,8 +566,8 @@ export const searchMarketplaceDirectFull = cache(async (
     }
 
     const [decoratedResults, decoratedDistantItems] = await Promise.all([
-        decorateExploreItems(finalResults, { includePromotions: isFirstPage }),
-        decorateExploreItems(moreDistantItems),
+        decorateExploreItems(finalResults, { includePromotions: isFirstPage, userId: resolvedUserId }),
+        decorateExploreItems(moreDistantItems, { userId: resolvedUserId }),
     ])
 
     // Fase 1: Anéis de proximidade (Perto de você -> Cidades vizinhas -> Envio nacional CEP)
@@ -711,6 +671,22 @@ function getCachedGlobalVersion(): number {
 }
 
 const searchMemoryCache = new Map<string, { results: any[]; filteredIds: string[]; expiresAt: number }>()
+const MAX_SEARCH_MEMORY_ENTRIES = 500
+
+function setSearchMemoryCache(key: string, value: { results: any[]; filteredIds: string[]; expiresAt: number }) {
+    if (searchMemoryCache.size >= MAX_SEARCH_MEMORY_ENTRIES) {
+        const now = Date.now()
+        for (const [k, entry] of searchMemoryCache.entries()) {
+            if (entry.expiresAt <= now) searchMemoryCache.delete(k)
+        }
+        while (searchMemoryCache.size >= MAX_SEARCH_MEMORY_ENTRIES) {
+            const oldestKey = searchMemoryCache.keys().next().value
+            if (!oldestKey) break
+            searchMemoryCache.delete(oldestKey)
+        }
+    }
+    searchMemoryCache.set(key, value)
+}
 
 export async function invalidateInMemoryVersionCache(): Promise<void> {
     localGlobalVersion++
@@ -726,6 +702,7 @@ const serializeSearchKey = (query: string, type: string, limits: any) => {
         limits.vitrines || '',
         limits.produtos || '',
         limits.servicos || '',
+        limits.planos || '',
         limits.geral || '',
         limits.cursor || '',
         limits.lastId || '',
@@ -734,6 +711,7 @@ const serializeSearchKey = (query: string, type: string, limits: any) => {
         limits.radius || '',
         limits.latitude || '',
         limits.longitude || '',
+        Array.isArray(limits.extraStoreTerms) ? limits.extraStoreTerms.join(',') : '',
     ].map(String).join(":")
 }
 
@@ -755,6 +733,7 @@ async function _searchMarketplaceCore(
         longitude?: number;
         centerCoords?: { lat: number; lng: number } | null;
         section?: string;
+        extraStoreTerms?: string[];
     } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
@@ -769,8 +748,11 @@ async function _searchMarketplaceCore(
     // 0. IN-MEMORY CACHE (0ms latency, ZERO Redis network roundtrips)
     if (!isPagination) {
         const memHit = searchMemoryCache.get(cacheKey)
-        if (memHit && memHit.expiresAt > Date.now()) {
-            return { results: memHit.results, filteredIds: memHit.filteredIds }
+        if (memHit) {
+            if (memHit.expiresAt > Date.now()) {
+                return { results: memHit.results, filteredIds: memHit.filteredIds }
+            }
+            searchMemoryCache.delete(cacheKey)
         }
     }
 
@@ -781,9 +763,9 @@ async function _searchMarketplaceCore(
     results = applyShowcasePenalty(results)
     filteredIds = results.map(r => `${r.itemType}:${r.id}`)
 
-    // 3. SAVE TO LOCAL RAM CACHE (60s SWR, zero remote Redis writes)
+    // 3. SAVE TO LOCAL RAM CACHE (60s SWR, bounded LRU/FIFO, zero remote Redis writes)
     if (!isPagination && filteredIds && filteredIds.length > 0) {
-        searchMemoryCache.set(cacheKey, { results, filteredIds, expiresAt: Date.now() + SEARCH_MEMORY_TTL_MS })
+        setSearchMemoryCache(cacheKey, { results, filteredIds, expiresAt: Date.now() + SEARCH_MEMORY_TTL_MS })
     }
 
     return { results, filteredIds }
@@ -811,6 +793,7 @@ async function _searchMarketplaceInternal(
         longitude?: number;
         centerCoords?: { lat: number; lng: number } | null;
         section?: string;
+        extraStoreTerms?: string[];
     } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, cursor, lastId, cursorRank } = limits
@@ -862,8 +845,8 @@ async function hydrateMarketplaceSearchHits(
         _hydrateProdIdx = promises.length
         promises.push(
             supabase.from("products").select(`
-                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
-                fulfillment_modes,
+                id, short_id, status, moderation_status, moderation_reason, name, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
+                condition, fulfillment_modes,
                 sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
@@ -882,7 +865,7 @@ async function hydrateMarketplaceSearchHits(
         _hydrateServIdx = promises.length
         promises.push(
             supabase.from("services").select(`
-                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, video_thumbnail, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                id, short_id, status, moderation_status, moderation_reason, name, price, promotional_price, images, video_thumbnail, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 fulfillment_modes, service_max_km, service_travel_fee_mode, service_free_travel_km, service_travel_flat_fee, service_travel_per_km, service_enforce_area,
                 marketplace_score, views_count, bookings_last_30_days, favorites_count,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
@@ -1073,9 +1056,9 @@ async function hydrateMarketplaceSearchHits(
 async function searchMarketplacePostgresFTS(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number; partnerIds?: string[] } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number; partnerIds?: string[]; storeIds?: string[]; extraStoreTerms?: string[] } = {}
 ) {
-    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, lastId, cursorRank, partnerIds } = limits
+    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, lastId, cursorRank, partnerIds, storeIds, extraStoreTerms } = limits
     const supabase = getAdminClient()
 
     if (!normalizeSearchQuery(query)) {
@@ -1093,14 +1076,30 @@ async function searchMarketplacePostgresFTS(
                     : servLimit
 
     try {
-        const { data: hits, error } = await supabase.rpc("search_marketplace_fts", {
+        const baseParams: Record<string, any> = {
             p_query: query,
             p_type: type,
             p_limit: limitCount,
             p_cursor_rank: cursorRank ?? null,
             p_cursor_id: lastId ?? null,
             p_partner_ids: partnerIds?.length ? partnerIds : null,
-        })
+            p_store_ids: storeIds?.length ? storeIds : null,
+        }
+
+        const hasExtraTerms = Boolean(extraStoreTerms?.length)
+        let { data: hits, error } = await supabase.rpc(
+            "search_marketplace_fts",
+            hasExtraTerms
+                ? { ...baseParams, p_extra_store_terms: extraStoreTerms }
+                : baseParams
+        )
+
+        // Fallback seguro caso o app seja deployado antes da migration 20261126_search_scale_and_quality_upgrade.sql
+        if (error && hasExtraTerms && (error.code === "PGRST202" || /p_extra_store_terms/i.test(error.message || ""))) {
+            const fallbackRes = await supabase.rpc("search_marketplace_fts", baseParams)
+            hits = fallbackRes.data
+            error = fallbackRes.error
+        }
 
         if (error) {
             console.error("Search FTS RPC Error:", error)
@@ -1135,6 +1134,7 @@ async function searchMarketplaceByCity(
         latitude?: number;
         longitude?: number;
         centerCoords?: { lat: number; lng: number } | null;
+        extraStoreTerms?: string[];
     }
 ) {
     const supabase = getAdminClient()
@@ -1171,7 +1171,7 @@ async function searchMarketplaceByCity(
             const p = Array.isArray(s.partners) ? s.partners[0] : s.partners
             return !isShowcaseAdminSuspended(s) && !isShowcaseAdminSuspended(p)
         })
-        let partnerIds: string[] = [...new Set(allPartners.flatMap((p: any) => [p.partner_id, p.id]).filter(Boolean))] as string[]
+        let scopedStores = allPartners
 
         // Filtro por Raio
         let centerCoords = limits.centerCoords || null
@@ -1183,8 +1183,8 @@ async function searchMarketplaceByCity(
             centerCoords = await resolveCityCoordsFromSlug(cidadeSlug)
         }
 
-        if (centerCoords && limits.radius && partnerIds.length > 0) {
-            const partnersInRadius = allPartners.filter((p: any) => {
+        if (centerCoords && limits.radius && scopedStores.length > 0) {
+            scopedStores = scopedStores.filter((p: any) => {
                 const addr = Array.isArray(p.addresses) ? p.addresses[0] : p.addresses
                 if (addr?.latitude !== null && addr?.longitude !== null) {
                     const dist = calculateDistance(centerCoords!, { lat: addr.latitude, lng: addr.longitude })
@@ -1192,16 +1192,19 @@ async function searchMarketplaceByCity(
                 }
                 return true
             })
-            partnerIds = [...new Set(partnersInRadius.flatMap((p: any) => [p.partner_id, p.id]).filter(Boolean))] as string[]
         }
 
-        if (!partnerIds.length) {
+        const partnerIds: string[] = [...new Set(scopedStores.map((p: any) => p.partner_id).filter(Boolean))] as string[]
+        const storeIds: string[] = [...new Set(scopedStores.map((p: any) => p.id).filter(Boolean))] as string[]
+
+        if (!partnerIds.length || !storeIds.length) {
             return { results: [], filteredIds: [] }
         }
 
         return searchMarketplacePostgresFTS(query, type, {
             ...limits,
             partnerIds,
+            storeIds,
             lastId: limits.lastId,
             cursorRank: limits.cursorRank,
         })
@@ -1297,7 +1300,8 @@ async function searchMarketplaceByCity(
             let pq = supabase
                 .from("products")
                 .select(`
-                    id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
+                    id, short_id, status, moderation_status, moderation_reason, name, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
+                    condition, fulfillment_modes,
                     sales_last_30_days, views_last_30_days, favorites_count, marketplace_score,
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
@@ -1323,7 +1327,7 @@ async function searchMarketplaceByCity(
             let sq = supabase
                 .from("services")
                 .select(`
-                    id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, video_thumbnail, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                    id, short_id, status, moderation_status, moderation_reason, name, price, promotional_price, images, video_thumbnail, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_score, views_count, bookings_last_30_days, favorites_count,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id),
@@ -1361,7 +1365,6 @@ async function searchMarketplaceByCity(
                 .eq("show_in_marketplace", true)
                 .or("moderation_status.eq.approved,moderation_status.is.null")
                 .in("partner_id", partnerIds)
-                .order("marketplace_score", { ascending: false, nullsFirst: false })
                 .order("marketplace_score", { ascending: false, nullsFirst: false })
                 .order("created_at", { ascending: false })
                 .limit(type === 'planos' || type === 'tudo' ? limitCount : 0)
@@ -1562,7 +1565,6 @@ async function searchMarketplaceByCity(
         results = normalizedPlans
     }
 
-    results.sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
     results.sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
     results = applySellerDiversity(results)
 

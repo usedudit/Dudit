@@ -84,14 +84,11 @@ export default function DeliveryAddressCard({
         {formatted && (
           <p className="whitespace-pre-line text-sm leading-relaxed text-brand-inactive-text dark:text-dark-body">
             {formatted}
-          </p>
-        )}
 
-        {(cityLine || zipCode) && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-            {cityLine && <span>{cityLine}</span>}
-            {zipCode && <span>CEP {zipCode}</span>}
-          </div>
+            {(zipCode) && (
+              <span>{zipCode}</span>
+            )}
+          </p>
         )}
       </div>
     </div>

@@ -2,12 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { formatCurrency } from "@/lib/utils"
-import { Button, AlertModal } from "@/components/reusable"
+import { Button, AlertModal, InfoCard } from "@/components/reusable"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { usePaymentMethods } from "@/hooks/use-payment-methods"
 import { getPaymentMethodDetailsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
-import { useStore } from "@/lib/store-context"
+import { useStoreOrNull } from "@/lib/store-context"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -44,6 +44,13 @@ type BalancePaymentCollectorProps = {
   onClearTargetLeg?: () => void
   onConfirmPayment?: () => void
   onHeaderStateChange?: (state: { title: string; canGoBack: boolean; onGoBack: () => void }) => void
+  driverMode?: boolean
+  preloadedMethods?: PartnerPaymentMethod[]
+  preloadedLoading?: boolean
+  storeName?: string
+  storePixKey?: string | null
+  storePixKeyType?: string | null
+  hideMethodSelection?: boolean
 }
 
 function buildFlatLeg(method: PartnerPaymentMethod, amount: number, installmentNumber = 1): PaymentBreakdownLeg {
@@ -74,13 +81,29 @@ export function BalancePaymentCollector({
   onClearTargetLeg,
   onConfirmPayment,
   onHeaderStateChange,
+  driverMode = false,
+  preloadedMethods,
+  preloadedLoading = false,
+  storeName,
+  storePixKey,
+  storePixKeyType,
+  hideMethodSelection = false,
 }: BalancePaymentCollectorProps) {
-  const { selectedStore } = useStore()
+  const storeContext = useStoreOrNull()
+  const selectedStore = storeContext?.selectedStore ?? null
   const { planSlug } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
-  const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
+  const isFreePlan = driverMode ? false : !hasMinimumPlan(planSlug, "crescer")
   const effectiveStoreId = storeId !== undefined ? storeId : selectedStore?.id
-  const { methods, isLoading } = usePaymentMethods(partnerId, effectiveStoreId)
+  const usePreloaded = driverMode && preloadedMethods !== undefined
+  const { methods: fetchedMethods, isLoading: fetchedLoading } = usePaymentMethods(
+    partnerId,
+    effectiveStoreId,
+    { enabled: !usePreloaded },
+  )
+  const methods = usePreloaded ? preloadedMethods : fetchedMethods
+  const isLoading = usePreloaded ? preloadedLoading : fetchedLoading
+  const effectiveStoreName = storeName || selectedStore?.name || "Loja"
   const activeMethods = useMemo(
     () => (methods || []).filter((m: PartnerPaymentMethod) => m.is_active !== false),
     [methods],
@@ -191,7 +214,7 @@ export function BalancePaymentCollector({
   }, [remainingBalance, partnerId, lockedMethodLabel])
 
   useEffect(() => {
-    if (!lockedMethodLabel || activeMethods.length === 0 || isLoading) return
+    if (!lockedMethodLabel || isLoading) return
     const normalizedLabel = normalizePaymentMethodLabel(lockedMethodLabel)
     const methodType = normalizeMethodType(normalizedLabel)
     const matches = activeMethods.filter((m: PartnerPaymentMethod) => {
@@ -201,8 +224,16 @@ export function BalancePaymentCollector({
     })
     if (matches.length > 0) {
       selectSingleMethod(matches[0])
+    } else if (driverMode) {
+      const fallback: PartnerPaymentMethod = {
+        id: "",
+        name: lockedMethodLabel,
+        type: methodType,
+        is_active: true,
+      }
+      selectSingleMethod(fallback)
     }
-  }, [lockedMethodLabel, activeMethods, isLoading])
+  }, [lockedMethodLabel, activeMethods, isLoading, driverMode])
 
   useEffect(() => {
     if (!targetLeg || activeMethods.length === 0 || isLoading) return
@@ -233,6 +264,23 @@ export function BalancePaymentCollector({
   // Effect to load Pix key details when method is selected and view goes to "pix"
   useEffect(() => {
     if (view === "pix" && selectedMethod) {
+      if (driverMode) {
+        const preloadedKey = (selectedMethod as any).pix_key || storePixKey || null
+        const preloadedType = (selectedMethod as any).pix_key_type || storePixKeyType || null
+        if (preloadedKey) {
+          setHasPixKey(true)
+          setSavedPixKey(preloadedKey)
+          setSavedPixKeyType(preloadedType)
+          setShowKeyInputs(false)
+        } else {
+          setHasPixKey(false)
+          setSavedPixKey(null)
+          setSavedPixKeyType(null)
+          setShowKeyInputs(false)
+        }
+        return
+      }
+      if (!selectedMethod.id) return
       getPaymentMethodDetailsAction(selectedMethod.id).then((res) => {
         if (res.success) {
           if (res.method.pix_key) {
@@ -248,7 +296,7 @@ export function BalancePaymentCollector({
         }
       })
     }
-  }, [view, selectedMethod])
+  }, [view, selectedMethod, driverMode, storePixKey, storePixKeyType])
 
   const emitLegs = useCallback(
     (legs: PaymentBreakdownLeg[]) => {
@@ -359,13 +407,13 @@ export function BalancePaymentCollector({
       openPlanUpgrade("crescer")
       return null
     }
-    if (!selectedMethod?.id) return null
+    if (!driverMode && !selectedMethod?.id) return null
     setGeneratingPix(true)
     try {
       const payload = generateStaticPix(
         keyToUse,
         amount,
-        selectedStore?.name || "Loja",
+        effectiveStoreName,
         "",
         "DUDIT",
         typeToUse
@@ -384,14 +432,13 @@ export function BalancePaymentCollector({
       openPlanUpgrade("crescer")
       return null
     }
-    if (!selectedMethod?.id) return null
     if (hasPixKey && savedPixKey) {
       setGeneratingPix(true)
       try {
         const payload = generateStaticPix(
           savedPixKey,
           pixAmount,
-          selectedStore?.name || "Loja",
+          effectiveStoreName,
           "",
           "DUDIT",
           savedPixKeyType
@@ -405,6 +452,12 @@ export function BalancePaymentCollector({
       }
     }
 
+    if (driverMode) {
+      return null
+    }
+
+    if (!selectedMethod?.id) return null
+
     setGeneratingPix(true)
     try {
       const res = await getPaymentMethodDetailsAction(selectedMethod.id)
@@ -416,7 +469,7 @@ export function BalancePaymentCollector({
         const payload = generateStaticPix(
           res.method.pix_key,
           pixAmount,
-          selectedStore?.name || "Loja",
+          effectiveStoreName,
           "",
           "DUDIT",
           res.method.pix_key_type
@@ -446,10 +499,10 @@ export function BalancePaymentCollector({
 
   return (
     <div className="space-y-4">
-      {!isLocked && view === "methods" && (
+      {!isLocked && !hideMethodSelection && view === "methods" && (
         <div className="space-y-3">
           <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-            Ou escolha outro método de pagamento:
+            {driverMode ? "Selecione a forma de pagamento:" : "Ou escolha outro método de pagamento:"}
           </h4>
           <PaymentMethodSelector
             availableMethodTypes={availableMethodTypes}
@@ -461,7 +514,7 @@ export function BalancePaymentCollector({
             onSelectDebitCard={() => openMethodType("debit_card")}
             onSelectBankTransfer={() => openMethodType("bank_transfer")}
             onSelectOther={() => openMethodType("other")}
-            onSelectSplit={() => setView("split")}
+            onSelectSplit={driverMode ? undefined : () => setView("split")}
           />
         </div>
       )}
@@ -488,32 +541,40 @@ export function BalancePaymentCollector({
       )}
 
       {view === "pix" && selectedMethod && (
-        <PixPaymentView
-          amount={amount}
-          onAmountChange={handleAmountChange}
-          baseAllocated={amount}
-          flatAmount
-          totalPaid={amount}
-          totalNeed={remainingBalance}
-          onGenerateQr={handleGeneratePix}
-          qrData={null}
-          isGenerating={generatingPix}
-          showKeyInputs={showKeyInputs}
-          tempPixKey={tempPixKey}
-          onTempPixKeyChange={setTempPixKey}
-          tempPixKeyType={tempPixKeyType}
-          onTempPixKeyTypeChange={setTempPixKeyType}
-          isFreePlan={isFreePlan}
-          onConfirmGenerateWithKey={() => {
-            if (tempPixKey) {
-              if (isFreePlan) {
-                handleGeneratePixWithKey(tempPixKey, tempPixKeyType)
-              } else {
-                setShowConfirmSaveModal(true)
+        <div className="space-y-3">
+          {driverMode && hasPixKey === false && (
+            <InfoCard
+              color="orange"
+              message="A loja não possui uma chave Pix cadastrada para gerar QR Code. Você ainda pode confirmar o recebimento manualmente após o cliente realizar o Pix."
+            />
+          )}
+          <PixPaymentView
+            amount={amount}
+            onAmountChange={handleAmountChange}
+            baseAllocated={amount}
+            flatAmount
+            totalPaid={amount}
+            totalNeed={remainingBalance}
+            onGenerateQr={driverMode && !hasPixKey ? undefined : handleGeneratePix}
+            qrData={null}
+            isGenerating={generatingPix}
+            showKeyInputs={driverMode ? false : showKeyInputs}
+            tempPixKey={tempPixKey}
+            onTempPixKeyChange={setTempPixKey}
+            tempPixKeyType={tempPixKeyType}
+            onTempPixKeyTypeChange={setTempPixKeyType}
+            isFreePlan={isFreePlan}
+            onConfirmGenerateWithKey={() => {
+              if (tempPixKey) {
+                if (isFreePlan) {
+                  handleGeneratePixWithKey(tempPixKey, tempPixKeyType)
+                } else {
+                  setShowConfirmSaveModal(true)
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+        </div>
       )}
 
       {view === "card" && selectedMethod && (
@@ -525,7 +586,7 @@ export function BalancePaymentCollector({
           installments={installments}
           onInstallmentsChange={setInstallments}
           maxInstallments={selectedMethod.max_installments || lockedInstallments || 12}
-          readOnlyInstallments={false}
+          readOnlyInstallments={Boolean(driverMode && lockedInstallments)}
           hideInstallments={isFreePlan || normalizeMethodType(selectedMethod.type) === "debit_card"}
           totalPaid={amount}
           totalNeed={remainingBalance}

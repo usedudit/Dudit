@@ -2,30 +2,23 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem, ActionsDropdown, IconPlaceholder, ThreeDotsLoader, Tooltip } from "@/components/reusable"
+import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, FormSection, ListItem, ActionsDropdown, IconPlaceholder, ThreeDotsLoader, Tooltip } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon, ShieldIcon, CheckCircleIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, ThreeDotsIcon, MoneyIcon, TruckIcon, StoreIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { checkDeliveryOtpRequirementAction, checkOrderDeliveryOtpRequirementAction } from "@/app/actions/delivery-otp"
 import ErpDeliveryOtpSection from "./ErpDeliveryOtpSection"
-import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
-import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatCurrency, formatDateTime } from "@/lib/utils"
 import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
 import { resolveLinkDeliveryStatus } from "@/lib/delivery/status-resolver"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
-import Portal from "@/components/Portal"
-import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { parseAddressString } from "../orders/CreateOrder"
 import PaymentStatusModal from "../orders/PaymentStatusModal"
-import DriverPaymentModal from "@/components/delivery/DriverPaymentModal"
 import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
 import DeliveryOrderDetailSheet from "./DeliveryOrderDetailSheet"
 import type { DuditPlatformDriver } from "./types"
@@ -102,8 +95,6 @@ export default function DeliveryDetailPage({
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
     const [activeLink, setActiveLink] = useState<any | null>(null)
     const [isOrderPaymentModalOpen, setIsOrderPaymentModalOpen] = useState(false)
-    const [isDriverPaymentModalOpen, setIsDriverPaymentModalOpen] = useState(false)
-    const [driverPaymentOrder, setDriverPaymentOrder] = useState<any | null>(null)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
@@ -123,7 +114,9 @@ export default function DeliveryDetailPage({
         orderNumber?: string | null
         customerName?: string | null
     }>({ loading: false, requiresOtp: false })
-    const isOwnerOrAdmin = userRole === "owner" || userRole === "admin"
+    const normalizedRole = String(userRole || "").toLowerCase()
+    const isOwnerOrAdmin = normalizedRole === "owner" || normalizedRole === "admin"
+    const isDelivery = normalizedRole === "delivery"
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
     const [orderStatusModal, setOrderStatusModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string } | null>(null)
     const [orderNewStatus, setOrderNewStatus] = useState<string>("")
@@ -640,13 +633,15 @@ export default function DeliveryDetailPage({
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                <ActionsDropdown
-                    onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
-                    onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
-                    cancelLabel="Cancelar entrega"
-                />
-            </div>
+            {!isDelivery && (
+                <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                    <ActionsDropdown
+                        onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
+                        onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
+                        cancelLabel="Cancelar entrega"
+                    />
+                </div>
+            )}
         </div>
     )
 
@@ -719,20 +714,22 @@ export default function DeliveryDetailPage({
                 </div>
 
                 {/* Mobile Bottom Action Bar */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                    <ActionsDropdown
-                        fullWidth
-                        onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
-                        onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
-                        cancelLabel="Cancelar entrega"
-                        className="!w-full"
-                        trigger={
-                            <Button variant="outline" className="flex-1 w-full h-12" leftIcon={<ThreeDotsIcon className="w-5 h-5" />}>
-                                Opções
-                            </Button>
-                        }
-                    />
-                </div>
+                {!isDelivery && (
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                        <ActionsDropdown
+                            fullWidth
+                            onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
+                            onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
+                            cancelLabel="Cancelar entrega"
+                            className="!w-full"
+                            trigger={
+                                <Button variant="outline" className="flex-1 w-full h-12" leftIcon={<ThreeDotsIcon className="w-5 h-5" />}>
+                                    Opções
+                                </Button>
+                            }
+                        />
+                    </div>
+                )}
             </Tabs>
 
             <AlertModal
@@ -850,7 +847,7 @@ export default function DeliveryDetailPage({
                             { value: 'sent', label: 'Enviado' },
                             { value: 'delivered', label: 'Entregue' },
                             { value: 'delivery_failed', label: 'Falha na entrega' },
-                            { value: 'cancelled', label: 'Cancelada' }
+                            ...(!isDelivery ? [{ value: 'cancelled', label: 'Cancelada' }] : []),
                         ]}
                     />
 
@@ -886,26 +883,11 @@ export default function DeliveryDetailPage({
                 onClose={() => setIsOrderPaymentModalOpen(false)}
                 order={selectedLink?.orders}
                 partnerId={partnerId}
+                driverMode={isDelivery}
+                assignmentId={delivery?.id || deliveryId}
                 onSuccess={() => {
                     loadDeliveryDetails()
                     setIsOrderPaymentModalOpen(false)
-                }}
-            />
-
-            <DriverPaymentModal
-                isOpen={isDriverPaymentModalOpen}
-                onClose={() => {
-                    setIsDriverPaymentModalOpen(false)
-                    setDriverPaymentOrder(null)
-                }}
-                assignmentId={delivery?.id || deliveryId}
-                order={driverPaymentOrder}
-                partnerId={partnerId}
-                canConfirm={(selectedLink?.status || driverPaymentOrder?.delivery_status) === "delivered"}
-                onSuccess={() => {
-                    setIsDriverPaymentModalOpen(false)
-                    setDriverPaymentOrder(null)
-                    loadDeliveryDetails()
                 }}
             />
 
@@ -950,7 +932,7 @@ export default function DeliveryDetailPage({
                                 { value: 'sent', label: 'Enviado' },
                                 { value: 'delivered', label: 'Entregue' },
                                 { value: 'delivery_failed', label: 'Falha na entrega' },
-                                { value: 'cancelled', label: 'Cancelada' }
+                                ...(!isDelivery ? [{ value: 'cancelled', label: 'Cancelada' }] : []),
                             ]}
                         />
 
@@ -1004,89 +986,40 @@ export default function DeliveryDetailPage({
                     ? Math.max(0, Number(selectedOrder.total_amount || 0) - Number(selectedOrder.paid_amount || 0))
                     : 0
 
-                const driverPaymentBanner = selectedOrder && userRole === "delivery" && !isPaid ? (
-                    isDelivered ? (
-                        <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <MoneyIcon size={20} className="text-brand-primary shrink-0" />
-                                <div>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento Pendente</p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Valor restante: {formatCurrency(remaining)}</p>
-                                </div>
+                const driverPaymentBanner = selectedOrder && isDelivery && !isPaid ? (
+                    <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <MoneyIcon size={20} className="text-brand-primary shrink-0" />
+                            <div>
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento Pendente</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Valor restante: {formatCurrency(remaining)}</p>
                             </div>
-                            <Button
-                                size="sm"
-                                onClick={() => {
-                                    setDriverPaymentOrder(selectedOrder)
-                                    setIsDriverPaymentModalOpen(true)
-                                }}
-                            >
-                                Receber Pagamento
-                            </Button>
                         </div>
-                    ) : (
-                        <InfoCard
-                            color="blue"
-                            message="O recebimento do pagamento poderá ser processado após a confirmação da entrega deste pedido."
-                        />
-                    )
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                setActiveLink(selectedLink)
+                                setIsOrderPaymentModalOpen(true)
+                            }}
+                        >
+                            Receber Pagamento
+                        </Button>
+                    </div>
                 ) : null
 
                 const sheetFooter = selectedOrder ? (
                     <div className="flex gap-3 w-full">
-                        {userRole === "delivery" ? (
-                            isPaid ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="flex-1 h-12"
-                                    onClick={() => {
-                                        setDriverPaymentOrder(selectedOrder)
-                                        setIsDriverPaymentModalOpen(true)
-                                    }}
-                                >
-                                    <CheckCircleIcon size={16} className="text-brand-green mr-1.5" />
-                                    Pago (Ver Detalhes)
-                                </Button>
-                            ) : isDelivered ? (
-                                <Button
-                                    type="button"
-                                    variant="default"
-                                    className="flex-1 h-12 font-bold"
-                                    onClick={() => {
-                                        setDriverPaymentOrder(selectedOrder)
-                                        setIsDriverPaymentModalOpen(true)
-                                    }}
-                                >
-                                    <MoneyIcon size={18} className="mr-1.5" />
-                                    Processar Pagamento
-                                </Button>
-                            ) : (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="flex-1 h-12"
-                                    onClick={() => {
-                                        setDriverPaymentOrder(selectedOrder)
-                                        setIsDriverPaymentModalOpen(true)
-                                    }}
-                                >
-                                    Status de Pagamento
-                                </Button>
-                            )
-                        ) : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="flex-1 h-12"
-                                onClick={() => {
-                                    setActiveLink(selectedLink)
-                                    setIsOrderPaymentModalOpen(true)
-                                }}
-                            >
-                                Status de Pagamento
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            variant={isDelivery && !isPaid ? "default" : "outline"}
+                            className="flex-1 h-12"
+                            onClick={() => {
+                                setActiveLink(selectedLink)
+                                setIsOrderPaymentModalOpen(true)
+                            }}
+                        >
+                            {isDelivery && !isPaid ? "Receber Pagamento" : "Status de Pagamento"}
+                        </Button>
                         <Button
                             type="button"
                             variant="outline"

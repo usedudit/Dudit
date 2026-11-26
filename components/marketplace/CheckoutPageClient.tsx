@@ -688,6 +688,15 @@ export function CheckoutPageClient() {
         [products],
     )
 
+    const carrierProductsSubtotal = useMemo(
+        () =>
+            products.reduce(
+                (sum: number, p: any) => sum + Number(p.unit_price ?? p.price ?? 0) * Math.max(1, Number(p.quantity || 1)),
+                0,
+            ),
+        [products],
+    )
+
     // Quote carrier options ONLY when carrierSectionVisible is true (own delivery
     // unavailable or outside radius). Avoids unnecessary SuperFrete API calls
     // for local deliveries inside the seller's radius.
@@ -697,7 +706,7 @@ export function CheckoutPageClient() {
             productId: p.product_id || p.id,
             quantity: Math.max(1, Number(p.quantity || 1)),
         }))
-        const dedupeKey = `${partnerId}:${destinationCep}:${carrierItemsKey}`
+        const dedupeKey = `${partnerId}:${destinationCep}:${carrierItemsKey}:${Math.round(carrierProductsSubtotal * 100)}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
         let completed = false
@@ -707,8 +716,10 @@ export function CheckoutPageClient() {
                 try {
                     const res = await quoteCarrierFreightAction({
                         partnerId,
+                        storeId: storeId || null,
                         toPostalCode: destinationCep,
                         items: productItems,
+                        orderSubtotal: carrierProductsSubtotal,
                     })
                     if (!active) return
                     if (res.success && res.options.length > 0) {
@@ -738,7 +749,7 @@ export function CheckoutPageClient() {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [carrierSectionVisible, destinationCep, partnerId, mpAvailable, carrierItemsKey])
+    }, [carrierSectionVisible, destinationCep, partnerId, storeId, mpAvailable, carrierItemsKey, carrierProductsSubtotal])
 
     const handleCarrierSelect = (opt: CarrierFreightOption) => {
         setSelectedCarrierServiceId(opt.serviceId)

@@ -220,7 +220,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         Gerencie entradas, saídas, correções e liberação de reservas
                     </p>
                 </div>
-                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex w-[40px] h-[40px]">
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex w-[40px] h-[40px]" data-unsaved-changes-ignore="true">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>
@@ -517,7 +517,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
             {/* Footer */}
             <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-4">
-                    <Button variant="outline" className="h-12 flex-1" onClick={onClose} disabled={isSaving}>
+                    <Button variant="outline" className="h-12 flex-1" onClick={onClose} disabled={isSaving} data-unsaved-changes-ignore="true">
                         Cancelar
                     </Button>
                     <Button
@@ -546,6 +546,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                 className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 style={{ zIndex }}
                 onClick={onClose}
+                data-unsaved-changes-ignore="true"
             >
                 <div
                     className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}

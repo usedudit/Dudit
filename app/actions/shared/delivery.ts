@@ -105,11 +105,17 @@ import {
   invalidateDeliveryContextCache,
   invalidateStoreCapabilityCache,
   invalidateServiceAttendanceCache,
+  invalidateCarrierFreeShippingRulesCache,
   deliveryContext,
   storeCapability,
   serviceAttendance,
   type DeliveryContext,
 } from "@/lib/delivery/order-cache"
+import {
+  normalizeStateList,
+  type CarrierFreeShippingAppliesTo,
+  type CarrierFreeShippingRule,
+} from "@/lib/services/shipping/carrier-free-shipping"
 
 async function resolveDeliveryContext(
   supabase: any,
@@ -146,11 +152,9 @@ async function resolveDeliveryContext(
 
   const settings = mapSettingsRow(settingsRow)
   const effectiveMaxKm = getEffectiveMaxDeliveryKm(settings)
-  const shouldCalculateDistance = (
-    effectiveMaxKm != null ||
-    settings.extraKmPrice > 0 ||
-    settings.includedKm > 0
-  )
+  // Always calculate distance when delivery is enabled so we enforce either
+  // the seller's configured radius or the local delivery fallback cap (50 km).
+  const shouldCalculateDistance = Boolean(settings.isDeliveryEnabled)
 
   let originCoords: { lat: number; lng: number } | null = null
   const storeAddr = Array.isArray(store?.addresses) ? store.addresses[0] : store?.addresses
@@ -222,10 +226,17 @@ export async function getPartnerDeliveryConfigAction(partnerId: string, storeId?
     rulesQuery = rulesQuery.is("store_id", null)
   }
 
-  const [settingsRow, { data: rules }] = await Promise.all([
+  const [settingsRow, { data: rules }, superFreteIntegration] = await Promise.all([
     resolveDeliverySettingsRow(supabase, partnerId, storeId),
     rulesQuery.order("start_time"),
+    findSuperFreteIntegration(supabase, partnerId),
   ])
+
+  const hasSuperFrete = Boolean(
+    superFreteIntegration &&
+    superFreteIntegration.status === "connected" &&
+    superFreteIntegration.access_token_encrypted,
+  )
 
   const normalizedSettings = mapSettingsRow(settingsRow)
   const normalizedRules = (rules || []).map(mapRuleRow)
@@ -233,6 +244,7 @@ export async function getPartnerDeliveryConfigAction(partnerId: string, storeId?
     success: true as const,
     planSlug: capability.planSlug,
     capability,
+    hasSuperFrete,
     settings: normalizedSettings,
     rules: normalizedRules,
   }
@@ -810,4 +822,106 @@ export async function checkServiceAttendanceAction(input: {
     fee: res.fee,
     outOfRadius: res.outOfRadius,
   }
+}
+
+// ─── Carrier free shipping rules (frete grátis por estado/valor na transportadora) ───
+
+function mapCarrierFreeShippingRuleRow(row: any): CarrierFreeShippingRule {
+  return {
+    id: String(row.id),
+    storeId: row.store_id || null,
+    minOrderValue: Math.max(0, Number(row.min_order_value || 0)),
+    allStates: Boolean(row.all_states),
+    states: normalizeStateList(row.states),
+    appliesTo: row.applies_to === "all" ? "all" : "cheapest",
+    isActive: Boolean(row.is_active ?? true),
+  }
+}
+
+export async function getCarrierFreeShippingRulesAction(
+  partnerId: string,
+  storeId?: string | null,
+): Promise<{ success: true; rules: CarrierFreeShippingRule[] } | { success: false; error: string; rules: CarrierFreeShippingRule[] }> {
+  const supabase = getAdminClient()
+  let query = supabase
+    .from("carrier_free_shipping_rules")
+    .select("*")
+    .eq("partner_id", partnerId)
+
+  if (storeId) {
+    query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+  } else {
+    query = query.is("store_id", null)
+  }
+
+  const { data, error } = await query.order("min_order_value", { ascending: true })
+  if (error) {
+    return { success: false as const, error: error.message, rules: [] }
+  }
+  return {
+    success: true as const,
+    rules: (data || []).map(mapCarrierFreeShippingRuleRow),
+  }
+}
+
+export async function upsertCarrierFreeShippingRuleAction(input: {
+  partnerId: string
+  storeId?: string | null
+  rule: {
+    id?: string
+    minOrderValue: number
+    allStates: boolean
+    states: string[]
+    appliesTo: CarrierFreeShippingAppliesTo
+    isActive?: boolean
+  }
+}) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_delivery")
+  if (input.storeId) {
+    await requireStoreAccess(input.storeId, input.partnerId)
+  }
+
+  const minOrderValue = Math.max(0, Number(input.rule.minOrderValue || 0))
+  const allStates = Boolean(input.rule.allStates)
+  const states = allStates ? [] : normalizeStateList(input.rule.states)
+  const appliesTo: CarrierFreeShippingAppliesTo = input.rule.appliesTo === "all" ? "all" : "cheapest"
+
+  if (!allStates && states.length === 0) {
+    return { success: false as const, error: "Selecione pelo menos um estado ou marque Todo o Brasil." }
+  }
+
+  const supabase = await getSupabaseServerClient()
+  const payload = {
+    id: input.rule.id || undefined,
+    partner_id: input.partnerId,
+    store_id: input.storeId || null,
+    min_order_value: minOrderValue,
+    all_states: allStates,
+    states,
+    applies_to: appliesTo,
+    is_active: Boolean(input.rule.isActive ?? true),
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error } = await supabase.from("carrier_free_shipping_rules").upsert(payload)
+  if (error) return { success: false as const, error: error.message }
+
+  invalidateCarrierFreeShippingRulesCache(input.partnerId)
+  return { success: true as const }
+}
+
+export async function deleteCarrierFreeShippingRuleAction(partnerId: string, ruleId: string) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "settings", "settings_delivery")
+  const supabase = await getSupabaseServerClient()
+  const { error } = await supabase
+    .from("carrier_free_shipping_rules")
+    .delete()
+    .eq("partner_id", partnerId)
+    .eq("id", ruleId)
+
+  if (error) return { success: false as const, error: error.message }
+  invalidateCarrierFreeShippingRulesCache(partnerId)
+  return { success: true as const }
 }

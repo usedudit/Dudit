@@ -41,6 +41,12 @@ import { getReturnShippingStateAction, createReturnShippingLabelAction, checkout
 import { SUPERFRETE_LABEL_STATUS, type SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
+import {
+    getReverseLogisticsMethodLabel,
+    getReverseLogisticsStatusLabel,
+    type ReverseLogisticsMethod,
+    type ReverseLogisticsStatus,
+} from "@/lib/returns/types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
 import { getReturnStatusMeta } from "./ReturnListRow"
 import { usePickerBucket, useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
@@ -268,6 +274,10 @@ export default function CreateReturnPage({
     const [isLoadingQuotes, setIsLoadingQuotes] = useState(false)
     const [returnQuoteError, setReturnQuoteError] = useState<string | null>(null)
     const [returnFreightPayer, setReturnFreightPayer] = useState<ReturnShippingPayer>("seller")
+    const [reverseLogisticsMethod, setReverseLogisticsMethod] = useState<ReverseLogisticsMethod>("in_person")
+    const [reverseLogisticsStatus, setReverseLogisticsStatus] = useState<ReverseLogisticsStatus>("pending")
+    const [reverseLogisticsTrackingCode, setReverseLogisticsTrackingCode] = useState<string>("")
+    const [reverseLogisticsNotes, setReverseLogisticsNotes] = useState<string>("")
     const [isGeneratingReturnLabel, setIsGeneratingReturnLabel] = useState(false)
     const [resolutionType, setResolutionType] = useState<"exchange" | "store_credit" | "refund" | "none" | "rejected">("refund")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
@@ -420,6 +430,11 @@ export default function CreateReturnPage({
             const statusChanged = returnStatus !== returnRequest.status
             const resolutionTypeChanged = resolutionType !== (returnRequest.approvedResolution || returnRequest.desiredResolution || "refund")
             const observationsChanged = observations !== (returnRequest.sellerNotes || "")
+            const reverseLogisticsChanged =
+                reverseLogisticsMethod !== (returnRequest.reverseLogisticsMethod || (isPickupOrder ? "in_person" : "carrier_label")) ||
+                reverseLogisticsStatus !== (returnRequest.reverseLogisticsStatus || "pending") ||
+                reverseLogisticsTrackingCode !== (returnRequest.reverseLogisticsTrackingCode || "") ||
+                reverseLogisticsNotes !== (returnRequest.reverseLogisticsNotes || "")
 
             const itemsChanged = returnItems.some(item => {
                 const orig = returnRequest.items.find(i => i.id === item.id)
@@ -427,10 +442,10 @@ export default function CreateReturnPage({
                 return !item.checked || item.quantity !== orig.quantity || item.reason !== mapToLegacyReason(orig.reason || "outro") || item.condition !== mapToLegacyCondition(orig.condition || "aberto")
             })
 
-            return statusChanged || resolutionTypeChanged || observationsChanged || itemsChanged || hasStagedEvidence
+            return statusChanged || resolutionTypeChanged || observationsChanged || reverseLogisticsChanged || itemsChanged || hasStagedEvidence
         }
         return false
-    }, [mode, isSaving, isUploading, selectedOrder, observations, evidenceImages, evidenceUploads, replacementItems.length, returnRequest, returnStatus, resolutionType, returnItems, hasStagedEvidence])
+    }, [mode, isSaving, isUploading, selectedOrder, observations, evidenceImages, evidenceUploads, replacementItems.length, returnRequest, returnStatus, resolutionType, returnItems, hasStagedEvidence, reverseLogisticsMethod, reverseLogisticsStatus, reverseLogisticsTrackingCode, reverseLogisticsNotes, isPickupOrder])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
@@ -472,11 +487,12 @@ export default function CreateReturnPage({
         }
     }, [mode, returnRequest?.id, partnerId, adminContext])
 
-    // Sync default exchange delivery type when selecting an order in create mode
+    // Sync default exchange delivery type and reverse logistics method when selecting an order in create mode
     useEffect(() => {
         if (mode === "create" && selectedOrder?.delivery_type) {
             const dt = String(selectedOrder.delivery_type).toLowerCase()
             setExchangeDeliveryType(dt === "pickup" ? "pickup" : "delivery")
+            setReverseLogisticsMethod(dt === "pickup" ? "in_person" : "carrier_label")
         }
     }, [mode, selectedOrder?.delivery_type])
 
@@ -633,6 +649,21 @@ export default function CreateReturnPage({
             setExchangeBalanceResolution(sourceRequest.exchangeBalanceResolution || "store_credit")
             setReplacementProduct((sourceRequest as any).replacementProduct || "")
             setObservations(sourceRequest.sellerNotes || "")
+
+            // Load reverse logistics state
+            const defaultMethod: ReverseLogisticsMethod =
+                String(sourceRequest.deliveryType || "").toLowerCase() === "pickup" ? "in_person" : "carrier_label"
+            const loadedMethod = (sourceRequest.reverseLogisticsMethod as ReverseLogisticsMethod | null) || defaultMethod
+            setReverseLogisticsMethod(loadedMethod)
+            setReverseLogisticsStatus(
+                (sourceRequest.reverseLogisticsStatus as ReverseLogisticsStatus | null) ||
+                (loadedMethod === "not_required" ? "not_required" : "pending")
+            )
+            if (sourceRequest.returnFreightPayer) {
+                setReturnFreightPayer(sourceRequest.returnFreightPayer as ReturnShippingPayer)
+            }
+            setReverseLogisticsTrackingCode(sourceRequest.reverseLogisticsTrackingCode || "")
+            setReverseLogisticsNotes(sourceRequest.reverseLogisticsNotes || "")
         }
     }, [mode, returnRequest, rawReturnRequestData, productBucket.bucket])
 
@@ -1293,6 +1324,11 @@ export default function CreateReturnPage({
                     image: item.product.image || null,
                 })),
                 exchangeBalanceResolution: (resolutionType === "exchange" && exchangeSurplus > 0) ? exchangeBalanceResolution : null,
+                reverseLogisticsMethod: hasOnlyServices ? "not_required" : reverseLogisticsMethod,
+                reverseLogisticsStatus: hasOnlyServices || reverseLogisticsMethod === "not_required" ? "not_required" : reverseLogisticsStatus,
+                returnFreightPayer: hasOnlyServices || reverseLogisticsMethod === "not_required" || reverseLogisticsMethod === "in_person" ? null : returnFreightPayer,
+                reverseLogisticsTrackingCode: hasOnlyServices || reverseLogisticsMethod === "not_required" ? null : (reverseLogisticsTrackingCode.trim() || null),
+                reverseLogisticsNotes: hasOnlyServices ? null : (reverseLogisticsNotes.trim() || null),
                 returnDate: returnDate.toISOString(),
                 observations,
                 evidenceImages: cleanEvidenceImages,
@@ -2104,13 +2140,13 @@ export default function CreateReturnPage({
                                                                         />
                                                                     )}
                                                                     <PaymentRow
-                                                                        label="Tipo de entrega"
+                                                                        label="Entrega do pedido de troca"
                                                                         value={getFulfillmentModeLabel(
                                                                             rawReturnRequestData?.exchangeOrderDeliveryType || exchangeDeliveryType
                                                                         )}
                                                                     />
                                                                     <PaymentRow
-                                                                        label="Status da entrega"
+                                                                        label="Status do envio da troca"
                                                                         value={(() => {
                                                                             const effectiveType = rawReturnRequestData?.exchangeOrderDeliveryType || exchangeDeliveryType
                                                                             const effectiveStatus = rawReturnRequestData?.exchangeOrderDeliveryStatus || exchangeDeliveryStatus
@@ -2263,7 +2299,7 @@ export default function CreateReturnPage({
                                                             {resolutionType === "exchange" && (
                                                                 <>
                                                                     <FormDropdown
-                                                                        label="Tipo de entrega"
+                                                                        label="Entrega do pedido de troca"
                                                                         disabled={isViewOnly}
                                                                         value={exchangeDeliveryType}
                                                                         setValue={(val) => {
@@ -2282,7 +2318,7 @@ export default function CreateReturnPage({
                                                                     />
 
                                                                     <FormDropdown
-                                                                        label="Status da entrega"
+                                                                        label="Status do envio da troca"
                                                                         disabled={isViewOnly}
                                                                         value={exchangeDeliveryStatus}
                                                                         setValue={(val) => setExchangeDeliveryStatus(val as any)}
@@ -2348,13 +2384,17 @@ export default function CreateReturnPage({
                                                                                     <thead>
                                                                                         <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                                             <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-28">Preço</th>
                                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-28">Total</th>
                                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
                                                                                         </tr>
                                                                                     </thead>
                                                                                     <tbody>
                                                                                         {replacementItems.map((item, index) => {
                                                                                             const itemStock = getReplacementStock(item.product)
+                                                                                            const unitPrice = Number(item.product.price || 0)
+                                                                                            const lineTotal = unitPrice * Number(item.quantity || 1)
                                                                                             return (
                                                                                                 <tr key={`${item.product.id}-${item.variantId || index}`} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
@@ -2374,6 +2414,11 @@ export default function CreateReturnPage({
                                                                                                             </div>
                                                                                                         </div>
                                                                                                     </td>
+                                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border align-middle">
+                                                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                                                            {formatCurrency(unitPrice)}
+                                                                                                        </span>
+                                                                                                    </td>
                                                                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                                                                         <div className="flex justify-center">
                                                                                                             <QuantitySelector
@@ -2385,6 +2430,11 @@ export default function CreateReturnPage({
                                                                                                                 disabled={isViewOnly}
                                                                                                             />
                                                                                                         </div>
+                                                                                                    </td>
+                                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right align-middle">
+                                                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                                            {formatCurrency(lineTotal)}
+                                                                                                        </span>
                                                                                                     </td>
                                                                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                                                                         <div className="flex justify-center">
@@ -2410,8 +2460,10 @@ export default function CreateReturnPage({
                                                                             <div className="block md:hidden md:col-span-2 space-y-2">
                                                                                 {replacementItems.map((item, index) => {
                                                                                     const itemStock = getReplacementStock(item.product)
+                                                                                    const unitPrice = Number(item.product.price || 0)
+                                                                                    const lineTotal = unitPrice * Number(item.quantity || 1)
                                                                                     return (
-                                                                                        <div key={item.product.id} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                                                                        <div key={`${item.product.id}-${item.variantId || index}`} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                                                                             <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
                                                                                                 <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                                                                             </div>
@@ -2429,9 +2481,17 @@ export default function CreateReturnPage({
                                                                                                         <TrashIcon size={14} />
                                                                                                     </button>
                                                                                                 </div>
-                                                                                                <p className="text-[11px] font-medium text-brand-inactive-text truncate mb-2">
+                                                                                                <p className="text-[11px] font-medium text-brand-inactive-text truncate mb-1">
                                                                                                     {item.product.sku || "Sem SKU"} • Estoque: {itemStock}
                                                                                                 </p>
+                                                                                                <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">
+                                                                                                        Unit.: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(unitPrice)}</strong>
+                                                                                                    </span>
+                                                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                                                        {formatCurrency(lineTotal)}
+                                                                                                    </span>
+                                                                                                </div>
                                                                                                 <QuantitySelector
                                                                                                     value={item.quantity}
                                                                                                     onChange={(val) => updateReplacementQty(index, val)}
@@ -2539,6 +2599,178 @@ export default function CreateReturnPage({
                                                             <div className="md:col-span-2 rounded-xl border border-brand-border dark:border-dark-border p-4 text-sm text-brand-inactive-text dark:text-dark-body">
                                                                 Valor pago proporcional selecionado: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedRefundValue)}</strong>
                                                             </div>
+                                                        </div>
+                                                    )}
+                                                </FormSection>
+                                            )}
+
+                                            {/* Reverse Logistics (how the returned item comes back to the store) */}
+                                            {(returnRequest || selectedOrder) && !hasOnlyServices && (
+                                                <FormSection hasSeparator title="Logística reversa (devolução do item)">
+                                                    {isViewOnly ? (
+                                                        <div className="space-y-1">
+                                                            <PaymentRow
+                                                                label="Como o item será devolvido"
+                                                                value={getReverseLogisticsMethodLabel(reverseLogisticsMethod)}
+                                                            />
+                                                            {reverseLogisticsMethod !== "not_required" && (
+                                                                <>
+                                                                    <PaymentRow
+                                                                        label="Status da devolução física"
+                                                                        value={getReverseLogisticsStatusLabel(reverseLogisticsStatus)}
+                                                                    />
+                                                                    {(reverseLogisticsMethod === "carrier_label" || reverseLogisticsMethod === "customer_shipping" || reverseLogisticsMethod === "own_pickup") && (
+                                                                        <PaymentRow
+                                                                            label="Quem paga o frete"
+                                                                            value={getShippingPayerLabel(returnFreightPayer)}
+                                                                        />
+                                                                    )}
+                                                                    {reverseLogisticsTrackingCode && (
+                                                                        <PaymentRow
+                                                                            label="Código de rastreio / referência"
+                                                                            value={reverseLogisticsTrackingCode}
+                                                                        />
+                                                                    )}
+                                                                    {returnShipping && returnShipping.status !== "cancelled" && (
+                                                                        <PaymentRow
+                                                                            label="Etiqueta SuperFrete"
+                                                                            value={
+                                                                                <div className="flex items-center justify-end gap-2">
+                                                                                    <span>{returnShipping.tracking_number || SUPERFRETE_LABEL_STATUS[returnShipping.status] || returnShipping.status}</span>
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        onClick={handleOpenReturnShipping}
+                                                                                    >
+                                                                                        Ver etiqueta
+                                                                                    </Button>
+                                                                                </div>
+                                                                            }
+                                                                        />
+                                                                    )}
+                                                                    {reverseLogisticsNotes && (
+                                                                        <PaymentRow
+                                                                            label="Instruções"
+                                                                            value={<span className="font-normal whitespace-pre-wrap">{reverseLogisticsNotes}</span>}
+                                                                        />
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                            <FormDropdown
+                                                                label="Como o item será devolvido"
+                                                                disabled={isViewOnly}
+                                                                value={reverseLogisticsMethod}
+                                                                setValue={(val) => {
+                                                                    const nextMethod = val as ReverseLogisticsMethod
+                                                                    setReverseLogisticsMethod(nextMethod)
+                                                                    if (nextMethod === "not_required") {
+                                                                        setReverseLogisticsStatus("not_required")
+                                                                    } else if (reverseLogisticsStatus === "not_required") {
+                                                                        setReverseLogisticsStatus("pending")
+                                                                    }
+                                                                }}
+                                                                options={[
+                                                                    { value: "not_required", label: "Não precisa devolver" },
+                                                                    { value: "in_person", label: "Devolução presencial na loja" },
+                                                                    { value: "own_pickup", label: "Coleta própria / motoboy" },
+                                                                    { value: "carrier_label", label: "Transportadora / Correios (Etiqueta)" },
+                                                                    { value: "customer_shipping", label: "Envio por conta do cliente" },
+                                                                ]}
+                                                            />
+
+                                                            {reverseLogisticsMethod !== "not_required" && (
+                                                                <FormDropdown
+                                                                    label="Status da devolução física"
+                                                                    disabled={isViewOnly}
+                                                                    value={reverseLogisticsStatus === "not_required" ? "pending" : reverseLogisticsStatus}
+                                                                    setValue={(val) => setReverseLogisticsStatus(val as ReverseLogisticsStatus)}
+                                                                    options={[
+                                                                        { value: "pending", label: "Aguardando devolução" },
+                                                                        { value: "scheduled", label: "Coleta / entrega agendada" },
+                                                                        { value: "in_transit", label: "Em trânsito" },
+                                                                        { value: "received", label: "Recebido na loja" },
+                                                                    ]}
+                                                                />
+                                                            )}
+
+                                                            {(reverseLogisticsMethod === "carrier_label" || reverseLogisticsMethod === "customer_shipping" || reverseLogisticsMethod === "own_pickup") && (
+                                                                <FormDropdown
+                                                                    label="Quem paga o frete da devolução"
+                                                                    disabled={isViewOnly}
+                                                                    value={returnFreightPayer}
+                                                                    setValue={(val) => setReturnFreightPayer(val as ReturnShippingPayer)}
+                                                                    options={[
+                                                                        { value: "seller", label: getShippingPayerLabel("seller") },
+                                                                        { value: "customer", label: getShippingPayerLabel("customer") },
+                                                                        { value: "case_by_case", label: getShippingPayerLabel("case_by_case") },
+                                                                    ]}
+                                                                />
+                                                            )}
+
+                                                            {(reverseLogisticsMethod === "customer_shipping" || reverseLogisticsMethod === "own_pickup") && (
+                                                                <Input
+                                                                    label={reverseLogisticsMethod === "own_pickup" ? "Entregador / referência da coleta" : "Código de rastreio"}
+                                                                    disabled={isViewOnly}
+                                                                    value={reverseLogisticsTrackingCode}
+                                                                    onChange={(e) => setReverseLogisticsTrackingCode(e.target.value)}
+                                                                    placeholder={reverseLogisticsMethod === "own_pickup" ? "Ex.: Motoboy João • Coleta amanhã 14h" : "Ex.: BR123456789BR"}
+                                                                />
+                                                            )}
+
+                                                            {reverseLogisticsMethod === "carrier_label" && (
+                                                                <div className="md:col-span-2 rounded-xl border border-brand-border dark:border-dark-border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                                    <div className="text-sm">
+                                                                        <p className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                            Etiqueta de devolução (SuperFrete)
+                                                                        </p>
+                                                                        {mode === "create" ? (
+                                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                Salve a solicitação para cotar e gerar a etiqueta de devolução pela SuperFrete.
+                                                                            </p>
+                                                                        ) : returnShipping && returnShipping.status !== "cancelled" ? (
+                                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                {returnShipping.service_name || "SuperFrete"} • {SUPERFRETE_LABEL_STATUS[returnShipping.status] || returnShipping.status}
+                                                                                {returnShipping.tracking_number ? ` • Rastreio: ${returnShipping.tracking_number}` : ""}
+                                                                            </p>
+                                                                        ) : (
+                                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                {returnShippingGate.reason || "Nenhuma etiqueta gerada ainda. Clique ao lado para cotar e gerar."}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                    {mode !== "create" && (
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            leftIcon={<TruckIcon size={16} />}
+                                                                            onClick={handleOpenReturnShipping}
+                                                                        >
+                                                                            {returnShipping && returnShipping.status !== "cancelled" ? "Gerenciar etiqueta" : "Gerar etiqueta"}
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {reverseLogisticsMethod !== "not_required" && (
+                                                                <div className="md:col-span-2">
+                                                                    <FormTextarea
+                                                                        name="reverseLogisticsNotes"
+                                                                        label="Instruções de devolução / coleta (visível ao cliente)"
+                                                                        placeholder="Ex.: Motoboy passará entre 14h e 17h, ou entregar na loja em horário comercial com o número do pedido."
+                                                                        disabled={isViewOnly}
+                                                                        value={reverseLogisticsNotes}
+                                                                        onChange={(e) => setReverseLogisticsNotes(e.target.value)}
+                                                                        maxLength={500}
+                                                                        rows={2}
+                                                                        showCharacterCount={true}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </FormSection>

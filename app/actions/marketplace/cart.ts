@@ -1358,9 +1358,11 @@ export async function checkoutCartAction(
         extractPostalCodeFromAddress(deliveryAddress)
       const carrier = await quoteCarrierFreightFee(adminClient, {
         partnerId,
+        storeId: targetStoreId,
         toPostalCode: cep,
         serviceId: carrierServiceId as number,
         items: carrierItems,
+        orderSubtotal: totalAmount,
       })
       if (!carrier.success) return carrier.error
       deliveryFee = carrier.fee

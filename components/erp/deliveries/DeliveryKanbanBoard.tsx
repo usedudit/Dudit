@@ -12,6 +12,7 @@ interface DeliveryKanbanBoardProps {
     onEdit?: (deliveryId: string) => void
     onQuickStatusChange?: (deliveryId: string, status: string) => void
     activeTab?: "active" | "closed"
+    canCancel?: boolean
 }
 
 export default function DeliveryKanbanBoard({
@@ -20,6 +21,7 @@ export default function DeliveryKanbanBoard({
     onEdit,
     onQuickStatusChange,
     activeTab = "active",
+    canCancel = true,
 }: DeliveryKanbanBoardProps) {
     const [dragOverCol, setDragOverCol] = useState<string | null>(null)
 
@@ -82,19 +84,22 @@ export default function DeliveryKanbanBoard({
             badgeClass: "bg-emerald-100/60 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300",
             items: deliveredDeliveries,
         },
-        {
-            id: "cancelled",
-            title: "Canceladas / Falhas",
-            subtitle: "Não concluídas",
-            themeClass: "bg-rose-50/70 border-rose-100/50 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
-            dotBgClass: "bg-rose-100 dark:bg-rose-900/40",
-            dotClass: "bg-rose-500",
-            badgeClass: "bg-rose-100/60 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300",
-            items: cancelledDeliveries,
-        },
+        ...(canCancel
+            ? [{
+                id: "cancelled",
+                title: "Canceladas / Falhas",
+                subtitle: "Não concluídas",
+                themeClass: "bg-rose-50/70 border-rose-100/50 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
+                dotBgClass: "bg-rose-100 dark:bg-rose-900/40",
+                dotClass: "bg-rose-500",
+                badgeClass: "bg-rose-100/60 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300",
+                items: cancelledDeliveries,
+            }]
+            : []),
     ]
 
     const handleDragOver = (e: React.DragEvent, colId: string) => {
+        if (!canCancel && colId === "cancelled") return
         e.preventDefault()
         setDragOverCol(colId)
     }
@@ -106,6 +111,7 @@ export default function DeliveryKanbanBoard({
     const handleDrop = (e: React.DragEvent, targetStatus: string) => {
         e.preventDefault()
         setDragOverCol(null)
+        if (!canCancel && targetStatus === "cancelled") return
         const deliveryId = e.dataTransfer.getData("text/plain")
         if (deliveryId && onQuickStatusChange) {
             onQuickStatusChange(deliveryId, targetStatus)
@@ -120,7 +126,7 @@ export default function DeliveryKanbanBoard({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="flex xl:grid xl:grid-cols-5 gap-4 overflow-x-auto xl:overflow-x-visible pb-6 snap-x snap-mandatory scrollbar-hide select-none"
+                className={`flex xl:grid ${canCancel ? "xl:grid-cols-5" : "xl:grid-cols-4"} gap-4 overflow-x-auto xl:overflow-x-visible pb-6 snap-x snap-mandatory scrollbar-hide select-none`}
             >
                 {columns.map((col) => (
                     <div
@@ -174,6 +180,7 @@ export default function DeliveryKanbanBoard({
                                             onDetails={() => onDetails(delivery.id)}
                                             onEdit={onEdit ? () => onEdit(delivery.id) : undefined}
                                             onQuickStatusChange={onQuickStatusChange}
+                                            canCancel={canCancel}
                                         />
                                     ))
                                 )}

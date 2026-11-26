@@ -1,13 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { processTinyWebhook, mapPaymentMethodToTiny, buildTinyOrderPayments } from "./tiny-integration"
+import { processTinyWebhook, mapPaymentMethodToTiny, buildTinyOrderPayments, syncDuditStockToTiny } from "./tiny-integration"
 
 vi.mock("server-only", () => ({}))
 
-const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })
-const mockSelect = vi.fn()
-const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+const mockTinySearchProducts = vi.fn().mockResolvedValue({ produtos: [] })
+const mockTinyUpdateProductStock = vi.fn().mockResolvedValue({ status: "OK" })
+
+vi.mock("./tiny-client", () => ({
+  createTinyClient: vi.fn(() => ({
+    searchProducts: mockTinySearchProducts,
+    updateProductStock: mockTinyUpdateProductStock,
+  })),
+}))
+
+vi.mock("@/lib/cryptoService", () => ({
+  encrypt: vi.fn((v: string) => v),
+  decrypt: vi.fn((v: string) => v),
+}))
+
+let mockTinyIntegrationRow: any = null
+let mockTinyProductRow: any = { external_id: "9999", external_provider: "bling", sku: "SIMPLE-SKU" }
+
+const mockVariantUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })
+const mockProductUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })
 
 const mockFrom = vi.fn((table: string) => {
+  if (table === "partner_integrations") {
+    return {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockTinyIntegrationRow, error: null }),
+          }),
+        }),
+      }),
+    }
+  }
   if (table === "product_variants") {
     return {
       select: vi.fn().mockReturnValue({
@@ -24,28 +52,27 @@ const mockFrom = vi.fn((table: string) => {
             error: null,
           }),
         }),
-        eq: vi.fn().mockResolvedValue({
-          data: [{ stock_quantity: 100 }],
-          error: null,
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: { sku: "MISSING-VAR-SKU" }, error: null }),
+          then: (resolve: any) => resolve({ data: [{ stock_quantity: 100, stock_reserved: 4 }], error: null }),
         }),
       }),
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
+      update: mockVariantUpdate,
     }
   }
 
   return {
     select: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: mockTinyProductRow, error: null }),
         is: vi.fn().mockReturnValue({
           or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
         }),
       }),
     }),
-    update: vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }),
+    update: mockProductUpdate,
     insert: vi.fn().mockResolvedValue({ data: null, error: null }),
   }
 })
@@ -67,9 +94,11 @@ vi.mock("@/lib/services/timeline.service", () => ({
 describe("Tiny Webhook Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockTinyIntegrationRow = null
+    mockTinyProductRow = { external_id: "9999", external_provider: "bling", sku: "SIMPLE-SKU" }
   })
 
-  it("should process stock update webhook for product variants", async () => {
+  it("should process stock update webhook for product variants including saldoReservado", async () => {
     const payload = {
       evento: "atualizacao_estoque",
       produtos: [
@@ -77,6 +106,7 @@ describe("Tiny Webhook Integration", () => {
           id: 335740556,
           sku: "CMB-M",
           saldo: 100,
+          saldoReservado: 4,
         },
       ],
     }
@@ -85,6 +115,82 @@ describe("Tiny Webhook Integration", () => {
     expect(result.success).toBe(true)
     expect(result.event).toBe("atualizacao_estoque")
     expect(result.affectedCount).toBe(1)
+    expect(mockVariantUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ stock_quantity: 100, stock_reserved: 4 })
+    )
+    expect(mockProductUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ stock_quantity: 100, stock_reserved: 4 })
+    )
+  })
+
+  it("skips Tiny stock webhook when sync_stock is disabled", async () => {
+    mockTinyIntegrationRow = {
+      id: "int-tiny",
+      partner_id: "partner-123",
+      provider_slug: "tiny",
+      status: "connected",
+      config: { sync_stock: false },
+    }
+
+    const result = await processTinyWebhook("partner-123", {
+      evento: "atualizacao_estoque",
+      produtos: [{ id: 335740556, sku: "CMB-M", saldo: 50 }],
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.affectedCount).toBe(0)
+    expect(result.details).toBe("sync_stock_disabled")
+  })
+
+  it("does NOT fall back to parent product when variant SKU is missing in Tiny", async () => {
+    mockTinyIntegrationRow = {
+      id: "int-tiny",
+      partner_id: "partner-123",
+      provider_slug: "tiny",
+      status: "connected",
+      access_token_encrypted: "tok",
+      config: { sync_stock: true, default_deposit: "Geral" },
+    }
+    mockTinySearchProducts.mockResolvedValueOnce({ produtos: [] })
+
+    const res = await syncDuditStockToTiny({
+      partnerId: "partner-123",
+      productId: "prod-1",
+      variantId: "var-missing",
+      newStock: 3,
+    })
+
+    expect(res.success).toBe(false)
+    expect(mockTinyUpdateProductStock).not.toHaveBeenCalled()
+  })
+
+  it("ignores Bling external_id and resolves by SKU + forwards default_deposit in Tiny", async () => {
+    mockTinyIntegrationRow = {
+      id: "int-tiny",
+      partner_id: "partner-123",
+      provider_slug: "tiny",
+      status: "connected",
+      access_token_encrypted: "tok",
+      config: { sync_stock: true, default_deposit: "Deposito Principal" },
+    }
+    mockTinyProductRow = { external_id: "8888", external_provider: "bling", sku: "SIMPLE-SKU" }
+    mockTinySearchProducts.mockResolvedValueOnce({
+      produtos: [{ produto: { id: 4444, codigo: "SIMPLE-SKU" } }],
+    })
+
+    const res = await syncDuditStockToTiny({
+      partnerId: "partner-123",
+      productId: "prod-1",
+      newStock: 18,
+      reason: "Teste depósito",
+    })
+
+    expect(res.success).toBe(true)
+    expect(mockTinyUpdateProductStock).toHaveBeenCalledWith(4444, 18, {
+      tipo: "B",
+      deposito: "Deposito Principal",
+      observacoes: "Teste depósito",
+    })
   })
 })
 

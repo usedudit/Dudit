@@ -1210,6 +1210,31 @@ export async function confirmImportAction(
       }
     }
 
+    // Sincroniza entrada de estoque via XML NF-e com ERPs conectados (Tiny / Bling) de forma não-bloqueante
+    import("@/lib/services/integrations/erp-sync")
+      .then(async ({ syncItemsStockToConnectedErps }) => {
+        const { data: importedItems } = await admin
+          .from("xml_import_items")
+          .select("matched_product_id, created_product_id")
+          .eq("xml_import_id", xmlImportId)
+          .not("stock_movement_id", "is", null)
+
+        const syncItems = (importedItems || [])
+          .map((it: any) => ({
+            productId: it.matched_product_id || it.created_product_id || null,
+          }))
+          .filter((it: any) => Boolean(it.productId))
+
+        if (syncItems.length > 0) {
+          await syncItemsStockToConnectedErps({
+            partnerId,
+            items: syncItems,
+            reason: `Entrada NF-e XML ${xmlImport.invoice_number || xmlImportId} (Dudit)`,
+          })
+        }
+      })
+      .catch(() => {})
+
     // Vincular XML como anexo nas movimentações de estoque geradas
     if (finalFileKey) {
       try {

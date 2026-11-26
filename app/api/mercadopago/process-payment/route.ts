@@ -908,9 +908,11 @@ async function handler(request: NextRequest) {
             }))
           const carrier = await quoteCarrierFreightFee(adminClient, {
             partnerId,
+            storeId: storeId || null,
             toPostalCode: cep,
             serviceId: carrierServiceId,
             items: carrierItems,
+            orderSubtotal: totalAmount,
           })
           if (!carrier.success) {
             return NextResponse.json({ error: carrier.error }, { status: 400 })

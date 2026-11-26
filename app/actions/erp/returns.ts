@@ -170,6 +170,11 @@ const createReturnSchema = z.object({
         image: z.string().optional().nullable(),
     })).max(100).optional().nullable(),
     exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
+    reverseLogisticsMethod: z.enum(["not_required", "in_person", "own_pickup", "carrier_label", "customer_shipping"]).nullable().optional(),
+    reverseLogisticsStatus: z.enum(["not_required", "pending", "scheduled", "in_transit", "received"]).nullable().optional(),
+    returnFreightPayer: z.enum(["seller", "customer", "case_by_case"]).nullable().optional(),
+    reverseLogisticsTrackingCode: z.string().trim().max(120).nullable().optional(),
+    reverseLogisticsNotes: z.string().trim().max(500).nullable().optional(),
     returnToInventory: z.boolean().optional().nullable(),
     customerId: z.string().uuid().optional().nullable(),
     skipRevalidate: z.boolean().optional(),
@@ -209,6 +214,11 @@ const processReturnSchema = z.object({
     exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
     exchangeDeliveryType: z.enum(["delivery", "pickup"]).nullable().optional(),
     exchangeDeliveryStatus: z.enum(["not_sent", "preparing", "sent", "pickup_available", "delivered"]).nullable().optional(),
+    reverseLogisticsMethod: z.enum(["not_required", "in_person", "own_pickup", "carrier_label", "customer_shipping"]).nullable().optional(),
+    reverseLogisticsStatus: z.enum(["not_required", "pending", "scheduled", "in_transit", "received"]).nullable().optional(),
+    returnFreightPayer: z.enum(["seller", "customer", "case_by_case"]).nullable().optional(),
+    reverseLogisticsTrackingCode: z.string().trim().max(120).nullable().optional(),
+    reverseLogisticsNotes: z.string().trim().max(500).nullable().optional(),
     notes: z.string().max(500).optional().nullable(),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
     skipMpPaymentCheck: z.boolean().optional().default(false),
@@ -375,17 +385,24 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         exchangeBalanceResolution: (row.exchange_balance_resolution || ((row.approved_resolution === "exchange" || row.desired_resolution === "exchange") && toNumber(row.exchange_surplus_amount) > 0
             ? (toNumber(row.store_credit_amount) > 0 ? "store_credit" : toNumber(row.refund_amount) > 0 ? "refund" : undefined)
             : undefined)) as any,
+        reverseLogisticsMethod: row.reverse_logistics_method || null,
+        reverseLogisticsStatus: row.reverse_logistics_status || null,
+        returnFreightPayer: row.return_freight_payer || null,
+        reverseLogisticsTrackingCode: row.reverse_logistics_tracking_code || null,
+        reverseLogisticsNotes: row.reverse_logistics_notes || null,
         items,
         returnEvents: (row.auditLogs || []).map((e: any) => ({
             id: e.id,
             return_request_id: e.return_request_id,
-            previous_status: e.from_status || null,
-            new_status: e.to_status || null,
-            changed_by: e.actor_user_id || null,
+            previous_status: e.previous_status ?? e.from_status ?? null,
+            new_status: e.new_status ?? e.to_status ?? null,
+            changed_by: e.changed_by ?? e.actor_user_id ?? null,
             actor_name: e.actor_name || undefined,
-            notes: e.message || null,
+            notes: e.notes ?? e.message ?? null,
+            change_lines: Array.isArray(e.change_lines) ? e.change_lines : [],
             metadata: e.metadata || {},
             event_type: e.event_type,
+            source: e.source ?? null,
             created_at: e.created_at,
         })),
     }
@@ -420,6 +437,7 @@ export async function getReturnRequestsPageAction(
         id, partner_id, store_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         refund_payment_method, exchange_order_id, exchange_substatus, exchange_shortfall_amount, exchange_surplus_amount, exchange_items_snapshot, exchange_balance_resolution,
+        reverse_logistics_method, reverse_logistics_status, return_freight_payer, reverse_logistics_tracking_code, reverse_logistics_notes,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
         eligibility_status, eligibility_details, policy_snapshot, sla_due_at, sla_status, sla_expired_at, reported_to_dudit_at, dudit_report_id,
         orders!order_id(order_number, customer_name, situation, delivery_status, delivery_type, delivery_address, buyer_id, payment_provider, mp_payment_id),
@@ -943,17 +961,37 @@ export async function createReturnRequestAction(input: unknown) {
         if (error) throw error
         const requestId = String((created as any)?.id || "")
 
-        // Save exchange items snapshot on creation so they persist even if process is deferred
+        // Save exchange items snapshot and reverse logistics metadata on creation
+        const createExtraPatch: Record<string, any> = {}
         if (data.exchangeItems && data.exchangeItems.length > 0) {
+            createExtraPatch.exchange_items_snapshot = data.exchangeItems as any
+        }
+        if (data.reverseLogisticsMethod !== undefined) {
+            createExtraPatch.reverse_logistics_method = data.reverseLogisticsMethod || null
+        }
+        if (data.reverseLogisticsStatus !== undefined) {
+            createExtraPatch.reverse_logistics_status = data.reverseLogisticsMethod === "not_required"
+                ? "not_required"
+                : (data.reverseLogisticsStatus || null)
+        }
+        if (data.returnFreightPayer !== undefined) {
+            createExtraPatch.return_freight_payer = data.returnFreightPayer || null
+        }
+        if (data.reverseLogisticsTrackingCode !== undefined) {
+            createExtraPatch.reverse_logistics_tracking_code = data.reverseLogisticsTrackingCode || null
+        }
+        if (data.reverseLogisticsNotes !== undefined) {
+            createExtraPatch.reverse_logistics_notes = sanitizeNotes(data.reverseLogisticsNotes) || null
+        }
+
+        if (requestId && Object.keys(createExtraPatch).length > 0) {
             const { error: updateErr } = await supabase
                 .from("return_requests")
-                .update({
-                    exchange_items_snapshot: data.exchangeItems as any,
-                })
+                .update(createExtraPatch)
                 .eq("id", requestId)
 
             if (updateErr) {
-                console.error("[createReturnRequestAction] Failed to save exchange items snapshot:", updateErr)
+                console.error("[createReturnRequestAction] Failed to save extra return fields:", updateErr)
             }
         }
 
@@ -1100,11 +1138,91 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
                 .eq("id", requestId)
         }
 
-        // Persist structured buyer reason (drives marketplace fault penalty)
-        if (requestId && base.reasonCategory) {
+        // Persist structured buyer reason and validated buyer-selected exchange items
+        const marketplaceExtraPatch: Record<string, any> = {}
+        if (base.reasonCategory) {
+            marketplaceExtraPatch.reason_category = base.reasonCategory
+        }
+
+        if (base.resolution === "exchange" && base.exchangeItems && base.exchangeItems.length > 0) {
+            const requestedProductIds = Array.from(new Set(base.exchangeItems.map((ei) => ei.product_id)))
+            const { data: prodRows, error: prodErr } = await supabase
+                .from("products")
+                .select("id, name, sku, price, promotional_price, stock_available, allow_sell_without_stock, images, video_thumbnail, is_active, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+                .eq("partner_id", order.partner_id)
+                .eq("is_active", true)
+                .in("id", requestedProductIds)
+
+            if (prodErr) throw new Error("Erro ao validar produtos selecionados para troca.")
+
+            const productsById = new Map<string, any>((prodRows || []).map((p: any) => [p.id, p]))
+            const validatedExchangeItems: Array<{
+                product_id: string
+                variant_id: string | null
+                quantity: number
+                unit_price: number
+                product_name: string
+                sku: string
+                image: string | null
+            }> = []
+
+            for (const reqItem of base.exchangeItems) {
+                const prod = productsById.get(reqItem.product_id)
+                if (!prod) {
+                    throw new Error("Um dos produtos selecionados para troca não está mais disponível.")
+                }
+
+                const variants = Array.isArray(prod.product_variants) ? prod.product_variants : []
+                const variant = reqItem.variant_id
+                    ? variants.find((v: any) => v.id === reqItem.variant_id)
+                    : null
+
+                if (reqItem.variant_id && !variant) {
+                    throw new Error(`A variação selecionada de "${prod.name}" não está mais disponível.`)
+                }
+
+                const availableStock = variant
+                    ? Number(variant.stock_available ?? 0)
+                    : Number(prod.stock_available ?? 0)
+
+                if (!prod.allow_sell_without_stock && reqItem.quantity > availableStock) {
+                    throw new Error(`Estoque insuficiente para "${prod.name}" (${availableStock} disponível(is)).`)
+                }
+
+                const basePrice = Number(prod.price || 0)
+                const promoPrice = prod.promotional_price != null && Number(prod.promotional_price) > 0 && Number(prod.promotional_price) < basePrice
+                    ? Number(prod.promotional_price)
+                    : null
+                const effectiveUnitPrice = variant
+                    ? Math.max(0, (promoPrice ?? basePrice) + Number(variant.price_adjustment || 0))
+                    : (promoPrice ?? basePrice)
+
+                const prodImgs = Array.isArray(prod.images) ? prod.images : []
+                const variantImg = variant && typeof variant.variant_options === "object" && variant.variant_options
+                    ? variant.variant_options.image || null
+                    : null
+                const resolvedImage = variantImg || prodImgs[0] || prod.video_thumbnail || null
+
+                validatedExchangeItems.push({
+                    product_id: prod.id,
+                    variant_id: variant ? variant.id : null,
+                    quantity: reqItem.quantity,
+                    unit_price: Number(effectiveUnitPrice.toFixed(2)),
+                    product_name: variant?.variant_name ? `${prod.name} - ${variant.variant_name}` : prod.name,
+                    sku: variant?.sku || prod.sku || "",
+                    image: resolvedImage,
+                })
+            }
+
+            if (validatedExchangeItems.length > 0) {
+                marketplaceExtraPatch.exchange_items_snapshot = validatedExchangeItems
+            }
+        }
+
+        if (requestId && Object.keys(marketplaceExtraPatch).length > 0) {
             await supabase
                 .from("return_requests")
-                .update({ reason_category: base.reasonCategory })
+                .update(marketplaceExtraPatch)
                 .eq("id", requestId)
         }
 
@@ -1149,6 +1267,118 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             metadata: { resolution },
         })
         return errorResponse(getReturnUserMessage(e, "Não foi possível enviar a solicitação. Tente novamente."))
+    }
+}
+
+export interface MarketplaceExchangeProduct {
+    id: string
+    name: string
+    sku: string
+    price: number
+    promotionalPrice: number | null
+    effectivePrice: number
+    stock: number
+    allowSellWithoutStock: boolean
+    image: string | null
+    hasVariants: boolean
+    variants: Array<{
+        id: string
+        name: string
+        sku: string
+        price: number
+        stock: number
+        image: string | null
+    }>
+}
+
+export async function getMarketplaceExchangeProductsAction(orderId: string): Promise<
+    | { success: true; data: { products: MarketplaceExchangeProduct[] } }
+    | { success: false; error: string }
+> {
+    try {
+        const user = await requireUser()
+        await requireOrderAccess(orderId)
+        const supabase = createAdminClient()
+
+        const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .select("id, partner_id, store_id, buyer_id, customer_id")
+            .eq("id", orderId)
+            .single()
+
+        if (orderError || !order) {
+            return { success: false, error: "Pedido não encontrado." }
+        }
+        if (!(await userOwnsBuyerOrder(order, user.id))) {
+            return { success: false, error: "Sem permissão para acessar este pedido." }
+        }
+
+        let query = supabase
+            .from("products")
+            .select("id, name, sku, price, promotional_price, stock_available, allow_sell_without_stock, images, video_thumbnail, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .eq("partner_id", order.partner_id)
+            .eq("is_active", true)
+
+        if (order.store_id) {
+            query = query.or(`store_id.eq.${order.store_id},store_id.is.null`)
+        }
+
+        const { data: rows, error } = await query
+            .order("name", { ascending: true })
+            .limit(300)
+
+        if (error) throw error
+
+        const products: MarketplaceExchangeProduct[] = []
+        for (const p of rows || []) {
+            const basePrice = Number(p.price || 0)
+            const promoPrice = p.promotional_price != null && Number(p.promotional_price) > 0 && Number(p.promotional_price) < basePrice
+                ? Number(p.promotional_price)
+                : null
+            const effectiveBase = promoPrice ?? basePrice
+            const imgs = Array.isArray(p.images) ? p.images : []
+            const primaryImg = imgs[0] || p.video_thumbnail || null
+            const allowNoStock = Boolean(p.allow_sell_without_stock)
+
+            const rawVariants = Array.isArray(p.product_variants) ? p.product_variants : []
+            const mappedVariants: MarketplaceExchangeProduct["variants"] = rawVariants
+                .map((v: any) => ({
+                    id: String(v.id),
+                    name: String(v.variant_name || "Opção"),
+                    sku: String(v.sku || p.sku || ""),
+                    price: Math.max(0, Number((effectiveBase + Number(v.price_adjustment || 0)).toFixed(2))),
+                    stock: Number(v.stock_available ?? 0),
+                    image: (typeof v.variant_options === "object" && v.variant_options ? v.variant_options.image || null : null) || primaryImg,
+                }))
+                .filter((v: MarketplaceExchangeProduct["variants"][number]) => allowNoStock || v.stock > 0)
+
+            const hasVariants = rawVariants.length > 0
+            const totalStock = hasVariants
+                ? mappedVariants.reduce((sum: number, v) => sum + v.stock, 0)
+                : Number(p.stock_available ?? 0)
+
+            // Only include products that have availability
+            if (!allowNoStock && totalStock <= 0) continue
+            if (hasVariants && mappedVariants.length === 0) continue
+
+            products.push({
+                id: String(p.id),
+                name: String(p.name || "Produto"),
+                sku: String(p.sku || ""),
+                price: basePrice,
+                promotionalPrice: promoPrice,
+                effectivePrice: effectiveBase,
+                stock: totalStock,
+                allowSellWithoutStock: allowNoStock,
+                image: primaryImg,
+                hasVariants,
+                variants: mappedVariants,
+            })
+        }
+
+        return { success: true, data: { products } }
+    } catch (e: any) {
+        return { success: false, error: e?.message || "Erro ao carregar produtos disponíveis para troca." }
     }
 }
 
@@ -1495,6 +1725,9 @@ export async function processReturnRequestAction(
 
         const isApprovedStatus = ["APPROVED", "PROCESSING", "RESOLVED"].includes(data.nextStatus || "")
         const isRejectedStatus = data.nextStatus === "REJECTED"
+        const draftExchangeItems = !isRejectedStatus && Array.isArray(data.exchangeItems) && data.exchangeItems.length > 0
+            ? data.exchangeItems
+            : null
 
         if (isRejectedStatus) {
             data.refundAmount = 0
@@ -1552,6 +1785,37 @@ export async function processReturnRequestAction(
         if (error) throw error
 
         const result = processed as any
+
+        // Persist reverse logistics fields and draft exchange items snapshot
+        const processExtraPatch: Record<string, any> = {}
+        if (data.reverseLogisticsMethod !== undefined) {
+            processExtraPatch.reverse_logistics_method = data.reverseLogisticsMethod || null
+        }
+        if (data.reverseLogisticsStatus !== undefined) {
+            processExtraPatch.reverse_logistics_status = data.reverseLogisticsMethod === "not_required"
+                ? "not_required"
+                : (data.reverseLogisticsStatus || null)
+        }
+        if (data.returnFreightPayer !== undefined) {
+            processExtraPatch.return_freight_payer = data.returnFreightPayer || null
+        }
+        if (data.reverseLogisticsTrackingCode !== undefined) {
+            processExtraPatch.reverse_logistics_tracking_code = data.reverseLogisticsTrackingCode || null
+        }
+        if (data.reverseLogisticsNotes !== undefined) {
+            processExtraPatch.reverse_logistics_notes = sanitizeNotes(data.reverseLogisticsNotes) || null
+        }
+        if (isExchange && !isApprovedStatus && draftExchangeItems) {
+            processExtraPatch.exchange_items_snapshot = draftExchangeItems
+        }
+
+        if (Object.keys(processExtraPatch).length > 0) {
+            await supabase
+                .from("return_requests")
+                .update(processExtraPatch)
+                .eq("id", data.requestId)
+                .eq("partner_id", data.partnerId)
+        }
 
         // Apply chosen delivery type & status to the newly created/existing exchange order
         if (

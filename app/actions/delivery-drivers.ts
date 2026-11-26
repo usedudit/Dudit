@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache"
 import { createHash } from "node:crypto"
-
 import { requireDeliveryDriver } from "@/lib/auth/delivery-driver"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { DeliveryBucket } from "@/lib/delivery/types"
@@ -937,12 +936,20 @@ async function resolveDeliveryAssignmentOrStoreDelivery(assignmentIdOrDeliveryId
     if (del) {
       const { data: pu } = await admin
         .from("partner_users")
-        .select("id, role")
+        .select("id, role, role_id")
         .eq("partner_id", del.partner_id)
         .eq("user_id", user.id)
         .maybeSingle()
 
       if (pu) {
+        const puRole = String((pu as any).role_id || (pu as any).role || "").toLowerCase()
+        if (puRole === "delivery") {
+          const personId = String(del.delivery_person_id || "").trim()
+          const isOwnDelivery = personId === String(pu.id) || personId === String(user.id)
+          if (!isOwnDelivery) {
+            return null
+          }
+        }
         const syntheticAssignment = {
           id: del.id,
           partner_id: del.partner_id,
@@ -1019,7 +1026,7 @@ export async function getDriverPaymentMethodsAction(assignmentId: string, orderI
     .select(
       "id, name, type, payment_type, is_active, is_default, is_online_default, " +
       "fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments, " +
-      "card_brand, priority, pix_key_encrypted, pix_key_type, store_id"
+      "card_brand, priority, pix_key, pix_key_type, store_id"
     )
     .eq("partner_id", assignment.partner_id)
     .eq("is_active", true)
@@ -1047,15 +1054,19 @@ export async function getDriverPaymentMethodsAction(assignmentId: string, orderI
   const processed = await Promise.all((methods || []).map(async (m: any) => {
     let pixKey: string | null = null
     const keyType = m.pix_key_type
-    const rawKey = m.pix_key_encrypted || m.pix_key
+    const rawKey = m.pix_key
 
     if (rawKey && keyType !== "cpf") {
       pixKey = rawKey
     } else if (rawKey && keyType === "cpf") {
-      try {
-        pixKey = await decryptCPF(rawKey)
-      } catch {
-        pixKey = null
+      if (String(rawKey).startsWith("v")) {
+        try {
+          pixKey = await decryptCPF(rawKey)
+        } catch {
+          pixKey = null
+        }
+      } else {
+        pixKey = rawKey
       }
     }
 
@@ -1080,13 +1091,20 @@ export async function getDriverPaymentMethodsAction(assignmentId: string, orderI
   const storePixKey = pixMethod?.pix_key || store?.business_info?.pix_key || null
   const storePixKeyType = pixMethod?.pix_key_type || store?.business_info?.pix_key_type || null
 
-  const { data: order } = await admin
-    .from("orders")
-    .select(
-      "id, order_number, total_amount, paid_amount, situation, payment_method, payment_provider, mp_payment_id, payment_breakdown, notes, customer_name, buyer_id, order_items(id, product_name, quantity, product_price, subtotal, products(name, images))"
-    )
-    .eq("id", targetOrderId)
-    .maybeSingle()
+  const [{ data: order }, { data: partnerRow }] = await Promise.all([
+    admin
+      .from("orders")
+      .select(
+        "id, partner_id, store_id, order_number, created_at, updated_at, order_source, total_amount, paid_amount, amount_paid, situation, payment_method, payment_provider, mp_payment_id, payment_breakdown, checkout_fulfillment, notes, customer_name, buyer_id, order_items(id, product_name, quantity, product_price, subtotal, products(name, images))"
+      )
+      .eq("id", targetOrderId)
+      .maybeSingle(),
+    admin
+      .from("partners")
+      .select("deposit_balance_manual_enabled")
+      .eq("id", assignment.partner_id)
+      .maybeSingle(),
+  ])
 
   return {
     success: true as const,
@@ -1094,6 +1112,7 @@ export async function getDriverPaymentMethodsAction(assignmentId: string, orderI
     storeName,
     storePixKey,
     storePixKeyType,
+    depositBalanceManualEnabled: Boolean((partnerRow as any)?.deposit_balance_manual_enabled),
     assignment,
     order: order || null,
   }
@@ -1104,6 +1123,8 @@ export async function driverConfirmPaymentAction(params: {
   orderId?: string | null
   paymentMethod: string
   amountReceived?: number
+  paidAmount?: number
+  paymentBreakdown?: any[]
   installments?: number
   paymentMethodId?: string | null
   note?: string
@@ -1143,69 +1164,79 @@ export async function driverConfirmPaymentAction(params: {
     return { success: false as const, error: "Informe o valor recebido." }
   }
 
-  if (amountReceived > totalAmount) {
+  if (amountReceived > totalAmount + 0.01) {
     return {
       success: false as const,
       error: `O valor recebido (R$${amountReceived.toFixed(2)}) não pode ser maior que o total do pedido (R$${totalAmount.toFixed(2)}).`,
     }
   }
 
+  const nextCumulativePaid = params.paidAmount != null
+    ? Math.min(totalAmount, Math.max(alreadyPaid, Number(params.paidAmount)))
+    : Math.min(totalAmount, alreadyPaid + amountReceived)
+
   let confirmedData: any = null
 
   try {
     if ((assignment as any).isStoreDelivery) {
-      const alreadyPaid = Number(order.paid_amount || 0)
-      const totalNewPaid = Math.min(totalAmount, alreadyPaid + amountReceived)
+      const totalNewPaid = nextCumulativePaid
       const isFull = totalNewPaid >= totalAmount - 0.01
       const newSituation = isFull ? "paid" : "partially_paid"
       const nowIso = new Date().toISOString()
 
-      let breakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
-        ? order.payment_breakdown.map((l: any) => ({ ...l }))
-        : []
-
-      if (breakdown.length > 0) {
-        const legIndex = breakdown.findIndex(
-          (l: any) => !l.amountReceived || Number(l.amountReceived) < Number(l.amount || 0)
-        )
-        if (legIndex >= 0) {
-          breakdown[legIndex].amountReceived = Number(
-            (Number(breakdown[legIndex].amountReceived || 0) + amountReceived).toFixed(2)
-          )
-          breakdown[legIndex].method = params.paymentMethod
-        } else {
-          breakdown.push({
-            method: params.paymentMethod,
-            amount: amountReceived,
-            effectiveAmount: amountReceived,
-            amountReceived: amountReceived,
-            paymentMethodId: params.paymentMethodId || null,
-            installmentNumber: params.installments || 1,
-            adjustmentType: "none",
-            adjustmentPercent: 0,
-            adjustmentAmount: 0,
-          })
-        }
+      let breakdown: any[] = []
+      if (Array.isArray(params.paymentBreakdown) && params.paymentBreakdown.length > 0) {
+        breakdown = params.paymentBreakdown
       } else {
-        breakdown = [
-          {
-            method: params.paymentMethod,
-            amount: totalAmount,
-            effectiveAmount: totalNewPaid,
-            amountReceived: totalNewPaid,
-            paymentMethodId: params.paymentMethodId || null,
-            installmentNumber: params.installments || 1,
-            adjustmentType: "none",
-            adjustmentPercent: 0,
-            adjustmentAmount: 0,
-          },
-        ]
+        breakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
+          ? order.payment_breakdown.map((l: any) => ({ ...l }))
+          : []
+
+        if (breakdown.length > 0) {
+          const legIndex = breakdown.findIndex(
+            (l: any) => !l.amountReceived || Number(l.amountReceived) < Number(l.amount || 0)
+          )
+          if (legIndex >= 0) {
+            breakdown[legIndex].amountReceived = Number(
+              (Number(breakdown[legIndex].amountReceived || 0) + amountReceived).toFixed(2)
+            )
+            breakdown[legIndex].method = params.paymentMethod
+          } else {
+            breakdown.push({
+              method: params.paymentMethod,
+              amount: amountReceived,
+              effectiveAmount: amountReceived,
+              amountReceived: amountReceived,
+              paymentMethodId: params.paymentMethodId || null,
+              installmentNumber: params.installments || 1,
+              adjustmentType: "none",
+              adjustmentPercent: 0,
+              adjustmentAmount: 0,
+            })
+          }
+        } else {
+          breakdown = [
+            {
+              method: params.paymentMethod,
+              amount: totalAmount,
+              effectiveAmount: totalNewPaid,
+              amountReceived: totalNewPaid,
+              paymentMethodId: params.paymentMethodId || null,
+              installmentNumber: params.installments || 1,
+              adjustmentType: "none",
+              adjustmentPercent: 0,
+              adjustmentAmount: 0,
+            },
+          ]
+        }
       }
 
       const { error: updateOrderError } = await admin
         .from("orders")
         .update({
-          payment_method: params.paymentMethod,
+          payment_method: order.payment_method && !String(order.payment_method).toLowerCase().includes("não definido")
+            ? order.payment_method
+            : params.paymentMethod,
           paid_amount: totalNewPaid,
           amount_paid: totalNewPaid,
           paid_at: isFull ? (order.paid_at || nowIso) : order.paid_at,
@@ -1229,7 +1260,7 @@ export async function driverConfirmPaymentAction(params: {
       const { data, error: rpcError } = await supabase.rpc("confirm_driver_payment", {
         p_assignment_id: assignment.id,
         p_payment_method: params.paymentMethod,
-        p_amount_received: amountReceived,
+        p_amount_received: nextCumulativePaid,
         p_installments: params.installments || 1,
         p_payment_method_id: params.paymentMethodId || null,
         p_note: params.note || null,
@@ -1243,18 +1274,29 @@ export async function driverConfirmPaymentAction(params: {
         }
       }
       confirmedData = data
+
+      // Persist exact leg-level payment_breakdown when provided by PaymentStatusModal
+      if (Array.isArray(params.paymentBreakdown) && params.paymentBreakdown.length > 0) {
+        await admin
+          .from("orders")
+          .update({
+            payment_breakdown: params.paymentBreakdown,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", targetOrderId)
+      }
     }
 
-  // 1. Obter nome do entregador para os logs
-  const { data: driverProfile } = await admin
-    .from("user_profiles")
-    .select("full_name")
-    .eq("user_id", user.id)
-    .maybeSingle()
-  const driverName = driverProfile?.full_name?.trim() || "Entregador"
+    // 1. Obter nome do entregador para os logs
+    const { data: driverProfile } = await admin
+      .from("user_profiles")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .maybeSingle()
+    const driverName = driverProfile?.full_name?.trim() || "Entregador"
 
-  const newSituation = (confirmedData as any)?.situation || "paid"
-  const confirmedAmount = Number((confirmedData as any)?.amount_received || amountReceived)
+    const newSituation = (confirmedData as any)?.situation || "paid"
+    const confirmedAmount = Number((confirmedData as any)?.amount_received || amountReceived)
     const { formatCurrency } = await import("@/lib/utils")
     const { getPaymentStatusLabel } = await import("@/lib/orders/status")
     const { formatPaymentMethodLabel } = await import("@/lib/utils/payment-method-label")

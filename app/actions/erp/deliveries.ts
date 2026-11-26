@@ -74,6 +74,7 @@ function revalidateDeliveryDashboard(partnerId: string, deliveryId?: string) {
   revalidatePath("/erp/entregas")
   revalidatePath("/erp/pedidos")
   revalidatePath("/erp/logistica")
+  revalidatePath("/pedidos")
 }
 
 const DUDIT_NETWORK_EXPIRATION_MS = 15 * 60 * 1000
@@ -268,8 +269,27 @@ export type SmartDeliverySuggestionGroup = {
 async function getDeliveryActorScope(partnerId: string, specificPermission?: string) {
   const options = specificPermission ? { specificPermission } : undefined
   const access = await requirePartnerRouteAccess(partnerId, "logistics", options)
-  if (access.roleId !== "delivery") {
-    return { roleId: access.roleId, partnerUserId: null as string | null, userId: access.userId }
+  let effectiveRoleId = String(access.roleId || "").toLowerCase()
+
+  // Also respect store-level role override (e.g. store_members.role = 'DELIVERY')
+  if (effectiveRoleId !== "delivery" && effectiveRoleId !== "owner") {
+    try {
+      const { getActiveStoreId } = await import("@/lib/auth/partner-context")
+      const activeStoreId = await getActiveStoreId()
+      if (activeStoreId) {
+        const { resolveEffectivePermissions } = await import("@/lib/store-members")
+        const storeEff = await resolveEffectivePermissions(partnerId, activeStoreId)
+        if (storeEff && String(storeEff.role || "").toLowerCase() === "delivery") {
+          effectiveRoleId = "delivery"
+        }
+      }
+    } catch {
+      // Non-fatal fallback to partner-level roleId
+    }
+  }
+
+  if (effectiveRoleId !== "delivery") {
+    return { roleId: effectiveRoleId, partnerUserId: null as string | null, userId: access.userId }
   }
 
   const admin = getAdminClient()
@@ -281,7 +301,7 @@ async function getDeliveryActorScope(partnerId: string, specificPermission?: str
     .maybeSingle()
 
   return {
-    roleId: access.roleId,
+    roleId: effectiveRoleId,
     partnerUserId: partnerUser?.id ? String(partnerUser.id) : null,
     userId: access.userId,
   }
@@ -292,13 +312,23 @@ async function isDeliveryAssignedToDriver(params: {
   deliveryPersonId: string | null | undefined
   actor: { roleId: string; partnerUserId: string | null; userId: string }
 }): Promise<boolean> {
-  if (params.actor.roleId !== "delivery") return true
+  if (String(params.actor.roleId || "").toLowerCase() !== "delivery") return true
 
   const pUserId = params.actor.partnerUserId
   const uId = params.actor.userId
+  const personId = String(params.deliveryPersonId || "").trim()
 
-  if (pUserId && String(params.deliveryPersonId || "") === pUserId) return true
-  if (uId && String(params.deliveryPersonId || "") === uId) return true
+  if (pUserId && personId === pUserId) return true
+  if (uId && personId === uId) return true
+
+  // If the delivery is explicitly assigned to ANOTHER store driver, never allow access
+  if (
+    personId &&
+    personId !== "dudit_network" &&
+    personId !== "platform:dudit_network"
+  ) {
+    return false
+  }
 
   const admin = getAdminClient()
   const { data: assignment } = await admin
@@ -2311,9 +2341,14 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     })
 
     rows = rows.filter((row: any) => {
-      const isPersonMatch = validDeliveryPersonIds.includes(String(row.delivery_person_id || ""))
-      const isIdMatch = assignedDeliveryIds.includes(String(row.id || ""))
-      return isPersonMatch || isIdMatch
+      const personId = String(row.delivery_person_id || "").trim()
+      const isPersonMatch = validDeliveryPersonIds.includes(personId)
+      if (isPersonMatch) return true
+      // If explicitly assigned to another store driver, never match via stale delivery_assignments
+      if (personId && personId !== "dudit_network" && personId !== "platform:dudit_network") {
+        return false
+      }
+      return assignedDeliveryIds.includes(String(row.id || ""))
     })
 
     const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
@@ -2889,6 +2924,9 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     if (!allowed.has(nextStatus)) {
       return { success: false as const, error: "Status de entrega inválido." }
     }
+    if (actor.roleId === "delivery" && nextStatus === "cancelled") {
+      return { success: false as const, error: "Entregadores não têm permissão para cancelar entregas." }
+    }
 
     // Se estiver marcando como entregue, verificar se exige código de confirmação
     if (nextStatus === "delivered") {
@@ -2973,7 +3011,9 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       patch.completed_at = null
     }
 
-    const { error } = await supabase
+    const admin = getAdminClient()
+
+    const { error } = await admin
       .from("deliveries")
       .update(patch)
       .eq("id", params.deliveryId)
@@ -2989,12 +3029,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     }
 
     const concurrentOps: PromiseLike<any>[] = [
-      supabase.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId),
+      admin.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId),
     ]
 
     if (nextStatus === "cancelled" || nextStatus === "delivered" || nextStatus === "sent") {
       concurrentOps.push(
-        getAdminClient()
+        admin
           .from("delivery_assignments")
           .update({ status: "cancelled", cancelled_at: nowIso })
           .eq("delivery_id", params.deliveryId)
@@ -3002,7 +3042,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       )
     }
 
-    const { data: links } = await supabase
+    const { data: links } = await admin
       .from("delivery_orders")
       .select("order_id")
       .eq("delivery_id", params.deliveryId)
@@ -3021,7 +3061,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         orderPatch.delivery_completed_at = nowIso
       }
       concurrentOps.push(
-        supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
+        admin.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
       )
     }
 
@@ -3478,6 +3518,9 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   if (!allowed.has(nextStatus)) {
     return { success: false as const, error: "Status de entrega inválido." }
   }
+  if (actor.roleId === "delivery" && nextStatus === "cancelled") {
+    return { success: false as const, error: "Entregadores não têm permissão para cancelar entregas." }
+  }
 
   // Se estiver marcando pedido como entregue, verificar se exige código de confirmação
   if (nextStatus === "delivered") {
@@ -3544,13 +3587,15 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     orderPatch.delivery_completed_at = nowIso
   }
 
-  const [linkRes] = await Promise.all([
-    supabase
+  const admin = getAdminClient()
+
+  const [linkRes, orderRes] = await Promise.all([
+    admin
       .from("delivery_orders")
       .update(childPatch)
       .eq("delivery_id", params.deliveryId)
       .eq("order_id", params.orderId),
-    supabase
+    admin
       .from("orders")
       .update(orderPatch)
       .eq("id", params.orderId)
@@ -3558,6 +3603,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   ])
 
   if (linkRes.error) return { success: false as const, error: linkRes.error.message }
+  if (orderRes.error) return { success: false as const, error: orderRes.error.message }
 
   let changeMsg = nextStatus === "delivered"
     ? "Pedido entregue ao destinatário com sucesso"
@@ -3590,7 +3636,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   ]).catch(() => {})
 
   // Derive and sync parent delivery status from all linked orders
-  const { data: allLinks } = await supabase
+  const { data: allLinks } = await admin
     .from("delivery_orders")
     .select("status, orders(delivery_status, situation)")
     .eq("delivery_id", params.deliveryId)
@@ -3615,13 +3661,13 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     deliveryPatch.completed_at = null
   }
 
-  await supabase
+  await admin
     .from("deliveries")
     .update(deliveryPatch)
     .eq("id", params.deliveryId)
 
   if (dbDeliveryStatus === "delivered" && currentDelivery.delivery_person_id) {
-    const { data: deliveryOrders } = await supabase
+    const { data: deliveryOrders } = await admin
       .from("delivery_orders")
       .select("orders(delivery_fee, store_id)")
       .eq("delivery_id", params.deliveryId)

@@ -75,7 +75,6 @@ const navItems: NavItem[] = [
             { label: "Catálogo de Produtos", href: "/erp/produtos" },
             { label: "Movimentação de Estoque", href: "/erp/movimentacao-estoque" },
             { label: "Importar XML (NF-e)", href: "/erp/importacao-xml" },
-            { label: "Notas de Entrada", href: "/" },
             { label: "Fornecedores", href: "/erp/fornecedores" },
             { label: "Cadastros de Produtos", href: "/erp/produtos/cadastros" },
         ],

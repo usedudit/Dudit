@@ -241,5 +241,22 @@ describe("Delivery Fee Calculation & Configuration", () => {
         })
       ).toThrow("Endereço fora do raio de entrega.")
     })
+
+    it("should reject distant addresses (e.g. 500km) using the 50km fallback when no maxDeliveryKm/includedKm is configured", () => {
+      expect(() =>
+        calculateDeliveryFee({
+          distanceKm: 500,
+          currentTime: new Date(),
+          settings: {
+            ...defaultSettings,
+            baseFee: 5,
+            includedKm: 0,
+            extraKmPrice: 0,
+            maxDeliveryKm: null,
+          },
+          rules: [],
+        })
+      ).toThrow("Endereço fora do raio de entrega.")
+    })
   })
 })

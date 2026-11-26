@@ -27,6 +27,10 @@ import {
   updateOrdersStatusInBatchAction,
   getFreshOrderPaymentDataAction,
 } from "@/app/actions/erp/orders";
+import {
+  getDriverPaymentMethodsAction,
+  driverConfirmPaymentAction,
+} from "@/app/actions/delivery-drivers";
 import { getDepositBalanceManualPolicyAction } from "@/app/actions/erp/deposit-balance-policy";
 import {
   findReceivableLegIndex,
@@ -72,6 +76,8 @@ interface PaymentStatusModalProps {
   order: any;
   partnerId: string;
   onSuccess?: () => void;
+  driverMode?: boolean;
+  assignmentId?: string;
 }
 
 const SuccessActionCard = React.memo(
@@ -238,6 +244,8 @@ export default function PaymentStatusModal({
   order,
   partnerId,
   onSuccess,
+  driverMode = false,
+  assignmentId,
 }: PaymentStatusModalProps) {
   const { toast } = useToast();
 
@@ -304,8 +312,14 @@ export default function PaymentStatusModal({
 
   const { role } = usePermissions();
   const userRole = String(role || "").toLowerCase();
-  const canChangePaymentMethod = ["owner", "admin", "manager"].includes(userRole);
+  const isDriver = Boolean(driverMode || userRole === "delivery");
+  const canChangePaymentMethod = !isDriver && ["owner", "admin", "manager"].includes(userRole);
   const [showChangeMethodModal, setShowChangeMethodModal] = useState(false);
+  const [driverMethods, setDriverMethods] = useState<any[] | undefined>(undefined);
+  const [driverMethodsLoading, setDriverMethodsLoading] = useState(false);
+  const [driverStoreName, setDriverStoreName] = useState<string | undefined>(undefined);
+  const [driverStorePixKey, setDriverStorePixKey] = useState<string | null>(null);
+  const [driverStorePixKeyType, setDriverStorePixKeyType] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -379,6 +393,52 @@ export default function PaymentStatusModal({
     if (!isOpen || !targetOrderId) return;
     let cancelled = false;
 
+    if (isDriver) {
+      setDriverMethodsLoading(true);
+      const targetAssignmentId = assignmentId || targetOrder?.delivery_id || "";
+      getDriverPaymentMethodsAction(targetAssignmentId, String(targetOrderId))
+        .then((res) => {
+          if (cancelled) return;
+          if (res.success) {
+            if (res.order) {
+              setCurrentOrder((prev: any) => ({
+                ...(prev || {}),
+                ...res.order,
+                updated_at: res.order.updated_at,
+                paid_amount: res.order.paid_amount,
+                paidAmount: res.order.paid_amount,
+                total_amount: res.order.total_amount,
+                totalAmount: res.order.total_amount,
+                situation: res.order.situation,
+                payment_breakdown: res.order.payment_breakdown,
+              }));
+            }
+            setDriverMethods(res.methods || []);
+            if (res.storeName) setDriverStoreName(res.storeName);
+            setDriverStorePixKey(res.storePixKey || null);
+            setDriverStorePixKeyType(res.storePixKeyType || null);
+            setManualPolicy({
+              loaded: true,
+              enabled: Boolean((res as any).depositBalanceManualEnabled),
+              canOverride: false,
+              role: "delivery",
+            });
+          } else {
+            setDriverMethods([]);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setDriverMethods([]);
+        })
+        .finally(() => {
+          if (!cancelled) setDriverMethodsLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     getFreshOrderPaymentDataAction(targetOrderId, partnerId)
       .then((res) => {
         if (!cancelled && res.success && res.order) {
@@ -400,10 +460,10 @@ export default function PaymentStatusModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, targetOrderId, partnerId]);
+  }, [isOpen, targetOrderId, partnerId, isDriver, assignmentId]);
 
   const fetchOrderInstallments = useCallback(async () => {
-    if (!targetOrderId || !partnerId) {
+    if (isDriver || !targetOrderId || !partnerId) {
       setOrderInstallments([]);
       return;
     }
@@ -422,13 +482,13 @@ export default function PaymentStatusModal({
       console.error("Erro ao carregar parcelas do pedido:", err);
       setOrderInstallments([]);
     }
-  }, [targetOrderId, partnerId, targetOrderNumber]);
+  }, [isDriver, targetOrderId, partnerId, targetOrderNumber]);
 
   useEffect(() => {
-    if (isOpen && targetOrderId && partnerId) {
+    if (isOpen && !isDriver && targetOrderId && partnerId) {
       void fetchOrderInstallments();
     }
-  }, [isOpen, targetOrderId, partnerId, fetchOrderInstallments]);
+  }, [isOpen, isDriver, targetOrderId, partnerId, fetchOrderInstallments]);
 
   const isMpOrder = Boolean(
     targetOrder?.payment_provider === "Mercado Pago" ||
@@ -441,7 +501,7 @@ export default function PaymentStatusModal({
   );
 
   useEffect(() => {
-    if (!isOpen || !depositSummary?.usesDeposit) return;
+    if (!isOpen || isDriver || !depositSummary?.usesDeposit) return;
     let cancelled = false;
 
     getDepositBalanceManualPolicyAction(partnerId)
@@ -577,8 +637,46 @@ export default function PaymentStatusModal({
   const isMethodPlaceholder = !orderPaymentMethod || UNDEFINED_PAYMENT_PLACEHOLDERS.includes(String(orderPaymentMethod).trim().toLowerCase());
   const isCustomerChosenMarketplaceMethod = isOnlineOrder && !isMethodPlaceholder && !depositSummary?.usesDeposit;
 
-  const lockedMethod = isCustomerChosenMarketplaceMethod ? targetOrder.payment_method : null;
-  const lockedInstallments = null;
+  const unpaidRealLegs = useMemo(() => {
+    return breakdown.filter((leg) => {
+      if ((leg as any)?.checkoutPricing) return false;
+      const norm = String(leg.method || "").trim().toLowerCase();
+      if (!norm || UNDEFINED_PAYMENT_PLACEHOLDERS.includes(norm) || norm.includes("não definido") || norm.includes("metodo nao definido")) {
+        return false;
+      }
+      const legAmount = Number(leg.amount || 0);
+      const legReceived = Number(leg.amountReceived || 0);
+      return legAmount - legReceived > 0.009 || legReceived <= 0.009;
+    });
+  }, [breakdown]);
+
+  const driverLockedMethod = useMemo(() => {
+    if (!isDriver) return null;
+    if (unpaidRealLegs.length === 1) {
+      return unpaidRealLegs[0].method;
+    }
+    if (unpaidRealLegs.length > 1) {
+      return null; // Multiple predefined legs: driver selects one in DepositReceiptsSection
+    }
+    if (!isMethodPlaceholder) {
+      return targetOrder.payment_method;
+    }
+    return null;
+  }, [isDriver, unpaidRealLegs, isMethodPlaceholder, targetOrder?.payment_method]);
+
+  const driverLockedInstallments = useMemo(() => {
+    if (!isDriver) return null;
+    if (unpaidRealLegs.length === 1 && unpaidRealLegs[0].installmentNumber && unpaidRealLegs[0].installmentNumber > 1) {
+      return unpaidRealLegs[0].installmentNumber;
+    }
+    return null;
+  }, [isDriver, unpaidRealLegs]);
+
+  const driverHideMethodSelection = isDriver && unpaidRealLegs.length > 1;
+  const lockedMethod = isCustomerChosenMarketplaceMethod
+    ? targetOrder.payment_method
+    : driverLockedMethod;
+  const lockedInstallments = driverLockedInstallments;
 
   const pendingNewAmount = useMemo(
     () =>
@@ -935,18 +1033,49 @@ export default function PaymentStatusModal({
         totalOrder,
       );
 
-      const res = await updateOrdersStatusInBatchAction({
-        orderIds: [targetOrderId],
-        partnerId,
-        actionType: "payment_status",
-        statusValue: nextSituation,
-        paidAmount: nextPaidAmount,
-        paymentBreakdown: finalBreakdown,
-        manualBalanceOverride: isManualBalanceOverride || undefined,
-        expectedUpdatedAt: targetOrder.updated_at,
-        expectedPaidAmount: totalPaid,
-        expectedTotalAmount: totalOrder,
-      });
+      let res: { success?: boolean; error?: string };
+
+      if (isDriver) {
+        const primaryLeg = pendingLegs[0] || finalBreakdown[0];
+        const primaryMethodLabel = String(
+          primaryLeg?.method || targetOrder?.payment_method || "Dinheiro",
+        );
+        const appliedAmount = Number(
+          Math.min(totalRemaining, pendingNewAmount).toFixed(2),
+        );
+        const changeNote =
+          pendingChange > 0.009
+            ? `Troco devolvido: ${formatCurrency(pendingChange)}`
+            : undefined;
+
+        res = await driverConfirmPaymentAction({
+          assignmentId:
+            assignmentId ||
+            targetOrder?.delivery_id ||
+            String(targetOrderId),
+          orderId: String(targetOrderId),
+          paymentMethod: primaryMethodLabel,
+          amountReceived: appliedAmount,
+          paidAmount: nextPaidAmount,
+          paymentBreakdown: finalBreakdown,
+          installments: Number(primaryLeg?.installmentNumber || 1),
+          paymentMethodId: primaryLeg?.paymentMethodId || null,
+          note: changeNote,
+        });
+      } else {
+        res = await updateOrdersStatusInBatchAction({
+          orderIds: [targetOrderId],
+          partnerId,
+          actionType: "payment_status",
+          statusValue: nextSituation,
+          paidAmount: nextPaidAmount,
+          paymentBreakdown: finalBreakdown,
+          manualBalanceOverride: isManualBalanceOverride || undefined,
+          expectedUpdatedAt: targetOrder.updated_at,
+          expectedPaidAmount: totalPaid,
+          expectedTotalAmount: totalOrder,
+        });
+      }
 
       if (res.success) {
         const updated = {
@@ -1275,7 +1404,11 @@ export default function PaymentStatusModal({
 
                       <InfoCard
                         color="orange"
-                        message="A confirmação é automática. Se o pagamento não for identificado, use “Confirmar recebimento”."
+                        message={
+                          isDriver
+                            ? "A confirmação via Mercado Pago é automática. Se o cliente já pagou, clique em “Verificar”."
+                            : "A confirmação é automática. Se o pagamento não for identificado, use “Confirmar recebimento”."
+                        }
                         className="w-full mb-4"
                       />
 
@@ -1291,14 +1424,16 @@ export default function PaymentStatusModal({
                           ) : null}
                           Verificar
                         </Button>
-                        <Button
-                          className="flex-1 h-11"
-                          onClick={() => setShowConfirmSinalModal(true)}
-                          isLoading={confirmingSinal}
-                          disabled={syncing}
-                        >
-                          Confirmar recebimento
-                        </Button>
+                        {!isDriver && (
+                          <Button
+                            className="flex-1 h-11"
+                            onClick={() => setShowConfirmSinalModal(true)}
+                            isLoading={confirmingSinal}
+                            disabled={syncing}
+                          >
+                            Confirmar recebimento
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1516,6 +1651,13 @@ export default function PaymentStatusModal({
                             )}
                           </div>
                         )}
+
+                        {isDriver && isMpPaymentPendingInline && (
+                          <InfoCard
+                            color="blue"
+                            message="O pagamento via Mercado Pago é confirmado automaticamente assim que o cliente pagar. Clique em “Verificar” para atualizar o status agora."
+                          />
+                        )}
                       </div>
                     )}
 
@@ -1563,6 +1705,13 @@ export default function PaymentStatusModal({
                       onClearTargetLeg={handleClearTargetLeg}
                       onConfirmPayment={handleSubmit}
                       onHeaderStateChange={handleHeaderStateChange}
+                      driverMode={isDriver}
+                      preloadedMethods={isDriver ? driverMethods : undefined}
+                      preloadedLoading={isDriver ? driverMethodsLoading : false}
+                      storeName={driverStoreName}
+                      storePixKey={driverStorePixKey}
+                      storePixKeyType={driverStorePixKeyType}
+                      hideMethodSelection={driverHideMethodSelection}
                     />
                   ) : isFullyPaid ? (
                     <div className="my-auto py-10">
@@ -1740,7 +1889,8 @@ export default function PaymentStatusModal({
           {paymentStatus === "input" &&
             !isFullyPaid &&
             totalRemaining > 0.009 &&
-            !mustPaySinalOnline && (
+            !mustPaySinalOnline &&
+            !(isDriver && isMpPaymentPendingInline) && (
               <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30 flex gap-3">
                 <Button
                   variant="outline"

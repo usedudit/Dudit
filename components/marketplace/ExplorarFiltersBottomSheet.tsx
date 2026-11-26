@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import Portal from "@/components/Portal"
-import { Button, Input } from "@/components/reusable"
+import { Button, Input, MoneyInput } from "@/components/reusable"
 import { Check, MapPin, Star } from "lucide-react"
 import { XIcon } from "@/lib/icons"
 import type { FilterConfig } from "./contextual-filters"
@@ -222,6 +222,20 @@ export function ExplorarFiltersBottomSheet({
     const handleTypeSelect = (value: string) => {
         setDraftType(value)
         setDraftCategories([])
+        if (value === "vitrines" || value === "negocios") {
+            setDraftMinPrice("")
+            setDraftMaxPrice("")
+            setDraftPromo(false)
+            setDraftCondition("")
+            setDraftShipping(false)
+        } else if (value === "servicos") {
+            setDraftPromo(false)
+            setDraftCondition("")
+            setDraftShipping(false)
+        } else if (value === "planos") {
+            setDraftCondition("")
+            setDraftShipping(false)
+        }
     }
 
     const handleToggleCategory = (cat: string) => {
@@ -387,23 +401,21 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Price Section */}
-            {filterConfig.showPrice !== false && (
+            {filterConfig.showPrice !== false && !isStoreMode && (
                 <section>
                     <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Preço</h4>
                     <div className="grid grid-cols-2 gap-2">
-                        <Input
+                        <MoneyInput
                             value={draftMinPrice}
-                            onChange={(e) => setDraftMinPrice(e.target.value)}
-                            inputMode="decimal"
+                            onChange={(val) => setDraftMinPrice(val > 0 ? val : "")}
                             placeholder="Mín."
-                            className="h-10 text-sm"
+                            className="h-10"
                         />
-                        <Input
+                        <MoneyInput
                             value={draftMaxPrice}
-                            onChange={(e) => setDraftMaxPrice(e.target.value)}
-                            inputMode="decimal"
+                            onChange={(val) => setDraftMaxPrice(val > 0 ? val : "")}
                             placeholder="Máx."
-                            className="h-10 text-sm"
+                            className="h-10"
                         />
                     </div>
                 </section>
@@ -455,9 +467,8 @@ export function ExplorarFiltersBottomSheet({
                                 step="1"
                                 value={draftMaxDistance ?? 20}
                                 onChange={(e) => setDraftMaxDistance(Number(e.target.value))}
-                                className={`w-full h-2 rounded-lg appearance-none cursor-pointer accent-brand-green transition-opacity ${
-                                    draftMaxDistance ? "bg-gray-200 dark:bg-dark-border" : "bg-gray-200/70 dark:bg-dark-border/50 opacity-70"
-                                }`}
+                                className={`w-full h-2 rounded-lg appearance-none cursor-pointer accent-brand-green transition-opacity ${draftMaxDistance ? "bg-gray-200 dark:bg-dark-border" : "bg-gray-200/70 dark:bg-dark-border/50 opacity-70"
+                                    }`}
                                 style={{
                                     background: draftMaxDistance
                                         ? `linear-gradient(to right, #22c55e 0%, #22c55e ${((draftMaxDistance - 1) / 19) * 100}%, var(--dark-border, #e5e7eb) ${((draftMaxDistance - 1) / 19) * 100}%, var(--dark-border, #e5e7eb) 100%)`
@@ -487,15 +498,14 @@ export function ExplorarFiltersBottomSheet({
                                             isMin
                                                 ? { left: 0 }
                                                 : isMax
-                                                ? { right: 0 }
-                                                : {
-                                                      left: `calc(8px + (100% - 16px) * ${ratio})`,
-                                                      transform: "translateX(-50%)",
-                                                  }
+                                                    ? { right: 0 }
+                                                    : {
+                                                        left: `calc(8px + (100% - 16px) * ${ratio})`,
+                                                        transform: "translateX(-50%)",
+                                                    }
                                         }
-                                        className={`absolute text-center hover:text-brand-green transition-colors cursor-pointer ${
-                                            isSelected ? "font-bold text-brand-green" : ""
-                                        }`}
+                                        className={`absolute text-center hover:text-brand-green transition-colors cursor-pointer ${isSelected ? "font-bold text-brand-green" : ""
+                                            }`}
                                     >
                                         {mark.label}
                                     </button>
@@ -518,11 +528,10 @@ export function ExplorarFiltersBottomSheet({
                                     key={opt.label}
                                     type="button"
                                     onClick={() => setDraftMaxDistance(opt.value)}
-                                    className={`py-1.5 px-0.5 rounded-full text-xs font-semibold border transition-all text-center ${
-                                        isSelected
-                                            ? "bg-brand-green text-white border-brand-green shadow-xs"
-                                            : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading border-gray-200 dark:border-dark-border hover:border-brand-green/60"
-                                    }`}
+                                    className={`py-1.5 px-0.5 rounded-full text-xs font-semibold border transition-all text-center ${isSelected
+                                        ? "bg-brand-green text-white border-brand-green shadow-xs"
+                                        : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading border-gray-200 dark:border-dark-border hover:border-brand-green/60"
+                                        }`}
                                 >
                                     {opt.label}
                                 </button>
@@ -578,7 +587,7 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Promo Section */}
-            {filterConfig.showPromo !== false && (
+            {filterConfig.showPromo !== false && !isStoreMode && draftType !== "servicos" && (
                 <section>
                     <button
                         onClick={() => setDraftPromo(!draftPromo)}
@@ -600,7 +609,7 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Envio nacional Section */}
-            {filterConfig.showShipping !== false && (
+            {filterConfig.showShipping !== false && !isStoreMode && draftType !== "servicos" && draftType !== "planos" && (
                 <section>
                     <button
                         onClick={() => setDraftShipping(!draftShipping)}

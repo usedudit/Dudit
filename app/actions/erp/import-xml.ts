@@ -213,6 +213,17 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
           } else {
             updatedProducts.push(updated)
             console.log(`Estoque atualizado: ${product.name} (${existingProduct.stock_quantity} → ${newStock})`)
+            import("@/lib/services/integrations/erp-sync")
+              .then(({ syncStockToConnectedErps }) =>
+                syncStockToConnectedErps({
+                  partnerId,
+                  productId: existingProduct.id,
+                  sku: existingProduct.sku || undefined,
+                  newStock,
+                  reason: "Entrada via importação XML (Dudit)",
+                })
+              )
+              .catch(() => {})
           }
         } else {
           let inserted = null

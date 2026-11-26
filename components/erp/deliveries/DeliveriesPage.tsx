@@ -205,12 +205,14 @@ export default function DeliveriesPage({
     const [deliveryOtpInput, setDeliveryOtpInput] = useState("")
     const [bypassDeliveryOtp, setBypassDeliveryOtp] = useState(false)
     const [bypassReasonInput, setBypassReasonInput] = useState("")
-    const isOwnerOrAdmin = initialUserRole === "owner" || initialUserRole === "admin"
+    const normalizedUserRole = String(initialUserRole || "").toLowerCase()
+    const isOwnerOrAdmin = normalizedUserRole === "owner" || normalizedUserRole === "admin"
+    const isDelivery = normalizedUserRole === "delivery"
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const queryKey = useMemo(() => ["erp", "deliveries", partnerId] as const, [partnerId])
+    const queryKey = useMemo(() => ["erp", "deliveries", partnerId, normalizedUserRole] as const, [partnerId, normalizedUserRole])
     const {
         items,
         isLoading,
@@ -238,7 +240,7 @@ export default function DeliveriesPage({
         fetchNextPage: fetchCarrierNextPage,
     } = useInfiniteList<any, ERPCarrierDeliveryListCursor>({
         queryKey: carrierQueryKey,
-        enabled: carrierEnabled || mode === "carriers",
+        enabled: !isDelivery && (carrierEnabled || mode === "carriers"),
         fetchFn: async ({ cursor }) => {
             const res = await getERPCarrierDeliveriesPageAction(partnerId, { cursor, limit: 25 })
             if (!res.success) throw new Error(res.error || "Erro ao carregar envios.")
@@ -266,8 +268,6 @@ export default function DeliveriesPage({
             },
         })
     }, [exportData, partnerId, debouncedSearch, filters.status, filters.datePeriod])
-
-    const isDelivery = initialUserRole === "delivery"
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: mode === "deliveries",
@@ -400,7 +400,7 @@ export default function DeliveriesPage({
                     "Enviado",
                     "Entregue",
                     "Falha na entrega",
-                    "Cancelada",
+                    ...(!isDelivery ? ["Cancelada"] : []),
                 ],
             },
             {
@@ -412,15 +412,17 @@ export default function DeliveriesPage({
                     "No prazo",
                 ],
             },
-            {
-                id: "driverType",
-                title: "Tipo de entregador",
-                type: "checkbox-list",
-                options: [
-                    "Entrega própria",
-                    "Rede Dudit",
-                ],
-            },
+            ...(!isDelivery
+                ? [{
+                    id: "driverType",
+                    title: "Tipo de entregador",
+                    type: "checkbox-list" as const,
+                    options: [
+                        "Entrega própria",
+                        "Rede Dudit",
+                    ],
+                }]
+                : []),
             {
                 id: "grouping",
                 title: "Agrupamento de pedidos",
@@ -448,7 +450,7 @@ export default function DeliveriesPage({
                 type: "date-period",
             },
         ]
-    }, [mode, carrierOptions])
+    }, [mode, carrierOptions, isDelivery])
 
     const mapDeliveryRows = useCallback((sourceItems: any[]) => {
         const nowMs = Date.now()
@@ -747,6 +749,7 @@ export default function DeliveriesPage({
     }
 
     const handleQuickStatusChange = (deliveryId: string, targetOrCurrentStatus?: string) => {
+        if (isDelivery && targetOrCurrentStatus === "cancelled") return
         const item = (mapped || []).find((d: any) => d.id === deliveryId)
         const currentStatus = item ? item.status : "pending"
 
@@ -771,6 +774,7 @@ export default function DeliveriesPage({
     const handleStatusTransition = (deliveryId: string, currentStatus: string, nextStatus: string) => {
         setStatusModal(null)
         if (currentStatus === nextStatus) return
+        if (isDelivery && nextStatus === "cancelled") return
 
         if (doesTransitionRequireReason(currentStatus, nextStatus)) {
             setDeliveryWarningModal({
@@ -1165,6 +1169,7 @@ export default function DeliveriesPage({
                                                         onDetails={(id) => openEntity("view", id)}
                                                         onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
                                                         onQuickStatusChange={handleQuickStatusChange}
+                                                        canCancel={!isDelivery}
                                                     />
                                                 </FadeIn>
                                             ) : effectiveViewMode === "grid" ? (
@@ -1177,6 +1182,7 @@ export default function DeliveriesPage({
                                                                 onDetails={() => openEntity("view", delivery.id)}
                                                                 onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
                                                                 onQuickStatusChange={handleQuickStatusChange}
+                                                                canCancel={!isDelivery}
                                                             />
                                                         ))}
                                                     </div>
@@ -1235,6 +1241,7 @@ export default function DeliveriesPage({
                                                                             onDetails={() => openEntity("view", delivery.id)}
                                                                             onEdit={isDelivery ? undefined : () => openEntity("edit", delivery.id)}
                                                                             onQuickStatusChange={handleQuickStatusChange}
+                                                                            canCancel={!isDelivery}
                                                                         />
                                                                     ))}
                                                                 </tbody>
@@ -1437,7 +1444,7 @@ export default function DeliveriesPage({
                                 { value: "sent", label: "Enviado" },
                                 { value: "delivered", label: "Entregue" },
                                 { value: "delivery_failed", label: "Falha na entrega" },
-                                { value: "cancelled", label: "Cancelada" },
+                                ...(!isDelivery ? [{ value: "cancelled", label: "Cancelada" }] : []),
                             ]}
                             placeholder="Selecione o status"
                         />

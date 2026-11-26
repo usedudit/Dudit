@@ -19,6 +19,24 @@ export type ReturnResolution = (typeof RETURN_RESOLUTIONS)[number]
 export const RETURN_REQUEST_TYPES = ["cancellation", "return", "exchange", "refund", "store_credit"] as const
 export type ReturnRequestType = (typeof RETURN_REQUEST_TYPES)[number]
 
+export const REVERSE_LOGISTICS_METHODS = [
+  "not_required",
+  "in_person",
+  "own_pickup",
+  "carrier_label",
+  "customer_shipping",
+] as const
+export type ReverseLogisticsMethod = (typeof REVERSE_LOGISTICS_METHODS)[number]
+
+export const REVERSE_LOGISTICS_STATUSES = [
+  "not_required",
+  "pending",
+  "scheduled",
+  "in_transit",
+  "received",
+] as const
+export type ReverseLogisticsStatus = (typeof REVERSE_LOGISTICS_STATUSES)[number]
+
 export const RETURN_REASONS = [
   "wrong_item",
   "defective",
@@ -110,6 +128,11 @@ export type ReturnRequestListItem = {
     image?: string | null
   }> | null
   exchangeBalanceResolution?: "store_credit" | "refund" | null
+  reverseLogisticsMethod?: ReverseLogisticsMethod | null
+  reverseLogisticsStatus?: ReverseLogisticsStatus | null
+  returnFreightPayer?: "customer" | "seller" | "case_by_case" | null
+  reverseLogisticsTrackingCode?: string | null
+  reverseLogisticsNotes?: string | null
   items: Array<{
     id: string
     orderItemId: string
@@ -151,5 +174,44 @@ export function getReturnResolutionLabel(resolution: string) {
     case "none": return "Sem resolução"
     case "rejected": return "Recusado"
     default: return resolution || "-"
+  }
+}
+
+export function getReverseLogisticsMethodLabel(method?: string | null): string {
+  switch (method) {
+    case "not_required": return "Não precisa devolver"
+    case "in_person": return "Devolução presencial na loja"
+    case "own_pickup": return "Coleta própria / motoboy"
+    case "carrier_label": return "Transportadora / Correios (Etiqueta)"
+    case "customer_shipping": return "Envio por conta do cliente"
+    default: return "Não definido"
+  }
+}
+
+export function getReverseLogisticsStatusLabel(status?: string | null): string {
+  switch (status) {
+    case "not_required": return "Não aplicável"
+    case "pending": return "Aguardando devolução"
+    case "scheduled": return "Coleta / entrega agendada"
+    case "in_transit": return "Em trânsito"
+    case "received": return "Recebido na loja"
+    default: return "Não definido"
+  }
+}
+
+export function getReverseLogisticsCustomerDescription(method?: string | null): string | null {
+  switch (method) {
+    case "not_required":
+      return "Não é necessário devolver o produto fisicamente."
+    case "in_person":
+      return "Leve o produto diretamente até a loja para concluir a devolução."
+    case "own_pickup":
+      return "A loja enviará um motoboy/coleta própria para retirar o produto no seu endereço."
+    case "carrier_label":
+      return "A devolução será feita via transportadora/Correios com etiqueta fornecida pela loja."
+    case "customer_shipping":
+      return "Envie o produto pelos Correios ou transportadora de sua preferência para o endereço da loja."
+    default:
+      return null
   }
 }

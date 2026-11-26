@@ -117,10 +117,11 @@ describe("avaliação, condição e envio", () => {
         expect(matchesConditionFilter({ itemType: "loja" }, "novo")).toBe(true)
     })
 
-    it("filtra envio nacional apenas em produtos", () => {
+    it("filtra envio nacional apenas para itens com shipping habilitado", () => {
         expect(matchesShippingFilter({ itemType: "produto", fulfillment_modes: ["shipping"] })).toBe(true)
         expect(matchesShippingFilter({ itemType: "produto", fulfillment_modes: ["pickup"] })).toBe(false)
-        expect(matchesShippingFilter({ itemType: "loja" })).toBe(true)
+        expect(matchesShippingFilter({ itemType: "servico", fulfillment_modes: ["shipping"] })).toBe(false)
+        expect(matchesShippingFilter({ itemType: "loja" })).toBe(false)
     })
 })
 

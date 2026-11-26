@@ -328,7 +328,7 @@ export function matchesConditionFilter(item: any, condition: string): boolean {
 /* -------------------------------------------------------------------------- */
 
 export function matchesShippingFilter(item: any): boolean {
-    if (item?.itemType !== "produto") return true
+    if (!item || item.itemType === "servico" || item.itemType === "loja") return false
     const modes = item.fulfillment_modes || item.fulfillmentModes || []
     return Array.isArray(modes) && modes.includes("shipping")
 }
@@ -392,8 +392,8 @@ export function serializeFiltersToParams(filters: ExploreFilterState, params: UR
     const min = filters.minPrice === "" || filters.minPrice === null || filters.minPrice === undefined ? null : Number(filters.minPrice)
     const max = filters.maxPrice === "" || filters.maxPrice === null || filters.maxPrice === undefined ? null : Number(filters.maxPrice)
 
-    if (min !== null && Number.isFinite(min)) params.set("preco_min", String(min))
-    if (max !== null && Number.isFinite(max)) params.set("preco_max", String(max))
+    if (min !== null && Number.isFinite(min) && min > 0) params.set("preco_min", String(min))
+    if (max !== null && Number.isFinite(max) && max > 0) params.set("preco_max", String(max))
     if (filters.promoOn) params.set("promo", "1")
     if (filters.condition) params.set("cond", filters.condition)
     if (filters.shipping) params.set("envio", "1")

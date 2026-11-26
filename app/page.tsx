@@ -15,11 +15,11 @@ import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 
 export const metadata: Metadata = {
     title: {
-        absolute: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        absolute: "Dudit | Descubra. Anuncie. Organize.",
     },
     description: "Compre perto de você ou de lojas que enviam para todo o Brasil. Plataforma de vendas e gestão comercial com 0% de comissão para pequenos negócios.",
     openGraph: {
-        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        title: "Dudit | Descubra. Anuncie. Organize.",
         description: "Compre perto de você ou de lojas que enviam para todo o Brasil. Plataforma de vendas e gestão comercial com 0% de comissão para pequenos negócios.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@usedudit",
         creator: "@usedudit",
-        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        title: "Dudit | Descubra. Anuncie. Organize.",
         description: "Compre perto de você ou de lojas que enviam para todo o Brasil com 0% de comissão.",
         images: ["https://dudit.com.br/og-image.png"],
     },

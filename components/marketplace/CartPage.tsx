@@ -976,7 +976,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                             quantity: Math.max(1, Number(it.quantity || 1)),
                         }))
                     const itemsDedupe = productItems.map((p: any) => `${p.productId}:${p.quantity}`).sort().join(",")
-                    const carrierKey = `${targetPartnerId}:${destinationCep}:${itemsDedupe}`
+                    const carrierKey = `${targetPartnerId}:${destinationCep}:${itemsDedupe}:${Math.round(partnerItemsTotal * 100)}`
                     if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
                         carrierFetchedKeysRef.current[storeKey] = carrierKey
                         setCarrierQuotes(prev => ({
@@ -985,8 +985,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                         }))
                         quoteCarrierFreightAction({
                             partnerId: targetPartnerId,
+                            storeId: data.storeId || null,
                             toPostalCode: destinationCep,
                             items: productItems,
+                            orderSubtotal: partnerItemsTotal,
                         }).then(res => {
                             if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
                             setCarrierQuotes(prev => {

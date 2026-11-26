@@ -50,7 +50,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
     metadataBase: new URL("https://dudit.com.br"),
     title: {
-        default: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        default: "Dudit | Descubra. Anuncie. Organize.",
         template: "%s | Dudit",
     },
     description:
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
         locale: "pt_BR",
         url: "https://dudit.com.br",
         siteName: "Dudit",
-        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        title: "Dudit | Descubra. Anuncie. Organize.",
         description:
             "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP, agendamento, OS e envios locais ou para todo o Brasil.",
         images: [
@@ -90,7 +90,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         site: "@usedudit",
         creator: "@usedudit",
-        title: "Dudit | Vendas e Gestão Comercial com 0% de Comissão",
+        title: "Dudit | Descubra. Anuncie. Organize.",
         description:
             "Sistema de gestão comercial e vendas com 0% de comissão: PDV, catálogo digital, Tiny ERP, agendamento, OS e envios locais ou para todo o Brasil.",
         images: ["https://dudit.com.br/og-image.png"],

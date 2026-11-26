@@ -29,6 +29,7 @@ const INITIAL_FILTERS = {
 type Props = {
     isOpen: boolean
     product: any
+    initialSelections?: Array<{ variantId: string; qty: number }>
     onClose: () => void
     onConfirm: (
         selections: Array<{ variantId: string; qty: number }>,
@@ -43,27 +44,44 @@ type Props = {
     ) => void
 }
 
-export default function SelectProductVariantSheet({ isOpen, product, onClose, onConfirm }: Props) {
+export default function SelectProductVariantSheet({ isOpen, product, initialSelections, onClose, onConfirm }: Props) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { error: notifyError } = useNotification()
 
-    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
-    const zIndex = useModalLayer(isOpen)
+    // Mantém o último produto durante a animação de fechamento (300ms) para não apagar o conteúdo antes de sair.
+    const [cachedProduct, setCachedProduct] = useState<any>(product)
+    useEffect(() => {
+        if (product) setCachedProduct(product)
+    }, [product])
+    const activeProduct = product ?? cachedProduct
+
+    // z-index dinâmico: mantém a camada ativa durante a animação de fechamento (300ms)
+    // para deslizar para fora acima do modal/sheet que está atrás.
+    const [isLayerActive, setIsLayerActive] = useState(isOpen)
+    useEffect(() => {
+        if (isOpen) {
+            setIsLayerActive(true)
+            return
+        }
+        const timer = setTimeout(() => setIsLayerActive(false), 300)
+        return () => clearTimeout(timer)
+    }, [isOpen])
+    const zIndex = useModalLayer(isLayerActive)
 
     // Variants and Addons detection
     const rawVariants = useMemo<any[]>(() => {
-        if (!product) return []
-        return product.product_variants || product.variants || []
-    }, [product])
+        if (!activeProduct) return []
+        return activeProduct.product_variants || activeProduct.variants || []
+    }, [activeProduct])
 
     const hasVariants = rawVariants.length > 0
 
     const productAddons = useMemo<any[]>(() => {
-        if (!product) return []
-        const raw = (Array.isArray(product.addon_groups) && product.addon_groups.length > 0)
-            ? product.addon_groups
-            : (Array.isArray(product.technical_specs?.addon_groups) && product.technical_specs.addon_groups.length > 0)
-                ? product.technical_specs.addon_groups
+        if (!activeProduct) return []
+        const raw = (Array.isArray(activeProduct.addon_groups) && activeProduct.addon_groups.length > 0)
+            ? activeProduct.addon_groups
+            : (Array.isArray(activeProduct.technical_specs?.addon_groups) && activeProduct.technical_specs.addon_groups.length > 0)
+                ? activeProduct.technical_specs.addon_groups
                 : []
 
         return raw.map((grp: any, gIdx: number) => {
@@ -87,7 +105,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                 })),
             }
         })
-    }, [product])
+    }, [activeProduct])
 
     const hasAddons = productAddons.length > 0
     const hasBoth = hasVariants && hasAddons
@@ -119,8 +137,12 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
     const sentinelRef = useRef<HTMLDivElement>(null)
     const loadMoreLock = useRef(false)
 
-    // Reset states when opening
+    // Reset states when opening / closing
     useEffect(() => {
+        if (!isOpen) {
+            setIsFilterOpen(false)
+            return
+        }
         if (isOpen && product) {
             setSearch("")
             setFilters(INITIAL_FILTERS)
@@ -133,10 +155,17 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             // Select initial tab
             setActiveTab(hasVariants ? "variants" : "addons")
 
-            // Initialize variant quantities
+            // Initialize variant quantities (pre-populating existing selections if provided)
             const nextQty: Record<string, number> = {}
             for (const variant of rawVariants) {
                 nextQty[variant.id] = 0
+            }
+            if (initialSelections && initialSelections.length > 0) {
+                for (const sel of initialSelections) {
+                    if (sel.variantId in nextQty) {
+                        nextQty[sel.variantId] = Math.max(0, Number(sel.qty || 0))
+                    }
+                }
             }
             setQtyByVariantId(nextQty)
 
@@ -148,7 +177,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             })
             setExpandedAddonGroups(nextExpanded)
         }
-    }, [isOpen, product, hasVariants, rawVariants, productAddons])
+    }, [isOpen, product, hasVariants, rawVariants, productAddons, initialSelections])
 
     const selections = useMemo(() => {
         return Object.entries(qtyByVariantId)
@@ -210,22 +239,22 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
 
     // Faixa de preço das variações (igual ao card do PDV: "De: ... Até: ...")
     const variantPriceRange = useMemo(() => {
-        if (!product || !hasVariants) return null
+        if (!activeProduct || !hasVariants) return null
         const prices = rawVariants
             .map((v: any) => {
                 const vp = v.price !== undefined && v.price !== null
                     ? Number(v.price)
-                    : Number(product.price || 0) + Number(v.price_adjustment || 0)
+                    : Number(activeProduct.price || 0) + Number(v.price_adjustment || 0)
                 return vp
             })
             .filter((p: number) => !isNaN(p) && p > 0)
         if (prices.length === 0) return null
         return { min: Math.min(...prices), max: Math.max(...prices) }
-    }, [product, hasVariants, rawVariants])
+    }, [activeProduct, hasVariants, rawVariants])
 
     // Dynamic filter configuration for variants
     const filterConfig = useMemo<FilterSectionConfig[]>(() => {
-        if (!product || !hasVariants) return []
+        if (!activeProduct || !hasVariants) return []
         const attrMap = new Map<string, Set<string>>()
         const SPLIT_SEPARATOR = " / "
 
@@ -256,15 +285,15 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             { id: "stockRange", title: "Estoque", type: "range" as const, rangeConfig: { minKey: "minStock", maxKey: "maxStock", minPlaceholder: "Qtd Min", maxPlaceholder: "Qtd Max", inputType: "number" as const } },
             ...dynamicSections,
         ]
-    }, [product, hasVariants, rawVariants])
+    }, [activeProduct, hasVariants, rawVariants])
 
     // Filtered and sorted variants
     const sortedAndFilteredVariants = useMemo(() => {
-        if (!product || !hasVariants) return []
+        if (!activeProduct || !hasVariants) return []
         let result = rawVariants.map((variant: any) => {
             const stock = Math.max(0, Number(variant.stock_available ?? variant.stock_quantity ?? variant.stock ?? 0))
-            const variantImage = (variant.variant_options?.image as string | undefined) || variant.image || product.images?.[0] || product.image || null
-            const variantPrice = variant.price !== undefined ? Number(variant.price) : (Number(product.price || 0) + Number(variant.price_adjustment || 0))
+            const variantImage = (variant.variant_options?.image as string | undefined) || variant.image || activeProduct.images?.[0] || activeProduct.image || null
+            const variantPrice = variant.price !== undefined ? Number(variant.price) : (Number(activeProduct.price || 0) + Number(variant.price_adjustment || 0))
             const variantName = variant.variant_name || variant.name || ""
             return {
                 ...variant,
@@ -351,7 +380,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
         }
 
         return result
-    }, [product, hasVariants, rawVariants, search, filters, sortConfig])
+    }, [activeProduct, hasVariants, rawVariants, search, filters, sortConfig])
 
     // Pagination slicing
     useEffect(() => {
@@ -474,7 +503,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             ? "Selecionar variações"
             : "Selecionar complementos"
 
-    const content = !product ? null : (
+    const content = !activeProduct ? null : (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             {/* Header */}
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -527,13 +556,13 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                 <div className="flex items-center gap-3">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border/40">
                         <img
-                            src={getPrimaryProductDisplayImage(product, "thumbnail")}
-                            alt={product.name}
+                            src={getPrimaryProductDisplayImage(activeProduct, "thumbnail")}
+                            alt={activeProduct.name}
                             className="h-full w-full object-cover"
                         />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</h3>
+                        <h3 className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{activeProduct.name}</h3>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                             {hasVariants && variantPriceRange ? (
                                 variantPriceRange.min === variantPriceRange.max ? (
@@ -552,7 +581,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                                 )
                             ) : (
                                 <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(product.price)}
+                                    {formatCurrency(activeProduct.price)}
                                 </span>
                             )}
                             {addonsUnitPrice > 0 && (
@@ -654,7 +683,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                                     const currentQty = Math.max(0, Number(qtyByVariantId[variant.id] || 0))
                                     const variantImage = variant.image
                                     const variantPrice = variant.price
-                                    const outOfStock = !product.allow_sell_without_stock && stock <= 0
+                                    const outOfStock = !activeProduct.allow_sell_without_stock && stock <= 0
                                     const isSelected = currentQty > 0
 
                                     return (
@@ -872,7 +901,13 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                     onClick={onClose}
                 >
                     <div
-                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
+                            isOpen
+                                ? isFilterOpen
+                                    ? "-translate-x-10 scale-[0.97] opacity-70"
+                                    : "translate-x-0 opacity-100"
+                                : "translate-x-[120%] opacity-100"
+                        }`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {content}

@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, Combobox, Checkbox, QuantitySelector, IconPlaceholder } from "@/components/reusable"
+import { Button, Tabs, TabsList, TabsTrigger, Combobox, Checkbox, QuantitySelector, IconPlaceholder, InfoCard } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, TrashIcon, Package } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 import { type LabelPreset, type LabelContentConfig, type PaperSize, DEFAULT_CONTENT_CONFIG, LABEL_PRESETS, buildCustomPreset, PAPER_SIZES } from "@/lib/labels/presets"
-import { LabelSheet, type LabelProduct, type LabelVariant } from "./LabelSheet"
-import { formatCurrency } from "@/lib/utils"
+import { LabelSheet, type LabelProduct } from "./LabelSheet"
 import { generateEAN13 } from "@/lib/utils/barcode"
 import Pagination from "@/components/reusable/Pagination"
 import SelectProductSheet from "./SelectProductSheet"
@@ -46,11 +45,16 @@ interface LabelPrintModalProps {
 }
 
 interface SelectedItem {
+    key: string
     productId: string
     quantity: number
     product: ProductBase
     barcodeValue: string
     selectedVariantId?: string
+}
+
+function makeItemKey(productId: string, variantId?: string): string {
+    return variantId ? `${productId}::${variantId}` : productId
 }
 
 const presetOptions = [
@@ -141,7 +145,15 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
             ids.forEach((id) => {
                 if (!existingIdsSet.has(id)) {
                     const product = allProducts.find((p) => p.id === id)
-                    if (product) newItems.push({ productId: id, quantity: 1, product, barcodeValue: makeBarcode(product) })
+                    if (product) {
+                        newItems.push({
+                            key: makeItemKey(id),
+                            productId: id,
+                            quantity: 1,
+                            product,
+                            barcodeValue: makeBarcode(product),
+                        })
+                    }
                 }
             })
             const keepItems = prev.filter((s) => ids.includes(s.productId))
@@ -149,27 +161,18 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
         })
     }
 
-    const removeProduct = (productId: string) => {
-        setSelected((prev) => prev.filter((s) => s.productId !== productId))
-        setSelectedPage(1)
+    const removeItem = (itemKey: string) => {
+        setSelected((prev) => {
+            const next = prev.filter((s) => s.key !== itemKey)
+            const nextTotalPages = Math.max(1, Math.ceil(next.length / SELECTED_PAGE_SIZE))
+            setSelectedPage((page) => Math.min(page, nextTotalPages))
+            return next
+        })
     }
 
-    const updateQty = (productId: string, qty: number) => {
+    const updateQty = (itemKey: string, qty: number) => {
         setSelected((prev) =>
-            prev.map((s) => (s.productId === productId ? { ...s, quantity: Math.min(MAX_QUANTITY, Math.max(1, qty)) } : s)),
-        )
-    }
-
-    const handleVariantConfirm = (productId: string, variantId: string | null) => {
-        setSelected((prev) =>
-            prev.map((s) => {
-                if (s.productId !== productId) return s
-                if (variantId) {
-                    const variant = s.product.variants?.find((v) => v.id === variantId)
-                    return { ...s, selectedVariantId: variantId, barcodeValue: variant?.sku || s.barcodeValue }
-                }
-                return { ...s, selectedVariantId: undefined, barcodeValue: makeBarcode(s.product) }
-            }),
+            prev.map((s) => (s.key === itemKey ? { ...s, quantity: Math.min(MAX_QUANTITY, Math.max(1, qty)) } : s)),
         )
     }
 
@@ -186,17 +189,70 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
         }
     }, [showVariantSheet, allProducts])
 
+    const variantPickerInitialSelections = useMemo(() => {
+        if (!showVariantSheet) return []
+        return selected
+            .filter((s) => s.productId === showVariantSheet && s.selectedVariantId)
+            .map((s) => ({ variantId: s.selectedVariantId!, qty: s.quantity }))
+    }, [showVariantSheet, selected])
+
     const handleVariantSheetConfirm = useCallback(
         (selections: Array<{ variantId: string; qty: number }>) => {
             if (!showVariantSheet) return
-            if (selections.length > 0) {
-                handleVariantConfirm(showVariantSheet, selections[0].variantId)
-            } else {
-                handleVariantConfirm(showVariantSheet, null)
-            }
+            const targetProductId = showVariantSheet
+            setSelected((prev) => {
+                const product =
+                    prev.find((s) => s.productId === targetProductId)?.product ||
+                    allProducts.find((p) => p.id === targetProductId)
+                if (!product) return prev
+
+                const existingByVariantId = new Map<string, SelectedItem>()
+                let insertIndex = -1
+                prev.forEach((item, idx) => {
+                    if (item.productId === targetProductId) {
+                        if (insertIndex === -1) insertIndex = idx
+                        if (item.selectedVariantId) {
+                            existingByVariantId.set(item.selectedVariantId, item)
+                        }
+                    }
+                })
+
+                const remaining = prev.filter((s) => s.productId !== targetProductId)
+
+                const replacementItems: SelectedItem[] =
+                    selections.length > 0
+                        ? selections.map((sel) => {
+                            const existing = existingByVariantId.get(sel.variantId)
+                            const variant = product.variants?.find((v) => v.id === sel.variantId)
+                            return {
+                                key: makeItemKey(targetProductId, sel.variantId),
+                                productId: targetProductId,
+                                quantity: Math.min(MAX_QUANTITY, Math.max(1, sel.qty)),
+                                product,
+                                selectedVariantId: sel.variantId,
+                                barcodeValue: existing?.barcodeValue || variant?.sku || makeBarcode(product),
+                            }
+                        })
+                        : [
+                            {
+                                key: makeItemKey(targetProductId),
+                                productId: targetProductId,
+                                quantity: 1,
+                                product,
+                                barcodeValue: makeBarcode(product),
+                            },
+                        ]
+
+                if (insertIndex === -1) {
+                    return [...remaining, ...replacementItems]
+                }
+                const next = [...remaining]
+                next.splice(insertIndex, 0, ...replacementItems)
+                return next
+            })
             setShowVariantSheet(null)
         },
-        [showVariantSheet, handleVariantConfirm],
+        [showVariantSheet, allProducts],
     )
 
     const totalSelectedPages = Math.max(1, Math.ceil(selected.length / SELECTED_PAGE_SIZE))
@@ -230,16 +286,36 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
         [selected],
     )
 
-    const installmentDisplay = useMemo(() => {
-        if (!maxInstallments || maxInstallments <= 1) return null
-        const price = selected.length > 0 ? selected[0].product.price : 0
-        const perInstallment = price / maxInstallments
-        return {
-            maxInstallments,
-            perInstallment,
-            text: `${maxInstallments}x de ${formatCurrency(perInstallment)}`,
-        }
-    }, [maxInstallments, selected])
+    const hasInstallmentsAvailable = Boolean(maxInstallments && maxInstallments > 1)
+    const activePrimaryFieldsCount = [
+        contentConfig.showName,
+        contentConfig.showPrice,
+        contentConfig.showInternalCode,
+        contentConfig.showBarcode,
+    ].filter(Boolean).length
+
+    const togglePrimaryField = (field: "showName" | "showPrice" | "showInternalCode" | "showBarcode", checked: boolean) => {
+        setContentConfig((prev) => {
+            if (!checked) {
+                const remainingCount = [
+                    field === "showName" ? false : prev.showName,
+                    field === "showPrice" ? false : prev.showPrice,
+                    field === "showInternalCode" ? false : prev.showInternalCode,
+                    field === "showBarcode" ? false : prev.showBarcode,
+                ].filter(Boolean).length
+                if (remainingCount === 0) return prev
+            }
+            if (field === "showPrice" && !checked) {
+                return {
+                    ...prev,
+                    showPrice: false,
+                    showPromotionalPrice: false,
+                    showInstallment: false,
+                }
+            }
+            return { ...prev, [field]: checked }
+        })
+    }
 
     const preset = useMemo((): LabelPreset => {
         if (presetId === "custom") {
@@ -364,7 +440,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                                                         const needsVariant = hasVariants && !variant
                                                         return (
                                                             <div
-                                                                key={item.productId}
+                                                                key={item.key}
                                                                 className={`group flex items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border transition-colors hover:bg-brand-gray dark:hover:bg-dark-border/10 ${needsVariant ? "bg-amber-50/50 dark:bg-amber-900/10" : "bg-white dark:bg-dark-background"}`}
                                                             >
                                                                 <div className="min-w-0 flex-1">
@@ -374,13 +450,19 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                                                                         </span>
                                                                     </div>
                                                                     {variant ? (
-                                                                        <span className="text-xs font-medium text-brand-primary truncate max-w-[200px] block mt-0.5">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowVariantSheet(item.productId)}
+                                                                            className="text-xs font-medium text-brand-primary hover:underline text-left truncate max-w-[220px] block mt-0.5 cursor-pointer"
+                                                                            title="Clique para editar variações"
+                                                                        >
                                                                             {variant.variant_type}: {variant.variant_name}
-                                                                        </span>
+                                                                        </button>
                                                                     ) : hasVariants ? (
                                                                         <button
+                                                                            type="button"
                                                                             onClick={() => setShowVariantSheet(item.productId)}
-                                                                            className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline text-left truncate max-w-[200px] block mt-0.5"
+                                                                            className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline text-left truncate max-w-[200px] block mt-0.5 cursor-pointer"
                                                                         >
                                                                             Selecionar variação
                                                                         </button>
@@ -393,12 +475,12 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
 
                                                                 <QuantitySelector
                                                                     value={item.quantity}
-                                                                    onChange={(v) => updateQty(item.productId, v)}
+                                                                    onChange={(v) => updateQty(item.key, v)}
                                                                     max={MAX_QUANTITY}
                                                                     size="sm"
                                                                 />
 
-                                                                <Button variant="outlinered" size="icon" onClick={() => removeProduct(item.productId)}>
+                                                                <Button variant="outlinered" size="icon" onClick={() => removeItem(item.key)}>
                                                                     <TrashIcon size={16} />
                                                                 </Button>
                                                             </div>
@@ -477,23 +559,57 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                                     {/* Content config */}
                                     <div>
                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Conteúdo da etiqueta</p>
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                                            <Checkbox name="showName" checked={contentConfig.showName} onChange={(c) => setContentConfig((prev) => ({ ...prev, showName: c }))} label="Nome do produto" />
-                                            <Checkbox name="showPrice" checked={contentConfig.showPrice} onChange={(c) => setContentConfig((prev) => ({ ...prev, showPrice: c }))} label="Preço" />
-                                            <Checkbox name="showPromotionalPrice" checked={contentConfig.showPromotionalPrice} onChange={(c) => setContentConfig((prev) => ({ ...prev, showPromotionalPrice: c }))} label="Preço promocional" />
-                                            <Checkbox name="showInstallment" checked={contentConfig.showInstallment} onChange={(c) => setContentConfig((prev) => ({ ...prev, showInstallment: c }))} label="Parcelamento" />
-                                            <Checkbox name="showInternalCode" checked={contentConfig.showInternalCode} onChange={(c) => setContentConfig((prev) => ({ ...prev, showInternalCode: c }))} label="Código interno" />
-                                            <Checkbox name="showBarcode" checked={contentConfig.showBarcode} onChange={(c) => setContentConfig((prev) => ({ ...prev, showBarcode: c }))} label="Código de barras" />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Checkbox
+                                                name="showName"
+                                                checked={contentConfig.showName}
+                                                disabled={contentConfig.showName && activePrimaryFieldsCount <= 1}
+                                                onChange={(c) => togglePrimaryField("showName", c)}
+                                                label="Nome do produto"
+                                            />
+                                            <Checkbox
+                                                name="showPrice"
+                                                checked={contentConfig.showPrice}
+                                                disabled={contentConfig.showPrice && activePrimaryFieldsCount <= 1}
+                                                onChange={(c) => togglePrimaryField("showPrice", c)}
+                                                label="Preço"
+                                            />
+                                            <Checkbox
+                                                name="showPromotionalPrice"
+                                                checked={contentConfig.showPromotionalPrice}
+                                                disabled={!contentConfig.showPrice}
+                                                onChange={(c) => setContentConfig((prev) => ({ ...prev, showPromotionalPrice: c }))}
+                                                label="Preço promocional"
+                                            />
+                                            <Checkbox
+                                                name="showInstallment"
+                                                checked={contentConfig.showInstallment}
+                                                disabled={!contentConfig.showPrice || !hasInstallmentsAvailable}
+                                                onChange={(c) => setContentConfig((prev) => ({ ...prev, showInstallment: c }))}
+                                                label="Parcelamento"
+                                            />
+                                            <Checkbox
+                                                name="showInternalCode"
+                                                checked={contentConfig.showInternalCode}
+                                                disabled={contentConfig.showInternalCode && activePrimaryFieldsCount <= 1}
+                                                onChange={(c) => togglePrimaryField("showInternalCode", c)}
+                                                label="Código interno"
+                                            />
+                                            <Checkbox
+                                                name="showBarcode"
+                                                checked={contentConfig.showBarcode}
+                                                disabled={contentConfig.showBarcode && activePrimaryFieldsCount <= 1}
+                                                onChange={(c) => togglePrimaryField("showBarcode", c)}
+                                                label="Código de barras"
+                                            />
                                         </div>
-                                        {contentConfig.showInstallment && installmentDisplay && (
-                                            <div className="mt-2 p-2 rounded-lg bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
-                                                <p className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                                                    Parcelamento padrao: {installmentDisplay.text}
-                                                </p>
-                                                <p className="text-xs text-brand-inactive-text mt-0.5">
-                                                    Baseado no metodo de pagamento com mais parcelas
-                                                </p>
-                                            </div>
+                                        {contentConfig.showInstallment && hasInstallmentsAvailable && (
+                                            <InfoCard
+                                                title={`Parcelamento em até ${maxInstallments}x`}
+                                                message="Calculado automaticamente com base no valor de cada item nas etiquetas (método de pagamento com mais parcelas)."
+                                                color="gray"
+                                                className="mt-3"
+                                            />
                                         )}
                                     </div>
 
@@ -556,14 +672,13 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                 onConfirm={handleProductConfirm}
             />
 
-            {variantPickerProduct && (
-                <SelectProductVariantSheet
-                    isOpen={!!showVariantSheet}
-                    product={variantPickerProduct}
-                    onClose={() => setShowVariantSheet(null)}
-                    onConfirm={handleVariantSheetConfirm}
-                />
-            )}
+            <SelectProductVariantSheet
+                isOpen={!!showVariantSheet}
+                product={variantPickerProduct}
+                initialSelections={variantPickerInitialSelections}
+                onClose={() => setShowVariantSheet(null)}
+                onConfirm={handleVariantSheetConfirm}
+            />
         </>
     )
 }

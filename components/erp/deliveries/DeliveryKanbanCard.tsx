@@ -13,6 +13,7 @@ interface DeliveryKanbanCardProps {
   onDetails: () => void
   onEdit?: () => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
+  canCancel?: boolean
 }
 
 // Function to calculate relative time elapsed
@@ -32,6 +33,7 @@ export default function DeliveryKanbanCard({
   onDetails,
   onEdit,
   onQuickStatusChange,
+  canCancel = true,
 }: DeliveryKanbanCardProps) {
   const [elapsed, setElapsed] = useState("")
 
@@ -78,7 +80,7 @@ export default function DeliveryKanbanCard({
             <ActionsDropdown
               onStatus={() => onQuickStatusChange?.(delivery.id, delivery.status)}
               onEdit={canEdit && onEdit ? onEdit : undefined}
-              onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+              onCancel={canCancel && delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
               cancelLabel="Cancelar entrega"
             />
           </div>

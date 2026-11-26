@@ -50,7 +50,12 @@ function mapReturnEventToHistoryEntry(
     const changeLines: string[] = []
     const metadata = event.metadata || {}
     const actionType = event.event_type || "updated"
-    const isCustomerEvent = actionType === "created" || Boolean(metadata.is_buyer || event.source === "marketplace")
+    const isErpAction = event.source === "erp" || metadata?.source === "erp"
+    const isCustomerEvent = !isErpAction && Boolean(
+        metadata.is_buyer ||
+        event.source === "marketplace" ||
+        metadata?.source === "marketplace"
+    )
 
     const actorName = resolveTimelineActorName({
         entry: {
@@ -62,13 +67,12 @@ function mapReturnEventToHistoryEntry(
                 admin_actor_name: metadata.admin_actor_name,
             },
             source: event.source || null,
-            entry_type: actionType === "created" ? "return_created" : actionType,
+            entry_type: isCustomerEvent && actionType === "created" ? "return_created" : actionType,
         },
         viewer,
-        orderCustomerName: event.actor_name || null,
+        orderCustomerName: isCustomerEvent ? (event.actor_name || null) : null,
     })
 
-    const isErpAction = event.source === "erp" || metadata?.source === "erp"
     const isDuditAction = !isErpAction && Boolean(
         metadata.dudit_action ||
         event.source === "admin" ||

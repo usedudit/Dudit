@@ -315,4 +315,30 @@ describe("resolveTimelineActorName", () => {
       storeName: "Dudit",
     })).toBe("Dudit")
   })
+
+  it("never labels an ERP-created return event as (Cliente)", () => {
+    const erpCreatedReturn = {
+      actor_user_id: "user-owner-1",
+      actor_name: "Dudit",
+      metadata: {},
+      source: "erp",
+      entry_type: "return_created",
+    }
+
+    expect(resolveTimelineActorName({
+      entry: erpCreatedReturn,
+      viewer: "seller",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit",
+    })).toBe("Dudit")
+
+    expect(resolveTimelineActorName({
+      entry: erpCreatedReturn,
+      viewer: "admin",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit",
+    })).toBe("Dudit (Vendedor)")
+  })
 })

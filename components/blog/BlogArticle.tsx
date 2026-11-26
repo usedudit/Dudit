@@ -134,7 +134,7 @@ export default function BlogArticle({ post, html, toc, related, previous, next }
                 onShare={handleShare}
             />
             <article className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-8 lg:pt-12">
-                <div className="mb-8">
+                <div className="my-8 lg:mb-8 lg:mt-0">
                     <h1 className="text-xl font-bold leading-snug tracking-tight text-brand-dark dark:text-dark-heading md:text-2xl lg:text-3xl">
                         {post.title}
                     </h1>

@@ -13,6 +13,7 @@ interface DeliveryListItemProps {
   onDetails: (delivery: any) => void
   onEdit?: (delivery: any) => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
+  canCancel?: boolean
 }
 
 function getAlignClass(align?: string) {
@@ -27,7 +28,7 @@ function getJustifyClass(align?: string) {
   return "justify-start"
 }
 
-const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQuickStatusChange }: DeliveryListItemProps) => {
+const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQuickStatusChange, canCancel = true }: DeliveryListItemProps) => {
   const statusMeta = getDeliveryStatusMeta(delivery.status)
   const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
 
@@ -108,7 +109,7 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
             <ActionsDropdown
               onStatus={() => onQuickStatusChange?.(delivery.id, delivery.status)}
               onEdit={canEdit && onEdit ? () => onEdit(delivery) : undefined}
-              onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+              onCancel={canCancel && delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
               cancelLabel="Cancelar entrega"
             />
           </div>

@@ -38,12 +38,17 @@ function BarcodeCell({ value }: { value: string }) {
   useEffect(() => {
     if (!ref.current || !value) return
     try {
+      const format = detectBarcodeFormat(value)
       JsBarcode(ref.current, value, {
-        format: detectBarcodeFormat(value),
+        format,
         width: 1,
         height: 18,
         fontSize: 7,
         margin: 1,
+        marginLeft: 1,
+        // EAN-13 adiciona 12 módulos à esquerda para o primeiro dígito fora das barras;
+        // compensar na margem direita centraliza visualmente as barras sob o nome do produto.
+        marginRight: format === "EAN13" ? 13 : 1,
         displayValue: true,
       })
     } catch {
@@ -170,16 +175,16 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false,
                         textAlign: "center",
                         fontWeight: 700,
                         fontSize: "8px",
-                        color: "#222",
+                        color: "#111",
                         marginTop: "0.5mm",
                       }}
                     >
                       {contentConfig.showPromotionalPrice && label.promotionalPrice != null ? (
                         <>
-                          <span style={{ textDecoration: "line-through", color: "#999", fontSize: "7px", marginRight: "1mm" }}>
+                          <span style={{ textDecoration: "line-through", color: "#666", fontWeight: 400, fontSize: "7px", marginRight: "1mm" }}>
                             {formatCurrency(label.price)}
                           </span>
-                          <span style={{ color: "#c00" }}>
+                          <span style={{ color: "#111", fontWeight: 700 }}>
                             {formatCurrency(label.promotionalPrice)}
                           </span>
                         </>
@@ -189,9 +194,9 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false,
                     </div>
                   )}
 
-                  {contentConfig.showInstallment && maxInstallments && maxInstallments > 1 && (
+                  {contentConfig.showPrice && contentConfig.showInstallment && maxInstallments && maxInstallments > 1 && (
                     <div style={{ textAlign: "center", fontSize: "6px", color: "#555", marginTop: "0.3mm" }}>
-                      ou {maxInstallments}x de {formatCurrency(label.price / maxInstallments)}
+                      ou {maxInstallments}x de {formatCurrency((contentConfig.showPromotionalPrice && label.promotionalPrice != null ? label.promotionalPrice : label.price) / maxInstallments)}
                     </div>
                   )}
                 </div>

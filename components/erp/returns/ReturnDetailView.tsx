@@ -45,7 +45,12 @@ import {
 } from "@/lib/utils";
 import { getReturnStatusMeta } from "./ReturnListRow";
 import { FadeIn } from "@/components/animations/FadeIn";
-import { getReturnResolutionLabel } from "@/lib/returns/types";
+import {
+  getReturnResolutionLabel,
+  getReverseLogisticsMethodLabel,
+  getReverseLogisticsStatusLabel,
+} from "@/lib/returns/types";
+import { getShippingPayerLabel } from "@/lib/returns/policy";
 import { useStore } from "@/lib/store-context";
 import DefaultModal from "@/components/reusable/DefaultModal";
 import ReturnPrintModal from "./ReturnPrintModal";
@@ -302,6 +307,41 @@ export function ReturnDetailView({
                       )}
                     </div>
                   </FormSection>
+
+                  {/* Reverse Logistics */}
+                  {request.reverseLogisticsMethod && (
+                    <FormSection title="Logística Reversa" hasSeparator>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ListItem
+                          title={<span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Modalidade</span>}
+                          right={<span className="font-bold text-brand-dark dark:text-dark-heading">{getReverseLogisticsMethodLabel(request.reverseLogisticsMethod)}</span>}
+                        />
+                        {request.reverseLogisticsMethod !== "not_required" && (
+                          <ListItem
+                            title={<span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Status da Devolução</span>}
+                            right={<span className="font-bold text-brand-dark dark:text-dark-heading">{getReverseLogisticsStatusLabel(request.reverseLogisticsStatus)}</span>}
+                          />
+                        )}
+                        {request.returnFreightPayer && (
+                          <ListItem
+                            title={<span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Quem Paga o Frete</span>}
+                            right={<span className="font-bold text-brand-dark dark:text-dark-heading">{getShippingPayerLabel(request.returnFreightPayer)}</span>}
+                          />
+                        )}
+                        {request.reverseLogisticsTrackingCode && (
+                          <ListItem
+                            title={<span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Rastreio / Referência</span>}
+                            right={<span className="font-bold text-brand-dark dark:text-dark-heading">{request.reverseLogisticsTrackingCode}</span>}
+                          />
+                        )}
+                      </div>
+                      {request.reverseLogisticsNotes && (
+                        <div className="mt-4 p-3.5 bg-brand-gray/30 dark:bg-dark-border/30 rounded-xl text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap">
+                          {request.reverseLogisticsNotes}
+                        </div>
+                      )}
+                    </FormSection>
+                  )}
 
                   {/* Items */}
                   <FormSection title="Itens da Devolução" hasSeparator>

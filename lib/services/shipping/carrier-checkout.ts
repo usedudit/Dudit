@@ -12,6 +12,14 @@ import {
   buildSuperFreteVolumes,
   type ShippingItemLogistics,
 } from "@/lib/services/shipping/superfrete-integration"
+import {
+  applyCarrierFreeShippingToOptions,
+  evaluateCarrierFreeShipping,
+  normalizeStateList,
+  type BrazilianStateUf,
+  type CarrierFreeShippingRule,
+} from "@/lib/services/shipping/carrier-free-shipping"
+import { carrierFreeShippingRules as carrierFreeShippingRulesCache } from "@/lib/delivery/order-cache"
 
 export { extractPostalCodeFromAddress } from "@/lib/services/shipping/postal-code"
 
@@ -31,6 +39,9 @@ export interface CarrierFreightOption {
   serviceId: number
   serviceName: string
   price: number
+  originalPrice?: number
+  isFreeShipping?: boolean
+  freeShippingRuleId?: string | null
   deliveryMinDays: number | null
   deliveryMaxDays: number | null
   companyName: string | null
@@ -45,7 +56,13 @@ export type CarrierUnavailableReason =
   | "quote_failed"
 
 export type CarrierQuoteResult =
-  | { available: true; options: CarrierFreightOption[]; fromPostalCode: string }
+  | {
+      available: true
+      options: CarrierFreightOption[]
+      fromPostalCode: string
+      destinationState?: BrazilianStateUf | null
+      freeShippingThreshold?: number | null
+    }
   | { available: false; reason: CarrierUnavailableReason }
 
 export function carrierReasonMessage(reason: CarrierUnavailableReason): string {
@@ -185,12 +202,84 @@ async function loadCarrierContext(
   return { ok: true, client, config, fromPostalCode }
 }
 
+async function loadCarrierFreeShippingRules(
+  supabase: SupabaseClient,
+  partnerId: string,
+  storeId?: string | null,
+): Promise<CarrierFreeShippingRule[]> {
+  const key = `${partnerId}|${storeId || ""}`
+  const cached = carrierFreeShippingRulesCache.get(key, Date.now())
+  if (cached) return cached
+
+  try {
+    let query = supabase
+      .from("carrier_free_shipping_rules")
+      .select("id, store_id, min_order_value, all_states, states, applies_to, is_active")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+
+    if (storeId) {
+      query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+    }
+
+    const { data, error } = await query.order("min_order_value", { ascending: true })
+    if (error || !Array.isArray(data)) {
+      return []
+    }
+
+    const mapped: CarrierFreeShippingRule[] = data.map((row: any) => ({
+      id: String(row.id),
+      storeId: row.store_id || null,
+      minOrderValue: Math.max(0, Number(row.min_order_value || 0)),
+      allStates: Boolean(row.all_states),
+      states: normalizeStateList(row.states),
+      appliesTo: row.applies_to === "all" ? "all" : "cheapest",
+      isActive: Boolean(row.is_active ?? true),
+    }))
+    carrierFreeShippingRulesCache.set(key, mapped)
+    return mapped
+  } catch {
+    return []
+  }
+}
+
+async function applyFreeShippingToResult(
+  supabase: SupabaseClient,
+  result: CarrierQuoteResult,
+  input: {
+    partnerId: string
+    storeId?: string | null
+    toPostalCode: string
+    orderSubtotal?: number | null
+  },
+): Promise<CarrierQuoteResult> {
+  if (!result.available) return result
+
+  const rules = await loadCarrierFreeShippingRules(supabase, input.partnerId, input.storeId)
+  const evaluation = evaluateCarrierFreeShipping({
+    destinationCep: input.toPostalCode,
+    orderSubtotal: input.orderSubtotal,
+    rules,
+  })
+
+  const options = applyCarrierFreeShippingToOptions(result.options, evaluation)
+  return {
+    available: true,
+    options,
+    fromPostalCode: result.fromPostalCode,
+    destinationState: evaluation.destinationState,
+    freeShippingThreshold: evaluation.applicableThreshold,
+  }
+}
+
 export async function quoteCarrierFreightOptions(
   supabase: SupabaseClient,
   input: {
     partnerId: string
+    storeId?: string | null
     toPostalCode: string
     items?: CarrierQuoteItemInput[]
+    orderSubtotal?: number | null
   },
 ): Promise<CarrierQuoteResult> {
   const toPostalCode = String(input.toPostalCode || "").replace(/\D/g, "")
@@ -205,10 +294,23 @@ export async function quoteCarrierFreightOptions(
   const fastNow = Date.now()
   const fastCached = carrierFastCache.get(fastKey)
   if (fastCached && fastNow - fastCached.at <= CARRIER_QUOTE_TTL_MS) {
-    return fastCached.result
+    return applyFreeShippingToResult(supabase, fastCached.result, {
+      partnerId: input.partnerId,
+      storeId: input.storeId,
+      toPostalCode,
+      orderSubtotal: input.orderSubtotal,
+    })
   }
   const fastInflight = carrierFastInflight.get(fastKey)
-  if (fastInflight) return fastInflight
+  if (fastInflight) {
+    const raw = await fastInflight
+    return applyFreeShippingToResult(supabase, raw, {
+      partnerId: input.partnerId,
+      storeId: input.storeId,
+      toPostalCode,
+      orderSubtotal: input.orderSubtotal,
+    })
+  }
 
   const run = (async (): Promise<CarrierQuoteResult> => {
     const ctx = await loadCarrierContext(supabase, input.partnerId, toPostalCode)
@@ -343,7 +445,12 @@ export async function quoteCarrierFreightOptions(
   try {
     const result = await run
     storeCarrierFastResult(fastKey, result)
-    return result
+    return applyFreeShippingToResult(supabase, result, {
+      partnerId: input.partnerId,
+      storeId: input.storeId,
+      toPostalCode,
+      orderSubtotal: input.orderSubtotal,
+    })
   } finally {
     carrierFastInflight.delete(fastKey)
   }
@@ -353,9 +460,11 @@ export async function quoteCarrierFreightFee(
   supabase: SupabaseClient,
   input: {
     partnerId: string
+    storeId?: string | null
     toPostalCode: string
     serviceId: number
     items?: CarrierQuoteItemInput[]
+    orderSubtotal?: number | null
   },
 ): Promise<
   | { success: true; fee: number; breakdown: Record<string, unknown> }
@@ -363,8 +472,10 @@ export async function quoteCarrierFreightFee(
 > {
   const quoted = await quoteCarrierFreightOptions(supabase, {
     partnerId: input.partnerId,
+    storeId: input.storeId,
     toPostalCode: input.toPostalCode,
     items: input.items,
+    orderSubtotal: input.orderSubtotal,
   })
   if (!quoted.available) {
     return { success: false, error: carrierReasonMessage(quoted.reason), reason: quoted.reason }
@@ -392,6 +503,11 @@ export async function quoteCarrierFreightFee(
       deliveryMaxDays: selected.deliveryMaxDays,
       fromPostalCode: quoted.fromPostalCode,
       toPostalCode: String(input.toPostalCode).replace(/\D/g, ""),
+      destinationState: quoted.destinationState ?? null,
+      originalFee: selected.originalPrice ?? selected.price,
+      isFreeShipping: Boolean(selected.isFreeShipping),
+      freeShippingRuleId: selected.freeShippingRuleId ?? null,
+      freeShippingThreshold: quoted.freeShippingThreshold ?? null,
     },
   }
 }

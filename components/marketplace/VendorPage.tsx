@@ -17,7 +17,7 @@ import { trackEvent } from "@/lib/analytics"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours, getOpenNowStatus } from "@/lib/utils/opening-hours"
 import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange, estimateDeliveryTimeRange } from "@/lib/services/location.service"
-import { getEffectiveMaxDeliveryKm } from "@/lib/delivery/fee"
+import { getEffectiveMaxDeliveryKm, MAX_LOCAL_DELIVERY_FALLBACK_KM } from "@/lib/delivery/fee"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { ListItem } from "@/components/reusable/ListItem"
@@ -222,8 +222,6 @@ const openStatusToneClass = (status?: string) =>
     status === "open" ? "text-brand-green"
         : status === "closing_soon" ? "text-brand-orange"
             : "text-brand-red"
-
-const MAX_LOCAL_DELIVERY_FALLBACK_KM = 50
 
 const StoreStatusLine = ({ openStatus, delivery, className = "" }: { openStatus: { label: string; status: string } | null; delivery: ReactNode | null; className?: string }) => (
     <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] lg:text-[14px] leading-snug ${className}`}>
@@ -1716,9 +1714,41 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             return <span className="font-medium text-brand-dark dark:text-dark-heading">Retirada no local</span>
         }
 
-        const { outOfRadius, deliveryTime, feeLabel } = deliveryInfo
+        const { outOfRadius, deliveryTime, feeLabel, baseFee } = deliveryInfo
 
-        if (outOfRadius || (!deliveryTime && !feeLabel)) {
+        if (outOfRadius) {
+            return (
+                <button
+                    type="button"
+                    onClick={() => setIsDeliveryCalculatorOpen(true)}
+                    className="inline-flex items-center gap-1 font-medium text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors cursor-pointer"
+                    title="Calcular entrega"
+                >
+                    <span>Entrega • A combinar</span>
+                    <ChevronRightIcon size={13} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                </button>
+            )
+        }
+
+        // Sem endereço definido/calculado: não exibir o valor base como se fosse o frete final
+        if (!hasDeliveryCalculation) {
+            const uncalculatedLabel = baseFee > 0 ? `A partir de ${formatCurrency(baseFee)}` : "A combinar"
+            return (
+                <button
+                    type="button"
+                    onClick={() => setIsDeliveryCalculatorOpen(true)}
+                    className="inline-flex flex-wrap items-center gap-x-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+                    title="Calcular entrega"
+                >
+                    <span className="font-medium text-brand-dark dark:text-dark-heading">Entrega</span>
+                    <span aria-hidden className="text-brand-inactive-text dark:text-dark-body">•</span>
+                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{uncalculatedLabel}</span>
+                    <ChevronRightIcon size={13} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                </button>
+            )
+        }
+
+        if (!deliveryTime && !feeLabel) {
             return (
                 <button
                     type="button"
@@ -1752,7 +1782,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 <ChevronRightIcon size={13} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
             </button>
         )
-    }, [deliveryInfo])
+    }, [deliveryInfo, hasDeliveryCalculation])
 
     const hasStatusLine = !!openStatus || !!deliveryNode
     const calculatedReviewsCount = reviews?.length || 0
@@ -2648,8 +2678,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </span>
                                     </>
                                 ) : (
-                                    <span className="font-bold text-[13px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
-                                        A combinar
+                                    <span className="font-bold text-[12px] sm:text-[14px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                        {!deliveryInfo.outOfRadius && deliveryInfo.isDeliveryEnabled && deliveryInfo.sellsProducts && deliveryInfo.baseFee > 0
+                                            ? `A partir de ${formatCurrency(deliveryInfo.baseFee)}`
+                                            : "A combinar"}
                                     </span>
                                 )}
                             </div>

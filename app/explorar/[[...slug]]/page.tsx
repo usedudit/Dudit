@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
-import { getCachedExploreProducts, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
+import { getCachedExploreCategories, getCachedExploreProducts, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { resolveCityCoordsFromSlug } from "@/app/actions/marketplace/search"
 import { getCommunityVideos } from "@/app/actions/marketplace/community-videos"
 import type { Metadata } from "next"
@@ -484,11 +484,21 @@ export default async function ExplorarPage({
         return { cookieCity, resolved, coords }
     })()
 
-    const videosPromise = getCommunityVideos(searchSlug || undefined)
-        .catch((err) => {
-            console.error("[ExplorarPage] Error fetching community videos:", err)
-            return { items: [] as Awaited<ReturnType<typeof getCommunityVideos>>["items"], nextCursor: null, hasMore: false }
-        })
+    // Só busca vídeos da comunidade quando a página vai realmente renderizar o carrossel (modo seções em "tudo").
+    const shouldFetchVideos = !query && type === "tudo" && !section && !categoria
+    const videosPromise = shouldFetchVideos
+        ? getCommunityVideos(searchSlug || undefined)
+            .catch((err) => {
+                console.error("[ExplorarPage] Error fetching community videos:", err)
+                return { items: [] as Awaited<ReturnType<typeof getCommunityVideos>>["items"], nextCursor: null, hasMore: false }
+            })
+        : Promise.resolve({ items: [] as Awaited<ReturnType<typeof getCommunityVideos>>["items"], nextCursor: null, hasMore: false })
+
+    const categoriesPromise = getCachedExploreCategories().catch(() => ({
+        products: [] as { id?: string; name: string; icon_url: string | null }[],
+        services: [] as { id?: string; name: string; icon_url: string | null }[],
+        partners: [] as { id?: string; name: string; icon_url: string | null }[],
+    }))
 
     const [
         fetched,
@@ -497,6 +507,7 @@ export default async function ExplorarPage({
         cookieScope,
         communityVideosData,
         userSessionRes,
+        initialCategories,
     ] = await Promise.all([
         explorePromise,
         cityPromise,
@@ -504,6 +515,7 @@ export default async function ExplorarPage({
         cookieScopePromise,
         videosPromise,
         initialUserProfilePromise,
+        categoriesPromise,
     ])
 
     const userProfile = userSessionRes.userProfile
@@ -523,13 +535,31 @@ export default async function ExplorarPage({
     let productsWithDistance = exploreItems
     let moreDistantSellersWithDistance = moreDistantSellers
     let moreDistantItemsWithDistance = moreDistantItems
+    let proximityRingsWithDistance = fetched.proximityRings
 
     // Se o backend não tiver calculado distância ou novas coordenadas de perfil estiverem disponíveis:
-    if (refCoords && productsWithDistance.length > 0 && productsWithDistance[0]?.partners?.distance_km == null) {
+    if (refCoords) {
         try {
-            productsWithDistance = enrichMarketplaceDistance(exploreItems || [], refCoords)
-            moreDistantSellersWithDistance = enrichMarketplaceDistance(moreDistantSellers || [], refCoords)
-            moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
+            const enrichIfNeeded = (list: any[]) =>
+                list.length > 0 && list[0]?.partners?.distance_km == null && list[0]?.distance_km == null
+                    ? enrichMarketplaceDistance(list, refCoords)
+                    : list
+
+            productsWithDistance = enrichIfNeeded(exploreItems || [])
+            moreDistantSellersWithDistance = enrichIfNeeded(moreDistantSellers || [])
+            moreDistantItemsWithDistance = enrichIfNeeded(moreDistantItems || [])
+
+            if (proximityRingsWithDistance) {
+                proximityRingsWithDistance = {
+                    ...proximityRingsWithDistance,
+                    nearby: enrichIfNeeded(proximityRingsWithDistance.nearby || []),
+                    regional: enrichIfNeeded(proximityRingsWithDistance.regional || []),
+                    regionalSellers: enrichIfNeeded(proximityRingsWithDistance.regionalSellers || []),
+                    nationalShipping: enrichIfNeeded(proximityRingsWithDistance.nationalShipping || []),
+                    otherDistant: enrichIfNeeded(proximityRingsWithDistance.otherDistant || []),
+                    otherDistantSellers: enrichIfNeeded(proximityRingsWithDistance.otherDistantSellers || []),
+                }
+            }
         } catch (err) {
             console.error("[ExplorarPage] Error enriching distances:", err)
         }
@@ -588,10 +618,16 @@ export default async function ExplorarPage({
         state: targetState,
     }
 
-    const [exploreAds, searchAds] = await Promise.all([
-        getSponsoredAdsForSlot("explore", adLocation),
-        query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
-    ])
+    let exploreAds: SponsoredAd[] = []
+    let searchAds: SponsoredAd[] = []
+    if (query) {
+        searchAds = await getSponsoredAdsForSlot("search", adLocation)
+        if (searchAds.length === 0) {
+            exploreAds = await getSponsoredAdsForSlot("explore", adLocation)
+        }
+    } else {
+        exploreAds = await getSponsoredAdsForSlot("explore", adLocation)
+    }
 
     // BreadcrumbList Schema
     const breadcrumbItems: { name: string; item: string }[] = [
@@ -657,10 +693,11 @@ export default async function ExplorarPage({
             }>
                 <ExplorarPageClient
                     initialResults={productsWithDistance}
-                    initialMoreDistantSellers={moreDistantSellersWithDistance}
-                    initialMoreDistantItems={moreDistantItemsWithDistance}
+                    initialMoreDistantSellers={proximityRingsWithDistance ? [] : moreDistantSellersWithDistance}
+                    initialMoreDistantItems={proximityRingsWithDistance ? [] : moreDistantItemsWithDistance}
                     initialSearchIntent={fetched.searchIntent}
-                    initialProximityRings={fetched.proximityRings}
+                    initialProximityRings={proximityRingsWithDistance ? { ...proximityRingsWithDistance, nearby: [] } : null}
+                    initialCategories={initialCategories}
                     initialSection={section}
                     query={query}
                     type={type}

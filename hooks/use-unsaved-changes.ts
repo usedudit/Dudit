@@ -41,6 +41,14 @@ export function useUnsavedChanges(isDirty: boolean) {
       if (isNavigatingRef.current) return
 
       const target = event.target as HTMLElement | null
+      if (!target) return
+
+      // Ignore clicks on elements marked to not trigger unsaved changes dialog
+      // (e.g., buttons that open modals/sheets like "Ajustar Estoque")
+      if (target.closest('[data-unsaved-changes-ignore="true"]')) {
+        return
+      }
+
       const anchor = target?.closest("a[href]") as HTMLAnchorElement | null
       if (!anchor) return
       if (anchor.target === "_blank" || anchor.hasAttribute("download")) return

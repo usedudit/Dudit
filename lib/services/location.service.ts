@@ -1,5 +1,5 @@
 import { sanitizeAddressComplement } from "@/lib/utils/phone-utils"
-import { getEffectiveMaxDeliveryKm } from "@/lib/delivery/fee"
+import { getEffectiveDeliveryRadiusLimit } from "@/lib/delivery/fee"
 
 export type LocationPoint = {
     lat: number
@@ -206,9 +206,9 @@ export function estimateDeliveryFeeLabel(params?: DeliveryFeeEstimateParams | nu
     }
 
     const distanceKm = params.distanceKm != null && !isNaN(Number(params.distanceKm)) ? Number(params.distanceKm) : null
-    const effectiveMaxKm = getEffectiveMaxDeliveryKm(params)
+    const effectiveMaxKm = getEffectiveDeliveryRadiusLimit(params)
 
-    if (distanceKm != null && effectiveMaxKm != null && distanceKm > effectiveMaxKm) {
+    if (distanceKm != null && distanceKm > effectiveMaxKm) {
         return null // Fora do raio de entrega
     }
 
@@ -484,8 +484,8 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
 
         const distanceKm = Number(calculateDistance(normalizedUser, normalizedPartner).toFixed(1))
         const deliverySettings = partner?.delivery_settings || (item as any)?.delivery_settings || null
-        const effectiveMaxKm = getEffectiveMaxDeliveryKm(deliverySettings)
-        const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
+        const effectiveMaxKm = getEffectiveDeliveryRadiusLimit(deliverySettings)
+        const isOutsideRadius = distanceKm > effectiveMaxKm
         
         const deliveryFeeFormatted = isOutsideRadius ? null : estimateDeliveryFeeLabel({
             distanceKm,

@@ -59,6 +59,8 @@ import type {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizePDVSearchTerm } from "@/lib/utils/pdv"
 import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner"
+import { playBeepSound } from "@/lib/utils/barcode"
 import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
@@ -1281,6 +1283,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 },
                 financeAccountId: financeAccountId || null,
                 paidAmount: Number(paymentData.paidAmount || 0),
+                paymentStatus: paymentData.paymentStatus,
                 paymentMethod: paymentData.paymentMethod || "Método não definido",
                 paymentBreakdown,
                 isPendingDelivery: paymentData.isPendingDelivery,
@@ -1404,16 +1407,43 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         return () => window.removeEventListener("open-pos-shortcuts", handleOpenShortcuts)
     }, [])
 
+    const isGlobalScannerEnabled =
+        isCashierOpen &&
+        !isCameraOpen &&
+        !isPaymentModalOpen &&
+        !isQuickProductSheetOpen &&
+        !isSelectCustomerOpen &&
+        !isSelectSellerOpen &&
+        !isSellerSheetOpen &&
+        !isCouponSheetOpen &&
+        !isShippingSheetOpen &&
+        !isNotesSheetOpen &&
+        !isGlobalDiscountModalOpen &&
+        !isOpenCashModalOpen &&
+        !isResetAlertOpen &&
+        !isGiftModalOpen &&
+        !isShortcutsModalOpen &&
+        !variantPickerProduct &&
+        !editingItem
+
+    useBarcodeScanner({
+        enabled: isGlobalScannerEnabled,
+        onScan: (code) => {
+            playBeepSound()
+            void handleScanBarcode(code)
+        },
+    })
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const activeEl = document.activeElement
             const isInput = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLSelectElement
-            const isSearchInput = activeEl?.getAttribute("placeholder") === "Buscar produtos..."
+            const isSearchInput = activeEl?.getAttribute("placeholder") === "Buscar itens..."
 
             if (isInput && !isSearchInput) {
                 if (e.key === "F2") {
                     e.preventDefault()
-                    const searchInput = document.querySelector('input[placeholder="Buscar produtos..."]') as HTMLInputElement | null
+                    const searchInput = document.querySelector('input[placeholder="Buscar itens..."]') as HTMLInputElement | null
                     if (searchInput) {
                         searchInput.focus()
                         searchInput.select()
@@ -1431,7 +1461,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     break
                 case "F2":
                     e.preventDefault()
-                    const searchInput = document.querySelector('input[placeholder="Buscar produtos..."]') as HTMLInputElement | null
+                    const searchInput = document.querySelector('input[placeholder="Buscar itens..."]') as HTMLInputElement | null
                     if (searchInput) {
                         searchInput.focus()
                         searchInput.select()

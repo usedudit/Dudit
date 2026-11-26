@@ -195,11 +195,12 @@ export async function syncTinyProductsToDudit(params: {
             }
           }
 
-          // Checa se já existe na Dudit pelo external_id ou SKU
+          // Checa se já existe na Dudit pelo external_id (do próprio Tiny) ou SKU
           let { data: existingProduct } = await supabase
             .from("products")
             .select("id, stock_quantity, stock_reserved")
             .eq("partner_id", partnerId)
+            .eq("external_provider", TINY_PROVIDER)
             .eq("external_id", externalId)
             .maybeSingle()
 
@@ -401,6 +402,7 @@ export async function syncTinyProductsToDudit(params: {
                 const { data: bySku } = await supabase
                   .from("product_variants")
                   .select("id")
+                  .eq("product_id", targetProductId)
                   .eq("sku", vSku)
                   .maybeSingle()
                 existingVar = bySku
@@ -1179,11 +1181,6 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       },
     }
 
-    const tinyRes = await client.createOrder(payload)
-
-    // Se o pedido já saiu entregue/enviado (ou PDV com baixa física imediata), marca como entregue/enviado
-    // e sincroniza o saldo físico real (balanço) de cada item/variante no Tiny para efetivar a baixa física.
-    // Caso contrário, se já estiver pago, aprova o pedido no Tiny para manter a reserva de estoque.
     const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
     const isDeliveredOrDeducted =
       deliveryStatus === "delivered" ||
@@ -1191,6 +1188,38 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       Boolean((order as any).inventory_deducted)
     const isPaid = String(order.situation || "").toLowerCase() === "paid" || Number(order.paid_amount || 0) >= Number(order.total_amount || 0)
 
+    // Snapshot do estoque físico na Dudit ANTES de chamar o Tiny (evita race condition com webhook)
+    const preOrderStockSnapshots = new Map<string, number>()
+    if (isDeliveredOrDeducted) {
+      for (const it of (order.order_items || []) as any[]) {
+        if (!it.product_id) continue
+        const key = it.variant_id ? `variant:${it.variant_id}` : `product:${it.product_id}`
+        if (preOrderStockSnapshots.has(key)) continue
+        try {
+          if (it.variant_id) {
+            const { data: vRow } = await supabase
+              .from("product_variants")
+              .select("stock_quantity")
+              .eq("id", it.variant_id)
+              .maybeSingle()
+            if (vRow) preOrderStockSnapshots.set(key, Math.max(0, Number(vRow.stock_quantity || 0)))
+          } else {
+            const { data: pRow } = await supabase
+              .from("products")
+              .select("stock_quantity")
+              .eq("id", it.product_id)
+              .maybeSingle()
+            if (pRow) preOrderStockSnapshots.set(key, Math.max(0, Number(pRow.stock_quantity || 0)))
+          }
+        } catch { }
+      }
+    }
+
+    const tinyRes = await client.createOrder(payload)
+
+    // Se o pedido já saiu entregue/enviado (ou PDV com baixa física imediata), marca como entregue/enviado
+    // e sincroniza o saldo físico real (balanço) de cada item/variante no Tiny para efetivar a baixa física.
+    // Caso contrário, se já estiver pago, aprova o pedido no Tiny para manter a reserva de estoque.
     if (tinyRes.id) {
       if (isDeliveredOrDeducted) {
         const tinySit = deliveryStatus === "sent" ? "enviado" : "entregue"
@@ -1201,24 +1230,30 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
         }
 
         // Garante baixa física no estoque do Tiny (incluindo variantes) via balanço idempotente
+        const syncedKeys = new Set<string>()
         for (const it of (order.order_items || []) as any[]) {
           if (!it.product_id) continue
+          const key = it.variant_id ? `variant:${it.variant_id}` : `product:${it.product_id}`
+          if (syncedKeys.has(key)) continue
+          syncedKeys.add(key)
           try {
-            let newStock = 0
-            if (it.variant_id) {
-              const { data: vRow } = await supabase
-                .from("product_variants")
-                .select("stock_quantity")
-                .eq("id", it.variant_id)
-                .maybeSingle()
-              newStock = Number(vRow?.stock_quantity || 0)
-            } else {
-              const { data: pRow } = await supabase
-                .from("products")
-                .select("stock_quantity")
-                .eq("id", it.product_id)
-                .maybeSingle()
-              newStock = Number(pRow?.stock_quantity || 0)
+            let newStock = preOrderStockSnapshots.get(key)
+            if (newStock === undefined) {
+              if (it.variant_id) {
+                const { data: vRow } = await supabase
+                  .from("product_variants")
+                  .select("stock_quantity")
+                  .eq("id", it.variant_id)
+                  .maybeSingle()
+                newStock = Number(vRow?.stock_quantity || 0)
+              } else {
+                const { data: pRow } = await supabase
+                  .from("products")
+                  .select("stock_quantity")
+                  .eq("id", it.product_id)
+                  .maybeSingle()
+                newStock = Number(pRow?.stock_quantity || 0)
+              }
             }
             await syncDuditStockToTiny({
               partnerId: order.partner_id,
@@ -1450,7 +1485,9 @@ export async function syncDuditStockToTiny(params: {
     const client = await getValidTinyClient(partnerId)
     let targetTinyId: string | number | null = null
 
-    // 1. Se tem variantId, tenta achar o produto no Tiny pelo SKU da variante
+    // 1. Se tem variantId, resolve exclusivamente a variação pelo SKU no Tiny.
+    // IMPORTANTE: nunca fazer fallback para o produto pai quando variantId é informado,
+    // pois isso sobrescreveria o estoque do produto pai no Tiny com o saldo de uma única variação.
     if (variantId) {
       const { data: vRow } = await supabase
         .from("product_variants")
@@ -1458,10 +1495,11 @@ export async function syncDuditStockToTiny(params: {
         .eq("id", variantId)
         .maybeSingle()
 
-      if (vRow?.sku) {
+      const variantSku = vRow?.sku ? String(vRow.sku).trim() : (sku ? String(sku).trim() : null)
+      if (variantSku) {
         try {
-          const skuNorm = String(vRow.sku).trim().toLowerCase()
-          const search = await client.searchProducts({ pesquisa: vRow.sku })
+          const skuNorm = variantSku.toLowerCase()
+          const search = await client.searchProducts({ pesquisa: variantSku })
           const found = (search.produtos || []).find(
             (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
           )
@@ -1470,44 +1508,48 @@ export async function syncDuditStockToTiny(params: {
           }
         } catch { }
       }
-    }
 
-    // 2. Se tem productId e ainda não achou, tenta pelo external_id ou SKU do produto
-    if (!targetTinyId && productId) {
-      const { data: pRow } = await supabase
-        .from("products")
-        .select("external_id, sku")
-        .eq("id", productId)
-        .maybeSingle()
-
-      if (pRow?.external_id) {
-        targetTinyId = pRow.external_id
-      } else if (pRow?.sku) {
-        try {
-          const skuNorm = String(pRow.sku).trim().toLowerCase()
-          const search = await client.searchProducts({ pesquisa: pRow.sku })
-          const found = (search.produtos || []).find(
-            (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
-          )
-          if (found?.produto?.id) {
-            targetTinyId = found.produto.id
-          }
-        } catch { }
+      if (!targetTinyId) {
+        return { success: false, error: "Variação correspondente não encontrada no Tiny ERP." }
       }
-    }
+    } else {
+      // 2. Se tem productId, tenta pelo external_id (apenas se for do Tiny) ou SKU do produto
+      if (productId) {
+        const { data: pRow } = await supabase
+          .from("products")
+          .select("external_id, external_provider, sku")
+          .eq("id", productId)
+          .maybeSingle()
 
-    // 3. Fallback por SKU direto
-    if (!targetTinyId && sku) {
-      try {
-        const skuNorm = String(sku).trim().toLowerCase()
-        const search = await client.searchProducts({ pesquisa: sku })
-        const found = (search.produtos || []).find(
-          (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
-        )
-        if (found?.produto?.id) {
-          targetTinyId = found.produto.id
+        if (pRow?.external_id && (!pRow.external_provider || pRow.external_provider === TINY_PROVIDER)) {
+          targetTinyId = pRow.external_id
+        } else if (pRow?.sku) {
+          try {
+            const skuNorm = String(pRow.sku).trim().toLowerCase()
+            const search = await client.searchProducts({ pesquisa: pRow.sku })
+            const found = (search.produtos || []).find(
+              (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+            )
+            if (found?.produto?.id) {
+              targetTinyId = found.produto.id
+            }
+          } catch { }
         }
-      } catch { }
+      }
+
+      // 3. Fallback por SKU direto
+      if (!targetTinyId && sku) {
+        try {
+          const skuNorm = String(sku).trim().toLowerCase()
+          const search = await client.searchProducts({ pesquisa: sku })
+          const found = (search.produtos || []).find(
+            (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+          )
+          if (found?.produto?.id) {
+            targetTinyId = found.produto.id
+          }
+        } catch { }
+      }
     }
 
     if (!targetTinyId) {
@@ -1516,6 +1558,7 @@ export async function syncDuditStockToTiny(params: {
 
     await client.updateProductStock(targetTinyId, newStock, {
       tipo: "B",
+      deposito: config.default_deposit || undefined,
       observacoes: (reason || "Ajuste de estoque via Dudit").substring(0, 100),
     })
 
@@ -1555,6 +1598,19 @@ export async function processTinyWebhook(
     Array.isArray(root?.produtos) ||
     root?.produto
   ) {
+    // Respeita a preferência sync_stock da integração (quando explicitamente desativada)
+    try {
+      const integration = await findTinyIntegration(supabase, partnerId)
+      if ((integration?.config as TinyIntegrationConfig | undefined)?.sync_stock === false) {
+        return {
+          success: true,
+          event: "atualizacao_estoque",
+          affectedCount: 0,
+          details: "sync_stock_disabled",
+        }
+      }
+    } catch { }
+
     const rawProducts = Array.isArray(root.produtos)
       ? root.produtos
       : root.produto
@@ -1564,48 +1620,73 @@ export async function processTinyWebhook(
     for (const item of rawProducts) {
       const externalId = item.id ? String(item.id) : null
       const sku = item.sku || item.codigo ? String(item.sku || item.codigo).trim() : null
-      const newStock = Math.max(0, Number(item.saldo ?? item.quantidade ?? 0))
+      const newStock = Math.max(
+        0,
+        Number(item.saldo ?? item.saldoFisico ?? item.saldo_fisico ?? item.estoqueAtual ?? item.quantidade ?? 0)
+      )
+      const rawReserved = item.saldoReservado ?? item.saldo_reservado
+      const hasReserved = rawReserved !== undefined && rawReserved !== null
+      const newReserved = hasReserved ? Math.max(0, Number(rawReserved)) : undefined
 
       if (!externalId && !sku) continue
 
+      const skuNorm = sku ? sku.toLowerCase() : null
+      const escapedSku = sku ? sku.replace(/[\\%_]/g, "\\$&") : null
+
       let matchedVariant = false
 
-      // 1. Tenta atualizar em product_variants pelo SKU (case-insensitive)
-      if (sku) {
-        const { data: matchedVariants } = await supabase
+      // 1. Tenta atualizar em product_variants pelo SKU (case-insensitive exato)
+      if (escapedSku && skuNorm) {
+        const { data: rawMatchedVariants } = await supabase
           .from("product_variants")
           .select("id, product_id, sku, stock_quantity, products!inner(partner_id)")
-          .ilike("sku", sku)
+          .ilike("sku", escapedSku)
           .eq("products.partner_id", partnerId)
 
-        if (matchedVariants && matchedVariants.length > 0) {
+        const matchedVariants = (rawMatchedVariants || []).filter(
+          (v: any) => !v?.sku || String(v.sku).trim().toLowerCase() === skuNorm
+        )
+
+        if (matchedVariants.length > 0) {
           matchedVariant = true
           for (const variant of matchedVariants) {
+            const varPatch: Record<string, any> = {
+              stock_quantity: newStock,
+              updated_at: new Date().toISOString(),
+            }
+            if (hasReserved && newReserved !== undefined) {
+              varPatch.stock_reserved = newReserved
+            }
+
             await supabase
               .from("product_variants")
-              .update({
-                stock_quantity: newStock,
-                updated_at: new Date().toISOString(),
-              })
+              .update(varPatch)
               .eq("id", variant.id)
 
-            // Recalcula o estoque total do produto pai
+            // Recalcula o estoque total (e reservado, se enviado) do produto pai
             const { data: allVars } = await supabase
               .from("product_variants")
-              .select("stock_quantity")
+              .select("stock_quantity, stock_reserved")
               .eq("product_id", variant.product_id)
 
             const totalParentStock = (allVars || []).reduce(
               (acc: number, v: any) => acc + Math.max(0, Number(v.stock_quantity || 0)),
               0
             )
+            const parentPatch: Record<string, any> = {
+              stock_quantity: totalParentStock,
+              last_external_sync_at: new Date().toISOString(),
+            }
+            if (hasReserved) {
+              parentPatch.stock_reserved = (allVars || []).reduce(
+                (acc: number, v: any) => acc + Math.max(0, Number(v.stock_reserved || 0)),
+                0
+              )
+            }
 
             await supabase
               .from("products")
-              .update({
-                stock_quantity: totalParentStock,
-                last_external_sync_at: new Date().toISOString(),
-              })
+              .update(parentPatch)
               .eq("id", variant.product_id)
 
             try {
@@ -1620,29 +1701,50 @@ export async function processTinyWebhook(
 
       // 2. Se não era uma variação, busca e atualiza em products
       if (!matchedVariant) {
-        let productQuery = supabase
-          .from("products")
-          .select("id, name, stock_quantity")
-          .eq("partner_id", partnerId)
-          .is("deleted_at", null)
+        const matchedMap = new Map<string, { id: string }>()
 
-        if (externalId && sku) {
-          productQuery = productQuery.or(`external_id.eq.${externalId},sku.ilike.${sku}`)
-        } else if (externalId) {
-          productQuery = productQuery.eq("external_id", externalId)
-        } else if (sku) {
-          productQuery = productQuery.ilike("sku", sku)
+        if (externalId) {
+          const { data: byExt } = await supabase
+            .from("products")
+            .select("id, external_provider")
+            .eq("partner_id", partnerId)
+            .is("deleted_at", null)
+            .eq("external_id", externalId)
+
+          for (const p of byExt || []) {
+            if (!p.external_provider || p.external_provider === TINY_PROVIDER) {
+              matchedMap.set(p.id, { id: p.id })
+            }
+          }
         }
 
-        const { data: matchedProducts } = await productQuery
+        if (escapedSku && skuNorm) {
+          const { data: bySku } = await supabase
+            .from("products")
+            .select("id, sku")
+            .eq("partner_id", partnerId)
+            .is("deleted_at", null)
+            .ilike("sku", escapedSku)
 
-        for (const prod of matchedProducts || []) {
+          for (const p of bySku || []) {
+            if (!p?.sku || String(p.sku).trim().toLowerCase() === skuNorm) {
+              matchedMap.set(p.id, { id: p.id })
+            }
+          }
+        }
+
+        for (const prod of matchedMap.values()) {
+          const prodPatch: Record<string, any> = {
+            stock_quantity: newStock,
+            last_external_sync_at: new Date().toISOString(),
+          }
+          if (hasReserved && newReserved !== undefined) {
+            prodPatch.stock_reserved = newReserved
+          }
+
           await supabase
             .from("products")
-            .update({
-              stock_quantity: newStock,
-              last_external_sync_at: new Date().toISOString(),
-            })
+            .update(prodPatch)
             .eq("id", prod.id)
 
           try {

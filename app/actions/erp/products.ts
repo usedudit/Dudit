@@ -1358,6 +1358,24 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             )
         }
 
+        // Sincroniza estoque manual alterado no cadastro do produto com ERPs conectados (Tiny / Bling)
+        if (
+            data.stockQuantity !== undefined &&
+            Number(data.stockQuantity) !== Number(product.stock_quantity || 0)
+        ) {
+            import("@/lib/services/integrations/erp-sync")
+                .then(({ syncStockToConnectedErps }) =>
+                    syncStockToConnectedErps({
+                        partnerId: product.partner_id,
+                        productId,
+                        sku: data.sku || product.sku || undefined,
+                        newStock: Number(data.stockQuantity),
+                        reason: "Edição de estoque no cadastro do produto (Dudit)",
+                    })
+                )
+                .catch(() => {})
+        }
+
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1414,6 +1432,21 @@ export async function createProductVariantAction(data: {
         if (error) return { error: error.message }
 
         await invalidateProductCache(data.productId, product.partner_id, 'update')
+
+        if (data.stockQuantity !== undefined) {
+            import("@/lib/services/integrations/erp-sync")
+                .then(({ syncStockToConnectedErps }) =>
+                    syncStockToConnectedErps({
+                        partnerId: product.partner_id,
+                        productId: data.productId,
+                        sku: variantSku,
+                        newStock: Number(data.stockQuantity),
+                        reason: "Criação/atualização de estoque da variação (Dudit)",
+                    })
+                )
+                .catch(() => {})
+        }
+
         return { success: true, variantSku }
     } catch (error: any) {
         return { error: error.message }
@@ -1600,6 +1633,37 @@ export async function createProductVariantsBatchAction(data: {
         }
 
         await invalidateProductCache(data.productId, product.partner_id, 'update')
+
+        // Sincroniza estoque das variações alteradas/criadas com ERPs conectados (Tiny / Bling)
+        if (Array.isArray(inserted) && inserted.length > 0) {
+            const prevBySku = new Map<string, number>(
+                (existingVariants || [])
+                    .filter((ev: any) => ev?.sku)
+                    .map((ev: any) => [String(ev.sku).trim().toLowerCase(), Number(ev.stock_quantity || 0)])
+            )
+            const changedVariants = inserted.filter((v: any) => {
+                const k = String(v?.sku || "").trim().toLowerCase()
+                if (!prevBySku.has(k)) return true
+                return Number(v.stock_quantity || 0) !== prevBySku.get(k)
+            })
+            if (changedVariants.length > 0) {
+                import("@/lib/services/integrations/erp-sync")
+                    .then(({ syncItemsStockToConnectedErps }) =>
+                        syncItemsStockToConnectedErps({
+                            partnerId: product.partner_id,
+                            items: changedVariants.map((v: any) => ({
+                                productId: data.productId,
+                                variantId: v.id,
+                                sku: v.sku || null,
+                                newStock: Number(v.stock_quantity || 0),
+                            })),
+                            reason: "Edição de estoque em variações (Dudit)",
+                        })
+                    )
+                    .catch(() => {})
+            }
+        }
+
         return successResponse(inserted)
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1737,6 +1801,22 @@ export async function updateProductVariantAction(variantId: string, data: {
         if (error) return errorResponse(error.message)
 
         Promise.resolve().then(() => revalidateProducts(product.partner_id, variant.product_id)).catch(console.error)
+
+        if (data.stockQuantity !== undefined) {
+            import("@/lib/services/integrations/erp-sync")
+                .then(({ syncStockToConnectedErps }) =>
+                    syncStockToConnectedErps({
+                        partnerId: product.partner_id,
+                        productId: variant.product_id,
+                        variantId,
+                        sku: updated?.sku || data.sku || undefined,
+                        newStock: Number(data.stockQuantity),
+                        reason: "Edição de estoque da variação (Dudit)",
+                    })
+                )
+                .catch(() => {})
+        }
+
         return successResponse(updated)
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1860,6 +1940,26 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
         const firstProd = Array.isArray(variants[0]?.products) ? variants[0].products[0] : variants[0]?.products
         if (firstProd?.partner_id) {
             await invalidateProductCache(variants[0].product_id, firstProd.partner_id, 'update')
+
+            const stockUpdates = updates.filter((u) => u.stock !== undefined)
+            if (stockUpdates.length > 0) {
+                import("@/lib/services/integrations/erp-sync")
+                    .then(({ syncItemsStockToConnectedErps }) =>
+                        syncItemsStockToConnectedErps({
+                            partnerId: firstProd.partner_id,
+                            items: stockUpdates.map((u) => {
+                                const current = variants.find((v: any) => v.id === u.id)
+                                return {
+                                    productId: current?.product_id || variants[0].product_id,
+                                    variantId: u.id,
+                                    newStock: Number(u.stock),
+                                }
+                            }),
+                            reason: "Edição em lote de estoque de variações (Dudit)",
+                        })
+                    )
+                    .catch(() => {})
+            }
         }
         return successResponse({ updatedCount: updates.length })
     } catch (error: any) {
@@ -2911,6 +3011,22 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
             await Promise.all(sanitized.map(id =>
                 invalidateProductCache(id, partnerId, 'update')
             ))
+
+            const stockUpdates = normalizedUpdates.filter(({ data }) => "stock_quantity" in data)
+            if (stockUpdates.length > 0) {
+                import("@/lib/services/integrations/erp-sync")
+                    .then(({ syncItemsStockToConnectedErps }) =>
+                        syncItemsStockToConnectedErps({
+                            partnerId,
+                            items: stockUpdates.map(({ id, data }) => ({
+                                productId: id,
+                                newStock: Number(data.stock_quantity),
+                            })),
+                            reason: "Edição em lote de estoque de produtos (Dudit)",
+                        })
+                    )
+                    .catch(() => {})
+            }
         }
         return { success: true, count: normalizedUpdates.length }
     } catch (error: any) {

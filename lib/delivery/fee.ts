@@ -43,6 +43,8 @@ export type DeliveryBreakdown = {
   hasRatesConfigured?: boolean
 }
 
+export const MAX_LOCAL_DELIVERY_FALLBACK_KM = 50
+
 export function getEffectiveMaxDeliveryKm(
   settings?: {
     maxDeliveryKm?: number | null
@@ -63,6 +65,12 @@ export function getEffectiveMaxDeliveryKm(
     ? Number(rawIncluded)
     : null
   return includedKm
+}
+
+export function getEffectiveDeliveryRadiusLimit(
+  settings?: Parameters<typeof getEffectiveMaxDeliveryKm>[0],
+): number {
+  return getEffectiveMaxDeliveryKm(settings) ?? MAX_LOCAL_DELIVERY_FALLBACK_KM
 }
 
 export function hasDeliveryRatesConfigured(
@@ -134,18 +142,21 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
 
   // maxDeliveryKm defines the maximum delivery radius when configured;
   // otherwise includedKm acts as the seller's delivery radius limit.
+  // If neither is configured, enforce a safe local delivery cap (50 km) so
+  // distant addresses (e.g. 500 km away) are never quoted as local delivery.
   const effectiveMaxKm = getEffectiveMaxDeliveryKm({
     maxDeliveryKm: maxDeliveryKmSetting,
     includedKm,
   })
+  const radiusLimitKm = effectiveMaxKm ?? MAX_LOCAL_DELIVERY_FALLBACK_KM
 
-  const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
+  const isOutsideRadius = distanceKm > radiusLimitKm
   if (isOutsideRadius && !input.allowOutsideRadius) {
     throw new Error("Endereço fora do raio de entrega.")
   }
 
   const outsideRadiusWarning = isOutsideRadius
-    ? `Endereço fora do raio de entrega (${distanceKm} km / Máximo: ${effectiveMaxKm} km).`
+    ? `Endereço fora do raio de entrega (${distanceKm} km / Máximo: ${radiusLimitKm} km).`
     : undefined
 
   let fee = baseFee

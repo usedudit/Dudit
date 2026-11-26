@@ -22,7 +22,7 @@ const categoryGroups: CategoryGroup[] = [
         title: "Gestão",
         icon: "📊",
         categories: helpCategories.filter(cat =>
-            ["vendas", "produtos-estoque", "servicos", "financeiro", "clientes", "marketing", "integracoes"].includes(cat.id)
+            ["vendas", "produtos-estoque", "servicos", "financeiro", "clientes", "marketing", "assinaturas", "desempenho", "configuracoes", "integracoes"].includes(cat.id)
         )
     },
     {
@@ -42,11 +42,19 @@ const categoryGroups: CategoryGroup[] = [
         )
     },
     {
+        id: "comprando",
+        title: "Comprando na Dudit",
+        icon: "🛒",
+        categories: helpCategories.filter(cat =>
+            ["marketplace"].includes(cat.id)
+        )
+    },
+    {
         id: "geral",
         title: "Geral",
         icon: "ℹ️",
         categories: helpCategories.filter(cat =>
-            ["boas-vindas", "login-registro"].includes(cat.id)
+            ["boas-vindas", "login-registro", "planos"].includes(cat.id)
         )
     }
 ]
@@ -64,6 +72,7 @@ export default function HelpSidebar({
         "gestao": true,
         "vitrine-online": false,
         "portal-entregador": false,
+        "comprando": false,
         "geral": false
     })
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
@@ -102,6 +111,12 @@ export default function HelpSidebar({
         if (id === "clientes") return "👥"
         if (id === "vitrine-online") return "🛍️"
         if (id === "marketing") return "📢"
+        if (id === "integracoes") return "🔌"
+        if (id === "assinaturas") return "🔁"
+        if (id === "desempenho") return "📊"
+        if (id === "configuracoes") return "⚙️"
+        if (id === "marketplace") return "🛒"
+        if (id === "planos") return "💳"
         return "📁"
     }
 

@@ -560,6 +560,7 @@ export function resolveTimelineActorName({
   const isCustomer = Boolean(
     !isDuditAction &&
     !isSystem &&
+    !isErpAction &&
     ((buyerId && entry.actor_user_id === buyerId) ||
       metadata.is_buyer === true ||
       metadata.source === "marketplace" ||

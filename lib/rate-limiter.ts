@@ -408,7 +408,12 @@ export function getLimiter(category: RateLimitCategory): Ratelimit {
 
   const limiter = new Ratelimit({
     redis: redis,
-    limiter: Ratelimit.slidingWindow(config.maxRequests, config.window as any),
+    // Security-critical (failClosed) routes keep strict slidingWindow protection;
+    // general/non-critical routes use fixedWindow to cut Redis commands by ~50-60%
+    // (eliminating the two GET reads per check).
+    limiter: config.failClosed
+      ? Ratelimit.slidingWindow(config.maxRequests, config.window as any)
+      : Ratelimit.fixedWindow(config.maxRequests, config.window as any),
     analytics: false,
     prefix: `@rl/${category}`,
     ephemeralCache: new Map(),

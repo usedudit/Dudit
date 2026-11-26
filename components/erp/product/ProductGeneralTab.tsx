@@ -380,6 +380,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                 variant="outline"
                                                 className="h-8 px-3 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
                                                 onClick={() => setIsStockAdjustmentOpen(true)}
+                                                data-unsaved-changes-ignore="true"
                                             >
                                                 Ajustar
                                             </Button>
@@ -710,6 +711,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                     variant="outline"
                                                     className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
                                                     onClick={() => setIsStockAdjustmentOpen(true)}
+                                                    data-unsaved-changes-ignore="true"
                                                 >
                                                     Ajustar
                                                 </Button>
@@ -724,6 +726,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                     type="button"
                                                     onClick={() => setIsStockAdjustmentOpen(true)}
                                                     className="text-[11px] font-semibold text-brand-primary hover:underline"
+                                                    data-unsaved-changes-ignore="true"
                                                 >
                                                     Liberar reserva
                                                 </button>
@@ -801,6 +804,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                     variant="outline"
                                                     className="h-7 px-2.5 text-xs border border-brand-border hover:bg-brand-gray dark:border-dark-border dark:hover:bg-dark-border/50 text-brand-dark dark:text-dark-heading rounded-md font-medium"
                                                     onClick={() => setIsStockAdjustmentOpen(true)}
+                                                    data-unsaved-changes-ignore="true"
                                                 >
                                                     Ajustar
                                                 </Button>
@@ -815,6 +819,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                     type="button"
                                                     onClick={() => setIsStockAdjustmentOpen(true)}
                                                     className="text-[11px] font-semibold text-brand-primary hover:underline"
+                                                    data-unsaved-changes-ignore="true"
                                                 >
                                                     Liberar reserva
                                                 </button>

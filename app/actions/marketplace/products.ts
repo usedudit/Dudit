@@ -515,7 +515,8 @@ export const getCachedExploreProducts = async (
   type: MarketplaceSearchType,
   cidade?: string,
   section?: string,
-  coords?: { lat: number; lng: number } | null
+  coords?: { lat: number; lng: number } | null,
+  userId?: string | null
 ) => {
   const { results, moreDistantSellers, moreDistantItems, searchIntent, proximityRings } = await searchMarketplaceDirectFull(query, type, {
     vitrines: type === 'vitrines' ? 40 : 4,
@@ -528,9 +529,36 @@ export const getCachedExploreProducts = async (
     latitude: coords?.lat,
     longitude: coords?.lng,
     centerCoords: coords,
+    userId,
   })
   return { items: results, moreDistantSellers, moreDistantItems, searchIntent, proximityRings }
 }
+
+/**
+ * Categorias raiz do marketplace (produtos, serviços e lojas) cacheadas no servidor (1h).
+ * Evita 3 queries client-side ao Supabase em todo primeiro carregamento da página /explorar.
+ */
+export const getCachedExploreCategories = unstable_cache(
+  async (): Promise<{
+    products: { id?: string; name: string; icon_url: string | null }[]
+    services: { id?: string; name: string; icon_url: string | null }[]
+    partners: { id?: string; name: string; icon_url: string | null }[]
+  }> => {
+    const supabase = getAdminClient()
+    const [prodRes, servRes, partRes] = await Promise.all([
+      supabase.from("marketplace_product_categories").select("id, name, icon_url").is("parent_id", null).order("name"),
+      supabase.from("marketplace_service_categories").select("id, name, icon_url").is("parent_id", null).order("name"),
+      supabase.from("marketplace_partner_categories").select("id, name, icon_url").is("parent_id", null).order("name"),
+    ])
+    return {
+      products: prodRes.data || [],
+      services: servRes.data || [],
+      partners: partRes.data || [],
+    }
+  },
+  ["explore-root-categories-v1"],
+  { revalidate: 3600, tags: ["marketplace-categories"] }
+)
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
   if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }

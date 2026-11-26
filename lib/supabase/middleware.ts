@@ -2,6 +2,7 @@ import "server-only"
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { RateLimitCategory, getLimiter, RATE_LIMIT_CONFIGS } from "@/lib/rate-limiter"
+import { tryLocalRateLimitShortCircuit } from "@/lib/security/require-rate-limit"
 import { isAllowedServerActionOrigin } from "@/lib/security/origin-validation"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { evaluateMaintenanceMode } from "@/lib/system/maintenance-guard"
@@ -71,6 +72,13 @@ const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/marketplace/view",
   "/api/system/announcement",
   "/api/system/maintenance",
+  "/api/csrf-token",
+  "/api/auth/create-profile",
+  "/api/checkout/recover-payment",
+  "/api/integrations/bling/webhook",
+  "/api/integrations/tiny/webhook",
+  "/api/log-error",
+  "/api/shipping/superfrete/webhook",
 ]
 
 function isPublicPath(pathname: string): boolean {
@@ -277,19 +285,25 @@ export async function middleware(request: NextRequest) {
     const config = RATE_LIMIT_CONFIGS[category]
 
     try {
-      const limiter = getLimiter(category)
       const identifier = `ip:${ip}`
-      const { success, reset } = await limiter.limit(identifier)
+      // Skip Redis for normal low-volume API_GENERAL bursts (never for AUTH_LOGIN / failClosed)
+      const shortCircuited =
+        !config.failClosed && tryLocalRateLimitShortCircuit(category, identifier, 0.2)
 
-      if (!success) {
-        const retryAfter = Math.max(1, Math.ceil((reset - Date.now()) / 1000))
-        return new NextResponse(
-          JSON.stringify({
-            error: "Muitas tentativas. Tente novamente em breve.",
-            retryAfter,
-          }),
-          { status: 429, headers: { "Content-Type": "application/json" } }
-        )
+      if (!shortCircuited) {
+        const limiter = getLimiter(category)
+        const { success, reset } = await limiter.limit(identifier)
+
+        if (!success) {
+          const retryAfter = Math.max(1, Math.ceil((reset - Date.now()) / 1000))
+          return new NextResponse(
+            JSON.stringify({
+              error: "Muitas tentativas. Tente novamente em breve.",
+              retryAfter,
+            }),
+            { status: 429, headers: { "Content-Type": "application/json" } }
+          )
+        }
       }
     } catch (error) {
       console.error("[MIDDLEWARE] Rate limit error:", error)

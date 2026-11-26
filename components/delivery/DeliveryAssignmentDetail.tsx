@@ -54,7 +54,7 @@ import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } fr
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "@/components/erp/orders/CreateOrder"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
-import DriverPaymentModal from "./DriverPaymentModal"
+import PaymentStatusModal from "@/components/erp/orders/PaymentStatusModal"
 
 const STEPS = [
     { key: "assigned", label: "Atribuída" },
@@ -1386,16 +1386,13 @@ export default function DeliveryAssignmentDetail({
                 </div>
             </FadeIn>
 
-            <DriverPaymentModal
+            <PaymentStatusModal
                 isOpen={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
+                partnerId={assignment.partner_id || ""}
+                driverMode={true}
                 assignmentId={assignment.assignment_id || assignment.id}
                 order={selectedPaymentOrder}
-                canConfirm={Boolean(
-                    selectedPaymentOrder?.delivery_status === "delivered" ||
-                    assignment.status === "delivered" ||
-                    (ordersList.length === 1 && isSingleDelivered)
-                )}
                 onSuccess={() => {
                     setShowPaymentModal(false)
                     const paidOrderId = selectedPaymentOrder?.id || selectedPaymentOrder?.order_id

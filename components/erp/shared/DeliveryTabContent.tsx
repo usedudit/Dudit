@@ -678,8 +678,8 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                         }
                         description={
                             <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                {driverInfo.totalDeliveries && driverInfo.totalDeliveries > 0 && <span>{driverInfo.totalDeliveries} entregas realizadas</span>}
-                                {driverInfo.vehicleType && <span>• {driverInfo.vehicleType}</span>}
+                                {Number(driverInfo.totalDeliveries || 0) > 0 && <span>{driverInfo.totalDeliveries} entregas realizadas</span>}
+                                {driverInfo.vehicleType && <span>{Number(driverInfo.totalDeliveries || 0) > 0 ? "• " : ""}{driverInfo.vehicleType}</span>}
                             </div>
                         }
                         left={
@@ -726,8 +726,8 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                         }
                         description={
                             <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                {driverInfo.totalDeliveries && driverInfo.totalDeliveries > 0 && <span>{driverInfo.totalDeliveries} entregas realizadas</span>}
-                                {driverInfo.vehicleType && <span>• {driverInfo.vehicleType}</span>}
+                                {Number(driverInfo.totalDeliveries || 0) > 0 && <span>{driverInfo.totalDeliveries} entregas realizadas</span>}
+                                {driverInfo.vehicleType && <span>{Number(driverInfo.totalDeliveries || 0) > 0 ? "• " : ""}{driverInfo.vehicleType}</span>}
                             </div>
                         }
                         left={
@@ -876,7 +876,7 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
                     label="Código de entrega"
                     value={
                         order.delivery_status === "delivered" || otpData.status === "confirmed" ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">Confirmado</span>
+                            <span className="text-brand-green font-bold">Confirmado</span>
                         ) : otpData.code ? (
                             <span className="font-mono tracking-widest text-base font-black text-brand-primary">
                                 {otpData.code}

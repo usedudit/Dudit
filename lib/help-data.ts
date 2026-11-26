@@ -81,6 +81,42 @@ Veja spam e lixo eletrônico. Se a conta foi criada pelo Google, não existe sen
 **"A página pede uma verificação."**
 É a proteção contra robôs. Basta marcar a caixinha que aparece antes de entrar.
 `
+            },
+            {
+                id: "inicio-painel",
+                title: "Conhecendo a tela Início",
+                description: "Veja o resumo do seu negócio, os alertas e as atividades recentes assim que entra no painel.",
+                slug: "inicio-painel",
+                category: "boas-vindas",
+                content: `
+## Para que serve
+A tela **Início** é a primeira que aparece quando você entra no painel. Ela mostra um resumo do negócio no período escolhido.
+
+## O que aparece
+
+| Bloco | O que mostra |
+| :--- | :--- |
+| **Resumo** | Faturamento, pedidos e outras métricas do período. |
+| **Faturamento** | Gráfico da evolução das vendas. |
+| **Origem da Receita** | De onde veio o dinheiro: canais e formas de pagamento. |
+| **Total de Pedidos** | Quantidade de pedidos ao longo do período. |
+| **Atividades Recentes** | O que aconteceu de mais novo no painel. |
+| **Precisa de Atenção** | Alertas que pedem ação, como contas vencidas e estoque baixo. |
+| **Últimos Pedidos** | Os pedidos mais recentes. |
+| **Próximos Agendamentos** | Os atendimentos marcados para os próximos dias. |
+| **Estoque Crítico** | Produtos perto de acabar. |
+
+## Como usar
+1. Escolha o **período** no topo da tela.
+2. Se quiser, ligue a **comparação** para ver o período anterior ao lado.
+3. Clique em um bloco para abrir a lista completa.
+
+> [!TIP]
+> Comece o dia pela tela Início: os alertas mostram o que precisa de ação antes de virar problema.
+
+## Se um bloco não aparece
+Alguns blocos só aparecem quando o recurso está ativo. Por exemplo: agendamentos só aparecem se você usa Serviços; estoque crítico só aparece se controla Produtos.
+`
             }
         ]
     },
@@ -5924,6 +5960,54 @@ Sim, desde que a visão atual contenha os lançamentos desejados.
 `
             },
             {
+                id: "dre-gerencial",
+                title: "DRE Gerencial",
+                description: "Entenda o demonstrativo de resultado: receita, custos, despesas, margens, EBITDA e lucro líquido.",
+                slug: "dre-gerencial",
+                category: "financeiro",
+                content: `
+## O que é
+A **DRE Gerencial** mostra se o negócio deu lucro no período. Ela pega as vendas, desconta custos e despesas e chega ao lucro.
+
+## Quem pode usar
+Plano **Escalar**.
+
+## Onde fica
+No menu **Financeiro**, clique em **DRE Gerencial**.
+
+## O que você vê
+
+| Indicador | O que significa |
+| :--- | :--- |
+| **Receita Líquida** | O que entrou de vendas, já sem devoluções e cancelamentos. |
+| **Lucro Bruto** | Receita menos o custo dos produtos vendidos. |
+| **Margem de Contribuição** | O que sobra para pagar as despesas fixas. |
+| **EBITDA Operacional** | Lucro antes de juros, impostos, depreciação e amortização. |
+| **Lucro Líquido** | O resultado final depois de todas as despesas. |
+
+## Como ler
+- **Margem Bruta**: quanto sobra de cada venda depois do custo do produto.
+- **Margem EBITDA**: mostra a eficiência da operação.
+- **Margem Líquida**: quanto realmente fica no fim.
+
+## O que entra no cálculo
+- Vendas de produtos, serviços e ordens de serviço.
+- Devoluções e cancelamentos.
+- Custos dos produtos (CMV).
+- Despesas comerciais, administrativas e pró-labore.
+- Impostos configurados em **Dados do Negócio**.
+
+> [!IMPORTANT]
+> Se um número parece errado, confira os **impostos** em **Configurações > Dados do Negócio** e se as despesas foram lançadas na categoria certa.
+
+## Regime de apuração
+Você pode ver por **Competência** (conta quando o fato aconteceu) ou por **Caixa** (conta quando o dinheiro entrou ou saiu). O regime aparece no topo da tela.
+
+## Exportar
+Use o botão de impressão para gerar o DRE em PDF e guardar ou enviar para o contador.
+`
+            },
+            {
                 id: "perguntas-frequentes-financeiro",
                 title: "Perguntas frequentes sobre Financeiro",
                 description: "Respostas rápidas sobre lançamentos, abas, contas, parcelas, recorrências, reembolsos e integrações.",
@@ -7722,6 +7806,1065 @@ Sim. Na tela de integração tem o botão **Sincronizar Produtos Agora**. Ele pu
 
 **Posso usar o PDV da Dudit (venda no balcão) junto com o Tiny?**
 Sim. Venda no PDV da Dudit e o estoque sincroniza com o Tiny. Tudo junto no mesmo lugar.
+`
+            },
+            {
+                id: "como-integrar-bling-dudit",
+                title: "Como conectar o Bling ERP na Dudit",
+                description: "Conecte seu Bling em poucos cliques e mantenha produtos, estoque, pedidos e notas fiscais sincronizados.",
+                slug: "como-integrar-bling-dudit",
+                category: "integracoes",
+                content: `
+## O que faz essa integração
+O **Bling** é um sistema de gestão (ERP) muito usado por lojas online. Conectado à Dudit, o que você cadastra de um lado aparece do outro: produtos, estoque, pedidos e notas fiscais.
+
+## O que você precisa
+- Conta na Dudit com plano **Crescer** ou **Escalar**.
+- Conta ativa no Bling.
+
+## Como conectar
+1. No painel da Dudit, vá em **Configurações > Integrações**.
+2. Ache o card **Bling ERP** e clique em **Conectar**.
+3. Você é levado para o Bling. Faça login e **autorize** o acesso da Dudit.
+4. Ao voltar, a conexão já estará ativa.
+
+> [!NOTE]
+> A conexão usa a autorização oficial do Bling (OAuth). Você não precisa copiar senha nem token.
+
+## O que é sincronizado
+| Item | O que acontece |
+| :--- | :--- |
+| **Produtos** | Nome, variações, fotos, preço, SKU e código de barras (GTIN/EAN). |
+| **Estoque** | Saldo físico e reservado, atualizado automaticamente. |
+| **Pedidos** | Pedidos do checkout, do ERP e do PDV são enviados ao Bling. |
+| **Notas fiscais** | NF-e e NFC-e emitidas no Bling ficam ligadas ao pedido na Dudit. |
+
+## Problemas comuns
+
+**"Cliquei em Conectar e o Bling não abriu."**
+Confira se o navegador bloqueou a janela. Se continuar, tente em uma aba anônima.
+
+**"Conectou, mas o estoque não bate."**
+Aguarde a próxima sincronização e confira se o produto tem o mesmo SKU nos dois sistemas.
+
+**"Quero trocar de conta do Bling."**
+Desconecte no mesmo card e conecte de novo com a conta certa.
+`
+            },
+            {
+                id: "como-integrar-superfrete-dudit",
+                title: "Como conectar a SuperFrete na Dudit",
+                description: "Calcule frete automático no checkout e gere etiquetas com Correios, JadLog, Loggi e J&T.",
+                slug: "como-integrar-superfrete-dudit",
+                category: "integracoes",
+                content: `
+## O que faz essa integração
+A **SuperFrete** calcula o frete e gera etiquetas de envio com **Correios, JadLog, Loggi, J&T** e outras transportadoras. Com ela conectada, o cliente vê o frete no checkout e você imprime a etiqueta sem sair do fluxo.
+
+## O que você precisa
+- Conta na Dudit com plano **Crescer** ou **Escalar**.
+- Conta na SuperFrete.
+- O **token** da SuperFrete.
+
+## Como pegar o token na SuperFrete
+1. Entre na sua conta da SuperFrete.
+2. Vá em **Integrações → API**.
+3. Informe os dados da loja: endereço do site, média de envios por mês e estágio do negócio.
+4. Gere e copie o **Token de API**.
+
+> [!TIP]
+> Para testar sem gastar, a SuperFrete tem um ambiente de teste em **sandbox.superfrete.com**.
+
+## Como conectar na Dudit
+1. Vá em **Configurações > Integrações**.
+2. No card **SuperFrete**, clique em **Conectar**.
+3. Cole o token e salve.
+
+## Depois de conectar
+1. No painel da SuperFrete, **habilite as transportadoras** que você vai usar.
+2. Cadastre o **CEP de origem** para ver prazos e preços que atendem sua região.
+3. Na Dudit, ajuste o **CEP de origem**, as **dimensões padrão** e o **peso** dos produtos.
+4. A partir daí, a etiqueta é gerada automaticamente a cada venda.
+
+## Problemas comuns
+
+**"O frete não aparece no checkout."**
+Confira o CEP de origem, o peso e as dimensões do produto.
+
+**"A etiqueta saiu com valor errado."**
+Revise peso e medidas do produto na Dudit e o contrato com a transportadora na SuperFrete.
+`
+            },
+            {
+                id: "como-conectar-whatsapp-dudit",
+                title: "Como conectar seu WhatsApp Business",
+                description: "Receba e envie avisos automáticos de pedidos, agendamentos, entregas e orçamentos pelo WhatsApp.",
+                slug: "como-conectar-whatsapp-dudit",
+                category: "integracoes",
+                content: `
+## O que faz essa integração
+Conectando o **WhatsApp** do seu negócio, a Dudit envia mensagens automáticas para o cliente sobre **agendamentos, pedidos, entregas e orçamentos**. Você continua atendendo normalmente pelo mesmo número.
+
+## O que você precisa
+- Conta na Dudit com o recurso de envio automático liberado (Crescer ou Escalar, conforme o aviso).
+- O celular com o WhatsApp do negócio em mãos.
+
+## Como conectar
+1. Vá em **Configurações > Integrações**.
+2. No card **WhatsApp Business**, clique em **Conectar**.
+3. Um **QR Code** aparece na tela.
+4. No celular, abra o WhatsApp → **Dispositivos conectados** → **Conectar dispositivo** → aponte a câmera para o código.
+5. Espere a confirmação na tela da Dudit.
+
+> [!IMPORTANT]
+> Use o número do negócio. Se conectar um número pessoal, os avisos automáticos vão sair por ele.
+
+## Para que servem as mensagens
+- Confirmar e lembrar agendamentos.
+- Avisar quando o pedido é aprovado, enviado ou entregue.
+- Enviar orçamentos para o cliente aprovar.
+- Avisos de carrinho abandonado e de aniversário, quando esses recursos estão ativos.
+
+## Problemas comuns
+
+**"O QR Code expirou."**
+Feche e abra de novo. O código vale por poucos minutos.
+
+**"Conectou, mas não chega mensagem."**
+Confira se o número está ativo no celular e se o aviso está ligado nas configurações.
+
+**"Quero desconectar."**
+No mesmo card, clique em **Desconectar**.
+`
+            },
+            {
+                id: "como-conectar-mercado-pago-dudit",
+                title: "Como conectar o Mercado Pago",
+                description: "Aceite cartão, Pix, boleto e débito na sua loja, com parcelamento em até 12x.",
+                slug: "como-conectar-mercado-pago-dudit",
+                category: "integracoes",
+                content: `
+## O que faz essa integração
+O **Mercado Pago** é a forma de receber pagamentos online na Dudit. O cliente paga com **cartão, Pix, boleto ou débito**, e o dinheiro cai na sua conta Mercado Pago.
+
+## O que você precisa
+- Conta na Dudit com plano **Crescer** ou **Escalar**.
+- Conta no Mercado Pago (dá para criar na hora).
+
+## Como conectar
+1. Vá em **Configurações > Integrações**.
+2. No card **Mercado Pago**, clique em **Conectar**.
+3. Você é levado ao Mercado Pago. Faça login e **autorize** a Dudit.
+4. Ao voltar, a conexão já estará ativa.
+
+## O que o cliente pode usar
+- Cartão de crédito, com parcelamento em até **12x**.
+- **Pix** e **boleto**.
+- Cartão de débito.
+- Quem tem conta Mercado Pago pode parcelar sem cartão.
+
+## Por que usar
+- Antifraude sempre atualizado.
+- Aprovação rápida do pagamento.
+- Compra Garantida, que passa mais segurança para o cliente.
+- Possibilidade de crédito para o seu negócio.
+
+## Problemas comuns
+
+**"Não aparece a opção de pagar com Mercado Pago."**
+Confira se a integração está conectada e se o plano permite pagamento online.
+
+**"O pagamento ficou pendente."**
+Pix e boleto podem levar alguns minutos. Cartão costuma aprovar na hora.
+
+**"Quero trocar de conta."**
+Desconecte no card e conecte com a conta certa.
+`
+            }
+        ]
+    },
+    {
+        id: "desempenho",
+        title: "Desempenho",
+        icon: "📊",
+        articles: [
+            {
+                id: "visao-geral-desempenho",
+                title: "Acompanhe o desempenho da sua equipe",
+                description: "Veja ranking de vendedores, ticket médio e comissão estimada em um só lugar.",
+                slug: "visao-geral-desempenho",
+                category: "desempenho",
+                content: `
+## Para que serve
+O menu **Desempenho** mostra como está a produtividade da sua equipe e do seu negócio. Ele reúne cinco telas: **Visão Geral**, **Metas**, **Comissões**, **Estatísticas** e **Relatórios**.
+
+> [!NOTE]
+> A **Visão Geral** (produtividade) e as **Metas** exigem o plano **Escalar**. Comissões, Estatísticas e Relatórios liberam a partir do **Crescer**.
+
+## Visão Geral (Produtividade)
+Abra **Desempenho > Visão Geral** para ver:
+
+| Bloco | O que mostra |
+| :--- | :--- |
+| **Comparativo de Vendedores** | Quem vendeu quanto no período. |
+| **Participação por Vendedor** | A fatia de cada pessoa no total de vendas. |
+| **Ranking de Vendedores** | A ordem do melhor para o menor resultado. |
+| **Ticket Médio** | O valor médio de cada venda. |
+| **Comissão Estimada** | Quanto deve ser pago de comissão no período. |
+
+## Metas
+Para criar e acompanhar metas, veja **[Definindo e acompanhando metas de vendas](/ajuda/vendas/metas-vendas)**.
+
+## Como ler os números
+- O período é o mesmo das outras telas do ERP. Se um número parece estranho, confira a data selecionada.
+- Vendedor sem venda aparece zerado, não escondido.
+- Pedido cancelado não conta como venda.
+
+## Dicas
+- Use o ranking para reconhecer quem está indo bem.
+- Compare o ticket médio entre vendedores: diferença grande pode indicar desconto aplicado sem critério.
+`
+            },
+            {
+                id: "comissoes",
+                title: "Como funcionam as comissões",
+                description: "Defina a comissão de cada membro da equipe e registre os pagamentos.",
+                slug: "comissoes",
+                category: "desempenho",
+                content: `
+## O que são
+É o valor que você paga para vendedores ou entregadores por venda ou entrega. Na Dudit, a comissão é calculada automaticamente e pode ser marcada como paga.
+
+## Quem pode usar
+Planos **Crescer** e **Escalar**.
+
+## Onde ficam
+| Tela | Para que serve |
+| :--- | :--- |
+| **Desempenho > Comissões** | Ver o valor acumulado por pessoa e registrar pagamentos. |
+| **Configurações > Comissão** | Definir a regra de comissão de cada membro da equipe. |
+
+## Como configurar a regra
+1. Vá em **Configurações > Comissão**.
+2. Escolha o membro da equipe.
+3. Defina o percentual ou o valor fixo por venda ou entrega.
+4. Salve.
+
+> [!IMPORTANT]
+> Só aparece para configurar quem já faz parte da sua equipe. Convide a pessoa em **Configurações > Equipe** primeiro.
+
+## Como pagar
+1. Abra **Desempenho > Comissões**.
+2. Escolha o período.
+3. Selecione o vendedor.
+4. Registre o pagamento.
+
+Depois de registrado, o valor sai da lista de pendentes e fica no histórico.
+
+## Perguntas frequentes
+**Posso mudar o percentual depois?** Sim. A mudança vale para os cálculos seguintes; o que já foi pago não muda.
+**Comissão de entregador também entra?** Sim, quando a regra dele estiver configurada.
+`
+            },
+            {
+                id: "estatisticas",
+                title: "Estatísticas do negócio",
+                description: "Compare períodos e veja os números do negócio em gráficos.",
+                slug: "estatisticas",
+                category: "desempenho",
+                content: `
+## O que são
+**Desempenho > Estatísticas** reúne os números do seu negócio em gráficos e comparativos, no período que você escolher.
+
+## Como usar
+1. Abra **Desempenho > Estatísticas**.
+2. Escolha o **período**.
+3. Se quiser, ligue o **comparar** para ver dois períodos lado a lado.
+4. Troque de aba para ver os números por área.
+
+## Abas disponíveis
+**Vendas**, **Produtos**, **Financeiro**, **Clientes** e **Entregas** liberam a partir do plano **Crescer**.
+
+**Serviços**, **Agendamentos**, **Ordens de Serviço**, **Marketing**, **Produtividade** e **Trocas/Devoluções** exigem o plano **Escalar**.
+
+## O que dá para comparar
+- Mês atual com o mês anterior.
+- A mesma semana do ano passado.
+- Período personalizado, com data de início e fim.
+
+## Dicas
+- Compare períodos do mesmo tamanho: 7 dias com 7 dias, mês com mês.
+- Datas com promoção distorcem a comparação. Anote quando houve campanha.
+`
+            },
+            {
+                id: "relatorios",
+                title: "Relatórios disponíveis",
+                description: "Listas prontas de vendas, estoque, financeiro, clientes e operação para conferir e exportar.",
+                slug: "relatorios",
+                category: "desempenho",
+                content: `
+## O que são
+**Desempenho > Relatórios** gera listas prontas para conferir e exportar. Cada relatório tem filtro de período e de loja.
+
+## Categorias disponíveis
+
+| Categoria | Exemplos |
+| :--- | :--- |
+| **Vendas** | Vendas por período, por canal, por forma de pagamento, produtos mais vendidos e margem por produto. |
+| **Produtos e estoque** | Estoque crítico, produtos sem movimentação, inventário e Curva ABC. |
+| **Financeiro** | Fluxo de caixa, receitas e despesas, despesas por categoria e contas vencidas. |
+| **Clientes** | Maior faturamento, clientes do período, sem compras recentes e evolução da carteira. |
+| **Serviços** | Agendamentos por status, serviços mais procurados e ordens de serviço. |
+| **Operação** | Entregas por status, devoluções por motivo e produtos mais devolvidos. |
+| **Marketing** | Desempenho de cupons e campanhas. |
+| **Assinaturas** | Faturamento e execuções dos planos recorrentes. |
+
+## Planos
+Os relatórios básicos liberam a partir do **Crescer**. Os mais detalhados, como listas completas, agendamentos detalhados e devoluções detalhadas, exigem **Escalar**.
+
+## Como exportar
+Dentro de um relatório, use o botão de exportar para baixar os dados. O arquivo vem pronto para abrir no Excel ou no Google Planilhas.
+`
+            }
+        ]
+    },
+    {
+        id: "assinaturas",
+        title: "Assinaturas e Recorrência",
+        icon: "🔁",
+        articles: [
+            {
+                id: "planos-recorrentes",
+                title: "Como criar um plano recorrente",
+                description: "Monte planos que se repetem todo mês, semana ou no intervalo que você definir.",
+                slug: "planos-recorrentes",
+                category: "assinaturas",
+                content: `
+## O que é um plano recorrente
+É uma venda que se repete sozinha: mensal, semanal, quinzenal ou no intervalo que você definir. Serve para assinatura de ração, cesta de café, kit de limpeza, mensalidade de serviço e por aí vai.
+
+## Quem pode usar
+Plano **Escalar**.
+
+## Onde fica
+**Assinaturas > Planos Recorrentes**.
+
+## Como criar
+1. Clique em **Novo plano**.
+2. Preencha **Nome** e **Descrição**.
+3. Em **Regra de Recorrência**, escolha a **Frequência** (dia, semana ou mês) e o **Intervalo** (por exemplo, 1 = todo mês).
+4. Defina a **Data de Início** e, se quiser, a **Data de Fim**.
+5. Em **Validade dos Créditos**, escolha por quantos dias o crédito do ciclo vale.
+6. Configure o **Frete**: como o cliente recebe e como o frete é cobrado.
+7. Adicione os **produtos ou serviços** do plano.
+8. Salve.
+
+## Publicar no marketplace
+Ligue a opção **Exibir este plano no marketplace para venda pública**. Desligada, o plano só é vendido por link direto.
+
+## Link do plano
+Cada plano tem um **link próprio** para divulgar. Copie em **Link do plano**.
+
+## Editar e excluir
+- Editar um plano muda as condições para as **próximas vendas**. Antes de salvar, confira se alguma assinatura ativa depende do que você vai mudar.
+- Excluir um plano é **permanente**. Confira se não há assinatura ativa usando esse plano antes de excluir.
+- Dá para excluir vários planos de uma vez pela seleção em lote.
+
+## Dicas
+- Use nomes que o cliente entenda, como "Ração mensal 10 kg".
+- Coloque na descrição o que vem em cada ciclo.
+`
+            },
+            {
+                id: "assinaturas-de-clientes",
+                title: "Acompanhando as assinaturas dos clientes",
+                description: "Veja quem assina, o que vai ser cobrado e a previsão de produtos para os próximos ciclos.",
+                slug: "assinaturas-de-clientes",
+                category: "assinaturas",
+                content: `
+## O que você acompanha
+Em **Assinaturas > Assinaturas de Clientes** ficam todas as assinaturas criadas a partir dos seus planos.
+
+## As abas
+
+| Aba | O que mostra |
+| :--- | :--- |
+| **Assinaturas** | Quem assina, qual plano, a situação e a próxima cobrança. |
+| **Faturamento** | Os pedidos gerados por assinatura. |
+| **Previsão** | A demanda de produtos para as próximas execuções. |
+
+## Situações comuns
+- **Ativa**: vai cobrar no próximo ciclo.
+- **Pausada**: não cobra até você reativar.
+- **Cancelada**: não cobra mais.
+
+## O que fazer no dia a dia
+1. Confira a **Próxima execução** para saber o que vai ser cobrado.
+2. Se um pagamento falhar, o sistema mostra a pendência. Você pode tentar de novo ou falar com o cliente.
+3. Use **Previsão** para comprar estoque antes do próximo ciclo.
+
+## Dicas
+- Avise o cliente um dia antes da cobrança pelo WhatsApp.
+- Se o cliente quiser trocar de plano, cancele a assinatura atual e crie outra. O histórico fica salvo.
+`
+            }
+        ]
+    },
+    {
+        id: "configuracoes",
+        title: "Configurações",
+        icon: "⚙️",
+        articles: [
+            {
+                id: "visao-geral-configuracoes",
+                title: "O que tem em Configurações",
+                description: "Um mapa de todas as opções do painel: negócio, vitrine, equipe, integrações e plano.",
+                slug: "visao-geral-configuracoes",
+                category: "configuracoes",
+                content: `
+## O que tem aqui
+**Configurações** é onde você ajusta o negócio, a vitrine, a equipe, as integrações e o plano. As opções aparecem conforme o seu plano e o seu tipo de negócio.
+
+## Os atalhos
+
+| Atalho | Para que serve |
+| :--- | :--- |
+| **Dados do Negócio** | Nome, documentos, endereço, horários e impostos. |
+| **Minha Vitrine** | Banner, logo, fotos, status e fluxo de pedidos. |
+| **Gerenciar recursos** | Liga e desliga ferramentas do painel. |
+| **Minha Assinatura** | Plano atual, faturas e troca de plano. |
+| **Configurações Gerais** | Descontos, margem de lucro, estoque na venda e mensagem do recibo. |
+| **Formas de Pagamento** | Métodos aceitos e taxas das operadoras. |
+| **Trocas e Devoluções** | Política de troca que aparece para o cliente. |
+| **Logística e Entrega** | Taxas, raios de atendimento e horários. |
+| **Integrações** | Mercado Pago, WhatsApp, SuperFrete, Tiny e Bling. |
+| **Comissão** | Regras de comissão da equipe. |
+| **Equipe e Acessos** | Convites, permissões e acesso por loja. |
+
+## Menu separado
+**Lojas e Filiais** não fica em Configurações: o acesso está no menu principal do painel. Veja o artigo **[Lojas e filiais](/ajuda/configuracoes/lojas-e-filiais)**.
+
+## Planos
+Configurações básicas estão em todos os planos. Equipe, Comissão, Logística, Formas de Pagamento e Integrações pedem **Crescer** ou **Escalar**. Lojas e Filiais pedem **Escalar**.
+
+## Se algo não aparece
+Pode ser permissão do seu usuário ou limite do plano. A tela mostra o aviso com o plano necessário quando for o caso.
+`
+            },
+            {
+                id: "dados-do-negocio",
+                title: "Dados do Negócio",
+                description: "Cadastre documentos, endereço, horários e impostos usados na vitrine, na nota e nos relatórios.",
+                slug: "dados-do-negocio",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Dados do Negócio** ficam as informações que aparecem para o cliente e valem para nota fiscal e relatórios.
+
+## Seções
+
+| Seção | O que tem |
+| :--- | :--- |
+| **Identificação** | Nome, nome fantasia e descrição. |
+| **Dados tributários** | Pessoa Física ou Jurídica, CPF ou CNPJ. |
+| **Perfil fiscal** | Enquadramento e limite de faturamento. |
+| **Impostos sobre faturamento (DRE)** | Percentuais usados no DRE. |
+| **Endereço** | CEP, rua, número, bairro, cidade e estado. |
+| **Horários de Funcionamento** | Dias e horários de abertura. |
+| **Fuso horário** | Fuso usado nos agendamentos e nos relatórios. |
+
+## Cuidados
+> [!IMPORTANT]
+> O **CNPJ** e o **regime tributário** precisam estar certos para a nota fiscal sair correta. Se você mudou de regime, atualize aqui.
+
+## Horário de funcionamento
+O horário é usado para:
+- Bloquear pedidos fora do horário, se você escolheu essa opção na vitrine.
+- Mostrar aberto ou fechado para o cliente.
+- Calcular agendamentos.
+
+## Problemas comuns
+
+**"O CEP não preenche o endereço."**
+Digite o CEP e espere. Se não vier, preencha manualmente.
+
+**"Mudei o horário e o cliente ainda consegue pedir."**
+Confira em **Minha Vitrine** se a opção de bloquear pedidos fora do horário está ativa.
+`
+            },
+            {
+                id: "gerenciar-recursos",
+                title: "Gerenciar recursos",
+                description: "Ligue e desligue ferramentas do painel para deixar o menu do seu jeito.",
+                slug: "gerenciar-recursos",
+                category: "configuracoes",
+                content: `
+## O que faz
+**Gerenciar recursos** liga e desliga ferramentas do seu painel. É útil para quem não usa uma parte do sistema e quer o menu mais limpo.
+
+## Como usar
+1. Vá em **Configurações > Gerenciar recursos**.
+2. Ligue ou desligue cada recurso.
+3. Salve.
+
+> [!IMPORTANT]
+> Antes de desativar, o sistema avisa o que deixa de aparecer. Desativar não apaga dados: os registros continuam salvos e voltam se você reativar.
+
+## Exemplos de recursos
+- Módulos como Entregas, Serviços e Assinaturas.
+- Recursos de venda, como PDV e orçamentos.
+- Recursos de marketing, como cupons e vídeos.
+
+## Quando usar
+- Negócio só de serviços: desligue Produtos e Estoque.
+- Loja sem entrega própria: desligue Entregas.
+- Quem ainda não vende assinatura: desligue Assinaturas.
+
+## Dica
+Se o menu parece grande demais, desligue o que não usa. Isso também evita erro de operação no dia a dia.
+`
+            },
+            {
+                id: "equipe-e-permissoes",
+                title: "Equipe, convites e permissões",
+                description: "Convide pessoas para o painel e defina o que cada uma pode ver e fazer.",
+                slug: "equipe-e-permissoes",
+                category: "configuracoes",
+                content: `
+## O que faz
+Em **Configurações > Equipe e Acessos** você convida pessoas para ajudar no painel e define o que cada uma pode ver e fazer.
+
+## Quem pode usar
+Plano **Crescer** (até 3 usuários) ou **Escalar** (até 10 usuários).
+
+## Como convidar
+1. Abra **Configurações > Equipe e Acessos**.
+2. Clique em **Convidar membro**.
+3. Informe o e-mail e escolha a **função** da pessoa.
+4. Copie o **link do convite** e envie para a pessoa.
+
+> [!NOTE]
+> O convite tem link próprio. Se a pessoa perder, você pode copiar de novo na lista de convites.
+
+## Funções
+| Função | O que pode fazer |
+| :--- | :--- |
+| **Proprietário** | Controle total: excluir loja, transferir propriedade e mudar a assinatura. |
+| **Administrador** | Tudo da operação, menos plano/assinatura e integrações. |
+| **Gestor** | Controla a operação e gerencia a equipe abaixo dele. |
+| **Operador** | Executa o dia a dia: pedidos, agenda e atendimento. |
+| **Entregador** | Atualiza entregas e acompanha as rotas e pedidos atribuídos. |
+
+## Acesso por loja
+Se você tem mais de uma loja, escolha a quais lojas cada membro tem acesso. Quem não tem acesso a uma loja não vê os dados dela.
+
+## Remover alguém
+Na lista, use **Remover**. A pessoa perde o acesso na hora; o histórico do que ela fez continua registrado.
+
+## Problemas comuns
+
+**"O convite não chegou."**
+Copie o link e envie por WhatsApp ou e-mail direto.
+
+**"A pessoa entrou e não vê o módulo."**
+Confira as permissões dela.
+
+**"Não consigo convidar mais ninguém."**
+Você atingiu o limite de usuários do plano.
+`
+            },
+            {
+                id: "lojas-e-filiais",
+                title: "Lojas e filiais",
+                description: "Tenha várias lojas na mesma conta, cada uma com sua vitrine e seu estoque.",
+                slug: "lojas-e-filiais",
+                category: "configuracoes",
+                content: `
+## O que faz
+**Lojas e Filiais** permite ter mais de uma loja na mesma conta, cada uma com sua vitrine, endereço e estoque.
+
+## Quem pode usar
+Plano **Escalar**.
+
+## Como funciona
+- Cada loja tem nome, endereço, banner, logo e fluxo de pedidos próprios.
+- O seletor de loja fica no topo do painel: você troca a loja ativa e o sistema mostra os dados dela.
+- Relatórios podem ser vistos por loja ou com todas juntas.
+
+## Como criar uma loja
+1. No menu principal, abra **Lojas e Filiais**.
+2. Clique em **Nova loja**.
+3. Preencha nome, endereço e categoria.
+4. Depois de trocar para a loja nova, configure a vitrine em **Configurações > Minha Vitrine**.
+
+## Cuidados
+> [!IMPORTANT]
+> Estoque e pedidos são separados por loja. Ao lançar uma venda ou movimentação, confira qual loja está ativa no seletor do topo.
+
+## Dica
+Use nomes curtos e claros nas lojas. Quem tem acesso a várias se perde fácil com nomes parecidos.
+`
+            },
+            {
+                id: "minha-assinatura",
+                title: "Minha Assinatura",
+                description: "Veja seu plano, os limites, as faturas e como trocar de plano.",
+                slug: "minha-assinatura",
+                category: "configuracoes",
+                content: `
+## O que faz
+Em **Configurações > Minha Assinatura** você vê o plano atual, o que está incluído, as faturas e como trocar de plano.
+
+## O que aparece
+
+| Bloco | O que mostra |
+| :--- | :--- |
+| **Plano atual** | Nome do plano e recursos inclusos. |
+| **Limites** | Itens no catálogo, pedidos por mês e número de usuários. |
+| **Histórico de Faturas** | Cobranças feitas, com data e situação. |
+| **Troca de plano** | Opções de upgrade e downgrade. |
+
+## Como trocar de plano
+1. Abra **Minha Assinatura**.
+2. Escolha o novo plano.
+3. Confirme.
+
+> [!NOTE]
+> Upgrade costuma valer na hora. Downgrade fica **agendado** para o fim do período já pago, para você não perder o que pagou.
+
+## Avisos que podem aparecer
+- **Pagamento em atraso**: regularize para não perder recursos.
+- **Aguardando pagamento**: a confirmação pode levar alguns minutos.
+- **Troca agendada**: o plano novo entra na data mostrada.
+
+## Cancelar
+Você pode cancelar a renovação. O plano continua ativo até o fim do período pago e depois não renova.
+`
+            },
+            {
+                id: "configuracoes-gerais",
+                title: "Configurações Gerais de Vendas",
+                description: "Descontos, margem de lucro, controle de estoque na venda e mensagem do recibo.",
+                slug: "configuracoes-gerais",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Configurações Gerais** ficam as regras de como as vendas funcionam no dia a dia.
+
+## Seções
+
+| Seção | O que tem |
+| :--- | :--- |
+| **Descontos e Preços** | Desconto máximo permitido, margem padrão de lucro, permitir alterar preço manual no PDV. |
+| **Controle de Estoque na Venda** | Permitir vender com estoque zerado ou negativo. |
+| **Operação de Vendas e Orçamentos** | Obrigar selecionar vendedor ao registrar pedidos. |
+| **Cancelamento Automático e Prazos** | Expiração de pedidos manuais/balcão, validade padrão de orçamentos. |
+| **Mensagem do Recibo** | Texto personalizado que aparece no rodapé do recibo. |
+| **Políticas e Termos no Recibo** | Exibir política de trocas, campo de assinatura do cliente. |
+| **Informações no Cabeçalho** | Exibir telefone, endereço e nome do vendedor no recibo. |
+
+## Dicas
+- O **desconto máximo** evita que vendedores deem desconto além do combinado.
+- A **margem padrão** ajuda a calcular o preço sugerido ao cadastrar produtos.
+- A mensagem do recibo pode ser usada para agradecer o cliente ou informar contato de suporte.
+`
+            },
+            {
+                id: "formas-de-pagamento",
+                title: "Formas de Pagamento",
+                description: "Configure os métodos aceitos e as taxas das operadoras de cartão.",
+                slug: "formas-de-pagamento",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Formas de Pagamento** você define como o cliente pode pagar.
+
+## O que configura
+- **Métodos aceitos**: dinheiro, cartão (débito/crédito), Pix, boleto, vale-compra.
+- **Taxas das operadoras**: porcentagem que cada maquininha cobra, para o sistema calcular o líquido.
+- **Parcelamento**: quais bandeiras permitem parcelar e em quantas vezes.
+
+## Quem pode usar
+Plano **Crescer** ou **Escalar**.
+
+## Dicas
+- Se você usa Mercado Pago, as taxas dele já vêm configuradas na integração.
+- Confira as taxas periodicamente: as operadoras mudam os valores.
+- O Pix não costuma ter taxa para quem recebe.
+`
+            },
+            {
+                id: "trocas-e-devolucoes-config",
+                title: "Trocas e Devoluções",
+                description: "Defina a política de troca e devolução que aparece para o cliente no anúncio e no recibo.",
+                slug: "trocas-e-devolucoes-config",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Trocas e Devoluções** você cria a política comercial da sua loja.
+
+## O que define
+| Item | Para que serve |
+| :--- | :--- |
+| **Aceita troca por tamanho** | Cliente pode pedir outro tamanho do mesmo produto. |
+| **Aceita troca por cor** | Cliente pode pedir outra cor. |
+| **Aceita vale-compra** | Oferece crédito na loja em vez de reembolso. |
+| **Aceita devolução presencial** | Cliente devolve na loja física. |
+| **Aceita devolução por envio** | Cliente manda o produto de volta. |
+| **Quem paga o frete** | Cliente, loja ou combinam caso a caso. |
+| **Prazo comercial (dias)** | Quantos dias o cliente tem para pedir troca além do prazo legal. |
+| **Validade do vale-compra** | Dias que o crédito fica disponível. |
+| **Garantia adicional (dias)** | Dias extras de garantia além do CDC. |
+| **SLA resposta vendedor (dias)** | Prazo que você tem para responder a solicitação. |
+
+## Onde aparece
+A política é mostrada no anúncio da vitrine, no detalhe do pedido e no recibo impresso.
+
+## Dicas
+- Seja claro: política confusa gera reclamação.
+- O prazo legal (CDC) é 7 dias para arrependimento em compra online, 30 dias para vícios em não duráveis, 90 para duráveis. Sua política comercial **soma** a isso.
+`
+            },
+            {
+                id: "logistica-e-entrega",
+                title: "Logística e Entrega",
+                description: "Configure taxas de entrega, raios de atendimento, horários e retiradas.",
+                slug: "logistica-e-entrega",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Logística e Entrega** você define como a entrega funciona.
+
+## O que configura
+- **Taxa de entrega**: valor fixo ou por faixa de CEP/raio.
+- **Raio de atendimento**: até quantos km da loja você entrega.
+- **Horários de entrega**: dias e horários que o entregador trabalha.
+- **Retirada na loja**: se o cliente pode buscar o pedido.
+- **Entregadores**: cadastre quem faz as entregas e veja as rotas.
+
+## Quem pode usar
+Plano **Crescer** ou **Escalar**.
+
+## Integração com SuperFrete
+Se você conectou a **SuperFrete** (veja o artigo **[Como conectar a SuperFrete na Dudit](/ajuda/integracoes/como-integrar-superfrete-dudit)**), o frete é calculado automaticamente no checkout com Correios, JadLog, Loggi e J&T.
+
+## Dicas
+- Defina o **CEP de origem** correto para o cálculo de frete dar certo.
+- Coloque **peso e dimensões** nos produtos para a etiqueta sair exata.
+- Use **raio por km** se atende bairros próximos; use **faixa de CEP** se atende cidades específicas.
+`
+            },
+            {
+                id: "recibos",
+                title: "Recibos e Comprovantes",
+                description: "Personalize o recibo impresso: mensagem, políticas, assinatura e informações do cabeçalho.",
+                slug: "recibos",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Configurações Gerais**, na parte de **Recibos**, você personaliza o que sai impresso.
+
+## O que personaliza
+| Item | O que faz |
+| :--- | :--- |
+| **Mensagem personalizada** | Texto no rodapé (ex: "Volte sempre!", "Suporte: (11) 9999-9999"). |
+| **Exibir política de trocas** | Mostra o resumo da política no recibo. |
+| **Campo de assinatura** | Linha para o cliente assinar o recebimento. |
+| **Telefone da loja** | Aparece no cabeçalho do recibo. |
+| **Endereço completo** | Aparece no cabeçalho. |
+| **Nome do vendedor** | Quem fez a venda aparece no recibo. |
+
+## Dicas
+- O recibo é o comprovante do cliente. Quanto mais completo, menos dúvida depois.
+- Se você emite nota fiscal (NF-e/NFC-e), o recibo da Dudit é o **comprovante não fiscal** — a nota sai separada.
+`
+            },
+            {
+                id: "minha-vitrine",
+                title: "Minha Vitrine",
+                description: "Configure banner, logo, galeria, status da vitrine e fluxo de pedidos (Dudit ou WhatsApp).",
+                slug: "minha-vitrine",
+                category: "configuracoes",
+                content: `
+## O que você ajusta
+Em **Configurações > Minha Vitrine** você deixa a loja online com a sua cara.
+
+## Seções
+
+| Seção | O que tem |
+| :--- | :--- |
+| **Banner do topo** | Imagem 1400×300 px, até 3 MB. |
+| **Logo da loja** | Aparece no cabeçalho da vitrine. |
+| **Galeria de imagens** | Fotos que rodam no carrossel da vitrine. |
+| **Status da vitrine** | **Ativa**, **Inativa** ou **Desativada pela Administração**. |
+| **Pedidos fora do horário** | Receber normalmente ou bloquear quando a loja está fechada. |
+| **Fluxo de pedidos** | **Pela Dudit** (checkout no site) ou **Pelo WhatsApp** (cliente fala com você). |
+| **Endereço por CEP** | Preenchimento automático quando o cliente digita o CEP. |
+
+## Status da vitrine
+| Status | O que significa |
+| :--- | :--- |
+| **Ativa** | A vitrine está no ar e recebe pedidos. |
+| **Inativa** | Você desligou temporariamente. Não aparece para clientes. |
+| **Desativada pela Administração** | A Dudit desligou por pendência (ex: pagamento). |
+
+## Fluxo de pedidos
+- **Pela Dudit**: o cliente finaliza a compra no site, paga online e você vê o pedido no painel.
+- **Pelo WhatsApp**: o botão "Comprar" abre a conversa no seu WhatsApp. Você combina e registra o pedido manual.
+
+> [!TIP]
+> Se a loja é só física, use o fluxo **Pelo WhatsApp** para receber o pedido formatado no celular.
+`
+            },
+        ]
+    },
+    {
+        id: "marketplace",
+        title: "Comprando na Dudit",
+        icon: "🛒",
+        articles: [
+            {
+                id: "como-comprar-na-dudit",
+                title: "Como comprar na Dudit",
+                description: "Passo a passo para encontrar produtos e serviços, escolher e finalizar o pedido.",
+                slug: "como-comprar-na-dudit",
+                category: "marketplace",
+                content: `
+## Antes de comprar
+Você precisa de uma conta. Se ainda não tem, veja **[Criando sua conta para comprar](/ajuda/login-registro/criando-conta)**.
+
+## Como comprar
+1. Use a **busca** ou navegue por **Produtos** e **Serviços**.
+2. Filtre por cidade, categoria e faixa de preço.
+3. Abra o anúncio e confira fotos, descrição e avaliações.
+4. Escolha as opções (cor, tamanho, adicionais) quando existirem.
+5. Clique em **Adicionar à sacola**.
+6. Na sacola, confira itens e quantidades.
+7. Vá para o **checkout**, informe o endereço e escolha o pagamento.
+8. Finalize o pedido.
+
+## Formas de pagamento
+Depende da loja. Pode aparecer **Pix, cartão, boleto** ou pagamento com **Mercado Pago**. Se a loja só atende pelo WhatsApp, o pedido termina na conversa.
+
+## Entrega ou retirada
+- **Entrega**: informe o endereço e veja o prazo e o frete.
+- **Retirada**: combine direto com a loja pelo WhatsApp.
+
+> [!TIP]
+> Confira o prazo de entrega antes de pagar. Ele é definido pela loja, não pela Dudit.
+
+## Problemas comuns
+
+**"Não consigo finalizar."**
+Confira se você está logado e se o endereço está completo.
+
+**"O frete não aparece."**
+A loja pode não ter frete configurado para o seu CEP. Fale com ela.
+
+**"Quero falar com a loja."**
+Use o botão de WhatsApp no anúncio.
+`
+            },
+            {
+                id: "acompanhando-seu-pedido",
+                title: "Acompanhando seu pedido",
+                description: "Veja a situação do pedido, o rastreio e o comprovante da compra.",
+                slug: "acompanhando-seu-pedido",
+                category: "marketplace",
+                content: `
+## Onde ver seus pedidos
+No topo do site, clique em **Pedidos**. Também dá para abrir pelo atalho do seu perfil.
+
+## O que cada situação significa
+
+| Situação | O que quer dizer |
+| :--- | :--- |
+| **Aguardando pagamento** | O pedido foi feito, mas o pagamento ainda não confirmou. |
+| **Pago** | O pagamento foi aprovado. |
+| **Parcialmente pago** | Parte do valor foi paga; o restante ainda está pendente. |
+| **Pagamento na retirada** | O pagamento será feito na loja, na hora de retirar. |
+| **Enviado** | Saiu para entrega, com código de rastreio quando houver. |
+| **Entregue** | Chegou ao destino. |
+| **Cancelado** | Não vai ser entregue. |
+
+## Acompanhar a entrega
+Quando a loja envia, aparece o **código de rastreio**. Toque nele para ver onde está o pedido.
+
+## Comprovantes
+No detalhe do pedido você vê os itens, o valor pago, o endereço e o comprovante da compra.
+
+## Problemas comuns
+
+**"Meu pedido não aparece."**
+Confira se você comprou com o mesmo e-mail da conta.
+
+**"O rastreio não atualiza."**
+Transportadoras às vezes demoram para atualizar. Espere um dia e confira de novo.
+
+**"O pedido atrasou."**
+Fale com a loja pelo WhatsApp no detalhe do pedido.
+`
+            },
+            {
+                id: "favoritos-colecoes-avaliacoes",
+                title: "Favoritos, coleções e avaliações",
+                description: "Salve o que gostou, organize em listas e avalie as lojas onde comprou.",
+                slug: "favoritos-colecoes-avaliacoes",
+                category: "marketplace",
+                content: `
+## Favoritos
+Toque no **coração** em qualquer anúncio para salvar. Depois, abra **Meus Favoritos** no menu do seu perfil.
+
+## Coleções
+**Minhas Coleções** serve para organizar o que você salvou em listas, como "Casa nova" ou "Presentes".
+
+## Avaliações
+Depois de receber um pedido, você pode avaliar a loja e o produto. Suas avaliações ficam em **Minhas Avaliações**.
+
+> [!TIP]
+> Avaliação honesta ajuda outros compradores e valoriza as lojas boas da sua região.
+
+## Privacidade
+Favoritos e coleções são só seus. A loja não vê o que você salvou.
+`
+            },
+            {
+                id: "trocas-e-devolucoes-comprador",
+                title: "Trocas e devoluções para quem comprou",
+                description: "Como pedir reembolso, troca ou crédito na loja, e o que fazer se a loja recusar.",
+                slug: "trocas-e-devolucoes-comprador",
+                category: "marketplace",
+                content: `
+## Antes de pedir
+Confira a **política de troca** da loja, que aparece no anúncio e no detalhe do pedido. Cada loja define prazo e condições.
+
+## Como pedir
+1. Abra **Pedidos** no topo do site.
+2. Escolha o pedido.
+3. Clique em **Solicitar troca ou devolução** (em alguns pedidos o botão aparece como **Solicitar devolução** ou **Solicitar reembolso**).
+4. Escolha o motivo e o que você quer: **reembolso**, **troca** ou **crédito na loja**.
+5. Envie fotos, se o problema for com o produto.
+6. Acompanhe a resposta da loja.
+
+## Prazos
+A loja precisa responder dentro do prazo da política dela. Se não responder, você pode acionar a Dudit.
+
+## O que acontece depois
+- **Reembolso**: volta para a forma de pagamento original.
+- **Crédito na loja**: fica disponível para usar em outra compra.
+- **Troca**: a loja combina o envio do novo item.
+
+## Problemas comuns
+
+**"O botão de devolução não aparece."**
+Pode estar fora do prazo da loja.
+
+**"A loja recusou."**
+Na tela do pedido, use o botão **Reportar à Dudit** para pedir uma análise.
+
+**"Não recebi o reembolso."**
+Pix e boleto podem levar alguns dias úteis. Cartão depende da operadora.
+`
+            },
+            {
+                id: "minhas-assinaturas-comprador",
+                title: "Minhas assinaturas",
+                description: "Veja, pause ou cancele os planos recorrentes que você assina nas lojas.",
+                slug: "minhas-assinaturas-comprador",
+                category: "marketplace",
+                content: `
+## O que são
+Algumas lojas vendem **planos recorrentes**: você recebe o produto ou o serviço todo mês (ou no intervalo combinado) e a cobrança se repete.
+
+## Onde ver
+No menu do seu perfil, clique em **Minhas Assinaturas**.
+
+## O que dá para fazer
+- Ver o plano, o valor e a próxima cobrança.
+- Pausar ou retomar.
+- Cancelar.
+- Conferir as cobranças de cada ciclo.
+
+> [!IMPORTANT]
+> O cancelamento vale para as próximas cobranças. A cobrança já feita continua valendo e o pedido dela é entregue normalmente.
+
+## Problemas comuns
+
+**"Não reconheço a cobrança."**
+Confira em Minhas Assinaturas se ela vem de um plano seu.
+
+**"Quero trocar o endereço de entrega."**
+Atualize em **Meu Perfil > Endereço** antes da próxima execução.
+`
+            }
+        ]
+    },
+    {
+        id: "planos",
+        title: "Planos e Limites",
+        icon: "💳",
+        articles: [
+            {
+                id: "planos-e-limites",
+                title: "Planos e limites",
+                description: "Compare o que vem em cada plano e entenda os limites de itens, pedidos e usuários.",
+                slug: "planos-e-limites",
+                category: "planos",
+                content: `
+## Os três planos
+
+| Plano | Para quem é | Limites principais |
+| :--- | :--- | :--- |
+| **Começar** | Pra começar a vender e organizar o negócio | Até 15 itens no catálogo, 25 pedidos por mês, 1 usuário. |
+| **Crescer** | Pra quem quer crescer e vender mais | Até 100 itens, 150 pedidos por mês, 20 importações XML por mês, 3 usuários. |
+| **Escalar** | Pra negócios que precisam de mais controle | Itens e pedidos ilimitados, importações XML ilimitadas, 15 imagens por item, 10 usuários. |
+
+## O que vem em cada um
+**Começar**: vitrine online, pedidos e agendamentos pelo WhatsApp, PDV, agenda, orçamentos, estoque, clientes e cadastro de produtos e serviços.
+
+**Crescer**: tudo do Começar, mais pedidos pelo sistema, pagamento com Mercado Pago, cupons, variações, complementos, trocas e devoluções, financeiro com visão de lucro, relatórios, fornecedores, ordens de serviço e importação XML.
+
+**Escalar**: tudo do Crescer, mais financeiro completo com fluxo de caixa e DRE, controle de entregas, campanhas, metas e desempenho, lembretes automáticos no WhatsApp e assinaturas recorrentes.
+
+## O que acontece quando bate o limite
+O sistema avisa e bloqueia a ação até você excluir itens, esperar o mês virar ou mudar de plano.
+`
+            },
+            {
+                id: "como-mudar-de-plano",
+                title: "Como mudar de plano",
+                description: "Upgrade vale na hora, downgrade fica agendado e cancelar não apaga seus dados.",
+                slug: "como-mudar-de-plano",
+                category: "planos",
+                content: `
+## Como fazer
+1. Vá em **Configurações > Minha Assinatura**.
+2. Escolha o novo plano.
+3. Confirme a troca.
+
+## Upgrade
+Vale assim que o pagamento do novo plano é confirmado. A partir daí, você passa a ter os recursos e limites do plano novo.
+
+## Downgrade
+Fica **agendado** para o fim do período que você já pagou. Até lá, tudo do plano atual continua funcionando.
+
+> [!NOTE]
+> Se o plano novo tiver limite menor e você já estiver acima dele, o sistema avisa antes de confirmar. Talvez seja preciso excluir itens para caber.
+
+## Cancelamento
+Você pode cancelar a renovação. O plano continua ativo até o fim do período pago e depois não renova. Os dados continuam salvos.
+
+## Perguntas frequentes
+
+**Perco meus dados ao mudar de plano?**
+Não. Os dados ficam salvos; só recursos e limites mudam.
+
+**Posso voltar para o plano anterior?**
+Sim, a qualquer momento.
+
+**Onde vejo minhas faturas?**
+Em **Minha Assinatura > Histórico de Faturas**.
 `
             }
         ]

@@ -12,9 +12,10 @@ interface DeliveryGridCardProps {
   onDetails: () => void
   onEdit?: () => void
   onQuickStatusChange?: (deliveryId: string, status: string) => void
+  canCancel?: boolean
 }
 
-const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatusChange }: DeliveryGridCardProps) => {
+const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatusChange, canCancel = true }: DeliveryGridCardProps) => {
   const statusMeta = getDeliveryStatusMeta(delivery.status)
   const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
   const isPlatformDriver = Boolean(delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver)
@@ -110,7 +111,7 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatu
             <ActionsDropdown
               onStatus={() => onQuickStatusChange?.(delivery.id, delivery.status)}
               onEdit={canEdit && onEdit ? onEdit : undefined}
-              onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+              onCancel={canCancel && delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
               cancelLabel="Cancelar entrega"
             />
           </div>

@@ -25,17 +25,26 @@ import {
     TabsContent,
 } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
-import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon, TruckIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import {
+    deleteCarrierFreeShippingRuleAction,
     deleteDeliveryFeeRuleAction,
+    getCarrierFreeShippingRulesAction,
     getPartnerDeliveryConfigAction,
     getServiceAttendanceSettingsAction,
+    upsertCarrierFreeShippingRuleAction,
     upsertDeliveryFeeRuleAction,
     upsertPartnerDeliveryConfigAction,
     upsertServiceAttendanceSettingsAction,
 } from "@/app/actions/shared/delivery"
+import {
+    BRAZILIAN_STATES,
+    type BrazilianStateUf,
+    type CarrierFreeShippingAppliesTo,
+    type CarrierFreeShippingRule,
+} from "@/lib/services/shipping/carrier-free-shipping"
 
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useNotification } from "@/hooks/use-notification"
@@ -114,6 +123,26 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
     const [newRule, setNewRule] = useState<{ startTime: string; endTime: string; type: "fixed" | "multiplier"; value: string }>({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
     const [rulePage, setRulePage] = useState(1)
+    const [hasSuperFrete, setHasSuperFrete] = useState(false)
+    const [carrierRules, setCarrierRules] = useState<CarrierFreeShippingRule[]>([])
+    const [carrierRulePage, setCarrierRulePage] = useState(1)
+    const [isCarrierRuleModalOpen, setIsCarrierRuleModalOpen] = useState(false)
+    const [editingCarrierRule, setEditingCarrierRule] = useState<CarrierFreeShippingRule | null>(null)
+    const [carrierRuleToDelete, setCarrierRuleToDelete] = useState<CarrierFreeShippingRule | null>(null)
+    const [savingCarrierRule, setSavingCarrierRule] = useState(false)
+    const [carrierRuleForm, setCarrierRuleForm] = useState<{
+        minOrderValue: string
+        allStates: boolean
+        states: BrazilianStateUf[]
+        appliesTo: CarrierFreeShippingAppliesTo
+        isActive: boolean
+    }>({
+        minOrderValue: "",
+        allStates: false,
+        states: [],
+        appliesTo: "cheapest",
+        isActive: true,
+    })
     const isMobile = useMediaQuery("(max-width: 767px)")
     const rulesPerPage = isMobile ? 4 : 6
     const totalRulePages = Math.max(1, Math.ceil(rules.length / rulesPerPage))
@@ -121,6 +150,11 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
         const start = (rulePage - 1) * rulesPerPage
         return rules.slice(start, start + rulesPerPage)
     }, [rules, rulesPerPage, rulePage])
+    const totalCarrierRulePages = Math.max(1, Math.ceil(carrierRules.length / rulesPerPage))
+    const paginatedCarrierRules = useMemo(() => {
+        const start = (carrierRulePage - 1) * rulesPerPage
+        return carrierRules.slice(start, start + rulesPerPage)
+    }, [carrierRules, rulesPerPage, carrierRulePage])
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
@@ -144,6 +178,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
         if (res.success) {
             setPlanSlug(res.planSlug)
             setAdvancedEnabled(res.capability.advancedEnabled)
+            setHasSuperFrete(Boolean(res.hasSuperFrete))
             setSettings({
                 baseFee: String(res.settings.baseFee || 0),
                 includedKm: String(res.settings.includedKm || 0),
@@ -158,7 +193,16 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
             setRules(res.rules || [])
             setRulePage(1)
 
-            const svcRes = await getServiceAttendanceSettingsAction(partnerId, storeId)
+            const [svcRes, carrierRulesRes] = await Promise.all([
+                getServiceAttendanceSettingsAction(partnerId, storeId),
+                res.hasSuperFrete
+                    ? getCarrierFreeShippingRulesAction(partnerId, storeId)
+                    : Promise.resolve({ success: true as const, rules: [] as CarrierFreeShippingRule[] }),
+            ])
+            if (carrierRulesRes.success) {
+                setCarrierRules(carrierRulesRes.rules)
+                setCarrierRulePage(1)
+            }
             setServiceSettings({
                 maxServiceKm: svcRes.maxServiceKm == null ? "" : String(svcRes.maxServiceKm),
                 travelFeeMode: svcRes.travelFeeMode,
@@ -208,7 +252,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Gerencie taxas, regras de entrega e atendimento a domicílio
+                                            Gerencie taxas de delivery{hasSuperFrete ? ", frete por transportadora" : ""} e atendimento a domicílio
                                         </div>
                                     </div>
 
@@ -273,7 +317,10 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                                        <TabsTrigger value="delivery">{hasSuperFrete ? "Delivery" : "Entrega"}</TabsTrigger>
+                                        {hasSuperFrete && (
+                                            <TabsTrigger value="carrier">Transportadora</TabsTrigger>
+                                        )}
                                         <TabsTrigger value="service">Atendimento a domicílio</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -637,6 +684,247 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                     </motion.div>
                                 </TabsContent>
 
+                                {/* Tab: Transportadora (SuperFrete) */}
+                                {hasSuperFrete && (
+                                    <TabsContent value="carrier" className="mt-0 focus-visible:outline-none">
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                            <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                                                {/* Main Content - Left Column */}
+                                                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
+                                                    <FormSection title="Frete grátis por estado (SuperFrete)">
+                                                        <div className="space-y-6">
+                                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    Defina a partir de qual valor do pedido o frete via transportadora fica grátis em estados específicos ou em todo o Brasil.
+                                                                </p>
+                                                                <Button
+                                                                    variant="link"
+                                                                    className="shrink-0 self-start sm:self-auto"
+                                                                    onClick={() => {
+                                                                        setEditingCarrierRule(null)
+                                                                        setCarrierRuleForm({
+                                                                            minOrderValue: "",
+                                                                            allStates: false,
+                                                                            states: [],
+                                                                            appliesTo: "cheapest",
+                                                                            isActive: true,
+                                                                        })
+                                                                        setIsCarrierRuleModalOpen(true)
+                                                                    }}
+                                                                    leftIcon={<PlusIcon className="w-4 h-4" />}
+                                                                >
+                                                                    Adicionar regra
+                                                                </Button>
+                                                            </div>
+
+                                                            {carrierRules.length === 0 ? (
+                                                                <IconPlaceholder
+                                                                    icon={TruckIcon}
+                                                                    title="Nenhuma regra de frete grátis cadastrada"
+                                                                    subtitle="Ex.: frete grátis a partir de R$ 50,00 para SP e PR, ou a partir de R$ 100,00 para SP, PR e SC ou todo o Brasil."
+                                                                />
+                                                            ) : (
+                                                                <>
+                                                                    {/* Desktop Table */}
+                                                                    <div className="hidden md:block w-full overflow-hidden bg-white dark:bg-dark-background">
+                                                                        <div className="overflow-x-auto">
+                                                                            <table className="w-full border-separate border-spacing-0">
+                                                                                <thead>
+                                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left rounded-l-lg">A partir de</th>
+                                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Estados</th>
+                                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left">Aplicar em</th>
+                                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Ativa</th>
+                                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody>
+                                                                                    {paginatedCarrierRules.map((rule) => (
+                                                                                        <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
+                                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading text-left whitespace-nowrap">
+                                                                                                {rule.minOrderValue > 0 ? formatCurrency(rule.minOrderValue) : "Qualquer valor"}
+                                                                                            </td>
+                                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading text-left">
+                                                                                                {rule.allStates ? (
+                                                                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-green/10 text-brand-green">
+                                                                                                        Todo o Brasil
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                                        {rule.states.map((uf) => (
+                                                                                                            <span
+                                                                                                                key={uf}
+                                                                                                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-brand-gray dark:bg-dark-border/60 text-brand-dark dark:text-dark-heading"
+                                                                                                            >
+                                                                                                                {uf}
+                                                                                                            </span>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </td>
+                                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-left whitespace-nowrap">
+                                                                                                {rule.appliesTo === "all" ? "Todas as opções" : "Opção mais barata"}
+                                                                                            </td>
+                                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                                <div className="flex justify-center">
+                                                                                                    <Switch
+                                                                                                        checked={rule.isActive}
+                                                                                                        onCheckedChange={async (checked) => {
+                                                                                                            const res = await upsertCarrierFreeShippingRuleAction({
+                                                                                                                partnerId,
+                                                                                                                storeId,
+                                                                                                                rule: {
+                                                                                                                    id: rule.id,
+                                                                                                                    minOrderValue: rule.minOrderValue,
+                                                                                                                    allStates: rule.allStates,
+                                                                                                                    states: rule.states,
+                                                                                                                    appliesTo: rule.appliesTo,
+                                                                                                                    isActive: checked,
+                                                                                                                },
+                                                                                                            })
+                                                                                                            if (res.success) {
+                                                                                                                setCarrierRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, isActive: checked } : r))
+                                                                                                            } else {
+                                                                                                                notifyError("Erro ao atualizar regra", res.error || "Não foi possível atualizar o status da regra.")
+                                                                                                            }
+                                                                                                        }}
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </td>
+                                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                                <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                                                                                    <ActionsDropdown
+                                                                                                        onEdit={() => {
+                                                                                                            setEditingCarrierRule(rule)
+                                                                                                            setCarrierRuleForm({
+                                                                                                                minOrderValue: String(rule.minOrderValue),
+                                                                                                                allStates: rule.allStates,
+                                                                                                                states: rule.states,
+                                                                                                                appliesTo: rule.appliesTo,
+                                                                                                                isActive: rule.isActive,
+                                                                                                            })
+                                                                                                            setIsCarrierRuleModalOpen(true)
+                                                                                                        }}
+                                                                                                        onDelete={() => setCarrierRuleToDelete(rule)}
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    ))}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Mobile Grid Cards */}
+                                                                    <div className="md:hidden grid grid-cols-1 gap-4">
+                                                                        {paginatedCarrierRules.map((rule) => (
+                                                                            <div key={rule.id} className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-3">
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <div>
+                                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body block">A partir de</span>
+                                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                            {rule.minOrderValue > 0 ? formatCurrency(rule.minOrderValue) : "Qualquer valor"}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Switch
+                                                                                            checked={rule.isActive}
+                                                                                            onCheckedChange={async (checked) => {
+                                                                                                const res = await upsertCarrierFreeShippingRuleAction({
+                                                                                                    partnerId,
+                                                                                                    storeId,
+                                                                                                    rule: {
+                                                                                                        id: rule.id,
+                                                                                                        minOrderValue: rule.minOrderValue,
+                                                                                                        allStates: rule.allStates,
+                                                                                                        states: rule.states,
+                                                                                                        appliesTo: rule.appliesTo,
+                                                                                                        isActive: checked,
+                                                                                                    },
+                                                                                                })
+                                                                                                if (res.success) {
+                                                                                                    setCarrierRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, isActive: checked } : r))
+                                                                                                } else {
+                                                                                                    notifyError("Erro ao atualizar regra", res.error || "Não foi possível atualizar o status da regra.")
+                                                                                                }
+                                                                                            }}
+                                                                                        />
+                                                                                        <ActionsDropdown
+                                                                                            onEdit={() => {
+                                                                                                setEditingCarrierRule(rule)
+                                                                                                setCarrierRuleForm({
+                                                                                                    minOrderValue: String(rule.minOrderValue),
+                                                                                                    allStates: rule.allStates,
+                                                                                                    states: rule.states,
+                                                                                                    appliesTo: rule.appliesTo,
+                                                                                                    isActive: rule.isActive,
+                                                                                                })
+                                                                                                setIsCarrierRuleModalOpen(true)
+                                                                                            }}
+                                                                                            onDelete={() => setCarrierRuleToDelete(rule)}
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex flex-wrap gap-1.5">
+                                                                                    {rule.allStates ? (
+                                                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-green/10 text-brand-green">
+                                                                                            Todo o Brasil
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        rule.states.map((uf) => (
+                                                                                            <span
+                                                                                                key={uf}
+                                                                                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-brand-gray dark:bg-dark-border/60 text-brand-dark dark:text-dark-heading"
+                                                                                            >
+                                                                                                {uf}
+                                                                                            </span>
+                                                                                        ))
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                                    Aplicar em: <span className="font-semibold text-brand-dark dark:text-dark-heading">{rule.appliesTo === "all" ? "Todas as opções" : "Opção mais barata"}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+
+                                                                    {totalCarrierRulePages > 1 && (
+                                                                        <div className="mt-4">
+                                                                            <Pagination
+                                                                                currentPage={carrierRulePage}
+                                                                                totalPages={totalCarrierRulePages}
+                                                                                onPageChange={setCarrierRulePage}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </FormSection>
+                                                </div>
+
+                                                {/* Right Column / Sidebar - Transportadora tab */}
+                                                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                    <SidebarCard hasTopStrip hasSeparator title="Como funciona">
+                                                        <div className="space-y-3 text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                            <p>
+                                                                Estas regras valem exclusivamente para envios via transportadora (SuperFrete), de forma independente do delivery próprio.
+                                                            </p>
+                                                            <p>
+                                                                O estado do comprador é identificado automaticamente pelo CEP informado na página do produto, carrinho, checkout e PDV.
+                                                            </p>
+                                                            <p>
+                                                                Você pode combinar várias faixas (ex.: R$ 50 para SP e PR, R$ 100 para SP, PR e SC ou todo o Brasil).
+                                                            </p>
+                                                        </div>
+                                                    </SidebarCard>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    </TabsContent>
+                                )}
+
                                 {/* Tab: Atendimento a domicílio */}
                                 <TabsContent value="service" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -867,6 +1155,188 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                         await deleteDeliveryFeeRuleAction(partnerId, ruleToDelete.id)
                         await reload()
                         setRuleToDelete(null)
+                    }}
+                />
+            )}
+
+            <DefaultModal
+                isOpen={isCarrierRuleModalOpen}
+                onClose={() => {
+                    setIsCarrierRuleModalOpen(false)
+                    setEditingCarrierRule(null)
+                }}
+                title={editingCarrierRule ? "Editar regra de frete grátis" : "Nova regra de frete grátis"}
+                maxWidth="lg"
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            disabled={savingCarrierRule}
+                            onClick={() => {
+                                setIsCarrierRuleModalOpen(false)
+                                setEditingCarrierRule(null)
+                            }}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            disabled={savingCarrierRule}
+                            onClick={async () => {
+                                if (!carrierRuleForm.allStates && carrierRuleForm.states.length === 0) {
+                                    notifyError("Selecione os estados", "Escolha pelo menos um estado ou marque Todo o Brasil.")
+                                    return
+                                }
+                                setSavingCarrierRule(true)
+                                const res = await upsertCarrierFreeShippingRuleAction({
+                                    partnerId,
+                                    storeId,
+                                    rule: {
+                                        id: editingCarrierRule?.id,
+                                        minOrderValue: Number(carrierRuleForm.minOrderValue || 0),
+                                        allStates: carrierRuleForm.allStates,
+                                        states: carrierRuleForm.states,
+                                        appliesTo: carrierRuleForm.appliesTo,
+                                        isActive: carrierRuleForm.isActive,
+                                    },
+                                })
+                                setSavingCarrierRule(false)
+                                if (res.success) {
+                                    notifySuccess(
+                                        editingCarrierRule ? "Regra atualizada" : "Regra criada",
+                                        "A regra de frete grátis para transportadora foi salva com sucesso.",
+                                    )
+                                    const refreshed = await getCarrierFreeShippingRulesAction(partnerId, storeId)
+                                    if (refreshed.success) setCarrierRules(refreshed.rules)
+                                    setIsCarrierRuleModalOpen(false)
+                                    setEditingCarrierRule(null)
+                                } else {
+                                    notifyError("Erro ao salvar regra", res.error || "Não foi possível salvar a regra.")
+                                }
+                            }}
+                            leftIcon={<SaveIcon size={18} />}
+                        >
+                            {savingCarrierRule ? "Salvando..." : editingCarrierRule ? "Salvar alterações" : "Criar regra"}
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <MoneyInput
+                            label="Frete grátis a partir de"
+                            value={carrierRuleForm.minOrderValue}
+                            onChange={(val) => setCarrierRuleForm((prev) => ({ ...prev, minOrderValue: String(val ?? "") }))}
+                            placeholder="R$ 0,00"
+                            min={0}
+                        />
+                        <FormDropdown
+                            label="Aplicar em"
+                            value={carrierRuleForm.appliesTo}
+                            setValue={(value) => setCarrierRuleForm((prev) => ({ ...prev, appliesTo: (value as CarrierFreeShippingAppliesTo) || "cheapest" }))}
+                            options={[
+                                { value: "cheapest", label: "Apenas a opção mais barata" },
+                                { value: "all", label: "Todas as opções de transportadora" },
+                            ]}
+                        />
+                    </div>
+
+                    <div className="pt-1">
+                        <Checkbox
+                            label="Válido para todo o Brasil"
+                            checked={carrierRuleForm.allStates}
+                            onChange={(checked) => setCarrierRuleForm((prev) => ({
+                                ...prev,
+                                allStates: Boolean(checked),
+                            }))}
+                        />
+                    </div>
+
+                    {!carrierRuleForm.allStates && (
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    Estados ({carrierRuleForm.states.length} selecionado{carrierRuleForm.states.length === 1 ? "" : "s"})
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(["Sul", "Sudeste", "Centro-Oeste", "Nordeste", "Norte"] as const).map((region) => {
+                                        const regionUfs = BRAZILIAN_STATES.filter((s) => s.region === region).map((s) => s.uf)
+                                        const allSelected = regionUfs.every((uf) => carrierRuleForm.states.includes(uf))
+                                        return (
+                                            <button
+                                                key={region}
+                                                type="button"
+                                                onClick={() => {
+                                                    setCarrierRuleForm((prev) => {
+                                                        const next = new Set(prev.states)
+                                                        if (allSelected) {
+                                                            regionUfs.forEach((uf) => next.delete(uf))
+                                                        } else {
+                                                            regionUfs.forEach((uf) => next.add(uf))
+                                                        }
+                                                        return { ...prev, states: Array.from(next).sort() as BrazilianStateUf[] }
+                                                    })
+                                                }}
+                                                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${allSelected
+                                                    ? "bg-brand-dark text-white border-brand-dark dark:bg-dark-heading dark:text-dark-background dark:border-dark-heading"
+                                                    : "bg-white dark:bg-dark-surface text-brand-inactive-text dark:text-dark-body border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading"
+                                                    }`}
+                                            >
+                                                {region}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-5 sm:grid-cols-9 gap-2">
+                                {BRAZILIAN_STATES.map((st) => {
+                                    const selected = carrierRuleForm.states.includes(st.uf)
+                                    return (
+                                        <button
+                                            key={st.uf}
+                                            type="button"
+                                            title={st.name}
+                                            onClick={() => {
+                                                setCarrierRuleForm((prev) => {
+                                                    const exists = prev.states.includes(st.uf)
+                                                    const next = exists
+                                                        ? prev.states.filter((u) => u !== st.uf)
+                                                        : ([...prev.states, st.uf].sort() as BrazilianStateUf[])
+                                                    return { ...prev, states: next }
+                                                })
+                                            }}
+                                            className={`py-2 px-1 rounded-lg text-xs font-bold border transition-colors ${selected
+                                                ? "bg-brand-dark text-white border-brand-dark dark:bg-dark-heading dark:text-dark-background dark:border-dark-heading"
+                                                : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading border-brand-border dark:border-dark-border hover:bg-brand-gray/60 dark:hover:bg-dark-border/40"
+                                                }`}
+                                        >
+                                            {st.uf}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </DefaultModal>
+
+            {carrierRuleToDelete && (
+                <AlertModal
+                    isOpen={true}
+                    onClose={() => setCarrierRuleToDelete(null)}
+                    title="Excluir regra de frete grátis"
+                    message={`Tem certeza que deseja excluir a regra a partir de ${carrierRuleToDelete.minOrderValue > 0 ? formatCurrency(carrierRuleToDelete.minOrderValue) : "qualquer valor"} (${carrierRuleToDelete.allStates ? "Todo o Brasil" : carrierRuleToDelete.states.join(", ")})?`}
+                    confirmText="Excluir"
+                    variant="danger"
+                    onConfirm={async () => {
+                        const res = await deleteCarrierFreeShippingRuleAction(partnerId, carrierRuleToDelete.id)
+                        if (res.success) {
+                            setCarrierRules((prev) => prev.filter((r) => r.id !== carrierRuleToDelete.id))
+                            notifySuccess("Regra excluída", "A regra de frete grátis foi removida.")
+                        } else {
+                            notifyError("Erro ao excluir", res.error || "Não foi possível excluir a regra.")
+                        }
+                        setCarrierRuleToDelete(null)
                     }}
                 />
             )}

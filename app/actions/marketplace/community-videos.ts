@@ -1,5 +1,6 @@
 "use server"
 
+import { unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
@@ -52,12 +53,11 @@ export interface CommunityVideoItem {
   partner?: { name?: string; store_image_url?: string | null; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
 }
 
-export async function getCommunityVideos(citySlug?: string, cursor?: string, limit = 20): Promise<{
+async function _fetchCommunityVideosUncached(citySlug?: string, cursor?: string, limit = 20): Promise<{
   items: CommunityVideoItem[]
   nextCursor: string | null
   hasMore: boolean
 }> {
-  const supabase = await getSupabaseServerClient()
   const admin = getAdminClient()
 
   // If a city slug is provided, find partner_ids for stores in that city first
@@ -94,7 +94,7 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
     cityPartnerIds = ids
   }
 
-  let query = supabase
+  let query = admin
     .from("community_videos")
     .select("*")
     .eq("moderation_status", "approved")
@@ -179,6 +179,24 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
   }
 
   return { items, nextCursor, hasMore }
+}
+
+const getCachedCommunityVideosFirstPage = unstable_cache(
+  (cityKey: string, limit: number) =>
+    _fetchCommunityVideosUncached(cityKey === "__all__" ? undefined : cityKey, undefined, limit),
+  ["community-videos-first-page-v1"],
+  { revalidate: 120, tags: ["community-videos"] }
+)
+
+export async function getCommunityVideos(citySlug?: string, cursor?: string, limit = 20): Promise<{
+  items: CommunityVideoItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}> {
+  if (!cursor) {
+    return getCachedCommunityVideosFirstPage(citySlug || "__all__", limit)
+  }
+  return _fetchCommunityVideosUncached(citySlug, cursor, limit)
 }
 
 export async function getPartnerCommunityVideos(partnerId: string, cursor?: string, limit = 20): Promise<{

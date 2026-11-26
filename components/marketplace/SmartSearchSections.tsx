@@ -1,10 +1,10 @@
 "use client"
 
 import React from "react"
-import { MapPin, Sparkles, Truck } from "lucide-react"
-import { Badge, Tooltip } from "@/components/reusable"
+import { Badge, FormSection, Tooltip } from "@/components/reusable"
 import type { ParsedSearchIntent } from "@/lib/search/intent-parser"
 import type { ProximityRingsResult } from "@/lib/search/proximity-rings"
+import { SparklesIcon } from "@/lib/icons"
 
 interface SmartSearchBadgeProps {
   query: string
@@ -67,7 +67,7 @@ export const SmartSearchBadge: React.FC<SmartSearchBadgeProps> = ({
         aria-label="Detalhes da busca inteligente"
         className="inline-flex shrink-0 cursor-default outline-none"
       >
-        <Badge variant="green" icon={<Sparkles />} className="w-7 h-7 p-1.5" />
+        <Badge variant="green" icon={<SparklesIcon />} className="w-7 h-7 p-1.5" />
       </span>
     </Tooltip>
   )
@@ -141,7 +141,6 @@ export const ProximityRingsSection: React.FC<ProximityRingsSectionProps> = ({
       {hasRegional && (
         <section>
           <div className="flex items-center gap-2 mb-1">
-            <MapPin className="w-4 h-4 text-brand-green shrink-0" />
             <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
               Em cidades vizinhas e na sua região
             </h2>
@@ -169,29 +168,16 @@ export const ProximityRingsSection: React.FC<ProximityRingsSectionProps> = ({
 
       {/* Anel 3: Vendedores nacionais com envio para o CEP */}
       {hasNational && (
-        <section className={hasRegional ? "pt-6 border-t border-brand-border/60 dark:border-dark-border" : ""}>
-          <div className="flex items-center gap-2 mb-1">
-            <Truck className="w-4 h-4 text-brand-green shrink-0" />
-            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
-              Vendedores que enviam para o seu CEP
-            </h2>
-          </div>
-          <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
-            Envio nacional por transportadora ou Correios
-          </p>
+        <FormSection title="Vendedores que enviam para o seu CEP" hasSeparator={hasRegional ? true : false}>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
             {rings.nationalShipping.map((item) => renderDistantItem(item))}
           </div>
-        </section>
+        </FormSection>
       )}
 
       {/* Fallback: Outras opções distantes */}
       {hasOther && (
-        <section className={hasRegional || hasNational ? "pt-6 border-t border-brand-border/60 dark:border-dark-border" : ""}>
-          <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">
-            Outras opções em todo o Brasil
-          </h2>
-
+        <FormSection title="Outras opções em todo o Brasil" hasSeparator={hasRegional || hasNational}>
           {otherSellers.length > 0 && (
             <div className="mb-5">
               <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Lojas e vitrines</h3>
@@ -206,7 +192,7 @@ export const ProximityRingsSection: React.FC<ProximityRingsSectionProps> = ({
               {rings.otherDistant.map((item) => renderDistantItem(item))}
             </div>
           )}
-        </section>
+        </FormSection>
       )}
     </div>
   )

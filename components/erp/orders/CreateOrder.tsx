@@ -1403,17 +1403,17 @@ export default function CreateOrder({
     }
 
     const handleClosePaymentModal = () => {
-        setIsPaymentModalOpen(false)
         if (wasSaleSuccessful) {
-            // Full cleanup (edit + payment) is done by onBack/closeEntity -
-            // clearPaymentParam now uses window.history.replaceState so there's
-            // no async router.replace race that could re-add ?edit=*id*.
+            // Call onBack FIRST to trigger navigation and unmount,
+            // which clears the header override via the cleanup effect.
+            // Then reset form state.
             resetForm()
             debouncedRefresh()
             setWasSaleSuccessful(false)
             onBack()
             return
         }
+        setIsPaymentModalOpen(false)
         clearPaymentParam()
     }
 

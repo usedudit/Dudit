@@ -352,6 +352,12 @@ export const getAdminTimeline = cache(
   },
 )
 
+// Action types that should only be visible to admin/seller, not to the client
+const ADMIN_ONLY_ACTION_TYPES = new Set([
+  "bling_order_exported",
+  "tiny_order_exported",
+])
+
 export const getUserTimeline = cache(
   async (
     entityType: string,
@@ -362,7 +368,9 @@ export const getUserTimeline = cache(
     return unstable_cache(
       async () => {
         const adminEntries = await fetchRawTimeline(entityType, entityId, partnerId, limit)
-        return adminEntries.map(entry => ({
+        // Filter out admin-only action types
+        const filteredEntries = adminEntries.filter(entry => !ADMIN_ONLY_ACTION_TYPES.has(entry.action_type))
+        return filteredEntries.map(entry => ({
           entity_type: entry.entity_type,
           action_type: entry.action_type,
           change_lines: entry.change_lines,

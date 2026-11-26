@@ -128,6 +128,7 @@ type FinalizePreSaleInput = {
   };
   financeAccountId?: string | null;
   paidAmount: number;
+  paymentStatus?: "paid" | "partially_paid" | "unpaid";
   paymentMethod?: string | null;
   paymentBreakdown?: FinalizePaymentEntry[];
   isPendingDelivery?: boolean;
@@ -1663,6 +1664,11 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     }
   }
 
+  const totalSaleTarget = safeMoney(Number(preSaleDraft.total_amount || 0));
+  const isExplicitlyUnpaid =
+    input.paymentStatus === "unpaid" ||
+    (paidAmount <= 0.005 && totalSaleTarget > 0.005);
+
   // Build payment breakdown
   const resolvedBreakdown: Array<{
     method: string;
@@ -1695,11 +1701,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     }
     const methodLabel =
       String(entry.method || input.paymentMethod || "PDV").trim() || "PDV";
-    const explicitReceived = Number((entry as any).amountReceived || 0);
+    const hasExplicitReceived =
+      entry.amountReceived !== undefined && entry.amountReceived !== null;
+    const explicitReceived = hasExplicitReceived
+      ? safeMoney(Number(entry.amountReceived))
+      : null;
     const payWith = Number((entry as any).payWithAmount || 0);
-    const receivedValue =
-      explicitReceived > 0.005
-        ? explicitReceived
+    const receivedValue = isExplicitlyUnpaid
+      ? 0
+      : hasExplicitReceived
+        ? explicitReceived!
         : payWith > 0.005
           ? payWith
           : amount;
@@ -1728,13 +1739,21 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   }
 
   let breakdownForOrder = resolvedBreakdown;
+  // For unpaid legs (amountReceived === 0), price the intended method against
+  // `amount` so payment-method discounts/fees are still computed accurately,
+  // while preserving `amountReceived: 0` on the stored breakdown below.
+  const pricingBreakdownInput = resolvedBreakdown.map((row) => ({
+    ...row,
+    amountReceived:
+      row.amountReceived > 0.005 ? row.amountReceived : row.amount,
+  }));
   const paymentAwarePromise = resolvePosFinalTotalWithPaymentMethod({
     supabase,
     partnerId: input.partnerId,
     storeId: input.storeId,
     preSaleId: input.preSaleId,
     baseTotal: Math.max(0, Number(preSaleDraft.total_amount || 0)),
-    paymentBreakdown: resolvedBreakdown,
+    paymentBreakdown: pricingBreakdownInput,
   });
   const customerNamePromise = preSaleDraft.customer_id
     ? supabase
@@ -1759,14 +1778,18 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     breakdownForOrder = paymentAware.adjustedBreakdown.map(
       (row: any, i: number) => {
         const source = resolvedBreakdownByMethod.get(i) || row;
+        const isUnpaidLeg =
+          isExplicitlyUnpaid || Number(source.amountReceived ?? 0) <= 0.005;
         return {
           method: row.method,
           amount: safeMoney(Number(row.amount || 0)),
-          amountReceived: safeMoney(
-            Number(
-              row.amountReceived ?? source.amountReceived ?? row.amount ?? 0,
-            ),
-          ),
+          amountReceived: isUnpaidLeg
+            ? 0
+            : safeMoney(
+                Number(
+                  row.amountReceived ?? source.amountReceived ?? row.amount ?? 0,
+                ),
+              ),
           adjustmentType: row.adjustmentType || "none",
           adjustmentPercent: Math.max(0, Number(row.adjustmentPercent || 0)),
           adjustmentAmount: Math.max(0, Number(row.adjustmentAmount || 0)),
@@ -1809,27 +1832,31 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     );
   }
 
-  const totalPaidAmount =
-    breakdownForOrder.length > 0
+  const totalPaidAmount = isExplicitlyUnpaid
+    ? 0
+    : breakdownForOrder.length > 0
       ? safeMoney(
           // `amount` is the charged value per leg. `amountReceived` is the
           // pre-adjustment base and must not inflate paid totals (cash change
-          // and customer fees/interest are handled separately).
-          breakdownForOrder.reduce(
-            (acc, row) => acc + Number((row as any).amount ?? 0),
-            0,
-          ),
+          // and customer fees/interest are handled separately). Legs with
+          // `amountReceived === 0` represent intended unpaid methods and must
+          // not be counted as paid.
+          breakdownForOrder.reduce((acc, row) => {
+            if (Number((row as any).amountReceived ?? 0) <= 0.005) return acc;
+            return acc + Number((row as any).amount ?? 0);
+          }, 0),
         )
       : paidAmount;
 
-  const totalSaleTarget = safeMoney(Number(preSaleDraft.total_amount || 0));
   const isUnderpaid = totalPaidAmount < totalSaleTarget - 0.005;
   const derivedPaymentStatus: "paid" | "partially_paid" | "unpaid" =
-    totalPaidAmount <= 0.005
+    isExplicitlyUnpaid
       ? "unpaid"
-      : isUnderpaid
-        ? "partially_paid"
-        : "paid";
+      : totalPaidAmount <= 0.005 && totalSaleTarget > 0.005
+        ? "unpaid"
+        : isUnderpaid
+          ? "partially_paid"
+          : "paid";
 
   // Customer name lookup if customer_id is provided
   const customerName: string | undefined =
@@ -2012,9 +2039,15 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   // the remaining time shown by the PDV.
   // Store credit is not money entering the drawer, so it must not appear in
   // the cash session movements even though it is part of the sale.
-  const cashMovementEntries = breakdownForOrder.filter(
-    (entry) => !isStoreCreditMethod(entry.method),
-  );
+  // Unpaid sales / legs with R$ 0 received also must not create cash movements.
+  const cashMovementEntries =
+    derivedPaymentStatus === "unpaid" || totalPaidAmount <= 0.005
+      ? []
+      : breakdownForOrder.filter(
+          (entry) =>
+            !isStoreCreditMethod(entry.method) &&
+            Number(entry.amountReceived ?? 0) > 0.005,
+        );
   const cashMovementsPromise =
     capabilities.hasFinancial &&
     activeSessionResult.data?.id &&
@@ -2038,7 +2071,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   // Seller commission
   const sellerPartnerUserId = input.sellerId || null;
   const sellerCommissionPromise =
-    capabilities.hasProductivity && sellerPartnerUserId
+    capabilities.hasProductivity &&
+    sellerPartnerUserId &&
+    totalPaidAmount > 0.005
       ? createCommissionExpenseForEntity({
           supabase,
           partnerId: input.partnerId,
@@ -2055,7 +2090,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
   // Goals tracking
   const goalsPromise =
-    capabilities.hasGoals && user.id
+    capabilities.hasGoals && user.id && totalPaidAmount > 0.005
       ? applySaleToGoals({
           supabase,
           partnerId: input.partnerId,

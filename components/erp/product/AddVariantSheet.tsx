@@ -1057,6 +1057,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                                         rowId: row.id
                                                                                     })
                                                                                 }}
+                                                                                data-unsaved-changes-ignore="true"
                                                                             >
                                                                                 Ajustar
                                                                             </Button>

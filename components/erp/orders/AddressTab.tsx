@@ -2,7 +2,7 @@
 
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Button, DatePicker, FormDropdown, FormSection, InfoCard, Input, SidebarCard, TimePicker } from "@/components/reusable"
+import { Button, DatePicker, FormDropdown, FormSection, InfoCard, Input, ListItem, SidebarCard, TimePicker } from "@/components/reusable"
 import { usePermissions } from "@/lib/permission-context"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
@@ -265,6 +265,15 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-4">
+                                {!deliveryBreakdown && onOpenDeliveryDriverSheet && (
+                                    <ListItem
+                                        icon={TruckIcon}
+                                        title="Adicionar entrega"
+                                        description="Define o valor da entrega do pedido"
+                                        onClick={isDeliveryLocked ? undefined : onOpenDeliveryDriverSheet}
+                                        className={`px-4 py-3 gap-4 ${isDeliveryLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                    />
+                                )}
                                 <FormDropdown
                                     label="Entregador"
                                     value={selectedDeliveryPersonId || "none"}

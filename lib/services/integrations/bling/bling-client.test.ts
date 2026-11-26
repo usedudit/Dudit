@@ -4,6 +4,7 @@ import {
   BlingClient,
   exchangeBlingAuthCode,
   refreshBlingAccessToken,
+  sanitizeBlingPhone,
 } from "./bling-client"
 
 vi.mock("server-only", () => ({}))
@@ -180,5 +181,39 @@ describe("BlingClient (API v3)", () => {
     expect(putBody.endereco.geral.endereco).toBe("Rua das Flores")
     expect(putBody.endereco.geral.cep).toBe("01001000")
     expect(putBody.endereco.geral.uf).toBe("SP")
+  })
+
+  it("sanitizes Brazilian phones for Bling v3 and omits invalid ones", () => {
+    expect(sanitizeBlingPhone("+55 (11) 98765-4321")).toEqual({ celular: "11987654321" })
+    expect(sanitizeBlingPhone("011 3333-4444")).toEqual({ telefone: "1133334444" })
+    expect(sanitizeBlingPhone("12345")).toEqual({})
+    expect(sanitizeBlingPhone("(00) 00000-0000")).toEqual({})
+    expect(sanitizeBlingPhone("Não informado")).toEqual({})
+  })
+
+  it("omits invalid phone when creating contact via POST /contatos", async () => {
+    const client = createBlingClient(fakeToken)
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [] }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ data: { id: 888 } }),
+      } as any)
+
+    const id = await client.findOrCreateContact({
+      nome: "Maria Oliveira",
+      telefone: "9999",
+    })
+
+    expect(id).toBe(888)
+    const [, postInit] = fetchSpy.mock.calls[1]
+    const postBody = JSON.parse(String(postInit?.body))
+    expect(postBody.telefone).toBeUndefined()
+    expect(postBody.celular).toBeUndefined()
   })
 })

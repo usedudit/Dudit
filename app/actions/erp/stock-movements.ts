@@ -654,6 +654,20 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             await invalidateProductCache(productId, partnerId, 'update', { silent: true })
         }
 
+        // Sincroniza o estoque revertido no ERP conectado (Tiny / Bling) de forma não-bloqueante
+        import("@/lib/services/integrations/erp-sync")
+            .then(({ syncItemsStockToConnectedErps }) =>
+                syncItemsStockToConnectedErps({
+                    partnerId,
+                    items: (childItems || []).map((it: any) => ({
+                        productId: it.product_id,
+                        variantId: it.variant_id || null,
+                    })),
+                    reason: `Estorno movimentação na Dudit${reason ? `: ${reason}` : ""}`,
+                })
+            )
+            .catch(() => {})
+
         return successResponse(movementRecord)
 
     } catch (err: any) {

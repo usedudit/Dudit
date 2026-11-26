@@ -63,8 +63,18 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
     const [localFilters, setLocalFilters] = useState<Record<string, any>>(filters)
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
-    // z-index dinâmico: a variante desktop abre acima de tudo que já estava aberto.
-    const zIndex = useModalLayer(isOpen)
+    // z-index dinâmico: mantém a camada ativa durante a animação de fechamento (300ms)
+    // para não cair atrás de outras sheets antes de deslizar para fora.
+    const [isLayerActive, setIsLayerActive] = useState(isOpen)
+    useEffect(() => {
+        if (isOpen) {
+            setIsLayerActive(true)
+            return
+        }
+        const timer = setTimeout(() => setIsLayerActive(false), 300)
+        return () => clearTimeout(timer)
+    }, [isOpen])
+    const zIndex = useModalLayer(isLayerActive)
 
     // Sincroniza estado local ao abrir
     useEffect(() => {
@@ -363,7 +373,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
     return (
         <Portal>
             <div
-                className={`fixed inset-0 bg-black/50 ${zIndexClass || "z-50"} transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                className={`fixed inset-0 bg-black/50 ${zIndexClass || "z-50"} transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 style={{ zIndex }}
                 onClick={onClose}
             >

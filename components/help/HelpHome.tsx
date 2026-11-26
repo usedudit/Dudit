@@ -15,6 +15,9 @@ import {
     KeyIcon,
     InfoIcon,
     StarIcon,
+    AnalyticsIcon,
+    RepeatIcon,
+    CreditCardIcon,
 } from "@/lib/icons"
 import Link from "next/link"
 import { Button, Badge, InfoCard, ListItem, FormSection } from "@/components/reusable"
@@ -118,6 +121,10 @@ export default function HelpHome() {
                         <ListItem className="px-4 py-3" icon={<UserIcon />} title="Clientes" onClick={() => window.location.href = "/ajuda/clientes/visao-geral-clientes"} />
                         <ListItem className="px-4 py-3" icon={<MoneyIcon />} title="Financeiro" onClick={() => window.location.href = "/ajuda/financeiro/visao-geral-financeiro"} />
                         <ListItem className="px-4 py-3" icon={<MegaphoneIcon />} title="Marketing" onClick={() => window.location.href = "/ajuda/marketing/visao-geral-cupons"} />
+                        <ListItem className="px-4 py-3" icon={<AnalyticsIcon />} title="Desempenho" onClick={() => window.location.href = "/ajuda/desempenho/visao-geral-desempenho"} />
+                        <ListItem className="px-4 py-3" icon={<RepeatIcon />} title="Assinaturas" onClick={() => window.location.href = "/ajuda/assinaturas/planos-recorrentes"} />
+                        <ListItem className="px-4 py-3" icon={<SettingsIcon />} title="Configurações" onClick={() => window.location.href = "/ajuda/configuracoes/visao-geral-configuracoes"} />
+                        <ListItem className="px-4 py-3" icon={<CreditCardIcon />} title="Planos" onClick={() => window.location.href = "/ajuda/planos/planos-e-limites"} />
                     </div>
                 </FormSection>
 

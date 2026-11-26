@@ -195,9 +195,11 @@ export async function priceMarketplaceCartCheckout(
         }))
       const carrier = await quoteCarrierFreightFee(adminClient, {
         partnerId,
+        storeId: targetStoreId,
         toPostalCode: cep,
         serviceId: params.carrierServiceId,
         items: carrierItems,
+        orderSubtotal: subtotal,
       })
       if (carrier.success) {
         deliveryFee = carrier.fee

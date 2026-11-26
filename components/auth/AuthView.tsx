@@ -66,7 +66,6 @@ export default function AuthView({
     const [email, setEmail] = useState(initialEmail)
     const [password, setPassword] = useState("")
     const [acceptedTerms, setAcceptedTerms] = useState(false)
-    const [acceptedAnalytics, setAcceptedAnalytics] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -79,13 +78,6 @@ export default function AuthView({
     const [verifyContext, setVerifyContext] = useState<"signup" | "recovery">("signup")
     const isSubmittingRef = useRef(false)
     const [isSupportOpen, setIsSupportOpen] = useState(false)
-
-    const saveAnalyticsPreference = (accepted: boolean) => {
-        const secure = window.location.protocol === "https:" ? "; Secure" : ""
-        const choice = accepted ? "accepted" : "rejected"
-        document.cookie = `dudit_analytics_consent=${choice}; Path=/; Max-Age=15552000; SameSite=Lax${secure}`
-        window.dispatchEvent(new Event("dudit:analytics-consent"))
-    }
 
     const changeMode = (newMode: AuthMode) => {
         setMode(newMode)
@@ -174,7 +166,6 @@ export default function AuthView({
         isSubmittingRef.current = true
         setIsLoading(true)
         try {
-            if (mode === "signup") saveAnalyticsPreference(acceptedAnalytics)
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             await supabase.auth.signInWithOAuth({
                 provider: "google",
@@ -237,7 +228,6 @@ export default function AuthView({
                 }
 
                 if (data.user) {
-                    saveAnalyticsPreference(acceptedAnalytics)
                     trackEvent("signup_completed", { method: "password" })
                     try {
                         await Promise.all(
@@ -621,12 +611,6 @@ export default function AuthView({
                                                     <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
                                                     <label htmlFor="terms" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">
                                                         Li e aceito os <Link href="/institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de Uso</Link> e estou ciente da <Link href="/institucional/privacidade" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Política de Privacidade</Link>.
-                                                    </label>
-                                                </div>
-                                                <div className="flex items-start gap-2">
-                                                    <Checkbox id="analytics-consent" checked={acceptedAnalytics} onChange={(checked) => setAcceptedAnalytics(checked as boolean)} />
-                                                    <label htmlFor="analytics-consent" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">
-                                                        Aceito métricas de uso e gravação de sessões para ajudar a melhorar a Dudit. Opcional; posso alterar essa escolha depois nas preferências de privacidade.
                                                     </label>
                                                 </div>
                                             </div>

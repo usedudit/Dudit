@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon, ExportFileIcon } from '@/lib/icons';
+import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon, ExportFileIcon, EyeIcon, EyeOffIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal } from '@/components/reusable';
 import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import Pagination from '@/components/reusable/Pagination';
@@ -104,6 +104,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const bdayInfo = useMemo(() => checkBirthday(customer.birth_date), [customer.birth_date]);
     const [isSendingNotification, setIsSendingNotification] = useState(false);
     const [canReceiveNotification, setCanReceiveNotification] = useState(false);
+    const [showCpf, setShowCpf] = useState(false);
 
     const handleCreateBirthdayCoupon = useCallback(async () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -686,9 +687,35 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">
                                                                     {customer.cnpj ? 'CNPJ' : 'CPF'}
                                                                 </span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                    {customer.cnpj || customer.cpf}
-                                                                </span>
+                                                                {showCpf ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading font-mono">
+                                                                            {customer.cnpj || customer.cpf}
+                                                                        </span>
+                                                                        <Button
+                                                                            variant="link"
+                                                                            size="sm"
+                                                                            className="p-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                                                                            onClick={() => setShowCpf(false)}
+                                                                            aria-label={`Esconder ${customer.cnpj ? 'CNPJ' : 'CPF'}`}
+                                                                        >
+                                                                            <EyeOffIcon size={16} />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <Button
+                                                                        variant="link"
+                                                                        size="sm"
+                                                                        className="p-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                                                                        onClick={() => setShowCpf(true)}
+                                                                        aria-label={`Mostrar ${customer.cnpj ? 'CNPJ' : 'CPF'}`}
+                                                                    >
+                                                                        <span className="flex items-center gap-1">
+                                                                            Mostrar {customer.cnpj ? 'CNPJ' : 'CPF'}
+                                                                            <EyeIcon size={14} />
+                                                                        </span>
+                                                                    </Button>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {customer.phone && (
@@ -891,7 +918,33 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                 {customer.cnpj && (
                                                                     <div className="flex justify-between items-center">
                                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CNPJ</span>
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
+                                                                        {showCpf ? (
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading font-mono">{customer.cnpj}</span>
+                                                                                <Button
+                                                                                    variant="link"
+                                                                                    size="sm"
+                                                                                    className="p-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                                                                                    onClick={() => setShowCpf(false)}
+                                                                                    aria-label="Esconder CNPJ"
+                                                                                >
+                                                                                    <EyeOffIcon size={16} />
+                                                                                </Button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <Button
+                                                                                variant="link"
+                                                                                size="sm"
+                                                                                className="p-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                                                                                onClick={() => setShowCpf(true)}
+                                                                                aria-label="Mostrar CNPJ"
+                                                                            >
+                                                                                <span className="flex items-center gap-1">
+                                                                                    Mostrar CNPJ
+                                                                                    <EyeIcon size={14} />
+                                                                                </span>
+                                                                            </Button>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                                 {customer.nomeFantasia && (
@@ -909,7 +962,33 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             customer.cpf && (
                                                                 <div className="flex justify-between items-center">
                                                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CPF</span>
-                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
+                                                                    {showCpf ? (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading font-mono">{customer.cpf}</span>
+                                                                            <Button
+                                                                                variant="link"
+                                                                                size="sm"
+                                                                                className="p-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                                                                                onClick={() => setShowCpf(false)}
+                                                                                aria-label="Esconder CPF"
+                                                                            >
+                                                                                <EyeOffIcon size={16} />
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <Button
+                                                                            variant="link"
+                                                                            size="sm"
+                                                                            className="p-1 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
+                                                                            onClick={() => setShowCpf(true)}
+                                                                            aria-label="Mostrar CPF"
+                                                                        >
+                                                                            <span className="flex items-center gap-1">
+                                                                                Mostrar CPF
+                                                                                <EyeIcon size={14} />
+                                                                            </span>
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
                                                             )
                                                         )}

@@ -242,6 +242,41 @@ export async function refreshBlingAccessToken(params: {
   return data as BlingTokenResponse
 }
 
+/**
+ * Normaliza telefone brasileiro para os campos `telefone` / `celular` do Bling API v3.
+ * Remove DDI +55/55, zero à esquerda do DDD e caracteres não numéricos.
+ * Retorna `undefined` se o número não for um telefone/celular BR válido (10 ou 11 dígitos),
+ * evitando erro de validação "É necessário preencher corretamente o campo Telefone" no Bling.
+ */
+export function sanitizeBlingPhone(raw?: string | null): { telefone?: string; celular?: string } {
+  if (!raw) return {}
+  let digits = String(raw).replace(/\D/g, "")
+  if (!digits) return {}
+
+  // Remove DDI 55 quando vier com 12 ou 13 dígitos (ex: 5511999998888)
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    digits = digits.slice(2)
+  }
+
+  // Remove 0 à esquerda do DDD (ex: 011999998888 -> 11999998888)
+  if ((digits.length === 11 || digits.length === 12) && digits.startsWith("0")) {
+    digits = digits.slice(1)
+  }
+
+  if (digits.length !== 10 && digits.length !== 11) return {}
+
+  const ddd = Number(digits.slice(0, 2))
+  if (!Number.isFinite(ddd) || ddd < 11 || ddd > 99) return {}
+
+  // Rejeita sequências triviais (ex: 0000000000, 11111111111, 99999999999)
+  if (/^(\d)\1+$/.test(digits) || /^(\d)\1+$/.test(digits.slice(2))) return {}
+
+  if (digits.length === 11) {
+    return { celular: digits }
+  }
+  return { telefone: digits }
+}
+
 export class BlingClient {
   private accessToken: string
   private lastRequestAt = 0
@@ -490,7 +525,14 @@ export class BlingClient {
         customer.tipo ||
         (finalDoc.length === 14 ? "J" : "F")
 
+      const sanitizedPhone = sanitizeBlingPhone(existing.telefone || customer.telefone)
+      const sanitizedCell = sanitizeBlingPhone(existing.celular)
+      const finalTelefone = sanitizedPhone.telefone
+      const finalCelular = sanitizedCell.celular || sanitizedPhone.celular
+
       const { id: _ignoredId, ...existingFields } = existing
+      delete existingFields.telefone
+      delete existingFields.celular
       await this.request(`/contatos/${contactId}`, {
         method: "PUT",
         body: {
@@ -500,7 +542,8 @@ export class BlingClient {
           situacao: existing.situacao || "A",
           ...(finalDoc ? { numeroDocumento: finalDoc } : {}),
           ...(existing.email || customer.email ? { email: existing.email || customer.email } : {}),
-          ...(existing.telefone || customer.telefone ? { telefone: existing.telefone || customer.telefone } : {}),
+          ...(finalTelefone ? { telefone: finalTelefone } : {}),
+          ...(finalCelular ? { celular: finalCelular } : {}),
           ...(mergedGeral.endereco
             ? {
               endereco: {
@@ -568,32 +611,50 @@ export class BlingClient {
       } catch { }
     }
 
-    const created = await this.request<{ data?: { id: number } }>("/contatos", {
-      method: "POST",
-      body: {
-        nome: customer.nome || "Cliente Dudit",
-        tipo: customer.tipo || (cleanDoc && cleanDoc.length === 14 ? "J" : "F"),
-        situacao: "A",
-        ...(cleanDoc ? { numeroDocumento: cleanDoc } : {}),
-        ...(customer.email ? { email: customer.email } : {}),
-        ...(customer.telefone ? { telefone: customer.telefone } : {}),
-        ...(customer.endereco?.endereco
-          ? {
-            endereco: {
-              geral: {
-                endereco: customer.endereco.endereco,
-                numero: customer.endereco.numero || "",
-                complemento: customer.endereco.complemento || "",
-                bairro: customer.endereco.bairro || "",
-                cep: customer.endereco.cep || "",
-                municipio: customer.endereco.municipio || "",
-                uf: customer.endereco.uf || "",
-              },
+    const sanitizedPhone = sanitizeBlingPhone(customer.telefone)
+    const createBody: Record<string, any> = {
+      nome: customer.nome || "Cliente Dudit",
+      tipo: customer.tipo || (cleanDoc && cleanDoc.length === 14 ? "J" : "F"),
+      situacao: "A",
+      ...(cleanDoc ? { numeroDocumento: cleanDoc } : {}),
+      ...(customer.email ? { email: customer.email } : {}),
+      ...(sanitizedPhone.telefone ? { telefone: sanitizedPhone.telefone } : {}),
+      ...(sanitizedPhone.celular ? { celular: sanitizedPhone.celular } : {}),
+      ...(customer.endereco?.endereco
+        ? {
+          endereco: {
+            geral: {
+              endereco: customer.endereco.endereco,
+              numero: customer.endereco.numero || "",
+              complemento: customer.endereco.complemento || "",
+              bairro: customer.endereco.bairro || "",
+              cep: customer.endereco.cep || "",
+              municipio: customer.endereco.municipio || "",
+              uf: customer.endereco.uf || "",
             },
-          }
-          : {}),
-      },
-    })
+          },
+        }
+        : {}),
+    }
+
+    let created: { data?: { id: number } }
+    try {
+      created = await this.request<{ data?: { id: number } }>("/contatos", {
+        method: "POST",
+        body: createBody,
+      })
+    } catch (createErr: any) {
+      const msg = String(createErr?.message || "").toLowerCase()
+      if ((createBody.telefone || createBody.celular) && (msg.includes("telefone") || msg.includes("celular"))) {
+        const { telefone: _t, celular: _c, ...bodyWithoutPhone } = createBody
+        created = await this.request<{ data?: { id: number } }>("/contatos", {
+          method: "POST",
+          body: bodyWithoutPhone,
+        })
+      } else {
+        throw createErr
+      }
+    }
 
     if (!created?.data?.id) {
       throw new Error("Bling ERP não retornou o ID do contato criado.")

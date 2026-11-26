@@ -166,6 +166,16 @@ export class ProductService {
     if (error) {
       return { success: false, error: error.message }
     }
+    import("@/lib/services/integrations/erp-sync")
+      .then(({ syncStockToConnectedErps }) =>
+        syncStockToConnectedErps({
+          partnerId,
+          productId,
+          newStock: quantity,
+          reason: "Atualização de estoque via Dudit",
+        })
+      )
+      .catch(() => {})
     return { success: true }
   }
 

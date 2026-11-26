@@ -6,6 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { calculateDistance, enrichMarketplaceDistance, formatDistanceLabel } from "@/lib/services/location.service"
 import { applySellerDiversity, calcTrendingScore } from "@/lib/marketplace/ranking"
+import { applyMarketplaceBadges } from "@/lib/marketplace/badges"
 
 const DISCOVER_DEBUG = false
 
@@ -584,30 +585,22 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
         _sales: item.sales_last_30_days ?? 0,
         _stock: Number(item.stock_quantity ?? item.stock_available ?? 0),
         _favs: item.favorites_count ?? 0,
+        marketplace_score: Number((item as any).marketplace_score ?? 0),
         ...extra,
     }
 }
 
-// ─── Urgency badges (Últimos N) ────────────────────────────────────────────
-// Random but deterministic per day so the same products don't always show them.
+// ─── Urgency & Highlight badges (Últimos N / Destaque) ─────────────────────
+// Uses the shared merit-based badge engine (real traction + strict per-section cap).
 
 function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
-    const seed = dailySeed(ctx.userId)
     for (const section of sections) {
-        for (const item of section.items) {
-            const it = item as any
-            if (it._badgeLabel) continue
-            if (it.itemType !== "produto") continue
-            const stock = Number(it._stock ?? 0)
-            const h = hashSeed(seed, `${it.id}-launch-badge`) % 100
-            if (stock > 0 && stock <= 5 && h < 45) {
-                it._badgeLabel = `Últimos ${stock}`
-                it._badgeVariant = "red"
-            } else if (h >= 75 && h < 90) {
-                it._badgeLabel = "Destaque"
-                it._badgeVariant = "purple"
-            }
-        }
+        section.items = applyMarketplaceBadges(section.items, {
+            userId: ctx.userId,
+            maxHighlights: 2,
+            maxHighlightRatio: 0.08,
+            onePerStore: true,
+        })
     }
 }
 
@@ -2197,7 +2190,6 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             if (filteredBy20km.length > 0) {
                 section.items = filteredBy20km.slice(0, 20)
                 section.title = `${sectionName} pertinho de você!`
-                section.subtitle = "Até 20km do seu endereço"
                 section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=20`
             } else {
                 if (ctx.scope === "city" || ctx.scope === "state") {

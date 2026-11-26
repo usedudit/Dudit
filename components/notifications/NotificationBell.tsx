@@ -40,7 +40,7 @@ export function NotificationBell({
     <div className={className}>
       <button
         className={cn(
-          "w-10 h-10 rounded-full border flex items-center justify-center transition-all group",
+          "relative w-10 h-10 rounded-full border flex items-center justify-center transition-all group",
           variant === "marketplace" &&
           "border border-white/10 hover:bg-white/5 hover:border-white/30 text-gray-400 dark:text-dark-body group-hover:text-white",
           buttonClassName,
@@ -50,7 +50,7 @@ export function NotificationBell({
       >
         <NotificationIcon
           className={cn(
-            "w-4 h-4",
+            "w-5 h-5",
             variant === "marketplace"
               ? "text-white"
               : "text-brand-dark dark:text-dark-heading",

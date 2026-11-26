@@ -469,6 +469,7 @@ export async function syncBlingProductsToDudit(params: {
             .from("products")
             .select("id, stock_reserved")
             .eq("partner_id", partnerId)
+            .eq("external_provider", BLING_PROVIDER)
             .eq("external_id", externalId)
             .maybeSingle()
 
@@ -650,6 +651,7 @@ export async function syncBlingProductsToDudit(params: {
               const { data: bySku } = await supabase
                 .from("product_variants")
                 .select("id")
+                .eq("product_id", targetProductId)
                 .eq("sku", vSku)
                 .maybeSingle()
               existingVar = bySku
@@ -1159,6 +1161,36 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
       observacoes: `Pedido Dudit #${order.order_number || order.id}. ${order.notes || ""}${exchangeNote}`.trim(),
     }
 
+    // Captura snapshot do estoque físico atual na Dudit ANTES de criar o pedido no Bling.
+    // Evita race condition onde um webhook `stock.updated` / `virtual_stock.updated` do Bling
+    // (disparado pela própria criação/alteração de status do pedido) sobrescreva temporariamente
+    // `products.stock_quantity` com o saldo pré-baixa antes de enviarmos o balanço físico.
+    const preOrderStockSnapshots = new Map<string, number>()
+    if (isAlreadyDispatched) {
+      for (const it of (order.order_items || []) as any[]) {
+        if (!it.product_id) continue
+        const key = it.variant_id ? `variant:${it.variant_id}` : `product:${it.product_id}`
+        if (preOrderStockSnapshots.has(key)) continue
+        try {
+          if (it.variant_id) {
+            const { data: vRow } = await supabase
+              .from("product_variants")
+              .select("stock_quantity")
+              .eq("id", it.variant_id)
+              .maybeSingle()
+            if (vRow) preOrderStockSnapshots.set(key, Math.max(0, Number(vRow.stock_quantity || 0)))
+          } else {
+            const { data: pRow } = await supabase
+              .from("products")
+              .select("stock_quantity")
+              .eq("id", it.product_id)
+              .maybeSingle()
+            if (pRow) preOrderStockSnapshots.set(key, Math.max(0, Number(pRow.stock_quantity || 0)))
+          }
+        } catch { }
+      }
+    }
+
     const blingRes = await client.createOrder(payload)
 
     // Atualiza a situação do pedido no Bling se já estiver pago, enviado ou entregue/retirado
@@ -1185,24 +1217,30 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     }
 
     if (isDeliveredOrDeducted && blingRes.id) {
+      const syncedKeys = new Set<string>()
       for (const it of (order.order_items || []) as any[]) {
         if (!it.product_id) continue
+        const key = it.variant_id ? `variant:${it.variant_id}` : `product:${it.product_id}`
+        if (syncedKeys.has(key)) continue
+        syncedKeys.add(key)
         try {
-          let newStock = 0
-          if (it.variant_id) {
-            const { data: vRow } = await supabase
-              .from("product_variants")
-              .select("stock_quantity")
-              .eq("id", it.variant_id)
-              .maybeSingle()
-            newStock = Number(vRow?.stock_quantity || 0)
-          } else {
-            const { data: pRow } = await supabase
-              .from("products")
-              .select("stock_quantity")
-              .eq("id", it.product_id)
-              .maybeSingle()
-            newStock = Number(pRow?.stock_quantity || 0)
+          let newStock = preOrderStockSnapshots.get(key)
+          if (newStock === undefined) {
+            if (it.variant_id) {
+              const { data: vRow } = await supabase
+                .from("product_variants")
+                .select("stock_quantity")
+                .eq("id", it.variant_id)
+                .maybeSingle()
+              newStock = Number(vRow?.stock_quantity || 0)
+            } else {
+              const { data: pRow } = await supabase
+                .from("products")
+                .select("stock_quantity")
+                .eq("id", it.product_id)
+                .maybeSingle()
+              newStock = Number(pRow?.stock_quantity || 0)
+            }
           }
           await syncDuditStockToBling({
             partnerId: order.partner_id,
@@ -1379,6 +1417,8 @@ export async function syncDuditStockToBling(params: {
     let targetBlingId: number | null = null
 
     // 1. Resolve ID do produto/variação no Bling
+    // IMPORTANTE: quando variantId é informado, nunca fazer fallback para o produto pai,
+    // pois isso sobrescreveria o estoque do produto pai no Bling com o saldo de uma única variação.
     if (variantId) {
       const { data: vRow } = await supabase
         .from("product_variants")
@@ -1386,33 +1426,44 @@ export async function syncDuditStockToBling(params: {
         .eq("id", variantId)
         .maybeSingle()
 
-      if (vRow?.sku) {
-        const list = await client.listProducts({ codigo: vRow.sku, limite: 5 })
-        const found = list.find((p) => String(p.codigo || "").trim().toLowerCase() === vRow.sku.trim().toLowerCase())
+      const variantSku = vRow?.sku?.trim() || sku?.trim() || null
+      if (variantSku) {
+        const list = await client.listProducts({ codigo: variantSku, limite: 5 })
+        const found = list.find(
+          (p) => String(p.codigo || "").trim().toLowerCase() === variantSku.toLowerCase()
+        )
         if (found?.id) targetBlingId = found.id
       }
-    }
 
-    if (!targetBlingId && productId) {
-      const { data: pRow } = await supabase
-        .from("products")
-        .select("external_id, external_provider, sku")
-        .eq("id", productId)
-        .maybeSingle()
+      if (!targetBlingId) {
+        return { success: false, error: "Variação não encontrada no Bling ERP." }
+      }
+    } else {
+      if (productId) {
+        const { data: pRow } = await supabase
+          .from("products")
+          .select("external_id, external_provider, sku")
+          .eq("id", productId)
+          .maybeSingle()
 
-      if (pRow?.external_provider === BLING_PROVIDER && pRow?.external_id) {
-        targetBlingId = Number(pRow.external_id)
-      } else if (pRow?.sku) {
-        const list = await client.listProducts({ codigo: pRow.sku, limite: 5 })
-        const found = list.find((p) => String(p.codigo || "").trim().toLowerCase() === pRow.sku.trim().toLowerCase())
+        if (pRow?.external_provider === BLING_PROVIDER && pRow?.external_id) {
+          targetBlingId = Number(pRow.external_id)
+        } else if (pRow?.sku) {
+          const list = await client.listProducts({ codigo: pRow.sku, limite: 5 })
+          const found = list.find(
+            (p) => String(p.codigo || "").trim().toLowerCase() === pRow.sku.trim().toLowerCase()
+          )
+          if (found?.id) targetBlingId = found.id
+        }
+      }
+
+      if (!targetBlingId && sku) {
+        const list = await client.listProducts({ codigo: sku, limite: 5 })
+        const found = list.find(
+          (p) => String(p.codigo || "").trim().toLowerCase() === sku.trim().toLowerCase()
+        )
         if (found?.id) targetBlingId = found.id
       }
-    }
-
-    if (!targetBlingId && sku) {
-      const list = await client.listProducts({ codigo: sku, limite: 5 })
-      const found = list.find((p) => String(p.codigo || "").trim().toLowerCase() === sku.trim().toLowerCase())
-      if (found?.id) targetBlingId = found.id
     }
 
     if (!targetBlingId) {
@@ -1484,6 +1535,14 @@ export async function processBlingWebhook(
     data?.deposito?.saldoFisico !== undefined
 
   if (isStockPayload) {
+    // Respeita a preferência sync_stock da integração (quando explicitamente desativada)
+    try {
+      const integration = await findBlingIntegration(supabase, partnerId)
+      if ((integration?.config as BlingIntegrationConfig | undefined)?.sync_stock === false) {
+        return { success: true, event: event || "stock.updated", affectedCount: 0, details: "sync_stock_disabled" }
+      }
+    } catch { }
+
     const prodId = data?.produto?.id ? String(data.produto.id) : null
     const physical = Math.max(0, Number(data?.saldoFisicoTotal ?? data?.deposito?.saldoFisico ?? data?.saldoFisico ?? 0))
     const virtual = Math.max(0, Number(data?.saldoVirtualTotal ?? data?.deposito?.saldoVirtual ?? data?.saldoVirtual ?? physical))
@@ -1499,15 +1558,22 @@ export async function processBlingWebhook(
       } catch { }
     }
 
+    const skuNorm = sku ? sku.toLowerCase() : null
+    const escapedSku = sku ? sku.replace(/[\\%_]/g, "\\$&") : null
+
     let matchedVariant = false
-    if (sku) {
-      const { data: matchedVariants } = await supabase
+    if (escapedSku && skuNorm) {
+      const { data: rawMatchedVariants } = await supabase
         .from("product_variants")
-        .select("id, product_id, products!inner(partner_id)")
-        .ilike("sku", sku)
+        .select("id, product_id, sku, products!inner(partner_id)")
+        .ilike("sku", escapedSku)
         .eq("products.partner_id", partnerId)
 
-      if (matchedVariants && matchedVariants.length > 0) {
+      const matchedVariants = (rawMatchedVariants || []).filter(
+        (v: any) => !v?.sku || String(v.sku).trim().toLowerCase() === skuNorm
+      )
+
+      if (matchedVariants.length > 0) {
         matchedVariant = true
         for (const variant of matchedVariants) {
           await supabase
@@ -1547,22 +1613,39 @@ export async function processBlingWebhook(
     }
 
     if (!matchedVariant && (prodId || sku)) {
-      let query = supabase
-        .from("products")
-        .select("id")
-        .eq("partner_id", partnerId)
-        .is("deleted_at", null)
+      const matchedMap = new Map<string, { id: string }>()
 
-      if (prodId && sku) {
-        query = query.or(`external_id.eq.${prodId},sku.ilike.${sku}`)
-      } else if (prodId) {
-        query = query.eq("external_id", prodId)
-      } else if (sku) {
-        query = query.ilike("sku", sku)
+      if (prodId) {
+        const { data: byExt } = await supabase
+          .from("products")
+          .select("id, external_provider")
+          .eq("partner_id", partnerId)
+          .is("deleted_at", null)
+          .eq("external_id", prodId)
+
+        for (const p of byExt || []) {
+          if (!p.external_provider || p.external_provider === BLING_PROVIDER) {
+            matchedMap.set(p.id, { id: p.id })
+          }
+        }
       }
 
-      const { data: matchedProducts } = await query
-      for (const prod of matchedProducts || []) {
+      if (escapedSku && skuNorm) {
+        const { data: bySku } = await supabase
+          .from("products")
+          .select("id, sku")
+          .eq("partner_id", partnerId)
+          .is("deleted_at", null)
+          .ilike("sku", escapedSku)
+
+        for (const p of bySku || []) {
+          if (!p?.sku || String(p.sku).trim().toLowerCase() === skuNorm) {
+            matchedMap.set(p.id, { id: p.id })
+          }
+        }
+      }
+
+      for (const prod of matchedMap.values()) {
         await supabase
           .from("products")
           .update({

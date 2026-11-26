@@ -17,10 +17,18 @@ import {
  */
 export async function quoteCarrierFreightAction(input: {
   partnerId: string
+  storeId?: string | null
   toPostalCode: string
   items?: CarrierQuoteItemInput[]
+  orderSubtotal?: number | null
 }): Promise<
-  | { success: true; options: CarrierFreightOption[]; fromPostalCode: string }
+  | {
+      success: true
+      options: CarrierFreightOption[]
+      fromPostalCode: string
+      destinationState?: string | null
+      freeShippingThreshold?: number | null
+    }
   | { success: false; error: string; reason: CarrierUnavailableReason }
 > {
   await requireRateLimit(RateLimitCategory.CART)
@@ -33,8 +41,10 @@ export async function quoteCarrierFreightAction(input: {
     const supabase = getAdminClient()
     const result = await quoteCarrierFreightOptions(supabase, {
       partnerId: input.partnerId,
+      storeId: input.storeId,
       toPostalCode: input.toPostalCode,
       items: input.items,
+      orderSubtotal: input.orderSubtotal,
     })
     if (!result.available) {
       return { success: false, error: carrierReasonMessage(result.reason), reason: result.reason }
@@ -43,6 +53,8 @@ export async function quoteCarrierFreightAction(input: {
       success: true,
       options: result.options,
       fromPostalCode: result.fromPostalCode,
+      destinationState: result.destinationState ?? null,
+      freeShippingThreshold: result.freeShippingThreshold ?? null,
     }
   } catch {
     return { success: false, error: carrierReasonMessage("quote_failed"), reason: "quote_failed" }

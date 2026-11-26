@@ -18,7 +18,7 @@ import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, normalizeStateUf, type LocationContext } from "@/lib/utils/location-label"
 import { calculateDistance, formatDistanceLabel, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
-import { getEffectiveMaxDeliveryKm } from "@/lib/delivery/fee"
+import { getEffectiveDeliveryRadiusLimit } from "@/lib/delivery/fee"
 import Button from "../reusable/Button"
 import { FormSection } from "../reusable"
 
@@ -87,20 +87,27 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         ? getDefaultBannerSeeded(vitrine.id || storeName)
         : getBannerUrlByColor(getAvatarColor(storeName))
     const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "medium") : fallbackBanner
-    const city = vitrine.city || ""
-    const state = vitrine.state || ""
+    const city = vitrine.city || partner?.city || ""
+    const state = vitrine.state || partner?.state || ""
+    const neighborhood = vitrine.neighborhood || partner?.neighborhood || ""
+    const locationPartner = {
+        city: city || null,
+        state: state || null,
+        neighborhood: neighborhood || null,
+        distance_km_formatted: partner?.distance_km_formatted || vitrine.distance_km_formatted || null,
+    }
     const category = vitrine.category || null
     const reviewsCount = vitrine.reviewsCount ?? 0
     const showRating = (vitrine.rating ?? 0) > 0
     const isBroadScope = locationContext?.scope === "country" || locationContext?.scope === "state"
-    const locationLabel = getLocationLabel(vitrine, locationContext, { full: preferCityLabel })
-        || (isBroadScope && (vitrine.city || partner?.city)
-            ? ((vitrine.state || partner?.state) ? `${vitrine.city || partner?.city}, ${normalizeStateUf(vitrine.state || partner?.state)}` : (vitrine.city || partner?.city))
+    const locationLabel = getLocationLabel(locationPartner, locationContext, { full: preferCityLabel || locationOnly })
+        || ((isBroadScope || preferCityLabel || locationOnly) && city
+            ? (state ? `${city}, ${normalizeStateUf(state)}` : city)
             : null)
 
     // Resolve distance (O(1) in-memory calculation)
-    const storeLat = vitrine.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
-    const storeLng = vitrine.longitude ?? vitrine.addresses?.[0]?.longitude ?? null
+    const storeLat = vitrine.latitude ?? partner?.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
+    const storeLng = vitrine.longitude ?? partner?.longitude ?? vitrine.addresses?.[0]?.longitude ?? null
 
     let distanceKm: number | null = null
     if (!isBroadScope) {
@@ -126,12 +133,10 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const showDeliveryTime = isDeliveryEnabled && hasProducts
 
     // Check if seller is outside the delivery radius
-    const maxDeliveryKm = getEffectiveMaxDeliveryKm(deliverySettings)
+    const maxDeliveryKm = getEffectiveDeliveryRadiusLimit(deliverySettings)
     const outOfRadius = isDeliveryEnabled
         && hasProducts
         && distanceKm != null
-        && maxDeliveryKm != null
-        && maxDeliveryKm > 0
         && distanceKm > maxDeliveryKm
 
     const deliveryTime = (showDeliveryTime && !outOfRadius && !locationOnly)
@@ -498,12 +503,10 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const showDeliveryTime = !isBroadScope && itemType === "produto" && isDeliveryEnabled
 
     // Check if seller is outside the delivery radius
-    const maxDeliveryKm = getEffectiveMaxDeliveryKm(deliverySettings)
+    const maxDeliveryKm = getEffectiveDeliveryRadiusLimit(deliverySettings)
     const outOfRadius = isDeliveryEnabled
         && itemType === "produto"
         && distanceKm != null
-        && maxDeliveryKm != null
-        && maxDeliveryKm > 0
         && distanceKm > maxDeliveryKm
 
     const deliveryTime = (showDeliveryTime && !outOfRadius)
@@ -647,7 +650,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase text-brand-dark shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase text-white shadow-sm tracking-wider whitespace-nowrap bg-brand-green">
                                 <span>{pricing.discountPercent}% OFF</span>
                             </div>
                         )}

@@ -106,6 +106,46 @@ async function buildIdentifier(
 // ============================================================================
 
 const localShortCircuitCache = new Map<string, { count: number; resetAt: number }>()
+const LOCAL_SHORT_CIRCUIT_WINDOW_MS = 15_000
+const LOCAL_SHORT_CIRCUIT_MAX_ENTRIES = 1000
+
+/**
+ * Bounded in-memory pre-check for non-critical (failClosed=false) rate limits.
+ * Avoids hitting Upstash Redis during normal UI bursts while still escalating
+ * to Redis as soon as traffic exceeds the local threshold in a 15s window.
+ *
+ * Returns true if the request can safely skip the remote Redis check.
+ */
+export function tryLocalRateLimitShortCircuit(
+    category: RateLimitCategory,
+    identifier: string,
+    maxLocalFraction: number = 0.5,
+): boolean {
+    const config = RATE_LIMIT_CONFIGS[category]
+    if (config.failClosed) return false
+
+    const now = Date.now()
+    if (localShortCircuitCache.size > LOCAL_SHORT_CIRCUIT_MAX_ENTRIES) {
+        for (const [k, v] of localShortCircuitCache) {
+            if (v.resetAt <= now) localShortCircuitCache.delete(k)
+        }
+    }
+
+    const cacheKey = `${category}:${identifier}`
+    const threshold = Math.max(10, Math.floor(config.maxRequests * maxLocalFraction))
+    const cached = localShortCircuitCache.get(cacheKey)
+
+    if (cached && cached.resetAt > now) {
+        cached.count++
+        return cached.count <= threshold
+    }
+
+    localShortCircuitCache.set(cacheKey, {
+        count: 1,
+        resetAt: now + LOCAL_SHORT_CIRCUIT_WINDOW_MS,
+    })
+    return true
+}
 
 /**
  * Rate-limit the current request based on the given category.
@@ -141,24 +181,8 @@ export async function requireRateLimit(
         )
 
         // Memory pre-check for non-critical routes to save Redis commands during fast UI interaction
-        if (!config.failClosed) {
-            const now = Date.now()
-            if (localShortCircuitCache.size > 1000) {
-                for (const [k, v] of localShortCircuitCache) {
-                    if (v.resetAt <= now) localShortCircuitCache.delete(k)
-                }
-            }
-
-            const cached = localShortCircuitCache.get(identifier)
-            if (cached && cached.resetAt > now) {
-                cached.count++
-                if (cached.count <= Math.max(10, Math.floor(config.maxRequests * 0.5))) {
-                    return { success: true }
-                }
-            } else {
-                localShortCircuitCache.set(identifier, { count: 1, resetAt: now + 15000 })
-                return { success: true }
-            }
+        if (tryLocalRateLimitShortCircuit(category, identifier)) {
+            return { success: true }
         }
 
         const { success, reset } = await limiter.limit(identifier)

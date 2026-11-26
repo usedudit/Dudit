@@ -272,12 +272,12 @@ export async function cancelBuyerOrderAction(orderId: string) {
     source: "marketplace",
   })
 
-  // Sync cancellation to external ERP (Tiny) if order was exported
+  // Sync cancellation to external ERPs (Tiny / Bling) if order was exported
   try {
-    const { updateTinyOrderStatus } = await import("@/lib/services/integrations/tiny/tiny-integration")
-    await updateTinyOrderStatus({ orderId, situacao: "cancelado" })
-  } catch (tinyErr) {
-    console.error("[cancelMarketplaceOrderAction] Error syncing cancellation to Tiny:", tinyErr)
+    const { updateOrderStatusOnConnectedErps } = await import("@/lib/services/integrations/erp-sync")
+    await updateOrderStatusOnConnectedErps({ orderId, situacao: "cancelado" })
+  } catch (erpErr) {
+    console.error("[cancelMarketplaceOrderAction] Error syncing cancellation to ERP:", erpErr)
   }
 
   revalidateOrdersCache()

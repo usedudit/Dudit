@@ -1,6 +1,7 @@
 import type { DeliverySettings, DeliveryFeeRule } from "@/lib/delivery/fee"
 import type { StoreFulfillmentCapabilities } from "@/lib/commerce/capabilities"
 import type { ServiceAttendanceSettings } from "@/lib/services/service-attendance"
+import type { CarrierFreeShippingRule } from "@/lib/services/shipping/carrier-free-shipping"
 
 export type DeliveryContext = {
     settings: DeliverySettings
@@ -16,6 +17,7 @@ const DELIVERY_CONTEXT_CACHE_MAX = 200
 const deliveryContextCache = new Map<string, { at: number; ctx: DeliveryContext }>()
 const storeCapabilityCache = new Map<string, { at: number; caps: StoreFulfillmentCapabilities }>()
 const serviceAttendanceCache = new Map<string, { at: number; settings: ServiceAttendanceSettings }>()
+const carrierFreeShippingRulesCache = new Map<string, { at: number; rules: CarrierFreeShippingRule[] }>()
 
 function prune(now: number, ttlMs: number, max: number, map: Map<string, { at: number }>) {
     for (const [key, entry] of map) {
@@ -46,6 +48,13 @@ export function invalidateServiceAttendanceCache(partnerId: string): void {
     const prefix = `${partnerId}|`
     for (const key of serviceAttendanceCache.keys()) {
         if (key.startsWith(prefix)) serviceAttendanceCache.delete(key)
+    }
+}
+
+export function invalidateCarrierFreeShippingRulesCache(partnerId: string): void {
+    const prefix = `${partnerId}|`
+    for (const key of carrierFreeShippingRulesCache.keys()) {
+        if (key.startsWith(prefix)) carrierFreeShippingRulesCache.delete(key)
     }
 }
 
@@ -87,5 +96,18 @@ export const serviceAttendance = {
     set(key: string, settings: ServiceAttendanceSettings): void {
         if (serviceAttendanceCache.size > 300) serviceAttendanceCache.clear()
         serviceAttendanceCache.set(key, { at: Date.now(), settings })
+    },
+}
+
+export const carrierFreeShippingRules = {
+    ttlMs: 30 * 1000,
+    get(key: string, now: number): CarrierFreeShippingRule[] | undefined {
+        const cached = carrierFreeShippingRulesCache.get(key)
+        if (cached && now - cached.at <= 30 * 1000) return cached.rules
+        return undefined
+    },
+    set(key: string, rules: CarrierFreeShippingRule[]): void {
+        if (carrierFreeShippingRulesCache.size > 300) carrierFreeShippingRulesCache.clear()
+        carrierFreeShippingRulesCache.set(key, { at: Date.now(), rules })
     },
 }

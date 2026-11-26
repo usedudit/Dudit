@@ -22,7 +22,7 @@ type PaymentMethodSelectorProps = {
   onSelectDebitCard: () => void
   onSelectBankTransfer: () => void
   onSelectOther: () => void
-  onSelectSplit: () => void
+  onSelectSplit?: () => void
   onSelectMercadoPago?: () => void
 }
 
@@ -77,7 +77,9 @@ export function PaymentMethodSelector({
       {availableMethodTypes.has("other") && (
         <PaymentMethodCard icon={TagIcon} label="Outros" disabled={disabled} onClick={onSelectOther} />
       )}
-      <PaymentMethodCard icon={SplitIcon} label="Dividir" disabled={disabled} onClick={onSelectSplit} />
+      {onSelectSplit && (
+        <PaymentMethodCard icon={SplitIcon} label="Dividir" disabled={disabled} onClick={onSelectSplit} />
+      )}
       {showMercadoPago && mpConnected && onSelectMercadoPago && (
         <button
           type="button"

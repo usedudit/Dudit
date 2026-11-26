@@ -476,9 +476,11 @@ async function handler(request: NextRequest) {
             }))
           const carrier = await quoteCarrierFreightFee(adminClient, {
             partnerId,
+            storeId: deliveryStoreId,
             toPostalCode: cep,
             serviceId: carrierServiceId,
             items: carrierItems,
+            orderSubtotal: totalAmount,
           })
           if (carrier.success) {
             deliveryFee = carrier.fee
