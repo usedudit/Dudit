@@ -118,7 +118,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
 
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("id, situation, buyer_id, customer_id, mp_payment_id, partner_id, paid_amount, amount_paid, updated_at, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
+    .select("id, situation, buyer_id, customer_id, mp_payment_id, partner_id, total_amount, paid_amount, amount_paid, payment_breakdown, updated_at, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
     .eq("id", orderId)
     .single()
 
@@ -134,17 +134,30 @@ export async function cancelBuyerOrderAction(orderId: string) {
   if (!cancellableStates.includes(order.situation)) {
     return { error: "Apenas pedidos pendentes ou não pagos podem ser cancelados" }
   }
-  if (Number(order.paid_amount ?? order.amount_paid ?? 0) > 0.009) {
-    return { error: "Este pedido já recebeu um pagamento. Solicite o estorno antes de cancelar." }
-  }
   if (!order.updated_at) {
     return { error: "Não foi possível verificar a versão atual do pedido. Atualize e tente novamente." }
   }
 
-  if (order.mp_payment_id && order.partner_id) {
+  const paidAmount = Number(order.paid_amount ?? order.amount_paid ?? 0)
+  const totalAmount = Number(order.total_amount ?? 0)
+  const hasPartialPayment =
+    paidAmount > 0.009 && (totalAmount <= 0 || paidAmount < totalAmount - 0.005)
+
+  const mpPaymentIdStr = order.mp_payment_id ? String(order.mp_payment_id) : null
+  const isMpPaymentAlreadyApprovedInLedger = Boolean(
+    mpPaymentIdStr &&
+      Array.isArray(order.payment_breakdown) &&
+      order.payment_breakdown.some(
+        (entry: any) =>
+          String(entry?.mpPaymentId ?? entry?.paymentId ?? entry?.id ?? "") === mpPaymentIdStr &&
+          (entry?.paymentStatus === "approved" || Number(entry?.amountReceived ?? 0) > 0.009),
+      ),
+  )
+
+  if (mpPaymentIdStr && order.partner_id && !(hasPartialPayment && isMpPaymentAlreadyApprovedInLedger)) {
     try {
       const mpAccessToken = await getValidMercadoPagoAccessToken(order.partner_id)
-      const paymentUrl = `https://api.mercadopago.com/v1/payments/${encodeURIComponent(String(order.mp_payment_id))}`
+      const paymentUrl = `https://api.mercadopago.com/v1/payments/${encodeURIComponent(mpPaymentIdStr)}`
       const mpResponse = await fetch(paymentUrl, {
         method: "PUT",
         headers: {
@@ -156,6 +169,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
       })
       const cancelResult = await mpResponse.json().catch(() => null)
       let providerStatus = typeof cancelResult?.status === "string" ? cancelResult.status : null
+      let providerAmount = Number(cancelResult?.transaction_amount ?? 0)
 
       if (!mpResponse.ok || providerStatus !== "cancelled") {
         const statusResponse = await fetch(paymentUrl, {
@@ -173,12 +187,18 @@ export async function cancelBuyerOrderAction(orderId: string) {
           return { error: "Não foi possível confirmar o cancelamento do pagamento. O pedido continua ativo." }
         }
         providerStatus = statusResult.status
+        providerAmount = Number(statusResult?.transaction_amount ?? providerAmount)
       }
 
-      if (providerStatus === "approved") {
+      const isPartialApprovedPayment =
+        hasPartialPayment ||
+        order.situation === "partially_paid" ||
+        (providerAmount > 0 && totalAmount > 0 && providerAmount < totalAmount - 0.005)
+
+      if (providerStatus === "approved" && !isPartialApprovedPayment) {
         return { error: "O pagamento já foi aprovado. Solicite o estorno antes de cancelar o pedido." }
       }
-      if (!["cancelled", "rejected", "expired"].includes(String(providerStatus))) {
+      if (providerStatus !== "approved" && !["cancelled", "rejected", "expired"].includes(String(providerStatus))) {
         return { error: "O Mercado Pago não confirmou o cancelamento do pagamento. O pedido continua ativo." }
       }
     } catch (mpError) {
@@ -268,7 +288,11 @@ export async function cancelBuyerOrderAction(orderId: string) {
     entityType: "order",
     entityId: orderId,
     actionType: "cancelled",
-    changeLines: ["Cliente cancelou o pedido."],
+    changeLines: [
+      paidAmount > 0.009
+        ? "Cliente cancelou o pedido (sinal/pagamento parcial já registrado)."
+        : "Cliente cancelou o pedido.",
+    ],
     source: "marketplace",
   })
 

@@ -1442,7 +1442,8 @@ async function fulfillMarketplaceOrderIfNeeded(
   orderId: string,
 ) {
   try {
-    const { data: order } = await supabase
+    const adminClient = createAdminClient();
+    const { data: order } = await adminClient
       .from("orders")
       .select("order_source, checkout_fulfillment")
       .eq("id", orderId)
@@ -1464,7 +1465,13 @@ async function fulfillMarketplaceOrderIfNeeded(
 
     const { fulfillMarketplaceOrder } =
       await import("@/lib/services/marketplace-checkout-fulfillment");
-    await fulfillMarketplaceOrder(supabase, orderId);
+    const result = await fulfillMarketplaceOrder(adminClient, orderId);
+    if (!result.success) {
+      console.error(
+        "[orders_fulfillment] fulfillMarketplaceOrderIfNeeded failed:",
+        { orderId, error: result.error },
+      );
+    }
   } catch (error) {
     console.error(
       "[orders_fulfillment] fulfillMarketplaceOrderIfNeeded:",
@@ -4881,8 +4888,14 @@ export async function updateERPOrderAction(
     order_source: currentOrder.order_source || "manual",
   });
 
-  if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
+  if (
+    paymentState.situation === "paid" ||
+    (paymentState.situation === "partially_paid" && Number(paymentState.paidAmount || 0) > 0.009)
+  ) {
     await fulfillMarketplaceOrderIfNeeded(supabase, orderId);
+  }
+
+  if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
     await createSellerCommissionForPaidOrder({
       supabase,
       partnerId: data.partnerId,
@@ -6873,8 +6886,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
         });
       }
 
-      if (order.situation !== "paid" && paymentState.situation === "paid") {
+      if (
+        paymentState.situation === "paid" ||
+        (paymentState.situation === "partially_paid" && Number(paymentState.paidAmount || 0) > 0.009)
+      ) {
         await fulfillMarketplaceOrderIfNeeded(supabase, order.id);
+      }
+
+      if (order.situation !== "paid" && paymentState.situation === "paid") {
         if (capabilities.hasProductivity) {
           await createSellerCommissionForPaidOrder({
             supabase,
@@ -8204,8 +8223,6 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         mpPaymentId: payload.mpPaymentId || null,
       });
 
-      await fulfillMarketplaceOrderIfNeeded(supabase, payload.orderId);
-
       await createSellerCommissionForPaidOrder({
         supabase,
         partnerId: payload.partnerId,
@@ -8216,6 +8233,13 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         createdByUserId: user.id,
         storeId: order.store_id || null,
       });
+    }
+
+    if (
+      nextSituation === "paid" ||
+      (nextSituation === "partially_paid" && nextPaidAmount > 0.009)
+    ) {
+      await fulfillMarketplaceOrderIfNeeded(supabase, payload.orderId);
     }
 
     const { data: linkedAppointment } = await supabase

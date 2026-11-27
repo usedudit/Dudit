@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getOrderDepositSummary, patchDepositCheckoutOnPayment, resolveSituationFromPaid } from "@/lib/payments/order-financial-state"
 import { buildOrderPaymentMethodLabel, hasReceivedAmount } from "@/lib/payments/payment-ledger"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { captureError } from "@/lib/monitoring/sentry"
 import { revalidatePath } from "next/cache"
 
 /**
@@ -77,8 +78,23 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Valor do sinal inválido para este pedido" }, { status: 400 })
         }
 
-        // Idempotência: se o sinal já foi recebido, devolve o estado atual.
+        // Idempotência: se o sinal já foi recebido, garante que o fulfillment (ex.: agendamento)
+        // também esteja concluído e devolve o estado atual.
         if (depositSummary.sinalPaid || currentPaid >= depositAmount - 0.01) {
+            try {
+                const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+                const fulfillmentResult = await fulfillMarketplaceOrder(adminClient, order.id)
+                if (!fulfillmentResult.success) {
+                    SecureLogger.error("Marketplace order fulfillment failed on already-confirmed deposit", {
+                        orderId: order.id,
+                        fulfillmentError: fulfillmentResult.error,
+                        fulfillmentSkipped: fulfillmentResult.skipped,
+                    })
+                }
+            } catch (fulfillErr: any) {
+                SecureLogger.error("Failed to fulfill order on already-confirmed deposit:", fulfillErr)
+            }
+
             return NextResponse.json({
                 success: true,
                 alreadyConfirmed: true,
@@ -220,8 +236,43 @@ export async function POST(request: NextRequest) {
                 orderSource: order.order_source || "manual",
                 paymentMethod,
             })
+            const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+            await syncReceivableForOrder(adminClient as any, {
+                order_number: order.order_number || order.id,
+                partner_id: order.partner_id,
+                store_id: order.store_id || null,
+                total_amount: totalAmount,
+                paid_amount: nextPaidAmount,
+                situation: nextSituation,
+                payment_method: paymentMethod,
+                customer_id: order.customer_id || order.buyer_id || null,
+                customer_name: order.customer_name || null,
+                finance_account_id: order.finance_account_id || null,
+                order_source: order.order_source || "manual",
+            })
         } catch (financialErr: any) {
             SecureLogger.error("Failed to create financial transaction for confirmed deposit:", financialErr)
+        }
+
+        // Executa o fulfillment pós-pagamento (criação de agendamentos, assinaturas, etc.)
+        // da mesma forma que ocorre na confirmação automática via webhook/sync.
+        try {
+            const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+            const fulfillmentResult = await fulfillMarketplaceOrder(adminClient, order.id, { force: true })
+            if (!fulfillmentResult.success) {
+                SecureLogger.error("Marketplace order fulfillment failed in confirm-deposit", {
+                    orderId: order.id,
+                    fulfillmentError: fulfillmentResult.error,
+                    fulfillmentSkipped: fulfillmentResult.skipped,
+                })
+                captureError(new Error(fulfillmentResult.error || "Falha no fulfillment"), {
+                    module: "orders",
+                    action: "marketplace_fulfillment_confirm_deposit",
+                    entityId: order.id,
+                })
+            }
+        } catch (fulfillErr: any) {
+            SecureLogger.error("Failed to fulfill order after manual deposit confirmation:", fulfillErr)
         }
 
         await logAuditEvent({
@@ -253,6 +304,7 @@ export async function POST(request: NextRequest) {
         await revalidateOrderHistory(order.id)
         revalidatePath(`/order/${order.order_number}`)
         revalidatePath("/erp/pedidos")
+        revalidatePath("/erp/agendamentos")
 
         return NextResponse.json({
             success: true,

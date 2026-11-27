@@ -2759,7 +2759,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         onClose={() => setIsCancelModalOpen(false)}
                         onConfirm={handleCancelOrder}
                         title="Cancelar pedido"
-                        description="Tem certeza de que deseja cancelar este pedido? Essa ação não pode ser desfeita."
+                        description={
+                            Number(order.paid_amount ?? order.amount_paid ?? 0) > 0.009
+                                ? "Tem certeza de que deseja cancelar este pedido? Como já existe um sinal pago, eventuais estornos ficam sujeitos à política do vendedor. Essa ação não pode ser desfeita."
+                                : "Tem certeza de que deseja cancelar este pedido? Essa ação não pode ser desfeita."
+                        }
                         confirmText={isCanceling ? "Cancelando..." : "Sim, cancelar pedido"}
                         cancelText="Manter pedido"
                         variant="danger"

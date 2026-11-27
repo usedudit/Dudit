@@ -56,7 +56,7 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
             <BlogHeader />
             <section className="border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
                 <div className="mx-auto w-full max-w-[1400px] px-4 py-12 lg:py-16">
-                    <div className="flex items-start gap-8 lg:gap-12">
+                    <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
                         <div className="flex-1 max-w-2xl">
                             <Badge variant="green" icon={null}>
                                 Blog do Dino
@@ -69,70 +69,70 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                             <p className="mt-4 text-base leading-relaxed text-brand-inactive-text dark:text-dark-body lg:text-lg">
                                 Conteúdo prático para quem toca um pequeno negócio no Brasil: segurança, finanças, fotos, atendimento, marketing e rotinas de gestão. Sem enrolação e sem termo difícil.
                             </p>
-                        </div>
 
-                        {/* Dino mascot */}
-                        <div className="hidden lg:block w-[200px] shrink-0 flex items-center justify-center">
-                            <img
-                                src="https://img.dudit.com.br/static/mascots/Artigos.png"
-                                alt="Dino do Blog"
-                                className="w-full h-auto object-contain select-none opacity-90"
-                                loading="lazy"
-                                decoding="async"
-                            />
-                        </div>
-                    </div>
+                            <form onSubmit={(event) => event.preventDefault()} className="mt-8 max-w-xl">
+                                <Input
+                                    variant="full-rounded"
+                                    placeholder="Buscar por golpes, fluxo de caixa, fotos..."
+                                    value={query}
+                                    onChange={(event) => setQuery(event.target.value)}
+                                    prefix={<SearchIcon size={16} />}
+                                    suffix={
+                                        query ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setQuery("")}
+                                                aria-label="Limpar busca"
+                                                className="text-brand-inactive-text dark:text-dark-body"
+                                            >
+                                                <XIcon size={16} />
+                                            </button>
+                                        ) : undefined
+                                    }
+                                />
+                            </form>
 
-                    <form onSubmit={(event) => event.preventDefault()} className="mt-8 max-w-xl">
-                        <Input
-                            variant="full-rounded"
-                            placeholder="Buscar por golpes, fluxo de caixa, fotos..."
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            prefix={<SearchIcon size={16} />}
-                            suffix={
-                                query ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setQuery("")}
-                                        aria-label="Limpar busca"
-                                        className="text-brand-inactive-text dark:text-dark-body"
-                                    >
-                                        <XIcon size={16} />
-                                    </button>
-                                ) : undefined
-                            }
-                        />
-                    </form>
-
-                    <div className="mt-6 flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedCategory("all")}
-                            className={`rounded-full border px-4 py-2 text-sm font-semibold ${selectedCategory === "all"
-                                ? "border-brand-dark bg-brand-dark text-white dark:border-brand-green dark:bg-brand-green"
-                                : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
-                                }`}
-                        >
-                            Todos
-                        </button>
-                        {BLOG_CATEGORIES.filter((category) => posts.some((post) => post.category === category.id)).map((category) => {
-                            const active = selectedCategory === category.id
-                            const accent = BLOG_ACCENT_CLASSES[category.accent]
-                            return (
+                            <div className="mt-6 flex flex-wrap items-center gap-2">
                                 <button
-                                    key={category.id}
                                     type="button"
-                                    onClick={() => setSelectedCategory(category.id)}
-                                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${active
-                                        ? `${accent.border} ${accent.softBg} ${accent.text}`
+                                    onClick={() => setSelectedCategory("all")}
+                                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${selectedCategory === "all"
+                                        ? "border-brand-dark bg-brand-dark text-white dark:border-brand-green dark:bg-brand-green"
                                         : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
                                         }`}
                                 >
-                                    {category.shortLabel}
+                                    Todos
                                 </button>
-                            )
-                        })}
+                                {BLOG_CATEGORIES.filter((category) => posts.some((post) => post.category === category.id)).map((category) => {
+                                    const active = selectedCategory === category.id
+                                    const accent = BLOG_ACCENT_CLASSES[category.accent]
+                                    return (
+                                        <button
+                                            key={category.id}
+                                            type="button"
+                                            onClick={() => setSelectedCategory(category.id)}
+                                            className={`rounded-full border px-4 py-2 text-sm font-semibold ${active
+                                                ? `${accent.border} ${accent.softBg} ${accent.text}`
+                                                : "border-brand-border bg-white text-brand-inactive-text dark:border-dark-border dark:bg-dark-surface dark:text-dark-body"
+                                                }`}
+                                        >
+                                            {category.shortLabel}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Dino mascot */}
+                        <div className="hidden lg:flex lg:flex-1 items-center justify-center">
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/Artigos.png"
+                                alt="Dino do Blog"
+                                className="w-[320px] xl:w-[380px] max-w-full h-auto object-contain select-none"
+                                loading="eager"
+                                decoding="async"
+                            />
+                        </div>
                     </div>
                 </div>
             </section>

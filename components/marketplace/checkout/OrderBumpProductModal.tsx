@@ -17,7 +17,6 @@ export interface OrderBumpVariant {
   stock_available?: number | null
   stock_quantity?: number | null
   variant_options?: Record<string, any> | string | null
-  image_url?: string | null
   is_active?: boolean | null
 }
 
@@ -112,7 +111,7 @@ export function OrderBumpProductModal({
           opts = null
         }
       }
-      const rawImg = v.image_url || opts?.image
+      const rawImg = opts?.image
       const hasDbImage = Boolean(rawImg && String(rawImg).length > 5)
       const fullImgUrl = hasDbImage ? getR2ImageUrl(String(rawImg)) : PLACEHOLDER
       const stock = Math.max(0, Number(v.stock_available ?? v.stock_quantity ?? 0))

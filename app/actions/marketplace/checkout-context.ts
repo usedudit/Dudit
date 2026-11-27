@@ -209,7 +209,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     (() => {
       let q = admin
         .from("products")
-        .select("id, short_id, name, price, promotional_price, images, stock_available, stock_quantity, availability_value, availability_unit, unit, product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_available, stock_quantity, variant_options, image_url, is_active)")
+        .select("id, short_id, name, price, promotional_price, images, stock_available, stock_quantity, availability_value, availability_unit, unit, product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_available, stock_quantity, variant_options, is_active)")
         .eq("partner_id", resolved.partnerId)
         .eq("is_active", true)
         .neq("moderation_status", "rejected")

@@ -124,20 +124,26 @@ type ServiceGroup = {
 function resolveGroupPayment(params: {
   paymentConfirmed: boolean
   orderFullyPaid: boolean
+  orderPaidAmount?: number
   situation: string
   group: ServiceGroup
 }): { paidAmount: number; paymentStatus: "unpaid" | "partially_paid" | "paid" } {
   if (!params.paymentConfirmed) return { paidAmount: 0, paymentStatus: "unpaid" }
 
+  const hasDepositLine = params.group.services.some((s) => s.payDepositOnly)
   const paidAmount = params.orderFullyPaid
     ? params.group.totalPrice
-    : params.group.services.reduce((sum, s) => {
-      return sum + (s.payDepositOnly ? (s.depositAmount ?? s.unitPrice * s.quantity) : s.unitPrice * s.quantity)
-    }, 0)
+    : hasDepositLine
+      ? params.group.services.reduce((sum, s) => {
+          return sum + (s.payDepositOnly ? (s.depositAmount ?? s.unitPrice * s.quantity) : s.unitPrice * s.quantity)
+        }, 0)
+      : params.situation === "partially_paid" && typeof params.orderPaidAmount === "number"
+        ? Math.min(params.group.totalPrice, Math.max(0, params.orderPaidAmount))
+        : params.group.services.reduce((sum, s) => sum + s.unitPrice * s.quantity, 0)
 
   const paymentStatus: "unpaid" | "partially_paid" | "paid" = params.orderFullyPaid
     ? "paid"
-    : (params.group.services.some((s) => s.payDepositOnly) || params.situation === "partially_paid")
+    : (hasDepositLine || params.situation === "partially_paid")
       ? "partially_paid"
       : "paid"
 
@@ -1185,6 +1191,7 @@ export async function fulfillMarketplaceOrder(
           const { paidAmount: groupPaidAmount, paymentStatus: groupPaymentStatus } = resolveGroupPayment({
             paymentConfirmed,
             orderFullyPaid,
+            orderPaidAmount,
             situation,
             group,
           })
@@ -1263,16 +1270,18 @@ export async function fulfillMarketplaceOrder(
   }
 
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("full_name, phone")
-    .eq("user_id", order.buyer_id)
-    .maybeSingle()
+  const { data: profile } = order.buyer_id
+    ? await supabase
+      .from("user_profiles")
+      .select("full_name, phone")
+      .eq("user_id", order.buyer_id)
+      .maybeSingle()
+    : { data: null }
 
   let resolvedCustomerId = (order as any).customer_id as string | null
   let buyerEmail: string | null = null
 
-  if (!resolvedCustomerId) {
+  if (!resolvedCustomerId && order.buyer_id) {
     try {
       const { data: authData } = await supabase.auth.admin.getUserById(order.buyer_id)
       buyerEmail = authData?.user?.email || null
@@ -1311,6 +1320,7 @@ export async function fulfillMarketplaceOrder(
         const { paidAmount: groupPaidAmount, paymentStatus: groupPaymentStatus } = resolveGroupPayment({
           paymentConfirmed,
           orderFullyPaid,
+          orderPaidAmount,
           situation,
           group,
         })
