@@ -230,7 +230,7 @@ export function matchBlingPaymentMethodId(
   if (norm.includes("debito") || norm.includes("debit")) {
     return findByDesc(["debito"]) ?? findByType([4])
   }
-  if (norm.includes("credito") || norm.includes("credit") || norm.includes("cartao") || norm.includes("mercado pago")) {
+  if (norm.includes("credito") || norm.includes("credit") || norm.includes("cartao")) {
     return (
       active.find((m) => {
         const d = normalizeMethodText(m.descricao)
@@ -289,7 +289,22 @@ export function buildBlingOrderParcelas(
     if (!item) continue
     const amt = Math.max(0, Number(item.amount ?? item.amountReceived ?? 0))
     if (amt <= 0.009) continue
-    const method = String(item.method || order.payment_method || "Outros")
+    const mpMethodId = String(item.mpPaymentMethodId || "").trim().toLowerCase()
+    const mpTypeId = String(item.paymentTypeId || "").trim().toLowerCase()
+    let method = String(item.method || order.payment_method || "Outros")
+    if (mpMethodId === "pix") {
+      method = "Pix"
+    } else if (mpTypeId === "debit_card") {
+      method = "Cartão de Débito"
+    } else if (mpTypeId === "ticket" || mpMethodId === "bolbradesco" || mpMethodId === "pec") {
+      method = "Boleto"
+    } else if (mpTypeId === "account_money" || mpMethodId === "account_money") {
+      method = "Saldo Mercado Pago"
+    } else if (mpTypeId === "digital_currency" || mpMethodId === "mercado_credito") {
+      method = "Mercado Crédito"
+    } else if (mpTypeId === "credit_card" && method.toLowerCase().includes("mercado pago")) {
+      method = "Cartão de Crédito"
+    }
     const installments = Math.max(1, Number(item.installmentNumber || item.installments || 1))
     legs.push({
       method,
@@ -877,6 +892,26 @@ export async function exportDuditOrderToBling(orderId: string): Promise<{
     }
   }
 
+  try {
+    const { data: priorBlingLog } = await supabase
+      .from("audit_logs")
+      .select("metadata")
+      .eq("entity_type", "order")
+      .eq("entity_id", orderId)
+      .eq("action_type", "bling_order_exported")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const priorMeta = (priorBlingLog as any)?.metadata
+    if (priorMeta?.blingOrderId) {
+      return {
+        success: true,
+        blingOrderId: Number(priorMeta.blingOrderId),
+        blingOrderNumber: priorMeta.blingOrderNumber,
+      }
+    }
+  } catch { }
+
   const integration = await findBlingIntegration(supabase, order.partner_id)
   if (!integration || integration.status !== "connected") {
     return { success: false, error: "Bling ERP não conectado para esta loja." }
@@ -1348,6 +1383,7 @@ async function resolveBlingStatusId(
 export async function updateBlingOrderStatus(params: {
   orderId: string
   situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
+  externalOrderId?: string | number | null
 }): Promise<{ success: boolean; error?: string }> {
   const { orderId, situacao } = params
   const supabase = createAdminClient()
@@ -1358,7 +1394,33 @@ export async function updateBlingOrderStatus(params: {
     .eq("id", orderId)
     .maybeSingle()
 
-  if (!order || order.external_provider !== BLING_PROVIDER || !order.external_order_id) {
+  if (!order) {
+    return { success: true }
+  }
+
+  let blingOrderId: string | null = params.externalOrderId
+    ? String(params.externalOrderId)
+    : order.external_provider === BLING_PROVIDER && order.external_order_id
+      ? String(order.external_order_id)
+      : null
+
+  if (!blingOrderId) {
+    try {
+      const { data: logRow } = await supabase
+        .from("audit_logs")
+        .select("metadata")
+        .eq("entity_type", "order")
+        .eq("entity_id", orderId)
+        .eq("action_type", "bling_order_exported")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const metaId = (logRow as any)?.metadata?.blingOrderId
+      if (metaId) blingOrderId = String(metaId)
+    } catch { }
+  }
+
+  if (!blingOrderId) {
     return { success: true }
   }
 
@@ -1366,7 +1428,7 @@ export async function updateBlingOrderStatus(params: {
     const client = await getValidBlingClient(order.partner_id)
     const targetStatusId = await resolveBlingStatusId(client, situacao)
 
-    await client.updateOrderStatus(order.external_order_id, targetStatusId)
+    await client.updateOrderStatus(blingOrderId, targetStatusId)
 
     await logAuditEvent({
       partnerId: order.partner_id,
@@ -1376,7 +1438,7 @@ export async function updateBlingOrderStatus(params: {
       actionType: "bling_order_status_updated",
       changeLines: [`Situação no Bling ERP atualizada para: ${situacao}`],
       source: "system",
-      metadata: { blingOrderId: order.external_order_id, situacao, targetStatusId },
+      metadata: { blingOrderId, situacao, targetStatusId },
     })
 
     return { success: true }

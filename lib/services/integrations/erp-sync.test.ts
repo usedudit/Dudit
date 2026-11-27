@@ -3,6 +3,7 @@ import {
   syncStockToConnectedErps,
   syncItemsStockToConnectedErps,
   exportOrderToConnectedErps,
+  updateOrderStatusOnConnectedErps,
 } from "./erp-sync"
 
 vi.mock("server-only", () => ({}))
@@ -30,10 +31,24 @@ vi.mock("./bling/bling-integration", () => ({
 
 let mockConnectedProviders: string[] = ["tiny", "bling"]
 let mockOrderRow: any = null
+let mockAuditLogs: any[] = []
 let mockProductStock: Record<string, number> = { "prod-1": 12 }
 let mockVariantStock: Record<string, number> = { "var-1": 5 }
 
 const mockFrom = vi.fn((table: string) => {
+  if (table === "audit_logs") {
+    return {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: mockAuditLogs, error: null }),
+            }),
+          }),
+        }),
+      }),
+    }
+  }
   if (table === "partner_integrations") {
     return {
       select: vi.fn().mockReturnValue({
@@ -93,10 +108,13 @@ describe("erp-sync", () => {
     vi.clearAllMocks()
     mockConnectedProviders = ["tiny", "bling"]
     mockOrderRow = null
+    mockAuditLogs = []
     mockProductStock = { "prod-1": 12 }
     mockVariantStock = { "var-1": 5 }
     mockSyncTinyStock.mockResolvedValue({ success: true })
     mockSyncBlingStock.mockResolvedValue({ success: true })
+    mockUpdateTinyStatus.mockResolvedValue({ success: true, stockLaunched: true })
+    mockUpdateBlingStatus.mockResolvedValue({ success: true })
   })
 
   it("deduplicates items and syncs current DB stock to both Tiny and Bling", async () => {
@@ -159,5 +177,34 @@ describe("erp-sync", () => {
     })
     expect(mockSyncTinyStock).not.toHaveBeenCalled()
     expect(mockSyncBlingStock).not.toHaveBeenCalled()
+  })
+
+  it("updates BOTH Tiny and Bling statuses even when Bling overwrote orders.external_provider", async () => {
+    mockOrderRow = {
+      partner_id: "partner-1",
+      external_provider: "bling",
+      external_order_id: "27532801518",
+    }
+    mockAuditLogs = [
+      { action_type: "bling_order_exported", metadata: { blingOrderId: 27532801518 } },
+      { action_type: "tiny_order_exported", metadata: { tinyOrderId: 34 } },
+    ]
+
+    const res = await updateOrderStatusOnConnectedErps({
+      orderId: "order-multi-1",
+      situacao: "entregue",
+    })
+
+    expect(mockUpdateTinyStatus).toHaveBeenCalledWith({
+      orderId: "order-multi-1",
+      situacao: "entregue",
+      externalOrderId: "34",
+    })
+    expect(mockUpdateBlingStatus).toHaveBeenCalledWith({
+      orderId: "order-multi-1",
+      situacao: "entregue",
+      externalOrderId: "27532801518",
+    })
+    expect(res.stockHandledProviders).toEqual(["tiny"])
   })
 })

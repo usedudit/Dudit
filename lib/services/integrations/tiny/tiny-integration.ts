@@ -546,15 +546,21 @@ export function mapPaymentMethodToTiny(methodStr?: string | null): { forma: stri
   const m = String(methodStr || "").trim().toLowerCase()
   if (!m) return { forma: "outros", meio: "Outros" }
 
-  if (m === "pix") return { forma: "pix", meio: "Pix" }
+  if (m.includes("pix")) return { forma: "pix", meio: "Pix" }
   if (m.includes("dinheiro") || m === "cash") return { forma: "dinheiro", meio: "Dinheiro" }
   if (m.includes("debito") || m.includes("débito") || m === "debit_card") return { forma: "debito", meio: "Cartão de Débito" }
-  if (m.includes("boleto")) return { forma: "boleto", meio: "Boleto Bancário" }
+  if (m.includes("boleto") || m === "bolbradesco" || m === "ticket") return { forma: "boleto", meio: "Boleto Bancário" }
   if (m.includes("transferencia") || m.includes("transferência") || m.includes("ted") || m.includes("doc")) {
     return { forma: "transferencia", meio: "Transferência Bancária" }
   }
   if (m.includes("crediario") || m.includes("crediário")) return { forma: "crediario", meio: "Crediário" }
   if (isStoreCreditMethod(m)) return { forma: "crediario", meio: "Crédito de Loja" }
+  if (m.includes("saldo mercado pago") || m === "account_money") {
+    return { forma: "outros", meio: "Saldo Mercado Pago" }
+  }
+  if (m.includes("mercado credito") || m.includes("mercado crédito") || m === "mercado_credito" || m === "digital_currency") {
+    return { forma: "crediario", meio: "Mercado Crédito" }
+  }
   if (
     m.includes("cartao") ||
     m.includes("cartão") ||
@@ -565,7 +571,7 @@ export function mapPaymentMethodToTiny(methodStr?: string | null): { forma: stri
     return { forma: "credito", meio: "Cartão de Crédito" }
   }
   if (m.includes("mercado pago") || m.includes("mercadopago")) {
-    return { forma: "credito", meio: "Mercado Pago" }
+    return { forma: "outros", meio: "Mercado Pago" }
   }
   return { forma: "outros", meio: methodStr || "Outros" }
 }
@@ -622,12 +628,45 @@ export function buildTinyOrderPayments(order: {
 
   const legs: PaymentLeg[] = []
 
+  const orderMethodNorm = String(order.payment_method || "").trim().toLowerCase()
+  const isOrderMethodSpecific =
+    Boolean(orderMethodNorm) &&
+    orderMethodNorm !== "mercado pago" &&
+    orderMethodNorm !== "mercadopago" &&
+    orderMethodNorm !== "outros" &&
+    orderMethodNorm !== "online"
+
   for (const item of rawBreakdown) {
     if (!item) continue
     const amt = Math.max(0, Number(item.amount ?? item.amountReceived ?? 0))
     if (amt <= 0.009) continue
 
-    const method = String(item.method || order.payment_method || "Outros")
+    const rawLegMethod = String(item.method || "").trim()
+    const rawLegLower = rawLegMethod.toLowerCase()
+    const mpMethodId = String(item.mpPaymentMethodId || "").trim().toLowerCase()
+    const mpTypeId = String(item.paymentTypeId || "").trim().toLowerCase()
+    const isGenericLeg =
+      !rawLegLower ||
+      rawLegLower === "mercado pago" ||
+      rawLegLower === "mercadopago" ||
+      rawLegLower === "online" ||
+      rawLegLower === "outros"
+    let method = isGenericLeg && isOrderMethodSpecific
+      ? String(order.payment_method)
+      : (rawLegMethod || order.payment_method || "Outros")
+    if (mpMethodId === "pix") {
+      method = "Pix"
+    } else if (mpTypeId === "debit_card") {
+      method = "Cartão de Débito"
+    } else if (mpTypeId === "ticket" || mpMethodId === "bolbradesco" || mpMethodId === "pec") {
+      method = "Boleto"
+    } else if (mpTypeId === "account_money" || mpMethodId === "account_money") {
+      method = "Saldo Mercado Pago"
+    } else if (mpTypeId === "digital_currency" || mpMethodId === "mercado_credito") {
+      method = "Mercado Crédito"
+    } else if (mpTypeId === "credit_card" && isGenericLeg) {
+      method = "Cartão de Crédito"
+    }
     const installments = Math.max(1, Number(item.installmentNumber || item.installments || 1))
     const isStoreCredit = isStoreCreditMethod(method)
 
@@ -850,7 +889,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     return { success: false, error: orderErr?.message || "Pedido não encontrado" }
   }
 
-  // Se já foi exportado com sucesso para o Tiny, não duplica
+  // Se já foi exportado com sucesso para o Tiny (seja na coluna da order ou no audit_logs quando Bling também está conectado), não duplica
   if (
     order.external_sync_status === "synced" &&
     order.external_order_id &&
@@ -862,6 +901,26 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       tinyOrderNumber: order.external_order_number,
     }
   }
+
+  try {
+    const { data: priorTinyLog } = await supabase
+      .from("audit_logs")
+      .select("metadata")
+      .eq("entity_type", "order")
+      .eq("entity_id", orderId)
+      .eq("action_type", "tiny_order_exported")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const priorMeta = (priorTinyLog as any)?.metadata
+    if (priorMeta?.tinyOrderId) {
+      return {
+        success: true,
+        tinyOrderId: priorMeta.tinyOrderId,
+        tinyOrderNumber: priorMeta.tinyOrderNumber,
+      }
+    }
+  } catch { }
 
   const integration = await findTinyIntegration(supabase, order.partner_id)
   if (!integration || integration.status !== "connected") {
@@ -1045,69 +1104,127 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
     const trackingCode = activeShipment?.tracking_number || undefined
     const trackingUrl = activeShipment?.tracking_url || undefined
 
-    // Monta itens do pedido para o Tiny com SKU / id_produto para reserva e movimentação correta de estoque
-    const items = await Promise.all(
-      (order.order_items || []).map(async (it: any) => {
-        const prod = it.products
-        const variant = it.product_variants
+    // Monta itens do pedido para o Tiny de forma SEQUENCIAL (evita rate-limit da API v2 do Tiny
+    // quando o pedido possui múltiplas variações) com vínculo exato de SKU / id_produto por variação.
+    const parentDetailCache = new Map<string, any>()
+    const items: Array<{
+      item: {
+        id_produto?: number
+        codigo?: string
+        descricao: string
+        quantidade: number
+        valor_unitario: number
+        unidade: string
+      }
+    }> = []
 
-        let itemCodigo: string | undefined = variant?.sku || prod?.sku || undefined
-        let itemDescricao: string = it.product_name
-        let idProduto: number | undefined = undefined
+    for (const it of (order.order_items || []) as any[]) {
+      const prod = it.products
+      let variant = it.product_variants
 
-        if (variant?.sku) {
-          itemCodigo = variant.sku
-          if (variant.variant_name && !it.product_name.includes(variant.variant_name)) {
-            itemDescricao = `${it.product_name} - ${variant.variant_name}`
-          }
-        } else if (prod?.external_id && (!prod.external_provider || prod.external_provider === TINY_PROVIDER)) {
-          idProduto = Number(prod.external_id) || undefined
+      // Se o pedido veio com variant_id mas o join não trouxe o objeto, busca diretamente
+      if (!variant && it.variant_id) {
+        const { data: directVar } = await supabase
+          .from("product_variants")
+          .select("id, sku, variant_name")
+          .eq("id", it.variant_id)
+          .maybeSingle()
+        if (directVar) variant = directVar
+      }
+
+      let itemCodigo: string | undefined = variant?.sku?.trim() || prod?.sku?.trim() || undefined
+      let itemDescricao: string = it.product_name
+      let idProduto: number | undefined = undefined
+
+      if (variant?.sku) {
+        itemCodigo = String(variant.sku).trim()
+        if (variant.variant_name && !it.product_name.includes(variant.variant_name)) {
+          itemDescricao = `${it.product_name} - ${variant.variant_name}`
         }
+      } else if (!variant && !it.variant_id && prod?.external_id && (!prod.external_provider || prod.external_provider === TINY_PROVIDER)) {
+        idProduto = Number(prod.external_id) || undefined
+      }
 
-        // Se for um produto com variações no Tiny (tipo "V") e não foi especificada uma variante no pedido,
-        // busca a primeira variante ativa do produto para não ser rejeitado pelo Tiny com "Um produto pai não pode ser informado"
-        if (prod && (prod.product_type === "V" || !itemCodigo)) {
-          const { data: fallbackVars } = await supabase
-            .from("product_variants")
-            .select("sku, variant_name")
-            .eq("product_id", prod.id)
-            .limit(1)
+      // IMPORTANTE: só tenta fallback para variantes do produto quando NÃO há variação definida no item!
+      // Antes o código entrava aqui mesmo com `variant` preenchido quando `prod.product_type === "V"`,
+      // sobrescrevendo todas as variações (ex: G) com a primeira variação (ex: M).
+      if (!variant && !it.variant_id && prod && (prod.product_type === "V" || !itemCodigo)) {
+        const { data: prodVariants } = await supabase
+          .from("product_variants")
+          .select("sku, variant_name, variant_value")
+          .eq("product_id", prod.id)
 
-          if (fallbackVars && fallbackVars.length > 0 && fallbackVars[0].sku) {
-            itemCodigo = fallbackVars[0].sku
-            if (fallbackVars[0].variant_name && !itemDescricao.includes(fallbackVars[0].variant_name)) {
-              itemDescricao = `${itemDescricao} - ${fallbackVars[0].variant_name}`
+        if (prodVariants && prodVariants.length > 0) {
+          const itemDescLower = String(itemDescricao || "").toLowerCase()
+          const matchedByDesc = prodVariants.find((v: any) => {
+            const vName = String(v.variant_name || "").trim().toLowerCase()
+            const vVal = String(v.variant_value || "").trim().toLowerCase()
+            return (vName && itemDescLower.includes(vName)) || (vVal && itemDescLower.includes(vVal))
+          })
+          const chosen = matchedByDesc || prodVariants[0]
+          if (chosen?.sku) {
+            itemCodigo = String(chosen.sku).trim()
+            if (chosen.variant_name && !itemDescricao.includes(chosen.variant_name)) {
+              itemDescricao = `${itemDescricao} - ${chosen.variant_name}`
             }
           }
         }
+      }
 
-        // Para variações (ou quando não temos idProduto do Tiny), resolve o id_produto da variação no Tiny pelo SKU
-        // garantindo vínculo exato no Tiny para reserva e baixa de estoque de variantes
-        if (!idProduto && itemCodigo) {
+      // Para variações (ou quando não temos idProduto do Tiny), resolve o id_produto exato no Tiny pelo SKU
+      if (!idProduto && itemCodigo) {
+        const skuNorm = itemCodigo.trim().toLowerCase()
+        try {
+          const search = await client.searchProducts({ pesquisa: itemCodigo })
+          const found = (search.produtos || []).find(
+            (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
+          )
+          if (found?.produto?.id) {
+            idProduto = Number(found.produto.id) || undefined
+          }
+        } catch { }
+
+        // Fallback determinístico para variações: consulta as variações do produto pai no Tiny (em cache)
+        // e encontra a variação exata pelo SKU (`codigo`) ou pela grade (`variant_name`)
+        if (!idProduto && (variant || it.variant_id) && prod?.external_id && (!prod.external_provider || prod.external_provider === TINY_PROVIDER)) {
           try {
-            const skuNorm = itemCodigo.trim().toLowerCase()
-            const search = await client.searchProducts({ pesquisa: itemCodigo })
-            const found = (search.produtos || []).find(
-              (p: any) => String(p?.produto?.codigo || "").trim().toLowerCase() === skuNorm
-            )
-            if (found?.produto?.id) {
-              idProduto = Number(found.produto.id) || undefined
+            const parentExtId = String(prod.external_id)
+            let parentDetail = parentDetailCache.get(parentExtId)
+            if (parentDetail === undefined) {
+              parentDetail = await client.getProduct(parentExtId)
+              parentDetailCache.set(parentExtId, parentDetail)
+            }
+            const tinyVars = Array.isArray((parentDetail as any)?.variacoes) ? (parentDetail as any).variacoes : []
+            const varNameNorm = String(variant?.variant_name || "").trim().toLowerCase()
+            const matchedVar = tinyVars.find((vObj: any) => {
+              const v = vObj?.variacao
+              if (!v) return false
+              const vCode = String(v.codigo || "").trim().toLowerCase()
+              if (vCode && vCode === skuNorm) return true
+              if (varNameNorm && v.grade) {
+                const gradeStr = Object.values(v.grade).filter(Boolean).join(" / ").trim().toLowerCase()
+                if (gradeStr === varNameNorm) return true
+              }
+              return false
+            })
+            if (matchedVar?.variacao?.id) {
+              idProduto = Number(matchedVar.variacao.id) || undefined
             }
           } catch { }
         }
+      }
 
-        return {
-          item: {
-            id_produto: idProduto,
-            codigo: itemCodigo,
-            descricao: itemDescricao,
-            quantidade: Number(it.quantity || 1),
-            valor_unitario: Number(it.product_price || 0),
-            unidade: "UN",
-          },
-        }
+      items.push({
+        item: {
+          id_produto: idProduto,
+          codigo: itemCodigo,
+          descricao: itemDescricao,
+          quantidade: Number(it.quantity || 1),
+          valor_unitario: Number(it.product_price || 0),
+          unidade: "UN",
+        },
       })
-    )
+    }
 
     const paymentInfo = buildTinyOrderPayments(order)
 
@@ -1363,6 +1480,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 export async function updateTinyOrderStatus(params: {
   orderId: string
   situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
+  externalOrderId?: string | number | null
 }): Promise<{ success: boolean; stockLaunched?: boolean; stockReversed?: boolean; error?: string }> {
   const { orderId, situacao } = params
   const supabase = createAdminClient()
@@ -1377,7 +1495,32 @@ export async function updateTinyOrderStatus(params: {
     console.error("[TINY] Erro ao buscar pedido para atualizar situação:", orderErr)
     return { success: false, error: orderErr?.message || "Pedido não encontrado" }
   }
-  if (order.external_provider !== TINY_PROVIDER || !order.external_order_id) {
+
+  let tinyOrderId: string | null = params.externalOrderId
+    ? String(params.externalOrderId)
+    : order.external_provider === TINY_PROVIDER && order.external_order_id
+      ? String(order.external_order_id)
+      : null
+
+  // Fallback multi-ERP: quando Bling e Tiny estão conectados juntos, Bling pode ter sobrescrito
+  // orders.external_provider/external_order_id; recupera o tinyOrderId salvo no audit_logs.
+  if (!tinyOrderId) {
+    try {
+      const { data: logRow } = await supabase
+        .from("audit_logs")
+        .select("metadata")
+        .eq("entity_type", "order")
+        .eq("entity_id", orderId)
+        .eq("action_type", "tiny_order_exported")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const metaId = (logRow as any)?.metadata?.tinyOrderId
+      if (metaId) tinyOrderId = String(metaId)
+    } catch { }
+  }
+
+  if (!tinyOrderId) {
     return { success: true }
   }
 
@@ -1391,21 +1534,21 @@ export async function updateTinyOrderStatus(params: {
 
     if (syncStockEnabled && (situacao === "enviado" || situacao === "entregue")) {
       try {
-        const launchRes = await client.launchOrderStock(order.external_order_id)
+        const launchRes = await client.launchOrderStock(tinyOrderId)
         stockLaunched = Boolean(launchRes.launched)
       } catch (launchErr: any) {
-        console.warn(`[TINY] Aviso ao lançar estoque do pedido ${order.external_order_id} no Tiny:`, launchErr?.message)
+        console.warn(`[TINY] Aviso ao lançar estoque do pedido ${tinyOrderId} no Tiny:`, launchErr?.message)
       }
     } else if (syncStockEnabled && situacao === "cancelado") {
       try {
-        const revRes = await client.reverseOrderStock(order.external_order_id)
+        const revRes = await client.reverseOrderStock(tinyOrderId)
         stockReversed = Boolean(revRes.reversed)
       } catch (revErr: any) {
-        console.warn(`[TINY] Aviso ao estornar estoque do pedido ${order.external_order_id} no Tiny:`, revErr?.message)
+        console.warn(`[TINY] Aviso ao estornar estoque do pedido ${tinyOrderId} no Tiny:`, revErr?.message)
       }
     }
 
-    await client.updateOrderStatus(order.external_order_id, situacao)
+    await client.updateOrderStatus(tinyOrderId, situacao)
 
     await logAuditEvent({
       partnerId: order.partner_id,
@@ -1418,7 +1561,7 @@ export async function updateTinyOrderStatus(params: {
       ],
       source: "system",
       metadata: {
-        tinyOrderId: order.external_order_id,
+        tinyOrderId,
         situacao,
         stockLaunched,
         stockReversed,

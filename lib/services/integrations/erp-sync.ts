@@ -48,6 +48,48 @@ function isBenignStockSyncSkip(error?: string): boolean {
 }
 
 /**
+ * Resolve os IDs externos já exportados de um pedido para Tiny e/ou Bling,
+ * suportando ambos os ERPs conectados simultaneamente sem que um sobrescreva o outro.
+ */
+async function resolveExportedOrderIds(
+  supabase: ReturnType<typeof createAdminClient>,
+  orderId: string,
+  orderRow?: { external_provider?: string | null; external_order_id?: string | null; external_sync_status?: string | null } | null
+): Promise<{ tinyOrderId: string | null; blingOrderId: string | null }> {
+  let tinyOrderId: string | null =
+    orderRow?.external_provider === TINY_PROVIDER && orderRow?.external_order_id
+      ? String(orderRow.external_order_id)
+      : null
+  let blingOrderId: string | null =
+    orderRow?.external_provider === BLING_PROVIDER && orderRow?.external_order_id
+      ? String(orderRow.external_order_id)
+      : null
+
+  if (!tinyOrderId || !blingOrderId) {
+    try {
+      const { data: logs } = await supabase
+        .from("audit_logs")
+        .select("action_type, metadata")
+        .eq("entity_type", "order")
+        .eq("entity_id", orderId)
+        .in("action_type", ["tiny_order_exported", "bling_order_exported"])
+        .order("created_at", { ascending: false })
+
+      for (const row of (logs || []) as any[]) {
+        if (!tinyOrderId && row.action_type === "tiny_order_exported" && row.metadata?.tinyOrderId) {
+          tinyOrderId = String(row.metadata.tinyOrderId)
+        }
+        if (!blingOrderId && row.action_type === "bling_order_exported" && row.metadata?.blingOrderId) {
+          blingOrderId = String(row.metadata.blingOrderId)
+        }
+      }
+    } catch { }
+  }
+
+  return { tinyOrderId, blingOrderId }
+}
+
+/**
  * Exporta um pedido da Dudit para o ERP conectado (Tiny e/ou Bling).
  * Idempotente e seguro para chamadas não-bloqueantes.
  * Caso o pedido já tenha tido baixa física de estoque (`inventory_deducted = true`)
@@ -70,15 +112,9 @@ export async function exportOrderToConnectedErps(orderId: string): Promise<{
   const providers = await getConnectedErpProviders(supabase, order.partner_id)
   if (providers.size === 0) return { exportedProviders: [], syncedStockProviders: [] }
 
-  const alreadySyncedTiny =
-    order.external_sync_status === "synced" &&
-    Boolean(order.external_order_id) &&
-    order.external_provider === TINY_PROVIDER
-
-  const alreadySyncedBling =
-    order.external_sync_status === "synced" &&
-    Boolean(order.external_order_id) &&
-    order.external_provider === BLING_PROVIDER
+  const { tinyOrderId, blingOrderId } = await resolveExportedOrderIds(supabase, orderId, order)
+  const alreadySyncedTiny = Boolean(tinyOrderId)
+  const alreadySyncedBling = Boolean(blingOrderId)
 
   const deliveryStatus = String((order as any).delivery_status || "").toLowerCase()
   const isDeducted =
@@ -155,24 +191,29 @@ export async function updateOrderStatusOnConnectedErps(params: {
   const supabase = createAdminClient()
   const { data: order } = await supabase
     .from("orders")
-    .select("external_provider, external_order_id")
+    .select("partner_id, external_provider, external_order_id")
     .eq("id", params.orderId)
     .maybeSingle()
 
-  if (!order?.external_order_id) return { stockHandledProviders: [] }
+  if (!order) return { stockHandledProviders: [] }
+
+  const { tinyOrderId, blingOrderId } = await resolveExportedOrderIds(supabase, params.orderId, order)
+  if (!tinyOrderId && !blingOrderId) return { stockHandledProviders: [] }
 
   const stockHandledProviders: string[] = []
 
-  if (order.external_provider === TINY_PROVIDER) {
-    const res = await updateTinyOrderStatus(params).catch((err) => {
+  if (tinyOrderId) {
+    const res = await updateTinyOrderStatus({ ...params, externalOrderId: tinyOrderId }).catch((err) => {
       console.error("[erp-sync] Tiny status update failed:", err)
       return { success: false as const, stockLaunched: false, stockReversed: false }
     })
     if (res?.stockLaunched || res?.stockReversed) {
       stockHandledProviders.push(TINY_PROVIDER)
     }
-  } else if (order.external_provider === BLING_PROVIDER) {
-    await updateBlingOrderStatus(params).catch((err) => {
+  }
+
+  if (blingOrderId) {
+    await updateBlingOrderStatus({ ...params, externalOrderId: blingOrderId }).catch((err) => {
       console.error("[erp-sync] Bling status update failed:", err)
     })
   }

@@ -134,6 +134,7 @@ export interface TinyOrderResponse {
 
 export class TinyClient {
   private token: string
+  private lastRequestAt = 0
 
   constructor(token: string) {
     if (!token || !token.trim()) {
@@ -142,7 +143,17 @@ export class TinyClient {
     this.token = token.trim()
   }
 
-  private async request<T = any>(endpoint: string, params: Record<string, any> = {}): Promise<T> {
+  private async throttle() {
+    const now = Date.now()
+    const elapsed = now - this.lastRequestAt
+    if (elapsed < 250) {
+      await new Promise((r) => setTimeout(r, 250 - elapsed))
+    }
+    this.lastRequestAt = Date.now()
+  }
+
+  private async request<T = any>(endpoint: string, params: Record<string, any> = {}, retryCount = 0): Promise<T> {
+    await this.throttle()
     const url = `${TINY_API_BASE_URL}/${endpoint}`
     const bodyParams = new URLSearchParams()
     bodyParams.append("token", this.token)
@@ -163,6 +174,11 @@ export class TinyClient {
       body: bodyParams.toString(),
       cache: "no-store",
     })
+
+    if (response.status === 429 && retryCount < 2) {
+      await new Promise((r) => setTimeout(r, 1200 * (retryCount + 1)))
+      return this.request<T>(endpoint, params, retryCount + 1)
+    }
 
     if (!response.ok) {
       throw new Error(`Erro na chamada Tiny API (${response.status}): ${response.statusText}`)
@@ -208,6 +224,15 @@ export class TinyClient {
             .filter(Boolean)
             .join("; ")
         : (retorno.mensagem || retorno.erro || "Erro na API do Tiny")
+
+      const lowerMsg = msg.toLowerCase()
+      if (
+        retryCount < 2 &&
+        (lowerMsg.includes("bloqueada") || lowerMsg.includes("excedido") || lowerMsg.includes("muitas requisic"))
+      ) {
+        await new Promise((r) => setTimeout(r, 1500 * (retryCount + 1)))
+        return this.request<T>(endpoint, params, retryCount + 1)
+      }
 
       throw new Error(`Tiny ERP: ${msg}`)
     }

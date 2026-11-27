@@ -3086,6 +3086,13 @@ export const IntegrationsSubPage = ({
                         maxWidth="lg"
                     >
                         <div className="space-y-6">
+                            {blingStatus?.connected && (
+                                <InfoCard
+                                    color="orange"
+                                    title="Atenção: Bling ERP já está conectado"
+                                    message="Não recomendamos manter Tiny e Bling conectados ao mesmo tempo na mesma loja. Com ambos ativos, todos os pedidos da Dudit são enviados para os dois ERPs, o que pode gerar duplicidade de vendas e conflitos de estoque. Prefira manter apenas um ERP principal conectado."
+                                />
+                            )}
                             {tinyStatus?.connected ? (
                                 <>
                                     <InfoCard
@@ -3547,6 +3554,13 @@ export const IntegrationsSubPage = ({
                         maxWidth="lg"
                     >
                         <div className="p-6 space-y-5">
+                            {tinyStatus?.connected && (
+                                <InfoCard
+                                    color="orange"
+                                    title="Atenção: Tiny ERP já está conectado"
+                                    message="Não recomendamos manter Bling e Tiny conectados ao mesmo tempo na mesma loja. Com ambos ativos, todos os pedidos da Dudit são enviados para os dois ERPs, o que pode gerar duplicidade de vendas e conflitos de estoque. Prefira manter apenas um ERP principal conectado."
+                                />
+                            )}
                             {!blingStatus?.connected ? (
                                 <div className="space-y-4">
                                     <IconPlaceholder

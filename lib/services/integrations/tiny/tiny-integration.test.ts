@@ -380,4 +380,20 @@ describe("Tiny Order Payment Mapping (buildTinyOrderPayments)", () => {
     const res = buildTinyOrderPayments(order)
     expect(res.obsExtra).toContain("Troca ref. Devolução #ret-999")
   })
+
+  it("maps Pix via Mercado Pago as pix (never credit card)", () => {
+    expect(mapPaymentMethodToTiny("Pix (Mercado Pago)")).toEqual({ forma: "pix", meio: "Pix" })
+    expect(mapPaymentMethodToTiny("Mercado Pago - Pix")).toEqual({ forma: "pix", meio: "Pix" })
+    expect(mapPaymentMethodToTiny("Mercado Pago")).toEqual({ forma: "outros", meio: "Mercado Pago" })
+
+    const res = buildTinyOrderPayments({
+      total_amount: 120,
+      paid_amount: 120,
+      payment_method: "Pix",
+      payment_breakdown: [{ method: "Mercado Pago", amount: 120 }],
+      created_at: "2026-11-27T12:00:00Z",
+    })
+    expect(res.forma_pagamento).toBe("pix")
+    expect(res.parcelas?.[0].parcela.forma_pagamento).toBe("pix")
+  })
 })

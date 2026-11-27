@@ -819,47 +819,47 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         const sanitized = allRaw
             .filter((entry: any) => !isInternalErpIntegrationTimelineEntry(entry))
             .map((entry: any) => {
-            const metadata = entry.metadata || {};
-            const actorName = resolveTimelineActorName({
-                entry,
-                viewer: "customer",
-                orderCustomerName: order?.customer_name,
-                storeName: order?.store?.name,
-                buyerId: order?.buyer_id,
-            });
+                const metadata = entry.metadata || {};
+                const actorName = resolveTimelineActorName({
+                    entry,
+                    viewer: "customer",
+                    orderCustomerName: order?.customer_name,
+                    storeName: order?.store?.name,
+                    buyerId: order?.buyer_id,
+                });
 
-            let changeLines = (entry.change_lines || []).map((line: string) => humanizeTimelineChangeLine(line)).filter(Boolean);
+                let changeLines = (entry.change_lines || []).map((line: string) => humanizeTimelineChangeLine(line)).filter(Boolean);
 
-            // Filter out internal seller notes edits and internal ERP sync logs from customer view
-            changeLines = changeLines.filter(
-                (l: string) =>
-                    !l.toLowerCase().includes("observações do pedido atualizadas") &&
-                    !l.toLowerCase().includes("alterou as observações do pedido") &&
-                    !isInternalStockTimelineLine(l) &&
-                    !isInternalErpIntegrationTimelineLine(l),
-            );
-
-            // If event was a return rejection, filter out false refund/credit/exchange lines
-            const isRejectedReturn = entry.entry_type === "return_rejected" ||
-                metadata.to_status === "REJECTED" ||
-                (entry.entry_type?.startsWith("return_") && changeLines.some((l: string) => l.toLowerCase().includes("recusad") || l.toLowerCase().includes("rejeitad")));
-
-            if (isRejectedReturn) {
-                changeLines = changeLines.filter((l: string) =>
-                    !l.startsWith("Valor do reembolso:") &&
-                    !l.startsWith("Status do reembolso:") &&
-                    !l.startsWith("Saldo da troca enviado para:") &&
-                    !l.startsWith("Vale-compra gerado:") &&
-                    !l.startsWith("Pedido de troca criado:")
+                // Filter out internal seller notes edits and internal ERP sync logs from customer view
+                changeLines = changeLines.filter(
+                    (l: string) =>
+                        !l.toLowerCase().includes("observações do pedido atualizadas") &&
+                        !l.toLowerCase().includes("alterou as observações do pedido") &&
+                        !isInternalStockTimelineLine(l) &&
+                        !isInternalErpIntegrationTimelineLine(l),
                 );
-            }
 
-            return {
-                ...entry,
-                actor_name: actorName,
-                change_lines: changeLines,
-            };
-        }).filter((e: any) => e.change_lines.length > 0);
+                // If event was a return rejection, filter out false refund/credit/exchange lines
+                const isRejectedReturn = entry.entry_type === "return_rejected" ||
+                    metadata.to_status === "REJECTED" ||
+                    (entry.entry_type?.startsWith("return_") && changeLines.some((l: string) => l.toLowerCase().includes("recusad") || l.toLowerCase().includes("rejeitad")));
+
+                if (isRejectedReturn) {
+                    changeLines = changeLines.filter((l: string) =>
+                        !l.startsWith("Valor do reembolso:") &&
+                        !l.startsWith("Status do reembolso:") &&
+                        !l.startsWith("Saldo da troca enviado para:") &&
+                        !l.startsWith("Vale-compra gerado:") &&
+                        !l.startsWith("Pedido de troca criado:")
+                    );
+                }
+
+                return {
+                    ...entry,
+                    actor_name: actorName,
+                    change_lines: changeLines,
+                };
+            }).filter((e: any) => e.change_lines.length > 0);
 
         return sanitized.sort((a: any, b: any) => {
             // Most recent events first
@@ -2851,8 +2851,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     video_thumbnail: item.products?.video_thumbnail || null,
                                                     fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                                 });
-                                                    const isItemChecked = Number(returnItems[item.id] || 0) > 0;
-                                                    return (
+                                                const isItemChecked = Number(returnItems[item.id] || 0) > 0;
+                                                return (
                                                     <div key={item.id} className="space-y-3 rounded-xl border border-brand-border/60 dark:border-dark-border/60 p-3">
                                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                                             <Checkbox
