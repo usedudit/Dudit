@@ -8,7 +8,7 @@ import {
   getOrderDeliveryOtpStatus,
   type DeliveryOtpResult,
 } from "@/lib/services/delivery-otp.service"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 
 /**
  * Returns the active OTP delivery confirmation code for the authenticated customer/buyer.
@@ -83,8 +83,8 @@ export async function checkDeliveryOtpRequirementAction(params: {
 }> {
   try {
     await requireUser()
-    const supabase = await getSupabaseServerClient()
-    const { data: links, error } = await supabase
+    const admin = getAdminClient()
+    const { data: links, error } = await admin
       .from("delivery_orders")
       .select("order_id, orders(id, order_number, customer_name)")
       .eq("delivery_id", params.deliveryId)

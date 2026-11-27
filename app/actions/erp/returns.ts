@@ -1604,6 +1604,211 @@ async function maybeRefundMercadoPago(params: {
     }
 }
 
+const updateReverseLogisticsSchema = z.object({
+    partnerId: z.string().uuid(),
+    requestId: z.string().uuid(),
+    reverseLogisticsMethod: z.enum(["not_required", "in_person", "own_pickup", "carrier_label", "customer_shipping"]).nullable().optional(),
+    reverseLogisticsStatus: z.enum(["not_required", "pending", "scheduled", "in_transit", "received"]).nullable().optional(),
+    returnFreightPayer: z.enum(["seller", "customer", "case_by_case"]).nullable().optional(),
+    reverseLogisticsTrackingCode: z.string().trim().max(120).nullable().optional(),
+    reverseLogisticsNotes: z.string().trim().max(500).nullable().optional(),
+    sellerNotes: z.string().max(500).nullable().optional(),
+    returnToInventoryItems: z.array(z.object({
+        id: z.string().uuid(),
+        quantity: z.number().int().positive(),
+    })).optional().nullable(),
+})
+
+export async function updateReturnReverseLogisticsAction(input: unknown) {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    try {
+        const user = await requireUser()
+        const data = updateReverseLogisticsSchema.parse(input)
+        const supabase = createAdminClient()
+
+        const [, access, reqRes] = await Promise.all([
+            requireMinimumPlan(data.partnerId, "crescer"),
+            requirePermission(data.partnerId, "orders", "edit", user),
+            supabase
+                .from("return_requests")
+                .select(`
+                    id, partner_id, store_id, order_id, status,
+                    reverse_logistics_method, reverse_logistics_status, return_freight_payer,
+                    reverse_logistics_tracking_code, reverse_logistics_notes, seller_notes,
+                    orders!order_id(store_id, delivery_status, inventory_deducted)
+                `)
+                .eq("id", data.requestId)
+                .eq("partner_id", data.partnerId)
+                .is("deleted_at", null)
+                .single(),
+        ])
+        assertPermission(access, "orders.can_refund")
+
+        const { data: request, error: reqErr } = reqRes
+        if (reqErr || !request) throw new Error("Solicitação não encontrada.")
+        if (["REJECTED", "EXPIRED"].includes(request.status)) {
+            throw new Error("Não é possível atualizar a logística reversa de uma solicitação recusada ou expirada.")
+        }
+
+        const requestStoreId = request.store_id || (request as any).orders?.store_id || null
+        if (requestStoreId) {
+            await requireStorePermission(requestStoreId, data.partnerId, "orders", "can_refund")
+        }
+
+        const nextMethod = data.reverseLogisticsMethod !== undefined ? data.reverseLogisticsMethod : request.reverse_logistics_method
+        const nextStatus = nextMethod === "not_required"
+            ? "not_required"
+            : (data.reverseLogisticsStatus !== undefined ? data.reverseLogisticsStatus : request.reverse_logistics_status)
+
+        const patch: Record<string, any> = {
+            reverse_logistics_method: nextMethod || null,
+            reverse_logistics_status: nextStatus || null,
+            return_freight_payer: data.returnFreightPayer !== undefined ? (data.returnFreightPayer || null) : request.return_freight_payer,
+            reverse_logistics_tracking_code: data.reverseLogisticsTrackingCode !== undefined ? (data.reverseLogisticsTrackingCode || null) : request.reverse_logistics_tracking_code,
+            reverse_logistics_notes: data.reverseLogisticsNotes !== undefined ? (sanitizeNotes(data.reverseLogisticsNotes) || null) : request.reverse_logistics_notes,
+            updated_by: user.id,
+            updated_at: new Date().toISOString(),
+        }
+        if (data.sellerNotes !== undefined) {
+            patch.seller_notes = sanitizeNotes(data.sellerNotes) || null
+        }
+
+        const { error: updateErr } = await supabase
+            .from("return_requests")
+            .update(patch)
+            .eq("id", data.requestId)
+            .eq("partner_id", data.partnerId)
+
+        if (updateErr) throw updateErr
+
+        let stockRestored = false
+        if (Array.isArray(data.returnToInventoryItems) && data.returnToInventoryItems.length > 0) {
+            const capabilities = await getPartnerCapabilities(data.partnerId, { storeId: requestStoreId })
+            if (capabilities.hasStockMovements) {
+                const { data: existingMovement } = await supabase
+                    .from("stock_movements")
+                    .select("id")
+                    .eq("source_return_request_id", data.requestId)
+                    .limit(1)
+                    .maybeSingle()
+
+                if (!existingMovement) {
+                    const itemIds = data.returnToInventoryItems.map((i) => i.id)
+                    const { data: dbItems } = await supabase
+                        .from("return_items")
+                        .select("id, order_item_id, product_id, variant_id")
+                        .eq("return_request_id", data.requestId)
+
+                    const qtyMap = new Map(data.returnToInventoryItems.map((i) => [i.id, i.quantity]))
+                    const toRestore: Array<{ product_id: string; variant_id: string | null; quantity: number }> = (dbItems || [])
+                        .filter((item: any) => itemIds.includes(item.id) || itemIds.includes(item.order_item_id))
+                        .map((item: any) => ({
+                            product_id: String(item.product_id || ""),
+                            variant_id: item.variant_id || null,
+                            quantity: qtyMap.get(item.id) || qtyMap.get(item.order_item_id) || 1,
+                        }))
+                        .filter((item: { product_id: string; variant_id: string | null; quantity: number }) => Boolean(item.product_id) && item.quantity > 0)
+
+                    if (toRestore.length > 0) {
+                        const orderInfo = (request as any).orders
+                        const { shouldDeductInventory, releaseOrderInventory } = await import("@/lib/stock/reservations")
+                        const wasPhysicallyDeducted = Boolean(
+                            orderInfo?.inventory_deducted ||
+                            shouldDeductInventory(orderInfo?.delivery_status || null)
+                        )
+
+                        if (!wasPhysicallyDeducted) {
+                            await releaseOrderInventory({
+                                client: supabase,
+                                partnerId: data.partnerId,
+                                orderId: request.order_id,
+                                items: toRestore,
+                                storeId: requestStoreId,
+                            })
+                        } else {
+                            const { data: stockMovementRes, error: stockMovementErr } = await supabase.rpc("create_batch_stock_movement", {
+                                p_partner_id: data.partnerId,
+                                p_movement_type: "in",
+                                p_reason: "RETURN_IN",
+                                p_notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                                p_created_by: user.id,
+                                p_items: toRestore,
+                                p_store_id: requestStoreId,
+                            })
+                            if (stockMovementErr) throw stockMovementErr
+
+                            const movementId = (stockMovementRes as any)?.id || null
+                            if (movementId) {
+                                await Promise.all([
+                                    supabase
+                                        .from("stock_movements")
+                                        .update({
+                                            source_return_request_id: data.requestId,
+                                            store_id: requestStoreId,
+                                            reason: "RETURN_IN",
+                                            reference_name: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                                            notes: `Devolução DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                                        })
+                                        .eq("id", movementId),
+                                    supabase
+                                        .from("return_requests")
+                                        .update({ inventory_movement_id: movementId })
+                                        .eq("id", data.requestId),
+                                ])
+                            }
+                        }
+                        stockRestored = true
+                    }
+                }
+            }
+        }
+
+        const { getReverseLogisticsMethodLabel, getReverseLogisticsStatusLabel } = await import("@/lib/returns/types")
+        const changeLines: string[] = []
+        if (nextMethod !== request.reverse_logistics_method) {
+            changeLines.push(`Modalidade de devolução alterada para: ${getReverseLogisticsMethodLabel(nextMethod)}.`)
+        }
+        if (nextStatus !== request.reverse_logistics_status) {
+            changeLines.push(`Status da devolução física: ${getReverseLogisticsStatusLabel(request.reverse_logistics_status)} → ${getReverseLogisticsStatusLabel(nextStatus)}.`)
+        }
+        if (patch.reverse_logistics_tracking_code !== request.reverse_logistics_tracking_code && patch.reverse_logistics_tracking_code) {
+            changeLines.push(`Rastreio / referência atualizado: ${patch.reverse_logistics_tracking_code}.`)
+        }
+        if (stockRestored) {
+            changeLines.push("Itens restaurados ao estoque físico.")
+        }
+        if (changeLines.length === 0) {
+            changeLines.push("Logística reversa atualizada.")
+        }
+
+        await logAuditEvent({
+            partnerId: data.partnerId,
+            storeId: requestStoreId,
+            entityType: "return_request",
+            entityId: data.requestId,
+            actionType: "updated",
+            actorUserId: user.id,
+            source: "erp",
+            changeLines,
+            metadata: {
+                source: "erp",
+                reverse_logistics_method: nextMethod,
+                reverse_logistics_status: nextStatus,
+                stock_restored: stockRestored,
+            },
+        })
+
+        await revalidateReturns(data.partnerId, request.order_id, data.requestId)
+        if (stockRestored) {
+            await revalidateStockMovements(data.partnerId)
+        }
+
+        return successResponse({ id: data.requestId, stockRestored })
+    } catch (e: any) {
+        return errorResponse(getReturnUserMessage(e, "Erro ao atualizar logística reversa."))
+    }
+}
+
 export async function processReturnRequestAction(
     input: unknown,
     opts?: { adminBypass?: boolean; actionCtx?: AdminActionContext | null },

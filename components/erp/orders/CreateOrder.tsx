@@ -2334,15 +2334,7 @@ export default function CreateOrder({
                                                                                 />
                                                                             )
                                                                         }
-                                                                        return (
-                                                                            <ListItem
-                                                                                icon={TruckIcon}
-                                                                                title="Adicionar entrega"
-                                                                                description="Define o valor da entrega do pedido"
-                                                                                onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
-                                                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                                                            />
-                                                                        )
+                                                                        return null
                                                                     })()}
                                                                 </>
                                                             )}

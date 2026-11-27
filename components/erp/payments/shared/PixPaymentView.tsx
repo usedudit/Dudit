@@ -76,7 +76,7 @@ export function PixPaymentView({
                 {!hideQrElements && (
                     <>
                         <PaymentAmountLabel label="Valor a receber" calculation={calculation} baseAllocated={baseAllocated} flatAmount={flatAmount} />
-                        <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
+                        <MoneyInput value={amount} onChange={onAmountChange} />
                         {showFeeBearer && onFeeBearerChange && !flatAmount && (
                             <FormDropdown
                                 label="Quem paga a taxa?"

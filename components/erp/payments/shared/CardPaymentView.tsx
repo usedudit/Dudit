@@ -62,7 +62,7 @@ export function CardPaymentView({
       </div>
       <div className="w-full text-left space-y-4">
         <PaymentAmountLabel label="Valor a receber" calculation={calculation} baseAllocated={baseAllocated} flatAmount={flatAmount} />
-        <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
+        <MoneyInput value={amount} onChange={onAmountChange} />
         {!hideInstallments && (
           readOnlyInstallments ? (
             <div>

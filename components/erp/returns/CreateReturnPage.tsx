@@ -34,7 +34,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, XIcon, PrinterIcon, TruckIcon, StoreIcon, ReturnIcon, ThreeDotsIcon, ShoppingCartIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
-import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction, saveReturnEvidenceAction } from "@/app/actions/erp/returns"
+import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction, saveReturnEvidenceAction, updateReturnReverseLogisticsAction } from "@/app/actions/erp/returns"
 import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
 import { getShippingPayerLabel, type ReturnShippingPayer } from "@/lib/returns/policy"
 import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction, getReturnShippingQuotesAction, printSuperFreteLabelAction } from "@/app/actions/shipping/superfrete"
@@ -290,6 +290,20 @@ export default function CreateReturnPage({
         if (adminContext) return false
         return mode === "view" || !!(returnRequest && ["APPROVED", "REJECTED", "RESOLVED", "EXPIRED"].includes(returnRequest.status))
     }, [mode, returnRequest, adminContext])
+
+    // Even after APPROVED (or while PROCESSING), reverse logistics (physical return tracking/receipt)
+    // and internal seller notes can still be updated so the return doesn't get stuck in "Aguardando devolução".
+    const canEditReverseLogistics = useMemo(() => {
+        if (adminContext) return true
+        if (mode === "create") return true
+        if (!returnRequest) return false
+        if (["REJECTED", "EXPIRED"].includes(returnRequest.status)) return false
+        if (mode === "edit") return true
+        return ["APPROVED", "PROCESSING"].includes(returnRequest.status)
+    }, [adminContext, mode, returnRequest])
+
+    const [isSavingLogistics, setIsSavingLogistics] = useState(false)
+    const [pendingPostApprovalLogisticsSave, setPendingPostApprovalLogisticsSave] = useState(false)
 
     const isMarketplaceRequest = useMemo(() => {
         return !!(returnRequest?.source === "marketplace")
@@ -1141,7 +1155,93 @@ export default function CreateReturnPage({
         onSave({ ...data, adminActionCtx: gate?.ctx ?? null })
     }, [adminContext, adminActionGate, computeChangedFields, onSave])
 
+    const persistPostApprovalLogistics = useCallback(async (returnToInventoryItems: { id: string; quantity: number }[] | null) => {
+        if (!returnRequest?.id) return
+        setIsSavingLogistics(true)
+        try {
+            const res = await updateReturnReverseLogisticsAction({
+                partnerId,
+                requestId: returnRequest.id,
+                reverseLogisticsMethod: hasOnlyServices ? "not_required" : reverseLogisticsMethod,
+                reverseLogisticsStatus: hasOnlyServices || reverseLogisticsMethod === "not_required" ? "not_required" : reverseLogisticsStatus,
+                returnFreightPayer: hasOnlyServices || reverseLogisticsMethod === "not_required" || reverseLogisticsMethod === "in_person" ? null : returnFreightPayer,
+                reverseLogisticsTrackingCode: hasOnlyServices || reverseLogisticsMethod === "not_required" ? null : (reverseLogisticsTrackingCode.trim() || null),
+                reverseLogisticsNotes: hasOnlyServices ? null : (reverseLogisticsNotes.trim() || null),
+                sellerNotes: observations,
+                returnToInventoryItems,
+            })
+            if (!res.success) throw new Error(res.error)
+            notifySuccess(
+                res.data?.stockRestored
+                    ? "Logística reversa atualizada e itens restaurados ao estoque!"
+                    : "Logística reversa atualizada com sucesso!"
+            )
+            const detailRes: any = await getReturnRequestDetailsAction(partnerId, returnRequest.id, { adminBypass: adminContext })
+            if (detailRes.success && detailRes.data) {
+                setRawReturnRequestData(detailRes.data)
+                if (detailRes.data.returnEvents) {
+                    setReturnEvents(detailRes.data.returnEvents)
+                }
+            }
+        } catch (err: any) {
+            notifyError(err?.message || "Erro ao atualizar logística reversa.")
+        } finally {
+            setIsSavingLogistics(false)
+            setPendingPostApprovalLogisticsSave(false)
+            setIsInventoryRestoreModalOpen(false)
+        }
+    }, [
+        returnRequest?.id,
+        partnerId,
+        hasOnlyServices,
+        reverseLogisticsMethod,
+        reverseLogisticsStatus,
+        returnFreightPayer,
+        reverseLogisticsTrackingCode,
+        reverseLogisticsNotes,
+        observations,
+        adminContext,
+        notifySuccess,
+        notifyError,
+    ])
+
+    const handleSavePostApprovalLogistics = useCallback(async () => {
+        if (!returnRequest?.id || isSavingLogistics) return
+        const prevLogisticsStatus = rawReturnRequestData?.reverseLogisticsStatus || returnRequest.reverseLogisticsStatus || null
+        const isTransitioningToReceived =
+            !hasOnlyServices &&
+            reverseLogisticsMethod !== "not_required" &&
+            reverseLogisticsStatus === "received" &&
+            prevLogisticsStatus !== "received" &&
+            checkedItems.length > 0
+
+        if (isTransitioningToReceived) {
+            const initialQty: Record<string, number> = {}
+            checkedItems.forEach((i) => { initialQty[i.id] = i.quantity })
+            setInventoryRestoreQuantities(initialQty)
+            setPendingPostApprovalLogisticsSave(true)
+            setIsInventoryRestoreModalOpen(true)
+            return
+        }
+
+        await persistPostApprovalLogistics(null)
+    }, [
+        returnRequest?.id,
+        returnRequest?.reverseLogisticsStatus,
+        rawReturnRequestData?.reverseLogisticsStatus,
+        isSavingLogistics,
+        hasOnlyServices,
+        reverseLogisticsMethod,
+        reverseLogisticsStatus,
+        checkedItems,
+        persistPostApprovalLogistics,
+    ])
+
     const completeSave = useCallback(async (returnToInventoryItems: { id: string; quantity: number }[] | null) => {
+        if (pendingPostApprovalLogisticsSave) {
+            await persistPostApprovalLogistics(returnToInventoryItems)
+            return
+        }
         if (!pendingSaveData) return
         await saveWithAdminGate({
             ...pendingSaveData,
@@ -1150,7 +1250,7 @@ export default function CreateReturnPage({
         })
         setPendingSaveData(null)
         setIsInventoryRestoreModalOpen(false)
-    }, [pendingSaveData, saveWithAdminGate])
+    }, [pendingPostApprovalLogisticsSave, persistPostApprovalLogistics, pendingSaveData, saveWithAdminGate])
 
     const handleSelectCustomer = useCallback((customer: any) => {
         setSelectedOrder((prev: any) => {
@@ -2620,7 +2720,7 @@ export default function CreateReturnPage({
                                             <FadeIn key="delivery" className="space-y-8">
                                                 {(returnRequest || selectedOrder) ? (
                                                     <FormSection title="Logística reversa (devolução do item)">
-                                                    {isViewOnly ? (
+                                                    {!canEditReverseLogistics ? (
                                                         <div className="space-y-1">
                                                             <PaymentRow
                                                                 label="Como o item será devolvido"
@@ -2672,10 +2772,18 @@ export default function CreateReturnPage({
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                        <div className="space-y-5">
+                                                            {isViewOnly && canEditReverseLogistics && (
+                                                                <InfoCard
+                                                                    color="blue"
+                                                                    title="Atualização de logística reversa"
+                                                                    message="A solicitação já foi aprovada, mas você ainda pode atualizar a forma de devolução, código de rastreio e marcar como 'Recebido na loja' para restaurar os itens ao estoque."
+                                                                />
+                                                            )}
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                             <FormDropdown
                                                                 label="Como o item será devolvido"
-                                                                disabled={isViewOnly}
+                                                                disabled={!canEditReverseLogistics}
                                                                 value={reverseLogisticsMethod}
                                                                 setValue={(val) => {
                                                                     const nextMethod = val as ReverseLogisticsMethod
@@ -2698,7 +2806,7 @@ export default function CreateReturnPage({
                                                             {reverseLogisticsMethod !== "not_required" && (
                                                                 <FormDropdown
                                                                     label="Status da devolução física"
-                                                                    disabled={isViewOnly}
+                                                                    disabled={!canEditReverseLogistics}
                                                                     value={reverseLogisticsStatus === "not_required" ? "pending" : reverseLogisticsStatus}
                                                                     setValue={(val) => setReverseLogisticsStatus(val as ReverseLogisticsStatus)}
                                                                     options={[
@@ -2713,7 +2821,7 @@ export default function CreateReturnPage({
                                                             {(reverseLogisticsMethod === "carrier_label" || reverseLogisticsMethod === "customer_shipping" || reverseLogisticsMethod === "own_pickup") && (
                                                                 <FormDropdown
                                                                     label="Quem paga o frete da devolução"
-                                                                    disabled={isViewOnly}
+                                                                    disabled={!canEditReverseLogistics}
                                                                     value={returnFreightPayer}
                                                                     setValue={(val) => setReturnFreightPayer(val as ReturnShippingPayer)}
                                                                     options={[
@@ -2727,7 +2835,7 @@ export default function CreateReturnPage({
                                                             {(reverseLogisticsMethod === "customer_shipping" || reverseLogisticsMethod === "own_pickup") && (
                                                                 <Input
                                                                     label={reverseLogisticsMethod === "own_pickup" ? "Entregador / referência da coleta" : "Código de rastreio"}
-                                                                    disabled={isViewOnly}
+                                                                    disabled={!canEditReverseLogistics}
                                                                     value={reverseLogisticsTrackingCode}
                                                                     onChange={(e) => setReverseLogisticsTrackingCode(e.target.value)}
                                                                     placeholder={reverseLogisticsMethod === "own_pickup" ? "Ex.: Motoboy João • Coleta amanhã 14h" : "Ex.: BR123456789BR"}
@@ -2775,13 +2883,26 @@ export default function CreateReturnPage({
                                                                         name="reverseLogisticsNotes"
                                                                         label="Instruções de devolução / coleta (visível ao cliente)"
                                                                         placeholder="Ex.: Motoboy passará entre 14h e 17h, ou entregar na loja em horário comercial com o número do pedido."
-                                                                        disabled={isViewOnly}
+                                                                        disabled={!canEditReverseLogistics}
                                                                         value={reverseLogisticsNotes}
                                                                         onChange={(e) => setReverseLogisticsNotes(e.target.value)}
                                                                         maxLength={500}
                                                                         rows={2}
                                                                         showCharacterCount={true}
                                                                     />
+                                                                </div>
+                                                            )}
+                                                            </div>
+                                                            {isViewOnly && canEditReverseLogistics && (
+                                                                <div className="flex justify-end pt-2">
+                                                                    <Button
+                                                                        type="button"
+                                                                        onClick={handleSavePostApprovalLogistics}
+                                                                        disabled={isSavingLogistics}
+                                                                        leftIcon={<SaveIcon size={18} />}
+                                                                    >
+                                                                        {isSavingLogistics ? "Salvando..." : "Salvar logística reversa"}
+                                                                    </Button>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -3043,6 +3164,7 @@ export default function CreateReturnPage({
                 isOpen={isInventoryRestoreModalOpen}
                 onClose={() => {
                     setPendingSaveData(null)
+                    setPendingPostApprovalLogisticsSave(false)
                     setIsInventoryRestoreModalOpen(false)
                 }}
                 title="Restaurar itens ao estoque?"
@@ -3111,16 +3233,17 @@ export default function CreateReturnPage({
                             variant="outline"
                             onClick={() => {
                                 setPendingSaveData(null)
+                                setPendingPostApprovalLogisticsSave(false)
                                 setIsInventoryRestoreModalOpen(false)
                             }}
-                            disabled={isSaving}
+                            disabled={isSaving || isSavingLogistics}
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={() => completeSave([])}
                             variant="outlinered"
-                            disabled={isSaving}
+                            disabled={isSaving || isSavingLogistics}
                         >
                             Não retornar nenhum
                         </Button>
@@ -3131,9 +3254,9 @@ export default function CreateReturnPage({
                                     .map(([id, quantity]) => ({ id, quantity }))
                                 completeSave(items)
                             }}
-                            disabled={isSaving}
+                            disabled={isSaving || isSavingLogistics}
                         >
-                            {isSaving ? "Salvando..." : "Confirmar e salvar"}
+                            {isSaving || isSavingLogistics ? "Salvando..." : "Confirmar e salvar"}
                         </Button>
                     </div>
                 </div>

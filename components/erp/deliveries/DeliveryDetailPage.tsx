@@ -85,6 +85,11 @@ export default function DeliveryDetailPage({
         currentStatus: string
         reasonDropdownValue: string
         customReasonText: string
+        otpPayload?: {
+            deliveryOtp?: string
+            bypassOtp?: boolean
+            bypassReason?: string
+        }
     } | null>(null)
     const [cancelDeliveryModal, setCancelDeliveryModal] = useState<{
         isOpen: boolean
@@ -117,7 +122,16 @@ export default function DeliveryDetailPage({
     const normalizedRole = String(userRole || "").toLowerCase()
     const isOwnerOrAdmin = normalizedRole === "owner" || normalizedRole === "admin"
     const isDelivery = normalizedRole === "delivery"
-    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
+    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{
+        isOpen: boolean
+        orderId: string
+        nextStatus: string
+        otpPayload?: {
+            deliveryOtp?: string
+            bypassOtp?: boolean
+            bypassReason?: string
+        }
+    } | null>(null)
     const [orderStatusModal, setOrderStatusModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string } | null>(null)
     const [orderNewStatus, setOrderNewStatus] = useState<string>("")
     const [activeTab, setActiveTab] = useState<string>("dados_gerais")
@@ -182,13 +196,14 @@ export default function DeliveryDetailPage({
         if (!delivery || selectedNewStatus === delivery.status) return
         const prevDelivery = delivery
         const effectiveBypass = isOwnerOrAdmin && bypassOtp
+        const trimmedOtp = deliveryOtp.trim() || undefined
         setDelivery((current: any) => current ? { ...current, status: selectedNewStatus } : current)
         try {
             const res = await updateERPDeliveryStatusAction({
                 deliveryId: delivery.id,
                 partnerId,
                 status: selectedNewStatus as any,
-                deliveryOtp: deliveryOtpCheck.requiresOtp && !effectiveBypass ? deliveryOtp.trim() || undefined : undefined,
+                deliveryOtp: !effectiveBypass ? trimmedOtp : undefined,
                 bypassOtp: deliveryOtpCheck.requiresOtp ? effectiveBypass : false,
                 bypassReason: deliveryOtpCheck.requiresOtp && effectiveBypass ? bypassReason.trim() || undefined : undefined,
             })
@@ -206,7 +221,7 @@ export default function DeliveryDetailPage({
             toast.error(err?.message || "Erro inesperado ao atualizar status.")
         }
         setIsStatusModalOpen(false)
-    }, [delivery, selectedNewStatus, partnerId, deliveryOtp, bypassOtp, bypassReason])
+    }, [delivery, selectedNewStatus, partnerId, isOwnerOrAdmin, deliveryOtpCheck.requiresOtp, deliveryOtp, bypassOtp, bypassReason])
 
     useEffect(() => {
         setHeaderOverride({
@@ -289,16 +304,26 @@ export default function DeliveryDetailPage({
 
     const confirmDeliveryWarningStatusChange = async () => {
         if (!deliveryWarningModal) return
-        const { orderId, nextStatus, reasonDropdownValue, customReasonText } = deliveryWarningModal
+        const { orderId, nextStatus, reasonDropdownValue, customReasonText, otpPayload } = deliveryWarningModal
         const reason = reasonDropdownValue === "other"
             ? customReasonText.trim()
             : CHANGE_STATUS_REASONS.find(r => r.value === reasonDropdownValue)?.label || ""
 
         setDeliveryWarningModal(null)
-        await handleOrderDeliveryStatusChange(orderId, nextStatus, reason, true)
+        await handleOrderDeliveryStatusChange(orderId, nextStatus, reason, true, otpPayload)
     }
 
-    const handleOrderDeliveryStatusChange = async (orderId: string, nextStatus: string, reason?: string, isConfirmed?: boolean) => {
+    const handleOrderDeliveryStatusChange = async (
+        orderId: string,
+        nextStatus: string,
+        reason?: string,
+        isConfirmed?: boolean,
+        otpPayload?: {
+            deliveryOtp?: string
+            bypassOtp?: boolean
+            bypassReason?: string
+        },
+    ) => {
         const link = (delivery?.delivery_orders || []).find((l: any) => l?.orders?.id === orderId)
         const currentStatus = link?.status || link?.orders?.delivery_status || "not_sent"
 
@@ -311,13 +336,15 @@ export default function DeliveryDetailPage({
                     currentStatus,
                     reasonDropdownValue: "",
                     customReasonText: "",
+                    otpPayload,
                 })
                 return
             } else {
                 setSimpleConfirmModal({
                     isOpen: true,
                     orderId,
-                    nextStatus
+                    nextStatus,
+                    otpPayload,
                 })
                 return
             }
@@ -347,16 +374,18 @@ export default function DeliveryDetailPage({
 
         setUpdatingOrderId(orderId)
         try {
-            const effectiveBypass = isOwnerOrAdmin && bypassOtp
+            const effectiveBypass = Boolean(isOwnerOrAdmin && (otpPayload?.bypassOtp ?? bypassOtp))
+            const resolvedOtp = (otpPayload?.deliveryOtp ?? deliveryOtp).trim() || undefined
+            const resolvedBypassReason = (otpPayload?.bypassReason ?? bypassReason).trim() || undefined
             const res = await updateERPSingleOrderDeliveryStatusAction({
                 partnerId,
                 deliveryId,
                 orderId,
                 status: nextStatus as any,
                 changeReason: reason,
-                deliveryOtp: orderOtpCheck.requiresOtp && !effectiveBypass ? deliveryOtp.trim() || undefined : undefined,
-                bypassOtp: orderOtpCheck.requiresOtp ? effectiveBypass : false,
-                bypassReason: orderOtpCheck.requiresOtp && effectiveBypass ? bypassReason.trim() || undefined : undefined,
+                deliveryOtp: !effectiveBypass ? resolvedOtp : undefined,
+                bypassOtp: effectiveBypass,
+                bypassReason: effectiveBypass ? resolvedBypassReason : undefined,
             })
             if (res.success) {
                 toast.success("Status do pedido atualizado com sucesso!")
@@ -419,8 +448,15 @@ export default function DeliveryDetailPage({
     const handleOrderStatusChange = async () => {
         if (!orderStatusModal || !orderNewStatus) return
         const { orderId } = orderStatusModal
+        const otpPayload = orderNewStatus === "delivered"
+            ? {
+                deliveryOtp: deliveryOtp.trim() || undefined,
+                bypassOtp: isOwnerOrAdmin && bypassOtp,
+                bypassReason: bypassReason.trim() || undefined,
+            }
+            : undefined
         setOrderStatusModal(null)
-        await handleOrderDeliveryStatusChange(orderId, orderNewStatus, undefined, false)
+        await handleOrderDeliveryStatusChange(orderId, orderNewStatus, undefined, false, otpPayload)
         setOrderNewStatus("")
     }
 
@@ -960,7 +996,13 @@ export default function DeliveryDetailPage({
                     isOpen={simpleConfirmModal.isOpen}
                     onClose={() => setSimpleConfirmModal(null)}
                     onConfirm={() => {
-                        handleOrderDeliveryStatusChange(simpleConfirmModal.orderId, simpleConfirmModal.nextStatus, undefined, true)
+                        handleOrderDeliveryStatusChange(
+                            simpleConfirmModal.orderId,
+                            simpleConfirmModal.nextStatus,
+                            undefined,
+                            true,
+                            simpleConfirmModal.otpPayload,
+                        )
                         setSimpleConfirmModal(null)
                     }}
                     title="Confirmar alteração de status"
@@ -986,31 +1028,9 @@ export default function DeliveryDetailPage({
                     ? Math.max(0, Number(selectedOrder.total_amount || 0) - Number(selectedOrder.paid_amount || 0))
                     : 0
 
-                const driverPaymentBanner = selectedOrder && isDelivery && !isPaid ? (
-                    <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                            <MoneyIcon size={20} className="text-brand-primary shrink-0" />
-                            <div>
-                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento Pendente</p>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Valor restante: {formatCurrency(remaining)}</p>
-                            </div>
-                        </div>
-                        <Button
-                            size="sm"
-                            onClick={() => {
-                                setActiveLink(selectedLink)
-                                setIsOrderPaymentModalOpen(true)
-                            }}
-                        >
-                            Receber Pagamento
-                        </Button>
-                    </div>
-                ) : null
-
                 const sheetFooter = selectedOrder ? (
                     <div className="flex gap-3 w-full">
                         <Button
-                            type="button"
                             variant={isDelivery && !isPaid ? "default" : "outline"}
                             className="flex-1 h-12"
                             onClick={() => {
@@ -1021,7 +1041,6 @@ export default function DeliveryDetailPage({
                             {isDelivery && !isPaid ? "Receber Pagamento" : "Status de Pagamento"}
                         </Button>
                         <Button
-                            type="button"
                             variant="outline"
                             className="flex-1 h-12"
                             onClick={() => {
@@ -1044,7 +1063,6 @@ export default function DeliveryDetailPage({
                         onClose={() => setSelectedLink(null)}
                         order={selectedOrder}
                         deliveryStatusOverride={resolvedSelectedStatus}
-                        extraGeneralContent={driverPaymentBanner}
                         footer={sheetFooter}
                     />
                 )

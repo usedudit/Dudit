@@ -32,6 +32,7 @@ import {
     transitionMyDeliveryAssignmentAction,
     markSingleOrderDeliveredAction,
 } from "@/app/actions/delivery-drivers"
+import { checkOrderDeliveryOtpRequirementAction } from "@/app/actions/delivery-otp"
 import { triggerDriverLocationCapture } from "./DriverLocationBeacon"
 import { DeliveryOtpModal } from "@/components/delivery/DeliveryOtpModal"
 import {
@@ -307,17 +308,25 @@ export default function DeliveryAssignmentDetail({
             return
         }
 
-        // Se estiver finalizando rota de pedido único, exigir código de confirmação
+        // Se estiver finalizando rota de pedido único, verificar se exige código de confirmação
         if (next.status === "delivered" && ordersList.length <= 1) {
             const singleOrder = ordersList[0]
-            setOtpModalState({
-                isOpen: true,
-                orderId: singleOrder?.order_id || assignment.order_id,
-                orderNumber: singleOrder?.order_number || assignment.order_number,
-                customerName: singleOrder?.customer_name || assignment.customer_name,
-                isSingleOrderRoute: true,
-            })
-            return
+            const targetOrderId = singleOrder?.order_id || assignment.order_id
+            if (targetOrderId) {
+                setLoading(true)
+                const otpCheck = await checkOrderDeliveryOtpRequirementAction({ orderId: String(targetOrderId) })
+                setLoading(false)
+                if (otpCheck.success && otpCheck.requiresOtp && !otpCheck.isConfirmed) {
+                    setOtpModalState({
+                        isOpen: true,
+                        orderId: targetOrderId,
+                        orderNumber: singleOrder?.order_number || assignment.order_number,
+                        customerName: singleOrder?.customer_name || assignment.customer_name,
+                        isSingleOrderRoute: true,
+                    })
+                    return
+                }
+            }
         }
 
         setLoading(true)
@@ -715,14 +724,36 @@ export default function DeliveryAssignmentDetail({
                                                                                     <EyeIcon size={16} /> Ver Detalhes do Pedido
                                                                                 </DropdownItem>
                                                                                 {assignment.status === "out_for_delivery" && !isOrderDelivered && (
-                                                                                    <DropdownItem onClick={() => {
-                                                                                        setOtpModalState({
-                                                                                            isOpen: true,
+                                                                                    <DropdownItem onClick={async () => {
+                                                                                        setLoading(true)
+                                                                                        const otpCheck = await checkOrderDeliveryOtpRequirementAction({ orderId: String(order.order_id) })
+                                                                                        if (otpCheck.success && otpCheck.requiresOtp && !otpCheck.isConfirmed) {
+                                                                                            setLoading(false)
+                                                                                            setOtpModalState({
+                                                                                                isOpen: true,
+                                                                                                orderId: order.order_id,
+                                                                                                orderNumber: order.order_number,
+                                                                                                customerName: order.customer_name,
+                                                                                                isSingleOrderRoute: false,
+                                                                                            })
+                                                                                            return
+                                                                                        }
+                                                                                        const res = await markSingleOrderDeliveredAction({
+                                                                                            assignmentId: assignment.assignment_id,
                                                                                             orderId: order.order_id,
-                                                                                            orderNumber: order.order_number,
-                                                                                            customerName: order.customer_name,
-                                                                                            isSingleOrderRoute: false,
                                                                                         })
+                                                                                        setLoading(false)
+                                                                                        if (!res.success) {
+                                                                                            toast.error(res.error || "Não foi possível confirmar a entrega do pedido.")
+                                                                                            return
+                                                                                        }
+                                                                                        setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
+                                                                                        triggerDriverLocationCapture("status_change")
+                                                                                        toast.success(`Pedido #${order.order_number || ""} entregue com sucesso!`)
+                                                                                        const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
+                                                                                        if (allDone) {
+                                                                                            setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+                                                                                        }
                                                                                     }}>
                                                                                         <CheckCircleIcon size={16} className="text-emerald-600" /> Confirmar Entrega deste Pedido
                                                                                     </DropdownItem>

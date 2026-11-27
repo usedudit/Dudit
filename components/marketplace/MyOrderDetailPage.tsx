@@ -1819,95 +1819,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
         });
 
-        const resolutionType = activeReturnRequest.approved_resolution || activeReturnRequest.desired_resolution;
-        const resolutionLabel = resolutionType === "refund" ? "Reembolso" :
-            resolutionType === "exchange" ? "Troca" :
-                resolutionType === "store_credit" ? "Vale-compra" : "Sem resolução";
-        const isResolved = activeReturnRequest.status === "RESOLVED" || activeReturnRequest.status === "APPROVED";
-        const reverseMethod = activeReturnRequest.reverse_logistics_method || null;
-        const reverseStatus = activeReturnRequest.reverse_logistics_status || null;
-        const reverseFreightPayer = activeReturnRequest.return_freight_payer || null;
-        const reverseTracking = activeReturnRequest.reverse_logistics_tracking_code || null;
-        const reverseNotes = activeReturnRequest.reverse_logistics_notes || null;
-        const reverseDesc = getReverseLogisticsCustomerDescription(reverseMethod);
-        const returnShipment = Array.isArray(order.order_shipments)
-            ? order.order_shipments.find((s: any) => s.kind === "return" && s.status !== "cancelled")
-            : null;
-        const exchangeItemsSnap = Array.isArray(activeReturnRequest.exchange_items_snapshot)
-            ? activeReturnRequest.exchange_items_snapshot
-            : [];
-
         return (
             <InfoCard
                 title={returnStatusCfg.title}
                 color={returnStatusCfg.color}
-                message={
-                    <span className="space-y-1 block">
-                        <span>{returnStatusCfg.description}</span>
-                        {isResolved && resolutionType && (
-                            <span className="block mt-1">
-                                <strong className="font-medium">Tipo de resolução:</strong> {resolutionLabel}
-                            </span>
-                        )}
-                        {exchangeItemsSnap.length > 0 && (
-                            <span className="block mt-1.5">
-                                <strong className="font-medium">Produtos selecionados na troca:</strong>{" "}
-                                {exchangeItemsSnap
-                                    .map((ei: any) => `${ei.product_name || "Produto"} (${ei.quantity || 1}x${Number(ei.unit_price || 0) > 0 ? ` - ${formatCurrency(Number(ei.unit_price))}` : ""})`)
-                                    .join(", ")}
-                            </span>
-                        )}
-                        {reverseMethod && (
-                            <span className="block mt-1.5">
-                                <strong className="font-medium">Devolução do item:</strong> {getReverseLogisticsMethodLabel(reverseMethod)}
-                                {reverseMethod !== "not_required" && reverseStatus ? ` (${getReverseLogisticsStatusLabel(reverseStatus)})` : ""}
-                                {reverseDesc ? ` — ${reverseDesc}` : ""}
-                            </span>
-                        )}
-                        {reverseFreightPayer && reverseMethod && reverseMethod !== "not_required" && reverseMethod !== "in_person" && (
-                            <span className="block mt-1">
-                                <strong className="font-medium">Frete da devolução:</strong> {getShippingPayerLabel(reverseFreightPayer)}
-                            </span>
-                        )}
-                        {(returnShipment?.tracking_number || reverseTracking) && (
-                            <span className="block mt-1">
-                                <strong className="font-medium">Rastreio / referência:</strong>{" "}
-                                {returnShipment?.tracking_url ? (
-                                    <a href={returnShipment.tracking_url} target="_blank" rel="noopener noreferrer" className="underline font-medium">
-                                        {returnShipment.tracking_number || "Acompanhar envio"}
-                                    </a>
-                                ) : (
-                                    returnShipment?.tracking_number || reverseTracking
-                                )}
-                            </span>
-                        )}
-                        {reverseNotes && (
-                            <span className="block mt-1">
-                                <strong className="font-medium">Instruções da loja:</strong> {reverseNotes}
-                            </span>
-                        )}
-                        {isResolved && Number(activeReturnRequest.refund_amount || 0) > 0 && (
-                            <span className="block mt-1">
-                                <strong className="font-medium">Valor reembolsado:</strong> {formatCurrency(Number(activeReturnRequest.refund_amount))}
-                            </span>
-                        )}
-                        {isResolved && Number(activeReturnRequest.store_credit_amount || 0) > 0 && (
-                            <span className="block mt-1">
-                                <strong className="font-medium">Vale-compra gerado:</strong> {formatCurrency(Number(activeReturnRequest.store_credit_amount))}
-                            </span>
-                        )}
-                        {activeReturnRequest.seller_notes && (
-                            <span className="block mt-1 font-medium">
-                                Observações do vendedor: {activeReturnRequest.seller_notes}
-                            </span>
-                        )}
-                        {activeReturnRequest.reported_to_dudit_at && (
-                            <span className="block mt-1">
-                                Reporte enviado à Dudit em {formatDate(activeReturnRequest.reported_to_dudit_at)}.
-                            </span>
-                        )}
-                    </span>
-                }
+                message={returnStatusCfg.description}
                 bottomElement={
                     <div className="flex flex-wrap items-center gap-4">
                         <Button

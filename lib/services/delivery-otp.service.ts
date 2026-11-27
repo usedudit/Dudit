@@ -1,6 +1,7 @@
 import { randomInt, randomBytes, createHmac, timingSafeEqual } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { encrypt, decrypt } from "@/lib/cryptoService"
+import { isOnlineMarketplaceOrder } from "@/lib/orders/order-utils"
 
 export type DeliveryModality =
   | "dudit_platform"
@@ -64,7 +65,7 @@ export async function doesOrderRequireDeliveryOtp(
   if (!order) {
     const { data: fetchedOrder } = await admin
       .from("orders")
-      .select("id, total_amount, situation, delivery_status, delivery_type, delivery_breakdown, partner_id, buyer_id")
+      .select("id, total_amount, situation, delivery_status, delivery_type, delivery_breakdown, partner_id, buyer_id, customer_id, order_source")
       .eq("id", orderId)
       .maybeSingle()
 
@@ -82,6 +83,57 @@ export async function doesOrderRequireDeliveryOtp(
   }
 
   const eligibleAmount = Number(order.total_amount || 0)
+
+  // 0. ERP / Manual order without a Dudit customer account:
+  // If the order was created outside the marketplace (e.g. Manual, PDV, WhatsApp)
+  // and the customer has no linked Dudit user account, they have no way to view an OTP code.
+  if (order.order_source && !isOnlineMarketplaceOrder(order.order_source)) {
+    const candidateIds = Array.from(
+      new Set([order.customer_id, order.buyer_id].filter(Boolean).map(String))
+    )
+    let hasDuditAccount = false
+
+    if (candidateIds.length > 0) {
+      let matchedCustomerRow = false
+      for (const cid of candidateIds) {
+        const { data: cust } = await admin
+          .from("customers")
+          .select("id, user_id, marketplace_user_id")
+          .eq("id", cid)
+          .maybeSingle()
+        if (cust) {
+          matchedCustomerRow = true
+          if (cust.user_id || cust.marketplace_user_id) {
+            hasDuditAccount = true
+            break
+          }
+        }
+      }
+
+      // If buyer_id wasn't a customers.id row, check if it directly references a Dudit user profile
+      if (!hasDuditAccount && !matchedCustomerRow && order.buyer_id) {
+        const { data: profile } = await admin
+          .from("user_profiles")
+          .select("user_id")
+          .eq("user_id", order.buyer_id)
+          .maybeSingle()
+        if (profile?.user_id) {
+          hasDuditAccount = true
+        }
+      }
+    }
+
+    if (!hasDuditAccount) {
+      return {
+        requiresOtp: false,
+        modality: "other",
+        reason: "Pedido criado via ERP para cliente sem conta na Dudit não exige código de confirmação.",
+        eligibleAmount,
+        hasActiveDriver: false,
+        driverType: null,
+      }
+    }
+  }
 
   // 1. Pickup modality: Never requires OTP
   if (order.delivery_type === "pickup") {

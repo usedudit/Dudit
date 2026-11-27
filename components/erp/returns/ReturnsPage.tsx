@@ -23,7 +23,7 @@ import ReturnPrintModal from "./ReturnPrintModal"
 import CreateReturnPage from "./CreateReturnPage"
 import ReturnPageControls from "./ReturnPageControls"
 import type { ReturnRequest } from "./types"
-import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction } from "@/app/actions/erp/returns"
+import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction, updateReturnReverseLogisticsAction } from "@/app/actions/erp/returns"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 
@@ -268,6 +268,25 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 }
                 toast({ title: "Sucesso", description: "Solicitação criada com sucesso." })
             } else if (entityState.action === "edit" && entityState.entityId) {
+                if (activeReturnRequest && ["APPROVED", "PROCESSING", "RESOLVED"].includes(activeReturnRequest.status)) {
+                    const logisticsRes = await updateReturnReverseLogisticsAction({
+                        partnerId,
+                        requestId: entityState.entityId,
+                        reverseLogisticsMethod: data.reverseLogisticsMethod ?? null,
+                        reverseLogisticsStatus: data.reverseLogisticsStatus ?? null,
+                        returnFreightPayer: data.returnFreightPayer ?? null,
+                        reverseLogisticsTrackingCode: data.reverseLogisticsTrackingCode ?? null,
+                        reverseLogisticsNotes: data.reverseLogisticsNotes ?? null,
+                        sellerNotes: data.observations ?? undefined,
+                        returnToInventoryItems: data.returnToInventoryItems || null,
+                    })
+                    if (!logisticsRes.success) throw new Error(logisticsRes.error)
+                    toast({ title: "Sucesso", description: "Logística reversa atualizada com sucesso." })
+                    await queryClient.invalidateQueries({ queryKey: ['erp', 'returns', partnerId] })
+                    closeEntity()
+                    return
+                }
+
                 const nextStatus = data.status
                 const isApprovedStatus = ["APPROVED", "PROCESSING", "RESOLVED"].includes(nextStatus || "")
                 const isRejectedStatus = nextStatus === "REJECTED"

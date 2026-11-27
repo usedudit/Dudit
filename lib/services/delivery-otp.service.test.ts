@@ -24,6 +24,8 @@ describe("Delivery Confirmation OTP (Delivery OTP) Service", () => {
     delivery_settings: Record<string, any>
     order_shipments: any[]
     order_delivery_otps: any[]
+    customers: any[]
+    user_profiles: any[]
   }
 
   let mockAdminClient: any
@@ -37,6 +39,8 @@ describe("Delivery Confirmation OTP (Delivery OTP) Service", () => {
       delivery_settings: {},
       order_shipments: [],
       order_delivery_otps: [],
+      customers: [],
+      user_profiles: [],
     }
 
     mockAdminClient = {
@@ -491,6 +495,56 @@ describe("Delivery Confirmation OTP (Delivery OTP) Service", () => {
       expect(mockStore.order_delivery_otps[0].confirmed_at).toBeDefined()
       expect(mockStore.order_delivery_otps[0].confirmed_by).toBe("admin_user_1")
       expect(mockStore.order_delivery_otps[0].invalidation_reason).toContain("Bypass autorizado por administrador")
+    })
+  })
+
+  describe("Rule E: Pedidos criados via ERP para cliente sem conta Dudit não exigem/geram OTP", () => {
+    it("não deve exigir OTP para pedido manual sem cliente vinculado (mesmo na Rede Dudit)", async () => {
+      mockStore.orders["ord_erp_no_cust"] = {
+        id: "ord_erp_no_cust",
+        total_amount: 800.0,
+        delivery_type: "delivery",
+        order_source: "Manual",
+        buyer_id: null,
+        customer_id: null,
+      }
+      mockStore.delivery_assignments.push({ order_id: "ord_erp_no_cust", driver_id: "driver_dudit_1", status: "assigned" })
+
+      const req = await doesOrderRequireDeliveryOtp("ord_erp_no_cust", { adminClient: mockAdminClient })
+      expect(req.requiresOtp).toBe(false)
+    })
+
+    it("não deve exigir OTP para pedido ERP cujo cliente cadastrado na loja não tem conta Dudit", async () => {
+      mockStore.customers.push({ id: "cust_local_1", user_id: null, marketplace_user_id: null })
+      mockStore.orders["ord_erp_local_cust"] = {
+        id: "ord_erp_local_cust",
+        total_amount: 1200.0,
+        delivery_type: "delivery",
+        order_source: "Manual",
+        buyer_id: "cust_local_1",
+        customer_id: "cust_local_1",
+      }
+      mockStore.delivery_assignments.push({ order_id: "ord_erp_local_cust", driver_id: "driver_dudit_1", status: "assigned" })
+
+      const req = await doesOrderRequireDeliveryOtp("ord_erp_local_cust", { adminClient: mockAdminClient })
+      expect(req.requiresOtp).toBe(false)
+    })
+
+    it("deve exigir OTP normalmente para pedido ERP cujo cliente possui conta Dudit vinculada", async () => {
+      mockStore.customers.push({ id: "cust_linked_1", user_id: null, marketplace_user_id: "auth_user_999" })
+      mockStore.orders["ord_erp_linked_cust"] = {
+        id: "ord_erp_linked_cust",
+        total_amount: 1200.0,
+        delivery_type: "delivery",
+        order_source: "Manual",
+        buyer_id: "cust_linked_1",
+        customer_id: "cust_linked_1",
+      }
+      mockStore.delivery_assignments.push({ order_id: "ord_erp_linked_cust", driver_id: "driver_dudit_1", status: "assigned" })
+
+      const req = await doesOrderRequireDeliveryOtp("ord_erp_linked_cust", { adminClient: mockAdminClient })
+      expect(req.requiresOtp).toBe(true)
+      expect(req.modality).toBe("dudit_platform")
     })
   })
 })
