@@ -57,7 +57,7 @@ export async function listDeliveryDriversAdminAction(params?: { limit?: number; 
   const hasMore = rows.length > limit
   const page = hasMore ? rows.slice(0, limit) : rows
   const profiles = page.length
-    ? (await admin.from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", page.map((row: any) => row.user_id))).data || []
+    ? (await admin.from("user_profiles").select("user_id, full_name, phone").in("user_id", page.map((row: any) => row.user_id))).data || []
     : []
   const profileById = new Map((profiles as any[]).map((profile) => [String(profile.user_id), profile]))
   const users = await Promise.all(page.map(async (row: any) => {
@@ -94,7 +94,7 @@ export async function getDeliveryDriverAdminAction(driverId: string) {
   if (error || !driver) return { success: false as const, error: "Entregador não encontrado." }
 
   const [{ data: profile }, authResult, { data: assignments }, { data: links }] = await Promise.all([
-    admin.from("user_profiles").select("user_id, full_name, phone, avatar_url").eq("user_id", safeDriverId).maybeSingle(),
+    admin.from("user_profiles").select("user_id, full_name, phone").eq("user_id", safeDriverId).maybeSingle(),
     admin.auth.admin.getUserById(safeDriverId),
     admin.from("delivery_assignments").select("id, order_id, partner_id, status, delivery_fee, assigned_at, completed_at, failure_reason, payment_confirmed_at").eq("driver_id", safeDriverId).order("assigned_at", { ascending: false }).limit(100),
     admin.from("delivery_driver_partners").select("id, partner_id, is_active, created_at").eq("driver_id", safeDriverId).order("created_at", { ascending: false }),

@@ -47,13 +47,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const router = useRouter()
     const pathname = usePathname()
     const [isTransitioning, setIsTransitioning] = useState(false)
-    const { profile, isLoading: isProfileLoading } = useUserProfile(userProfile ? { full_name: userProfile.fullName, address: null, avatar_url: userProfile.imageUrl || null } : null)
+    const { profile, isLoading: isProfileLoading } = useUserProfile(userProfile ? { full_name: userProfile.fullName, address: null, avatar_url: null } : null)
 
     const [userName, setUserName] = useState(userProfile?.fullName || profile?.full_name || "Usuário")
     const [userEmail, setUserEmail] = useState(userProfile?.email || "")
     const [userInitials, setUserInitials] = useState(userProfile?.initials || getUserInitials(userProfile?.fullName || profile?.full_name || "U"))
     const [avatarColor, setAvatarColor] = useState(userProfile?.avatarColor || getAvatarColor(userProfile?.fullName || profile?.full_name || "Usuário"))
-    const [imageUrl, setImageUrl] = useState<string | null>(userProfile?.imageUrl || null)
+    const imageUrl = null
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
     const { partnerId, planSlug, role, businessInfo } = usePermissions()
@@ -69,9 +69,6 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
             setUserName(profile.full_name)
             setUserInitials(getUserInitials(profile.full_name))
             setAvatarColor(getAvatarColor(profile.full_name))
-            if ((profile as any).avatar_url) {
-                setImageUrl((profile as any).avatar_url)
-            }
         }
     }, [profile, userProfile])
     // supabase singleton imported directly

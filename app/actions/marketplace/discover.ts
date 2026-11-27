@@ -1849,7 +1849,7 @@ async function fetchBrasilTodo(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     return {
         id: "brasilTodo",
         title: "Destaques em todo o Brasil",
-        subtitle: "Descubra produtos e novidades de lojas de todo o país",
+        subtitle: "",
         gatilho: "curiosidade",
         items,
         _allItems: diversified.map(item => processProduct(item as RawProduct)),

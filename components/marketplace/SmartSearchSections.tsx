@@ -136,19 +136,10 @@ export const ProximityRingsSection: React.FC<ProximityRingsSectionProps> = ({
   if (!hasRegional && !hasNational && !hasOther) return null
 
   return (
-    <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border space-y-10">
+    <div className="mt-12 pt-8 space-y-10">
       {/* Anel 2: Cidades vizinhas / Região */}
       {hasRegional && (
-        <section>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
-              Em cidades vizinhas e na sua região
-            </h2>
-          </div>
-          <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
-            Lojas, produtos e profissionais próximos fora da sua cidade
-          </p>
-
+        <FormSection title="Em cidades vizinhas e na sua região" hasSeparator={hasRegional ? true : false}>
           {regionalSellers.length > 0 && (
             <div className="mb-5">
               <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Lojas e vitrines</h3>
@@ -163,7 +154,7 @@ export const ProximityRingsSection: React.FC<ProximityRingsSectionProps> = ({
               {rings.regional.map((item) => renderDistantItem(item))}
             </div>
           )}
-        </section>
+        </FormSection>
       )}
 
       {/* Anel 3: Vendedores nacionais com envio para o CEP */}

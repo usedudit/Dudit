@@ -50,9 +50,9 @@ export function NotificationBell({
       >
         <NotificationIcon
           className={cn(
-            "w-5 h-5",
+            "w-4 h-4",
             variant === "marketplace"
-              ? "text-white"
+              ? "text-gray-400 dark:text-dark-body hover:text-white"
               : "text-brand-dark dark:text-dark-heading",
           )}
         />

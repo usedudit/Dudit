@@ -75,14 +75,14 @@ export function AdminHeader({
             ? {
                 full_name: userProfile.fullName,
                 address: null,
-                avatar_url: userProfile.imageUrl || null,
+                avatar_url: null,
             }
             : null
     )
 
     const [userName, setUserName] = useState(userProfile?.fullName || profile?.full_name || "Admin")
     const [userEmail, setUserEmail] = useState(userProfile?.email || "")
-    const [imageUrl, setImageUrl] = useState<string | null>(userProfile?.imageUrl || null)
+    const imageUrl = null
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [currentRole, setCurrentRole] = useState<string>(adminRole || "Administrador")
 
@@ -96,9 +96,6 @@ export function AdminHeader({
     useEffect(() => {
         if (profile?.full_name && !userProfile?.fullName) {
             setUserName(profile.full_name)
-            if ((profile as any).avatar_url) {
-                setImageUrl((profile as any).avatar_url)
-            }
         }
     }, [profile, userProfile])
 

@@ -123,8 +123,9 @@ function mapReturnEventToHistoryEntry(
         changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`)
     }
 
-    if (!isRejectedEvent && isApprovedOrResolved && metadata.exchange_order_id) {
-        changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
+    if (!isRejectedEvent && isApprovedOrResolved && (metadata.exchange_order_number || metadata.exchange_order_id)) {
+        const orderRef = metadata.exchange_order_number || `#${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`
+        changeLines.push(`Pedido de troca criado: ${orderRef}`)
     }
     if (!isRejectedEvent && isApprovedOrResolved && Number(metadata.exchange_shortfall_amount || 0) > 0) {
         changeLines.push(`Diferença complementar cobrada: ${formatCurrency(Number(metadata.exchange_shortfall_amount))}`)

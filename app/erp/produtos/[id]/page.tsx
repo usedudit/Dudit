@@ -146,6 +146,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         video_thumbnail: product.video_thumbnail || null,
         video_duration: product.video_duration || null,
         video_provider_id: product.video_provider_id || null,
+        external_id: (product as any).external_id || null,
+        external_provider: (product as any).external_provider || null,
+        last_external_sync_at: (product as any).last_external_sync_at || null,
     }
 
     return <EditProductWrapper product={formattedProduct} suppliers={suppliers || []} partnerId={partnerId} />

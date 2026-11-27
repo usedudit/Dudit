@@ -311,21 +311,6 @@ export function MarketplaceBottomMenu() {
                                 <MenuItem label="Fale com a gente" href="/institucional/contato" icon={CustomerSupportIcon} onClose={() => setIsMenuOpen(false)} />
                             </div>
                         </div>
-
-                        {/* Session Log out */}
-                        {user && (
-                            <div className="border-t border-gray-100 dark:border-dark-border mt-6 pt-4 px-2">
-                                <button
-                                    onClick={handleSignOut}
-                                    className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 text-brand-red font-semibold transition-all duration-200 w-full text-left group"
-                                >
-                                    <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-brand-red shrink-0 group-hover:scale-105 transition-transform duration-200">
-                                        <LogoutIcon size={20} className="text-brand-red" />
-                                    </div>
-                                    <span className="text-[14px] text-brand-red">Sair da sessão</span>
-                                </button>
-                            </div>
-                        )}
                     </div>
                 </BottomSheet>
             )}

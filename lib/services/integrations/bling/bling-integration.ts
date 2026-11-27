@@ -467,7 +467,7 @@ export async function syncBlingProductsToDudit(params: {
 
           let { data: existingProduct } = await supabase
             .from("products")
-            .select("id, stock_reserved")
+            .select("id, stock_reserved, description, images")
             .eq("partner_id", partnerId)
             .eq("external_provider", BLING_PROVIDER)
             .eq("external_id", externalId)
@@ -476,7 +476,7 @@ export async function syncBlingProductsToDudit(params: {
           if (!existingProduct && sku) {
             const { data: bySku } = await supabase
               .from("products")
-              .select("id, stock_reserved")
+              .select("id, stock_reserved, description, images")
               .eq("partner_id", partnerId)
               .eq("sku", sku)
               .maybeSingle()
@@ -488,6 +488,8 @@ export async function syncBlingProductsToDudit(params: {
 
           if (existingProduct) {
             targetProductId = existingProduct.id
+            const hasExistingDescription = Boolean(String(existingProduct.description || "").trim())
+            const hasExistingImages = Array.isArray(existingProduct.images) && existingProduct.images.length > 0
             const { error: updateErr } = await supabase
               .from("products")
               .update({
@@ -499,9 +501,10 @@ export async function syncBlingProductsToDudit(params: {
                 unit,
                 min_stock: minStock,
                 stock_quantity: stock,
-                stock_reserved: Math.max(Number(existingProduct.stock_reserved || 0), stockReserved),
-                description: description || undefined,
-                images: images.length > 0 ? images : undefined,
+                stock_reserved: stockReserved,
+                // Preserva customizações de vitrine feitas pelo lojista na Dudit (só preenche se estiver vazio)
+                description: !hasExistingDescription && description ? description : undefined,
+                images: !hasExistingImages && images.length > 0 ? images : undefined,
                 status: isActive ? "ativo" : "inativo",
                 deleted_at: null,
                 deleted_by: null,

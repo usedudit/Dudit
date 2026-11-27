@@ -1661,16 +1661,28 @@ async function handler(request: NextRequest) {
     }
 
     if (!existingOrderId && couponIdToSave) {
-      await adminClient.from("coupon_usages").upsert(
-        {
-          coupon_id: couponIdToSave,
-          customer_id: buyerId,
-          order_id: newOrder.id,
-        },
-        { onConflict: "coupon_id,order_id" }
-      ).catch((err: any) => {
-        SecureLogger.error("Failed to record coupon usage", { orderId: newOrder.id, error: err })
-      })
+      try {
+        const { error: couponUsageError } = await adminClient.from("coupon_usages").upsert(
+          {
+            coupon_id: couponIdToSave,
+            customer_id: resolvedCustomerId,
+            order_id: newOrder.id,
+          },
+          { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+        )
+        if (couponUsageError) {
+          SecureLogger.error("Failed to record coupon usage", {
+            orderId: newOrder.id,
+            errorCode: couponUsageError.code,
+            errorMessage: couponUsageError.message,
+          })
+        }
+      } catch (err: any) {
+        SecureLogger.error("Failed to record coupon usage", {
+          orderId: newOrder.id,
+          errorMessage: err?.message,
+        })
+      }
     }
 
     if (isDev) console.log(existingOrderId ? "Order updated successfully:" : "Order created successfully:", newOrder.id)

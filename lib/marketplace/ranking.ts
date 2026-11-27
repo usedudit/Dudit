@@ -157,6 +157,47 @@ export function sortByTrendingScore<T extends Parameters<typeof calcTrendingScor
 }
 
 /**
+ * Ranqueamento unificado do marketplace para listagens do /explorar
+ * (produtos, serviços, planos e vitrines, tanto locais quanto em anéis distantes).
+ * Combina o score do marketplace (`calcCategoryBrowseScore`) com a relevância textual
+ * (`_searchRank`) quando há busca, seguido de diversidade de vendedores.
+ */
+export function rankMarketplaceItems<T extends Record<string, any>>(
+  items: T[],
+  options: { applyDiversity?: boolean; maxConsecutive?: number } = {},
+): T[] {
+  if (!Array.isArray(items) || items.length <= 1) return items
+
+  const scored = items.map((item) => {
+    const browseScore = calcCategoryBrowseScore(item as unknown as RankableItem)
+    const rawRank =
+      typeof item._searchRank === "number" && Number.isFinite(item._searchRank)
+        ? item._searchRank
+        : null
+    return { item, browseScore, rawRank }
+  })
+
+  const finiteRanks = scored.map((s) => s.rawRank).filter((v): v is number => v !== null)
+  const hasSearchRank = finiteRanks.length > 0
+  const minRank = hasSearchRank ? Math.min(...finiteRanks) : 0
+  const spanRank = hasSearchRank ? Math.max(...finiteRanks) - minRank : 0
+
+  scored.sort((a, b) => {
+    const normRankA = a.rawRank === null ? 0 : (spanRank > 0 ? (a.rawRank - minRank) / spanRank : 0.5)
+    const normRankB = b.rawRank === null ? 0 : (spanRank > 0 ? (b.rawRank - minRank) / spanRank : 0.5)
+    const totalA = hasSearchRank ? 0.6 * a.browseScore + 0.4 * normRankA : a.browseScore
+    const totalB = hasSearchRank ? 0.6 * b.browseScore + 0.4 * normRankB : b.browseScore
+    if (Math.abs(totalB - totalA) > 0.0001) return totalB - totalA
+    return new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime()
+  })
+
+  const sorted = scored.map((s) => s.item)
+  return options.applyDiversity === false
+    ? sorted
+    : (applySellerDiversity(sorted as unknown as RankableItem[], options.maxConsecutive ?? 2) as unknown as T[])
+}
+
+/**
  * Score calculation for items inside a vendor's storefront.
  * Combines database marketplace_score with client-side trending signals,
  * featured/highlighted boost, and promotional boost.

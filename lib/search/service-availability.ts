@@ -33,6 +33,42 @@ const MAX_SERVICES_TO_CHECK = 20
 const CANCELLED_STATUSES = new Set(["cancelado", "cancelled", "canceled", "no-show", "no_show", "recusado"])
 const MIN_LEAD_TIME_MINUTES = 15
 
+const BRAZIL_DAYS_OF_WEEK: ParsedTimeWindow["dayOfWeekKey"][] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+]
+
+function buildDefaultTodayWindow(now: Date = new Date()): ParsedTimeWindow {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  })
+  const parts = formatter.formatToParts(now)
+  const year = parts.find((p) => p.type === "year")?.value ?? String(now.getUTCFullYear())
+  const month = parts.find((p) => p.type === "month")?.value ?? String(now.getUTCMonth() + 1).padStart(2, "0")
+  const day = parts.find((p) => p.type === "day")?.value ?? String(now.getUTCDate()).padStart(2, "0")
+  const weekdayShort = (parts.find((p) => p.type === "weekday")?.value ?? "").toLowerCase().slice(0, 3)
+  const weekdayMap: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
+  const dayIdx = weekdayMap[weekdayShort] ?? now.getUTCDay()
+
+  return {
+    targetDate: `${year}-${month}-${day}`,
+    dayOfWeekKey: BRAZIL_DAYS_OF_WEEK[dayIdx] ?? "monday",
+    period: "any",
+    startMinutes: 0,
+    endMinutes: 23 * 60 + 59,
+    label: "hoje",
+  }
+}
+
 function getBrazilNowInfo(now: Date): { todayYmd: string; currentMinutes: number } {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
@@ -280,6 +316,7 @@ export async function enrichServicesWithAvailability<T extends Record<string, an
   try {
     const storeIdList = Array.from(storeIds)
     const partnerIdList = Array.from(partnerIds)
+    const effectiveWindow = timeWindow ?? buildDefaultTodayWindow()
 
     const [storesRes, attendanceRes, appointmentsRes] = await Promise.all([
       storeIdList.length > 0
@@ -291,12 +328,12 @@ export async function enrichServicesWithAvailability<T extends Record<string, an
             .select("partner_id, store_id, max_service_km, travel_fee_mode, free_travel_km, travel_flat_fee, travel_per_km, enforce_service_area")
             .in("partner_id", partnerIdList)
         : Promise.resolve({ data: [] as any[], error: null }),
-      timeWindow && partnerIdList.length > 0
+      partnerIdList.length > 0
         ? supabase
             .from("appointments")
             .select("partner_id, store_id, start_time, end_time, status")
             .in("partner_id", partnerIdList)
-            .eq("start_date", timeWindow.targetDate)
+            .eq("start_date", effectiveWindow.targetDate)
         : Promise.resolve({ data: [] as any[], error: null }),
     ])
 
@@ -349,20 +386,20 @@ export async function enrichServicesWithAvailability<T extends Record<string, an
 
       const { travelFeeLabel, outOfServiceArea } = evaluateServiceAttendance(item, rule, distanceKm)
 
+      const openingHours = storeId ? openingHoursByStore.get(String(storeId)) : null
+      const booked =
+        (storeId ? bookedByScope.get(`store:${storeId}`) : undefined) ??
+        (partnerId ? bookedByScope.get(`partner:${partnerId}`) : undefined) ??
+        []
+
+      const availability = computeWindowAvailability({
+        openingHours,
+        bookedIntervals: booked,
+        timeWindow: effectiveWindow,
+        durationMinutes: item?.duration_minutes,
+      })
+
       if (timeWindow) {
-        const openingHours = storeId ? openingHoursByStore.get(String(storeId)) : null
-        const booked =
-          (storeId ? bookedByScope.get(`store:${storeId}`) : undefined) ??
-          (partnerId ? bookedByScope.get(`partner:${partnerId}`) : undefined) ??
-          []
-
-        const availability = computeWindowAvailability({
-          openingHours,
-          bookedIntervals: booked,
-          timeWindow,
-          durationMinutes: item?.duration_minutes,
-        })
-
         ;(item as any)._availability = {
           ...availability,
           targetDate: timeWindow.targetDate,
@@ -370,10 +407,18 @@ export async function enrichServicesWithAvailability<T extends Record<string, an
           travelFeeLabel,
           outOfServiceArea,
         } satisfies ServiceAvailabilityInfo
+      } else if (availability.status === "available" && availability.availableSlots.length > 0) {
+        ;(item as any)._availability = {
+          ...availability,
+          targetDate: effectiveWindow.targetDate,
+          periodLabel: effectiveWindow.label,
+          travelFeeLabel,
+          outOfServiceArea,
+        } satisfies ServiceAvailabilityInfo
       } else if (travelFeeLabel || outOfServiceArea) {
         ;(item as any)._availability = {
           status: "consult",
-          label: "Agendamento disponível",
+          label: travelFeeLabel || "Agendamento disponível",
           availableSlots: [],
           targetDate: null,
           periodLabel: null,

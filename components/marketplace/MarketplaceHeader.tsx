@@ -579,16 +579,15 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     // DERIVED VALUES - useMemo instead of useState+useEffect to avoid extra re-render
-    const { userName, fullName, avatarUrl } = useMemo(() => {
+    const { userName, fullName } = useMemo(() => {
         if (user) {
             if (profile?.full_name) {
-                const p = profile as any
-                return { userName: profile.full_name.split(" ")[0], fullName: profile.full_name, avatarUrl: p?.avatar_url || null }
+                return { userName: profile.full_name.split(" ")[0], fullName: profile.full_name }
             }
             const fallback = user.email?.split("@")[0] || "Usuário"
-            return { userName: fallback, fullName: fallback, avatarUrl: null }
+            return { userName: fallback, fullName: fallback }
         }
-        return { userName: "Visitante", fullName: "", avatarUrl: null }
+        return { userName: "Visitante", fullName: "" }
     }, [user, profile?.full_name])
 
     const userLocation = useMemo(() => {
@@ -896,7 +895,6 @@ const Header: React.FC<HeaderProps> = ({
                             >
                                 <UserProfileImage
                                     fullName={fullName}
-                                    imageUrl={avatarUrl}
                                     className="w-9 h-9 border border-white/10"
                                 />
                             </button>
@@ -1246,7 +1244,7 @@ const Header: React.FC<HeaderProps> = ({
                                 )
                             })}
 
-                            <div className="border-t border-brand-border dark:border-dark-border py-2">
+                            <div className="border-t border-brand-border dark:border-dark-border pt-2">
                                 <div className="px-6 py-2.5 flex items-center justify-between">
                                     <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
                                     <Switch checked={theme === "dark"} onCheckedChange={handleThemeToggle} />

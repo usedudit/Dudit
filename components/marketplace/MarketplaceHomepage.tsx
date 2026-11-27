@@ -14,9 +14,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import { Button } from "@/components/reusable/Button"
 import { Input } from "@/components/reusable/Input"
-import { CepInput } from "@/components/reusable/Inputs/CepInput"
-import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
-import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
+import { AddressFormModal } from "@/components/reusable/AddressFormModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getCitiesData } from "@/lib/data/cities-loader"
 import { MarketplaceLandingView } from "./MarketplaceLandingView"
@@ -134,8 +132,6 @@ export default function MarketplaceHome({
     const [activeTrend, setActiveTrend] = useState(TRENDS[0])
     const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false)
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
-    const [isSavingAddress, setIsSavingAddress] = useState(false)
-    const [addressError, setAddressError] = useState<string | null>(null)
 
     const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
     const [showStateList, setShowStateList] = useState(false)
@@ -171,21 +167,6 @@ export default function MarketplaceHome({
             setShowStateDropdown(false)
         }
     }, [isVisitorModalOpen])
-
-    const [form, setForm] = useState({
-        zipCode: "",
-        street: "",
-        number: "",
-        complement: "",
-        neighborhood: "",
-        city: "",
-        state: "",
-        addressType: "casa",
-        noNumber: false,
-        isDefault: false,
-        latitude: null as number | null,
-        longitude: null as number | null,
-    })
 
     const filteredCities = useMemo(() => {
         if (!searchQuery || searchQuery.trim().length < 2 || citiesList.length === 0) return []
@@ -308,192 +289,23 @@ export default function MarketplaceHome({
         return { scope: "city", city: selectedCityName || null, state }
     }, [selectedCitySlug, selectedCityName])
 
-    const handleAddressFetched = (addr: any) => {
-        setForm(f => ({
-            ...f,
-            street: addr.street || f.street,
-            number: addr.number || f.number,
-            noNumber: addr.number ? addr.number === "S/N" : f.noNumber,
-            neighborhood: addr.neighborhood || f.neighborhood,
-            city: addr.city || f.city,
-            state: addr.state || f.state,
-            latitude: addr.latitude ?? f.latitude,
-            longitude: addr.longitude ?? f.longitude,
-        }))
-    }
-
-    const handleSaveAddress = async () => {
-        const { zipCode, street, number, neighborhood, city, state, addressType, noNumber, isDefault } = form
-        const finalNumber = noNumber ? "S/N" : number
-        if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
-            setAddressError("Preencha todos os campos obrigatórios")
-            return
-        }
-
-        setIsSavingAddress(true)
-        setAddressError(null)
-
-        try {
-            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
-            const token = await getCSRFToken()
-
-            const result = await createAddressAction({
-                entityId: user.id,
-                entityType: "user",
-                zipCode,
-                street,
-                number: finalNumber,
-                complement: form.complement,
-                neighborhood,
-                city,
-                state,
-                isDefault,
-                addressType,
-                latitude: form.latitude ?? null,
-                longitude: form.longitude ?? null,
-                csrf_token: token,
-            })
-
-            if (result.error) {
-                setAddressError(result.error)
-                notifyError("Erro", result.error)
-            } else {
-                notifySuccess("Sucesso", "Endereço cadastrado com sucesso!")
-                setIsAddressModalOpen(false)
-                window.location.reload()
-            }
-        } catch (e: any) {
-            setAddressError("Erro ao cadastrar endereço. Tente novamente.")
-        } finally {
-            setIsSavingAddress(false)
-        }
+    const handleNewAddressSaved = async (savedAddress: any) => {
+        notifySuccess("Sucesso", "Endereço cadastrado com sucesso!")
+        setIsAddressModalOpen(false)
+        window.location.reload()
     }
 
     const renderAddressModal = () => {
         if (!user || !isAddressModalOpen) return null
 
         return (
-            <DefaultModal
+            <AddressFormModal
                 isOpen={isAddressModalOpen}
                 onClose={() => setIsAddressModalOpen(false)}
-                title="Cadastrar endereço"
-                maxWidth="md"
-            >
-                <div className="space-y-4 py-2">
-                    <div className="flex items-center gap-3 mb-2">
-                        {[
-                            { value: "casa", label: "Casa" },
-                            { value: "trabalho", label: "Trabalho" },
-                            { value: "outro", label: "Outro" },
-                        ].map(opt => (
-                            <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => setForm(f => ({ ...f, addressType: opt.value }))}
-                                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${form.addressType === opt.value
-                                    ? "bg-brand-green text-white border-brand-green"
-                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
-                                    }`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    <CepInput
-                        id="zipCode"
-                        name="zipCode"
-                        value={form.zipCode}
-                        onChange={val => setForm(f => ({ ...f, zipCode: val }))}
-                        onAddressFetched={handleAddressFetched}
-                    />
-
-                    <Input
-                        label="Rua/Avenida"
-                        id="street"
-                        name="street"
-                        placeholder="Rua, Avenida, etc."
-                        value={form.street}
-                        onChange={e => setForm(f => ({ ...f, street: e.target.value }))}
-                    />
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <NumberInputWithCheckbox
-                            label="Número"
-                            number={form.number}
-                            noNumber={form.noNumber}
-                            onNumberChange={val => setForm(f => ({ ...f, number: val }))}
-                            onNoNumberChange={checked => setForm(f => ({ ...f, noNumber: checked, number: checked ? "S/N" : "" }))}
-                            placeholder="123"
-                        />
-                        <Input
-                            label="Complemento"
-                            id="complement"
-                            name="complement"
-                            placeholder="Apto, Bloco, etc."
-                            value={form.complement}
-                            onChange={e => setForm(f => ({ ...f, complement: e.target.value }))}
-                        />
-                    </div>
-
-                    <Input
-                        label="Bairro"
-                        id="neighborhood"
-                        name="neighborhood"
-                        placeholder="Nome do bairro"
-                        value={form.neighborhood}
-                        onChange={e => setForm(f => ({ ...f, neighborhood: e.target.value }))}
-                    />
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input
-                            label="Cidade"
-                            id="city"
-                            name="city"
-                            placeholder="Nome da cidade"
-                            value={form.city}
-                            onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                        />
-                        <StateComboBox
-                            value={form.state}
-                            onChange={v => setForm(f => ({ ...f, state: v }))}
-                            className="w-full"
-                        />
-                    </div>
-
-                    {addressError && (
-                        <p className="text-red-500 text-sm font-semibold">{addressError}</p>
-                    )}
-
-                    <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
-                        <input
-                            type="checkbox"
-                            checked={form.isDefault}
-                            onChange={(e) => setForm(f => ({ ...f, isDefault: e.target.checked }))}
-                            className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
-                        />
-                        <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
-                    </label>
-
-                    <div className="flex gap-2 pt-2">
-                        <Button
-                            type="button"
-                            onClick={handleSaveAddress}
-                            disabled={isSavingAddress}
-                            className="bg-brand-green text-white hover:bg-[#047857]"
-                        >
-                            {isSavingAddress ? "Salvando..." : "Salvar Endereço"}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsAddressModalOpen(false)}
-                        >
-                            Cancelar
-                        </Button>
-                    </div>
-                </div>
-            </DefaultModal>
+                entityId={user.id}
+                isFirstAddress={true}
+                onSaved={handleNewAddressSaved}
+            />
         )
     }
 

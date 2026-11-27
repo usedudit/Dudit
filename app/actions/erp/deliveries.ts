@@ -79,6 +79,155 @@ function revalidateDeliveryDashboard(partnerId: string, deliveryId?: string) {
 
 const DUDIT_NETWORK_EXPIRATION_MS = 15 * 60 * 1000
 
+/**
+ * Finaliza a baixa de estoque (caso o pedido ainda não tenha `inventory_deducted = true`)
+ * e sincroniza status (`enviado` / `entregue`) + estoque físico/reservado com ERPs conectados (Tiny / Bling).
+ * Executado de forma não-bloqueante sempre que entregas via Delivery mudam para `sent` ou `delivered`.
+ */
+async function syncDeliveredOrdersToErps(params: {
+  partnerId: string
+  orderIds: string[]
+  nextStatus: DeliveryStatusValue
+  actorUserId?: string | null
+}): Promise<void> {
+  if (params.nextStatus !== "sent" && params.nextStatus !== "delivered") return
+  const uniqueOrderIds = Array.from(new Set((params.orderIds || []).filter(Boolean)))
+  if (uniqueOrderIds.length === 0) return
+
+  const admin = getAdminClient()
+  const { data: orders } = await admin
+    .from("orders")
+    .select("id, order_number, store_id, notes, created_by, inventory_deducted, order_items(product_id, variant_id, quantity)")
+    .eq("partner_id", params.partnerId)
+    .in("id", uniqueOrderIds)
+
+  if (!orders || orders.length === 0) return
+
+  const {
+    exportOrderToConnectedErps,
+    updateOrderStatusOnConnectedErps,
+    syncItemsStockToConnectedErps,
+  } = await import("@/lib/services/integrations/erp-sync")
+  const { reserveOrderInventory, finalizeOrderInventory } = await import("@/lib/stock/reservations")
+
+  const erpSit = params.nextStatus === "delivered" ? "entregue" : "enviado"
+
+  for (const order of orders as any[]) {
+    try {
+      const orderItems = (order.order_items || []).filter((it: any) => it?.product_id)
+
+      // 1. Se o pedido ainda não teve baixa física de estoque na Dudit, finaliza o estoque agora
+      if (!order.inventory_deducted && orderItems.length > 0) {
+        const shortfallItems: Array<{ product_id: string; variant_id: string | null; quantity: number }> = []
+        for (const it of orderItems) {
+          const qty = Math.max(0, Number(it.quantity || 0))
+          if (qty <= 0) continue
+          if (it.variant_id) {
+            const { data: vRow } = await admin
+              .from("product_variants")
+              .select("stock_reserved")
+              .eq("id", it.variant_id)
+              .maybeSingle()
+            const reserved = Math.max(0, Number(vRow?.stock_reserved || 0))
+            if (reserved < qty) {
+              shortfallItems.push({ product_id: it.product_id, variant_id: it.variant_id, quantity: qty - reserved })
+            }
+          } else {
+            const { data: pRow } = await admin
+              .from("products")
+              .select("stock_reserved")
+              .eq("id", it.product_id)
+              .maybeSingle()
+            const reserved = Math.max(0, Number(pRow?.stock_reserved || 0))
+            if (reserved < qty) {
+              shortfallItems.push({ product_id: it.product_id, variant_id: null, quantity: qty - reserved })
+            }
+          }
+        }
+
+        if (shortfallItems.length > 0) {
+          await reserveOrderInventory({
+            client: admin,
+            partnerId: params.partnerId,
+            orderId: order.id,
+            items: shortfallItems,
+            storeId: order.store_id || null,
+          })
+        }
+
+        const finalizeRes = await finalizeOrderInventory({
+          client: admin,
+          partnerId: params.partnerId,
+          orderId: order.id,
+          createdBy: params.actorUserId || order.created_by || "",
+          reason: "Venda de Produtos",
+          notes: order.notes || undefined,
+          items: orderItems,
+          storeId: order.store_id || null,
+        })
+
+        if (!("error" in finalizeRes)) {
+          await admin
+            .from("orders")
+            .update({ inventory_deducted: true })
+            .eq("id", order.id)
+            .eq("partner_id", params.partnerId)
+        }
+      }
+
+      // 2. Snapshot do estoque físico antes de chamar os ERPs (evita race condition com webhooks)
+      const stockSnapshots: Array<{ productId: string; variantId?: string | null; newStock: number }> = []
+      for (const it of orderItems) {
+        if (it.variant_id) {
+          const { data: vRow } = await admin
+            .from("product_variants")
+            .select("stock_quantity")
+            .eq("id", it.variant_id)
+            .maybeSingle()
+          stockSnapshots.push({
+            productId: it.product_id,
+            variantId: it.variant_id,
+            newStock: Math.max(0, Number(vRow?.stock_quantity || 0)),
+          })
+        } else {
+          const { data: pRow } = await admin
+            .from("products")
+            .select("stock_quantity")
+            .eq("id", it.product_id)
+            .maybeSingle()
+          stockSnapshots.push({
+            productId: it.product_id,
+            variantId: null,
+            newStock: Math.max(0, Number(pRow?.stock_quantity || 0)),
+          })
+        }
+      }
+
+      // 3. Exporta o pedido (se pendente), atualiza situação para enviado/entregue (lançando estoque no Tiny)
+      //    e sincroniza estoque físico nos provedores restantes sem duplicar
+      const exportRes = await exportOrderToConnectedErps(order.id)
+      const statusRes = !exportRes.exportedProviders.length
+        ? await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit })
+        : { stockHandledProviders: [] as string[] }
+
+      const alreadyHandled = Array.from(
+        new Set([...exportRes.syncedStockProviders, ...statusRes.stockHandledProviders])
+      )
+
+      if (stockSnapshots.length > 0) {
+        await syncItemsStockToConnectedErps({
+          partnerId: params.partnerId,
+          items: stockSnapshots,
+          reason: `Baixa entrega pedido #${order.order_number || order.id}`,
+          excludeProviders: alreadyHandled,
+        })
+      }
+    } catch (err) {
+      console.error(`[deliveries] Erro ao sincronizar pedido ${order.id} com ERP:`, err)
+    }
+  }
+}
+
 export async function expireOldDuditNetworkRequests(adminClient: any, partnerId?: string) {
   try {
     const cutoffIso = new Date(Date.now() - DUDIT_NETWORK_EXPIRATION_MS).toISOString()
@@ -1941,6 +2090,15 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       console.warn("[createERPDeliveryAction] order timestamps patch failed:", err)
     }
 
+    if (status === "sent" || status === "delivered") {
+      void syncDeliveredOrdersToErps({
+        partnerId: payload.partnerId,
+        orderIds,
+        nextStatus: status,
+        actorUserId: user?.id || null,
+      }).catch(() => {})
+    }
+
     await logDeliveryEvent({
       partnerId: payload.partnerId,
       actorUserId: user?.id || null,
@@ -2136,7 +2294,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           if (platformDriverUserIds.size > 0) {
             const driverIdsArray = Array.from(platformDriverUserIds)
             const [{ data: profiles }, { data: driverRows }] = await Promise.all([
-              getAdminClient().from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", driverIdsArray),
+              getAdminClient().from("user_profiles").select("user_id, full_name, phone").in("user_id", driverIdsArray),
               getAdminClient().from("delivery_drivers").select("user_id, vehicle_type, vehicle_plate, city").in("user_id", driverIdsArray),
             ])
 
@@ -2152,7 +2310,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
                 id: String(prof.user_id),
                 fullName: prof.full_name || "Entregador Dudit",
                 phone: prof.phone || null,
-                avatarUrl: prof.avatar_url || null,
+                avatarUrl: null,
                 vehicleType: dInfo?.vehicle_type === "moto" ? "Moto" : dInfo?.vehicle_type === "carro" ? "Carro" : (dInfo?.vehicle_type || null),
                 vehiclePlate: dInfo?.vehicle_plate || null,
                 city: dInfo?.city || null,
@@ -2392,7 +2550,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     if (platformDriverUserIds.size > 0) {
       const driverIdsArray = Array.from(platformDriverUserIds)
       const [{ data: profiles }, { data: driverRows }] = await Promise.all([
-        getAdminClient().from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", driverIdsArray),
+        getAdminClient().from("user_profiles").select("user_id, full_name, phone").in("user_id", driverIdsArray),
         getAdminClient().from("delivery_drivers").select("user_id, vehicle_type, vehicle_plate, city").in("user_id", driverIdsArray),
       ])
 
@@ -2408,7 +2566,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           id: String(prof.user_id),
           fullName: prof.full_name || "Entregador Dudit",
           phone: prof.phone || null,
-          avatarUrl: prof.avatar_url || null,
+          avatarUrl: null,
           vehicleType: dInfo?.vehicle_type === "moto" ? "Moto" : dInfo?.vehicle_type === "carro" ? "Carro" : (dInfo?.vehicle_type || null),
           vehiclePlate: dInfo?.vehicle_plate || null,
           city: dInfo?.city || null,
@@ -2671,7 +2829,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         const driverUserId = String(platformAssignment.driver_id)
         resolvedPlatformDriverId = driverUserId
         const [{ data: profile }, { data: driverRow }, { count: totalDeliveries }] = await Promise.all([
-          getAdminClient().from("user_profiles").select("full_name, phone, avatar_url").eq("user_id", driverUserId).maybeSingle(),
+          getAdminClient().from("user_profiles").select("full_name, phone").eq("user_id", driverUserId).maybeSingle(),
           getAdminClient().from("delivery_drivers").select("vehicle_type, vehicle_plate, city").eq("user_id", driverUserId).maybeSingle(),
           getAdminClient().from("delivery_assignments").select("id", { count: "exact", head: true }).eq("driver_id", driverUserId).eq("status", "delivered"),
         ])
@@ -2683,7 +2841,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           id: driverUserId,
           fullName,
           phone: profile?.phone || null,
-          avatarUrl: profile?.avatar_url || null,
+          avatarUrl: null,
           vehicleType,
           vehiclePlate: driverRow?.vehicle_plate || null,
           city: driverRow?.city || null,
@@ -3067,6 +3225,15 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     await Promise.all(concurrentOps)
 
+    if ((nextStatus === "sent" || nextStatus === "delivered") && orderIds.length > 0) {
+      void syncDeliveredOrdersToErps({
+        partnerId: params.partnerId,
+        orderIds,
+        nextStatus,
+        actorUserId: user?.id || null,
+      }).catch(() => {})
+    }
+
     const logPromises: Promise<any>[] = [
       logDeliveryEvent({
         partnerId: params.partnerId,
@@ -3400,6 +3567,15 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       console.warn("[updateERPDeliveryAction] order timestamps patch failed:", err)
     }
 
+    if ((nextStatus === "sent" || nextStatus === "delivered") && orderIds.length > 0) {
+      void syncDeliveredOrdersToErps({
+        partnerId: payload.partnerId,
+        orderIds,
+        nextStatus,
+        actorUserId: user?.id || null,
+      }).catch(() => {})
+    }
+
     // Build detailed log lines for history/audit
     const previousIds = new Set<string>((previousLinks || []).map((row: any) => String(row.order_id)))
     const currentIds = new Set<string>(orderIds.map(String))
@@ -3604,6 +3780,15 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
 
   if (linkRes.error) return { success: false as const, error: linkRes.error.message }
   if (orderRes.error) return { success: false as const, error: orderRes.error.message }
+
+  if (nextStatus === "sent" || nextStatus === "delivered") {
+    void syncDeliveredOrdersToErps({
+      partnerId: params.partnerId,
+      orderIds: [params.orderId],
+      nextStatus,
+      actorUserId: user?.id || null,
+    }).catch(() => {})
+  }
 
   let changeMsg = nextStatus === "delivered"
     ? "Pedido entregue ao destinatário com sucesso"

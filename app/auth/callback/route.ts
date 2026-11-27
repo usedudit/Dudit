@@ -168,11 +168,6 @@ export async function GET(request: NextRequest) {
           (typeof metadata.name === "string" && metadata.name.trim()) ||
           authUser.email?.split("@")[0] ||
           ""
-        const avatarUrl =
-          (typeof metadata.avatar_url === "string" && metadata.avatar_url.trim()) ||
-          (typeof metadata.picture === "string" && metadata.picture.trim()) ||
-          null
-
         const admin = getAdminClient()
 
         // Safety net: ensure user_profiles exists even when DB trigger doesn't run
@@ -180,9 +175,6 @@ export async function GET(request: NextRequest) {
           user_id: authUser.id,
           full_name: fullName,
           pending_partner_registration: false,
-        }
-        if (avatarUrl) {
-          profilePayload.avatar_url = avatarUrl
         }
 
         const { error: profileError } = await admin

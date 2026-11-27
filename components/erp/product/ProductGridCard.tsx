@@ -135,7 +135,7 @@ const ProductGridCard = React.memo(
 
                         {/* Linha 2: SKU • Categoria • Marca */}
                         <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center">
-                            <span>{hasVariations ? "Múltiplos SKUs" : `SKU: ${product.sku || "N/A"}`}</span>
+                            <span>{hasVariations ? `${variationsCount} ${variationsCount === 1 ? "variação" : "variações"}` : `SKU: ${product.sku || "N/A"}`}</span>
                             {product.category && (
                                 <>
                                     <span className="mx-1.5">•</span>
@@ -222,11 +222,6 @@ const ProductGridCard = React.memo(
                                 <div className="mt-0.5">
                                     <StockAvailabilityHint total={effectiveStock} reserved={reservedStock} />
                                 </div>
-                            )}
-                            {hasVariations && (
-                                <span className="text-[10px] font-bold text-brand-green underline decoration-brand-green/30 mt-0.5">
-                                    {variationsCount} {variationsCount === 1 ? 'variação' : 'variações'}
-                                </span>
                             )}
                         </div>
 

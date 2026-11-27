@@ -49,7 +49,7 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
       ? {
           full_name: session.profile.full_name,
           address: session.profile.address,
-          avatar_url: session.profile.avatar_url,
+          avatar_url: null,
         }
       : null,
     isLoading: isAuthLoading || session.isLoading,

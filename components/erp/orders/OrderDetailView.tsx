@@ -926,7 +926,14 @@ export default function OrderDetailView({
       ? payWithAmount - effectiveOrderTotal
       : 0;
 
-  const cleanNotes = cleanOrderNotes(order.notes);
+  const rawCleanNotes = cleanOrderNotes(order.notes);
+  const cleanNotes = rawCleanNotes
+    ? rawCleanNotes
+        .split("\n")
+        .filter((line) => !/^Pedido gerado pela troca DVL-[A-Z0-9]+$/i.test(line.trim()))
+        .join("\n")
+        .trim() || null
+    : null;
   const cancelNote = (
     String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || ""
   ).trim();
@@ -942,6 +949,7 @@ export default function OrderDetailView({
   const sourceServiceOrder = order.source_service_order || null;
   const sourceQuote = order.source_quote || null;
   const sourceSubscriptionId = order.recurring_subscription_id || null;
+  const sourceReturnRequestId = order.exchange_return_request_id || null;
 
   const getSourceSubtitle = () => {
     if (sourceServiceOrder) {
@@ -2339,6 +2347,27 @@ export default function OrderDetailView({
                             />
                           )}
 
+                          {sourceReturnRequestId && (
+                            <InfoCard
+                              title="Origem do Pedido"
+                              message={`Devolução #DVL-${String(sourceReturnRequestId).slice(0, 6).toUpperCase()}`}
+                              color="blue"
+                              bottomElement={
+                                <Button
+                                  variant="link"
+                                  onClick={() =>
+                                    window.open(
+                                      `/erp/devolucoes?view=${sourceReturnRequestId}`,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  Ver devolução
+                                </Button>
+                              }
+                            />
+                          )}
+
                           {hasPendingPayment && (
                             <InfoCard
                               title="Valor ainda em aberto"
@@ -2505,6 +2534,29 @@ export default function OrderDetailView({
                                   type="button"
                                 >
                                   Ver Assinatura
+                                </Button>
+                              }
+                            />
+                          </FormSection>
+                        )}
+
+                        {sourceReturnRequestId && (
+                          <FormSection title="" className="mt-0">
+                            <InfoCard
+                              title="Origem do Pedido"
+                              message={`Devolução #DVL-${String(sourceReturnRequestId).slice(0, 6).toUpperCase()}`}
+                              color="blue"
+                              bottomElement={
+                                <Button
+                                  variant="link"
+                                  onClick={() =>
+                                    window.open(
+                                      `/erp/devolucoes?view=${sourceReturnRequestId}`,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  Ver devolução
                                 </Button>
                               }
                             />

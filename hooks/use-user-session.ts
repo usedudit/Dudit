@@ -43,7 +43,7 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     if (!user) return null
 
     const [profileRes, cartRes, addressRes] = await Promise.all([
-      supabase.from("user_profiles").select("full_name, avatar_url").eq("user_id", user.id).maybeSingle(),
+      supabase.from("user_profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
       supabase.from("cart_items").select("quantity").eq("user_id", user.id),
       supabase.from("addresses").select("city, state")
         .eq("user_id", user.id)
@@ -89,7 +89,7 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
       profile: profileData ? {
         full_name: profileData.full_name,
         address: addressStr,
-        avatar_url: profileData.avatar_url || null,
+        avatar_url: null,
         city: addressData?.city || null,
         state: addressData?.state || null,
         citySlug: citySlug || null,

@@ -271,10 +271,7 @@ export function MarketplaceLandingView({
                 <>
                     <section className="w-full py-10 md:py-12">
                         <div className="max-w-[1400px] w-full mx-auto px-4 xl:px-0">
-                            <FormSection
-                                title="Destaques em todo o Brasil"
-                                description="Explore as melhores vitrines e produtos de lojas de todo o país"
-                            >
+                            <FormSection title="Destaques em todo o Brasil">
                                 {hasBrasilVitrines && brasilTodoVitrinesSection && (
                                     <HorizontalCarousel
                                         key={brasilTodoVitrinesSection.id}

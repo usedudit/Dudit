@@ -1,15 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { processTinyWebhook, mapPaymentMethodToTiny, buildTinyOrderPayments, syncDuditStockToTiny } from "./tiny-integration"
+import { processTinyWebhook, mapPaymentMethodToTiny, buildTinyOrderPayments, syncDuditStockToTiny, updateTinyOrderStatus } from "./tiny-integration"
 
 vi.mock("server-only", () => ({}))
 
 const mockTinySearchProducts = vi.fn().mockResolvedValue({ produtos: [] })
 const mockTinyUpdateProductStock = vi.fn().mockResolvedValue({ status: "OK" })
+const mockTinyUpdateOrderStatus = vi.fn().mockResolvedValue(true)
+const mockTinyLaunchOrderStock = vi.fn().mockResolvedValue({ launched: true })
+const mockTinyReverseOrderStock = vi.fn().mockResolvedValue({ reversed: true })
 
 vi.mock("./tiny-client", () => ({
   createTinyClient: vi.fn(() => ({
     searchProducts: mockTinySearchProducts,
     updateProductStock: mockTinyUpdateProductStock,
+    updateOrderStatus: mockTinyUpdateOrderStatus,
+    launchOrderStock: mockTinyLaunchOrderStock,
+    reverseOrderStock: mockTinyReverseOrderStock,
   })),
 }))
 
@@ -25,6 +31,24 @@ const mockVariantUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValu
 const mockProductUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })
 
 const mockFrom = vi.fn((table: string) => {
+  if (table === "orders") {
+    return {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              id: "ord-1",
+              partner_id: "partner-123",
+              external_order_id: "777888",
+              external_provider: "tiny",
+              external_sync_status: "synced",
+            },
+            error: null,
+          }),
+        }),
+      }),
+    }
+  }
   if (table === "partner_integrations") {
     return {
       select: vi.fn().mockReturnValue({
@@ -191,6 +215,42 @@ describe("Tiny Webhook Integration", () => {
       deposito: "Deposito Principal",
       observacoes: "Teste depósito",
     })
+  })
+
+  it("launches order stock (releasing saldoReservado) when updating Tiny order status to entregue", async () => {
+    mockTinyIntegrationRow = {
+      id: "int-tiny",
+      partner_id: "partner-123",
+      provider_slug: "tiny",
+      status: "connected",
+      access_token_encrypted: "tok",
+      config: { sync_stock: true },
+    }
+
+    const res = await updateTinyOrderStatus({ orderId: "ord-1", situacao: "entregue" })
+
+    expect(res.success).toBe(true)
+    expect(res.stockLaunched).toBe(true)
+    expect(mockTinyLaunchOrderStock).toHaveBeenCalledWith("777888")
+    expect(mockTinyUpdateOrderStatus).toHaveBeenCalledWith("777888", "entregue")
+  })
+
+  it("reverses order stock before cancelling Tiny order", async () => {
+    mockTinyIntegrationRow = {
+      id: "int-tiny",
+      partner_id: "partner-123",
+      provider_slug: "tiny",
+      status: "connected",
+      access_token_encrypted: "tok",
+      config: { sync_stock: true },
+    }
+
+    const res = await updateTinyOrderStatus({ orderId: "ord-1", situacao: "cancelado" })
+
+    expect(res.success).toBe(true)
+    expect(res.stockReversed).toBe(true)
+    expect(mockTinyReverseOrderStock).toHaveBeenCalledWith("777888")
+    expect(mockTinyUpdateOrderStatus).toHaveBeenCalledWith("777888", "cancelado")
   })
 })
 

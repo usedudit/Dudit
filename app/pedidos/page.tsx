@@ -33,7 +33,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     nfe_number, nfe_series, nfe_access_key, nfe_issued_at,
     partners(id, is_active, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
-    return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, exchange_items_snapshot, reverse_logistics_method, reverse_logistics_status, return_freight_payer, reverse_logistics_tracking_code, reverse_logistics_notes, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
+    return_requests!order_id(id, request_type, status, reason, desired_resolution, approved_resolution, refund_amount, refund_payment_method, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, exchange_order_id, exchange_substatus, exchange_shortfall_amount, exchange_surplus_amount, exchange_balance_resolution, exchange_items_snapshot, reverse_logistics_method, reverse_logistics_status, return_freight_payer, reverse_logistics_tracking_code, reverse_logistics_notes, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot, unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason), return_evidence(id, file_url, file_key, file_name, file_type, thumbnail_url)),
     order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_code, service_name, price, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),
@@ -50,7 +50,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     nfe_number, nfe_series, nfe_access_key, nfe_issued_at,
     partners(id, is_active, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
-    return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, exchange_items_snapshot, reverse_logistics_method, reverse_logistics_status, return_freight_payer, reverse_logistics_tracking_code, reverse_logistics_notes, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
+    return_requests!order_id(id, request_type, status, reason, desired_resolution, approved_resolution, refund_amount, refund_payment_method, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, exchange_order_id, exchange_substatus, exchange_shortfall_amount, exchange_surplus_amount, exchange_balance_resolution, exchange_items_snapshot, reverse_logistics_method, reverse_logistics_status, return_freight_payer, reverse_logistics_tracking_code, reverse_logistics_notes, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot, unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason), return_evidence(id, file_url, file_key, file_name, file_type, thumbnail_url)),
     order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_code, service_name, price, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       services(id, short_id, name, images),
@@ -225,7 +225,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
         const [{ data: profiles }, { data: driversData }, { data: deliveredRows }] = await Promise.all([
           adminClient
             .from("user_profiles")
-            .select("user_id, full_name, phone, avatar_url")
+            .select("user_id, full_name, phone")
             .in("user_id", allUserIds),
           platformDriverIds.length > 0
             ? adminClient
@@ -270,7 +270,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
               id: driverId,
               name: profile?.full_name || "Entregador Dudit",
               phone: profile?.phone || null,
-              avatarUrl: profile?.avatar_url || null,
+              avatarUrl: null,
               vehicleType,
               totalDeliveries: totalDeliveriesMap.get(driverId) || 0,
               status: assignment.status,
@@ -344,6 +344,31 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
       )
     } catch (e) {
       console.error("[MY_ORDERS_PAGE] Error hydrating delivery OTPs:", e)
+    }
+    // Sign private return evidence URLs so the buyer can view their own attached evidence
+    try {
+      const evidenceToSign: Array<{ ev: any; key: string }> = []
+      for (const ord of orders as any[]) {
+        for (const rr of ord.return_requests || []) {
+          for (const ev of rr.return_evidence || []) {
+            if (!ev.file_url && ev.file_key && typeof ev.file_key === "string" && !ev.file_key.includes("..")) {
+              evidenceToSign.push({ ev, key: ev.file_key })
+            }
+          }
+        }
+      }
+      if (evidenceToSign.length > 0) {
+        const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+        await Promise.all(
+          evidenceToSign.map(async ({ ev, key }) => {
+            try {
+              ev.signed_url = await generateSignedDownloadUrl(key)
+            } catch {}
+          })
+        )
+      }
+    } catch (e) {
+      console.error("[MY_ORDERS_PAGE] Error signing return evidence URLs:", e)
     }
   }
 

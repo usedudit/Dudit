@@ -2437,9 +2437,6 @@ export async function getReturnShippingStateAction(payload: {
     if (RETURN_SHIPMENT_BLOCKED_STATUSES.includes(returnRequest.status)) {
       canGenerate = false
       reason = "Solicitação de devolução encerrada: não é possível gerar etiqueta."
-    } else if (String((returnRequest as any).orders?.delivery_type || "").toLowerCase() === "pickup") {
-      canGenerate = false
-      reason = "Pedidos com retirada na loja não utilizam etiqueta de devolução."
     } else {
       const [plan, integration] = await Promise.all([
         getPartnerPlan(ctx.partnerId),

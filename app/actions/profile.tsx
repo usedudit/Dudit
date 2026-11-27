@@ -19,7 +19,7 @@ export async function getUserProfileAction() {
     return {
       full_name: sessionData.profile?.full_name || null,
       address: sessionData.profile && sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null,
-      avatar_url: sessionData.profile?.avatar_url || null
+      avatar_url: null
     }
   } catch {
     return null

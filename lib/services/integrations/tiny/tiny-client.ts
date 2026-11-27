@@ -353,6 +353,59 @@ export class TinyClient {
   }
 
   /**
+   * Lança o estoque de um pedido no Tiny ERP (efetiva a saída física e libera o saldoReservado).
+   * Idempotente: se o estoque do pedido já tiver sido lançado, retorna { launched: true, alreadyLaunched: true }.
+   */
+  async launchOrderStock(
+    id: string | number
+  ): Promise<{ launched: boolean; alreadyLaunched?: boolean }> {
+    try {
+      await this.request("pedido.lancar.estoque.php", {
+        id: String(id),
+      })
+      return { launched: true }
+    } catch (err: any) {
+      const msg = String(err?.message || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+      if (msg.includes("ja lancado") || msg.includes("ja foi lancado") || msg.includes("ja baixado")) {
+        return { launched: true, alreadyLaunched: true }
+      }
+      throw err
+    }
+  }
+
+  /**
+   * Estorna o estoque lançado de um pedido no Tiny ERP (devolve ao estoque físico).
+   * Idempotente: se o estoque ainda não havia sido lançado, retorna { reversed: false, notLaunched: true }.
+   */
+  async reverseOrderStock(
+    id: string | number
+  ): Promise<{ reversed: boolean; notLaunched?: boolean }> {
+    try {
+      await this.request("pedido.estornar.estoque.php", {
+        id: String(id),
+      })
+      return { reversed: true }
+    } catch (err: any) {
+      const msg = String(err?.message || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+      if (
+        msg.includes("nao lancado") ||
+        msg.includes("nao foi lancado") ||
+        msg.includes("nao possui") ||
+        msg.includes("sem lancamento")
+      ) {
+        return { reversed: false, notLaunched: true }
+      }
+      throw err
+    }
+  }
+
+  /**
    * Atualiza o código e URL de rastreamento de um pedido no Tiny ERP
    */
   async updateOrderTracking(params: {

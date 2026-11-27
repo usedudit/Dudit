@@ -11,7 +11,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
-import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, archiveProductAction, unarchiveProductAction } from "@/app/actions/erp/products"
+import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, archiveProductAction, unarchiveProductAction, unlinkProductFromExternalErpAction } from "@/app/actions/erp/products"
 import { createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { parseDecimalInput } from "@/lib/utils/formatters"
@@ -430,6 +430,41 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const [showNcmModal, setShowNcmModal] = useState(false)
     const [ncmSuggestions, setNcmSuggestions] = useState<any[]>([])
+    const [showUnlinkErpModal, setShowUnlinkErpModal] = useState(false)
+    const [isUnlinkingErp, setIsUnlinkingErp] = useState(false)
+
+    const externalProviderRaw = String((productData as any)?.external_provider || "").trim().toLowerCase()
+    const externalErpLabel =
+        externalProviderRaw === "bling"
+            ? "Bling ERP"
+            : externalProviderRaw === "tiny"
+                ? "Tiny ERP"
+                : null
+    const isExternalErpLocked = Boolean(externalErpLabel) && internalMode !== "add" && internalMode !== "duplicate"
+
+    const handleConfirmUnlinkErp = useCallback(async () => {
+        if (!productData?.id) return
+        setIsUnlinkingErp(true)
+        try {
+            const res = await unlinkProductFromExternalErpAction(productData.id)
+            if (res.success) {
+                setProductData((prev: any) => ({
+                    ...prev,
+                    external_id: null,
+                    external_provider: null,
+                    last_external_sync_at: null,
+                }))
+                notifySuccess("Produto desvinculado", `O produto foi desvinculado do ${externalErpLabel || "ERP"} e agora pode ser editado manualmente.`)
+            } else {
+                notifyError("Erro", res.error || "Não foi possível desvincular o produto.")
+            }
+        } catch (err: any) {
+            notifyError("Erro", err?.message || "Erro ao desvincular produto.")
+        } finally {
+            setIsUnlinkingErp(false)
+            setShowUnlinkErpModal(false)
+        }
+    }, [productData?.id, externalErpLabel, notifySuccess, notifyError])
     const [isLoadingNcmSuggestion, setIsLoadingNcmSuggestion] = useState(false)
 
     const handleNcmSelect = useCallback((s: { ncm: string }) => { setShowNcmModal(false); handleNcmChange(s.ncm) }, [handleNcmChange])
@@ -1194,6 +1229,24 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
                         {/* Tab Content */}
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            {isExternalErpLocked && externalErpLabel && (
+                                <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/30 px-4 py-3 text-sm">
+                                    <div className="text-blue-900 dark:text-blue-200">
+                                        <span className="font-semibold">Sincronizado com o {externalErpLabel}.</span>{" "}
+                                        Nome, SKU, código de barras, unidade, preço, custo e variações são gerenciados pelo {externalErpLabel} para evitar divergências. Você pode editar livremente descrição, fotos, vídeo, preço promocional, categoria e visibilidade na vitrine.
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowUnlinkErpModal(true)}
+                                        className="shrink-0 whitespace-nowrap"
+                                        data-unsaved-changes-ignore="true"
+                                    >
+                                        Desvincular do {externalErpLabel.replace(" ERP", "")}
+                                    </Button>
+                                </div>
+                            )}
                             <AnimatePresence mode="wait">
                                 {activeTab === "general" && (
                                     <FadeIn key="general" className="block">
@@ -1214,6 +1267,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             metadataPlanBlocked={metadataPlanBlocked}
                                             isGeneratingDetails={isGeneratingDetails}
                                             onGenerateDetails={handleGenerateAiDetails}
+                                            isExternalErpLocked={isExternalErpLocked}
+                                            externalErpLabel={externalErpLabel}
                                         />
                                     </FadeIn>
                                 )}
@@ -1224,7 +1279,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 <ThreeDotsLoader />
                                             </div>
                                         ) : (
-                                            <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
+                                            <ProductVariationsTab isEditing={isEditing && !isExternalErpLocked} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
                                         )}
                                     </FadeIn>
                                 )}
@@ -1491,9 +1546,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     variant="warning"
                 />
 
+                <AlertModal
+                    isOpen={showUnlinkErpModal}
+                    onClose={() => setShowUnlinkErpModal(false)}
+                    onConfirm={handleConfirmUnlinkErp}
+                    title={`Desvincular do ${externalErpLabel || "ERP"}?`}
+                    description={`Ao desvincular, nome, SKU, preço, custo e variações passarão a ser editáveis manualmente na Dudit e este produto deixará de ser sobrescrito automaticamente pelo ${externalErpLabel || "ERP"}.`}
+                    confirmText={isUnlinkingErp ? "Desvinculando..." : "Desvincular"}
+                    variant="warning"
+                />
+
                 <SavingStatusModal
-                    isOpen={isSavingProduct || isArchivingProduct}
-                    text={isArchivingProduct ? "Arquivando produto..." : internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
+                    isOpen={isSavingProduct || isArchivingProduct || isUnlinkingErp}
+                    text={isUnlinkingErp ? "Desvinculando produto..." : isArchivingProduct ? "Arquivando produto..." : internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
                 />
             </div>
         </FadeIn>

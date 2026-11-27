@@ -517,6 +517,39 @@ export function isInternalStockTimelineLine(line?: string | null): boolean {
   )
 }
 
+/**
+ * Eventos internos de integração com ERPs externos (Bling / Tiny).
+ * Devem aparecer apenas no histórico do ERP do lojista, nunca para o cliente final.
+ */
+export function isInternalErpIntegrationTimelineEntry(
+  entry?: { entry_type?: string | null; action_type?: string | null } | null
+): boolean {
+  if (!entry) return false
+  const rawType = String(entry.entry_type || entry.action_type || "").toLowerCase().trim()
+  return rawType.startsWith("bling_") || rawType.startsWith("tiny_")
+}
+
+/**
+ * Linhas internas de integração com ERPs externos (Bling / Tiny) que não devem aparecer para o cliente final.
+ */
+export function isInternalErpIntegrationTimelineLine(line?: string | null): boolean {
+  if (!line) return false
+  const norm = String(line)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+  return (
+    norm.includes("pedido exportado para o bling") ||
+    norm.includes("pedido exportado para o tiny") ||
+    norm.includes("situacao no bling") ||
+    norm.includes("situacao no tiny") ||
+    norm.includes("rastreio sincronizado no tiny") ||
+    norm.includes("rastreio sincronizado no bling") ||
+    norm.includes("emitida no tiny erp") ||
+    norm.includes("emitida no bling erp")
+  )
+}
+
 export interface ResolveTimelineActorParams {
   entry: {
     actor_user_id?: string | null

@@ -37,7 +37,8 @@ import { filterUnflaggedImages } from "@/lib/utils/product-display-images"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
-import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
+import { Button, Input, FormSection, IconPlaceholder, DefaultModal, Spinner, RadioButton, Badge, ListItem } from "@/components/reusable"
+import { AddressFormModal } from "@/components/reusable/AddressFormModal"
 import { formatCurrency } from "@/lib/utils"
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
@@ -256,12 +257,6 @@ export function ServiceDetailsPageClient({
     const [showAddressForm, setShowAddressForm] = useState(false)
     const [showAddressModal, setShowAddressModal] = useState(false)
     const [loadingAddresses, setLoadingAddresses] = useState(false)
-    const [loadingCep, setLoadingCep] = useState(false)
-    const [newAddressData, setNewAddressData] = useState({
-        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
-        addressType: "casa", isDefault: false,
-        latitude: null as number | null, longitude: null as number | null
-    })
 
     const showPrice = service.show_price_in_store !== false
 
@@ -490,69 +485,17 @@ export function ServiceDetailsPageClient({
         }
     }
 
-    const handleCepBlur = async () => {
-        const zip = newAddressData.zipCode.replace(/\D/g, "")
-        if (zip.length !== 8) return
-        setLoadingCep(true)
-        try {
-            const response = await fetch(`/api/cep?cep=${zip}`)
-            const data = await response.json()
-            if (!data.erro && !data.error) {
-                setNewAddressData(prev => ({
-                    ...prev,
-                    street: data.logradouro || prev.street,
-                    number: data.numero || prev.number,
-                    noNumber: data.numero ? data.numero === "S/N" : prev.noNumber,
-                    neighborhood: data.bairro || prev.neighborhood,
-                    city: data.localidade || data.municipio || prev.city,
-                    state: data.uf || prev.state,
-                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
-                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
-                }))
-            }
-        } catch (err) {
-            console.error("Erro ao buscar CEP:", err)
-        } finally {
-            setLoadingCep(false)
-        }
-    }
-
-    const handleSaveNewAddress = async () => {
-        if (!userId) return
-        const { zipCode, street, number, neighborhood, city, state, noNumber, addressType, isDefault } = newAddressData
-        const finalNumber = noNumber ? "S/N" : number
-        if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
-            setDeliveryError("Preencha todos os campos obrigatórios do endereço")
-            return
-        }
-        setDeliveryLoading(true)
-        const csrfToken = await fetchCSRFTokenSingleton() || ""
-        const result = await createAddressAction({
-            entityId: userId, entityType: "user",
-            street, number: finalNumber, complement: newAddressData.complement,
-            neighborhood, city, state, zipCode,
-            isDefault,
-            addressType,
-            latitude: newAddressData.latitude ?? null,
-            longitude: newAddressData.longitude ?? null,
-            csrf_token: csrfToken,
-        })
-        if (result.error) {
-            setDeliveryError(result.error)
+    const handleNewAddressSaved = async (savedAddress: any) => {
+        if (savedAddress) {
+            setUserAddresses(prev => [...prev, savedAddress])
+            setSelectedAddressId(savedAddress.id)
+            notifyAddressUpdated(savedAddress.id, savedAddress, (savedAddress as any)?.citySlug)
         } else {
-            if (result.address) {
-                setUserAddresses(prev => [...prev, result.address])
-                setSelectedAddressId(result.address.id)
-                notifyAddressUpdated(result.address.id, result.address, (result as any)?.citySlug)
-            } else {
-                await loadUserAddresses()
-                notifyAddressUpdated()
-            }
-            setShowAddressForm(false)
-            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, addressType: "casa", isDefault: false, latitude: null, longitude: null })
-            setDeliveryError(null)
+            await loadUserAddresses()
+            notifyAddressUpdated()
         }
-        setDeliveryLoading(false)
+        setShowAddressForm(false)
+        setDeliveryError(null)
     }
 
     const pricing = useMemo(() => {
@@ -2075,127 +2018,13 @@ export function ServiceDetailsPageClient({
                 </div>
             </DefaultModal>
 
-            <DefaultModal
+            <AddressFormModal
                 isOpen={showAddressForm}
                 onClose={() => setShowAddressForm(false)}
-                title="Adicionar novo endereço"
-            >
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3 mb-2">
-                        {[
-                            { value: "casa", label: "Casa" },
-                            { value: "trabalho", label: "Trabalho" },
-                            { value: "outro", label: "Outro" },
-                        ].map(opt => (
-                            <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => setNewAddressData(prev => ({ ...prev, addressType: opt.value }))}
-                                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${newAddressData.addressType === opt.value
-                                    ? "bg-brand-green text-white border-brand-green"
-                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300 dark:bg-dark-surface dark:text-dark-body dark:border-dark-border dark:hover:border-dark-border"
-                                    }`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div>
-                        <CepInput
-                            value={newAddressData.zipCode}
-                            onChange={(val) => setNewAddressData(prev => ({ ...prev, zipCode: val }))}
-                            onAddressFetched={(addr) => {
-                                setNewAddressData(prev => ({
-                                    ...prev,
-                                    street: addr.street || prev.street,
-                                    number: addr.number || prev.number,
-                                    noNumber: addr.number ? addr.number === "S/N" : prev.noNumber,
-                                    neighborhood: addr.neighborhood || prev.neighborhood,
-                                    city: addr.city || prev.city,
-                                    state: addr.state || prev.state,
-                                    latitude: addr.latitude ?? prev.latitude,
-                                    longitude: addr.longitude ?? prev.longitude,
-                                }))
-                                setDeliveryError(null)
-                            }}
-                            onLoadingChange={setLoadingCep}
-                        />
-                    </div>
-                    <div>
-                        <Input
-                            label="Rua/Avenida"
-                            value={newAddressData.street}
-                            onChange={(e) => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
-                            placeholder="Rua, Avenida, etc."
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <NumberInputWithCheckbox
-                                label="Número"
-                                number={newAddressData.number}
-                                noNumber={newAddressData.noNumber}
-                                onNumberChange={(val) => setNewAddressData(prev => ({ ...prev, number: val }))}
-                                onNoNumberChange={(checked) => setNewAddressData(prev => ({ ...prev, noNumber: checked, number: checked ? "S/N" : "" }))}
-                                placeholder="123"
-                            />
-                        </div>
-                        <div>
-                            <Input
-                                label="Complemento"
-                                value={newAddressData.complement}
-                                onChange={(e) => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
-                                placeholder="Apto, Bloco, etc."
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <Input
-                            label="Bairro"
-                            value={newAddressData.neighborhood}
-                            onChange={(e) => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
-                            placeholder="Nome do bairro"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Input
-                                label="Cidade"
-                                value={newAddressData.city}
-                                onChange={(e) => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
-                                placeholder="Nome da cidade"
-                            />
-                        </div>
-                        <div>
-                            <StateComboBox
-                                value={newAddressData.state}
-                                onChange={(val) => setNewAddressData(prev => ({ ...prev, state: val }))}
-                            />
-                        </div>
-                    </div>
-
-                    <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
-                        <input
-                            type="checkbox"
-                            checked={newAddressData.isDefault || userAddresses.length === 0}
-                            disabled={userAddresses.length === 0}
-                            onChange={(e) => setNewAddressData(prev => ({ ...prev, isDefault: e.target.checked }))}
-                            className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
-                        />
-                        <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
-                    </label>
-
-                    <Button
-                        onClick={handleSaveNewAddress}
-                        disabled={deliveryLoading || loadingCep}
-                        className="w-full mb-4"
-                    >
-                        {deliveryLoading ? <Spinner className="mr-2" size={16} /> : null}
-                        Salvar Endereço
-                    </Button>
-                </div>
-            </DefaultModal>
+                entityId={userId || ""}
+                isFirstAddress={userAddresses.length === 0}
+                onSaved={handleNewAddressSaved}
+            />
 
             <MarketplaceHeader
                 userProfile={userProfile}

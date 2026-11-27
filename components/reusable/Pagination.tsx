@@ -83,6 +83,9 @@ export function getCompactPaginationModel(
 const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, inline = false, fixedUntil = "md" }) => {
   const model = getCompactPaginationModel(currentPage, totalPages, 3)
 
+  // Sem páginas para navegar, não renderiza a barra (evita sombra/overlay vazio no mobile)
+  if (model.totalPages <= 1) return null
+
   return (
     <div
       className={cn(

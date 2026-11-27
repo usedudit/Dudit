@@ -92,7 +92,7 @@ export async function requestMarketplaceQuoteAction(input: RequestMarketplaceQuo
             // 4. Fetch buyer profile for customer sync
             const { data: buyerProfile } = await adminClient
                 .from("user_profiles")
-                .select("full_name, phone, avatar_url")
+                .select("full_name, phone")
                 .eq("user_id", user.id)
                 .maybeSingle()
 

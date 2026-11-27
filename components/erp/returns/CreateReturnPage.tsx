@@ -412,9 +412,9 @@ export default function CreateReturnPage({
     const showReturnShippingButton = useMemo(() => {
         if (mode === "create" || !returnRequest) return false
         const hasActiveReturnShipping = Boolean(returnShipping && returnShipping.status !== "cancelled")
-        if ((isPickupOrder || hasOnlyServices) && !hasActiveReturnShipping) return false
+        if (hasOnlyServices && !hasActiveReturnShipping) return false
         return ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(returnStatus) || hasActiveReturnShipping
-    }, [mode, returnRequest, isPickupOrder, hasOnlyServices, returnStatus, returnShipping])
+    }, [mode, returnRequest, hasOnlyServices, returnStatus, returnShipping])
 
     const hasStagedEvidence = useMemo(
         () => evidenceImages.some((img) => img instanceof File) || evidenceUploads.some((u: any) => u?.file instanceof File),
@@ -1190,8 +1190,11 @@ export default function CreateReturnPage({
 
         const shouldAskInventoryRestore =
             !adminContext &&
+            !hasOnlyServices &&
             checkedItems.length > 0 &&
-            (returnStatus === "APPROVED" || returnStatus === "REJECTED")
+            (returnStatus === "APPROVED" || returnStatus === "REJECTED") &&
+            reverseLogisticsMethod !== "not_required" &&
+            reverseLogisticsStatus === "received"
 
         if (shouldAskInventoryRestore) {
             const initialQty: Record<string, number> = {}
@@ -1203,7 +1206,7 @@ export default function CreateReturnPage({
 
         await saveWithAdminGate({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
         setPendingSaveData(null)
-    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest, adminContext, returnStatus])
+    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest, adminContext, returnStatus, hasOnlyServices, reverseLogisticsMethod, reverseLogisticsStatus])
 
     const handleFormSubmit = async () => {
         if (checkedItems.length === 0) return
@@ -1362,8 +1365,11 @@ export default function CreateReturnPage({
 
             const shouldAskInventoryRestore =
                 !adminContext &&
+                !hasOnlyServices &&
                 checkedItems.length > 0 &&
-                (returnStatus === "APPROVED" || returnStatus === "REJECTED")
+                (returnStatus === "APPROVED" || returnStatus === "REJECTED") &&
+                reverseLogisticsMethod !== "not_required" &&
+                reverseLogisticsStatus === "received"
 
             if (shouldAskInventoryRestore) {
                 setPendingSaveData(payload)
@@ -1469,6 +1475,9 @@ export default function CreateReturnPage({
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                                        {!hasOnlyServices && (
+                                            <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                                        )}
                                         {extraTabs?.map((tab) => (
                                             <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
                                         ))}
@@ -2603,10 +2612,14 @@ export default function CreateReturnPage({
                                                     )}
                                                 </FormSection>
                                             )}
+                                        </FadeIn>
+                                    </TabsContent>
 
-                                            {/* Reverse Logistics (how the returned item comes back to the store) */}
-                                            {(returnRequest || selectedOrder) && !hasOnlyServices && (
-                                                <FormSection hasSeparator title="Logística reversa (devolução do item)">
+                                    {!hasOnlyServices && (
+                                        <TabsContent value="delivery" className="mt-0">
+                                            <FadeIn key="delivery" className="space-y-8">
+                                                {(returnRequest || selectedOrder) ? (
+                                                    <FormSection title="Logística reversa (devolução do item)">
                                                     {isViewOnly ? (
                                                         <div className="space-y-1">
                                                             <PaymentRow
@@ -2773,10 +2786,13 @@ export default function CreateReturnPage({
                                                             )}
                                                         </div>
                                                     )}
-                                                </FormSection>
-                                            )}
-                                        </FadeIn>
-                                    </TabsContent>
+                                                    </FormSection>
+                                                ) : (
+                                                    <InfoCard color="gray" title="Sem Pedido Selecionado" message="Selecione um pedido na aba Dados gerais para configurar a logística reversa." />
+                                                )}
+                                            </FadeIn>
+                                        </TabsContent>
+                                    )}
 
                                     {extraTabs?.map((tab) => (
                                         <TabsContent key={tab.value} value={tab.value} className="mt-0">

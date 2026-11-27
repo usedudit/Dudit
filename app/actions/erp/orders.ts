@@ -3343,7 +3343,7 @@ export async function getOrderDetailsAction(
       try {
         const { data: userProfile } = await supabase
           .from("user_profiles")
-          .select("full_name, phone, avatar_url")
+          .select("full_name, phone")
           .eq("user_id", data.buyer_id)
           .maybeSingle();
 
@@ -3355,7 +3355,7 @@ export async function getOrderDetailsAction(
             "Cliente Marketplace",
           email: data.buyer_email || null,
           phone: userProfile?.phone || null,
-          image_url: userProfile?.avatar_url || null,
+          image_url: null,
           addresses: [],
         };
       } catch (err) {
@@ -3470,7 +3470,7 @@ export async function getOrderDetailsAction(
       ] = await Promise.all([
         supabase
           .from("user_profiles")
-          .select("full_name, phone, avatar_url")
+          .select("full_name, phone")
           .eq("user_id", driverUserId)
           .maybeSingle(),
         supabase
@@ -3499,7 +3499,7 @@ export async function getOrderDetailsAction(
           id: driverUserId,
           fullName,
           phone: profile?.phone || null,
-          avatarUrl: profile?.avatar_url || null,
+          avatarUrl: null,
           vehicleType,
           totalDeliveries: totalDeliveries || 0,
           status: targetAssignment.status,
@@ -5277,11 +5277,12 @@ export async function updateERPOrderAction(
       import("@/lib/services/integrations/erp-sync")
         .then(async ({ updateOrderStatusOnConnectedErps, syncItemsStockToConnectedErps }) => {
           const erpSit = data.deliveryStatus === "delivered" ? "entregue" : "enviado";
-          await updateOrderStatusOnConnectedErps({ orderId, situacao: erpSit });
+          const statusRes = await updateOrderStatusOnConnectedErps({ orderId, situacao: erpSit });
           await syncItemsStockToConnectedErps({
             partnerId: data.partnerId,
             items: stockSnapshots,
             reason: `Baixa entrega pedido #${currentOrder.order_number || orderId}`,
+            excludeProviders: statusRes.stockHandledProviders,
           });
         })
         .catch(() => {});
@@ -7120,14 +7121,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
         .then(async ({ exportOrderToConnectedErps, updateOrderStatusOnConnectedErps, syncItemsStockToConnectedErps }) => {
           const exportRes = await exportOrderToConnectedErps(order.id);
           const erpSit = payload.statusValue === "delivered" ? "entregue" : "enviado";
-          if (!exportRes.exportedProviders.length) {
-            await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit });
-          }
+          const statusRes = !exportRes.exportedProviders.length
+            ? await updateOrderStatusOnConnectedErps({ orderId: order.id, situacao: erpSit })
+            : { stockHandledProviders: [] as string[] };
+          const alreadyHandledProviders = Array.from(
+            new Set([...exportRes.syncedStockProviders, ...statusRes.stockHandledProviders])
+          );
           await syncItemsStockToConnectedErps({
             partnerId: payload.partnerId,
             items: deliveryStockSnapshots,
             reason: `Baixa entrega pedido #${order.order_number || order.id}`,
-            excludeProviders: exportRes.syncedStockProviders,
+            excludeProviders: alreadyHandledProviders,
           });
         })
         .catch(() => {});

@@ -145,12 +145,13 @@ export async function exportOrderToConnectedErps(orderId: string): Promise<{
 }
 
 /**
- * Atualiza a situação do pedido (ex: cancelado) no ERP em que ele foi sincronizado
+ * Atualiza a situação do pedido (ex: cancelado, enviado, entregue) no ERP em que ele foi sincronizado.
+ * Retorna os provedores nos quais o estoque do pedido já foi lançado/estornado diretamente via pedido.
  */
 export async function updateOrderStatusOnConnectedErps(params: {
   orderId: string
   situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
-}): Promise<void> {
+}): Promise<{ stockHandledProviders: string[] }> {
   const supabase = createAdminClient()
   const { data: order } = await supabase
     .from("orders")
@@ -158,17 +159,25 @@ export async function updateOrderStatusOnConnectedErps(params: {
     .eq("id", params.orderId)
     .maybeSingle()
 
-  if (!order?.external_order_id) return
+  if (!order?.external_order_id) return { stockHandledProviders: [] }
+
+  const stockHandledProviders: string[] = []
 
   if (order.external_provider === TINY_PROVIDER) {
-    await updateTinyOrderStatus(params).catch((err) => {
+    const res = await updateTinyOrderStatus(params).catch((err) => {
       console.error("[erp-sync] Tiny status update failed:", err)
+      return { success: false as const, stockLaunched: false, stockReversed: false }
     })
+    if (res?.stockLaunched || res?.stockReversed) {
+      stockHandledProviders.push(TINY_PROVIDER)
+    }
   } else if (order.external_provider === BLING_PROVIDER) {
     await updateBlingOrderStatus(params).catch((err) => {
       console.error("[erp-sync] Bling status update failed:", err)
     })
   }
+
+  return { stockHandledProviders }
 }
 
 /**

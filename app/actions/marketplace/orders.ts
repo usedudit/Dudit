@@ -306,11 +306,18 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
   }
 
   const { getOrderHistoryEntries } = await import("@/lib/services/order-history.service")
-  const { resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine } = await import("@/lib/utils/formatters")
+  const {
+    resolveTimelineActorName,
+    humanizeTimelineChangeLine,
+    isInternalStockTimelineLine,
+    isInternalErpIntegrationTimelineEntry,
+    isInternalErpIntegrationTimelineLine,
+  } = await import("@/lib/utils/formatters")
   try {
     const rawEntries = await getOrderHistoryEntries(orderId, order.partner_id)
     const storeName = (order.stores as any)?.name || null
     const entries = rawEntries
+      .filter((e) => !isInternalErpIntegrationTimelineEntry(e))
       .map((e) => {
         const actorName = resolveTimelineActorName({
           entry: e,
@@ -322,12 +329,13 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
 
         let changeLines = (e.change_lines || []).map((l) => humanizeTimelineChangeLine(l)).filter(Boolean)
 
-        // Filter out internal seller notes edits from buyer view
+        // Filter out internal seller notes edits and internal ERP sync logs from buyer view
         changeLines = changeLines.filter(
           (l) =>
             !l.toLowerCase().includes("observações do pedido atualizadas") &&
             !l.toLowerCase().includes("alterou as observações do pedido") &&
-            !isInternalStockTimelineLine(l),
+            !isInternalStockTimelineLine(l) &&
+            !isInternalErpIntegrationTimelineLine(l),
         )
 
         // Filter false refund/credit lines on rejected returns

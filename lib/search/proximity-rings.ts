@@ -1,4 +1,5 @@
 import type { SearchIntentType } from "./intent-parser"
+import { rankMarketplaceItems } from "@/lib/marketplace/ranking"
 
 export type ProximityRingKey = "nearby" | "regional" | "national_shipping" | "other_distant"
 
@@ -152,23 +153,13 @@ export function buildProximityRings<T extends Record<string, any>>(
     otherDistant.push({ ...item, _proximityRing: "other_distant" })
   }
 
-  // Ordena regionais por distância crescente (mantendo rank como desempate)
-  const sortByDistanceThenRank = (a: any, b: any) => {
-    const da = extractDistanceKm(a) ?? Number.POSITIVE_INFINITY
-    const db = extractDistanceKm(b) ?? Number.POSITIVE_INFINITY
-    if (Math.abs(da - db) > 1) return da - db
-    return Number(b._searchRank || 0) - Number(a._searchRank || 0)
-  }
-
-  regional.sort(sortByDistanceThenRank)
-  regionalSellers.sort(sortByDistanceThenRank)
-
+  // Todos os anéis seguem o ranqueamento unificado do marketplace (score + relevância + diversidade).
   return {
     nearby,
-    regional,
-    regionalSellers,
-    nationalShipping,
-    otherDistant,
-    otherDistantSellers,
+    regional: rankMarketplaceItems(regional),
+    regionalSellers: rankMarketplaceItems(regionalSellers),
+    nationalShipping: rankMarketplaceItems(nationalShipping),
+    otherDistant: rankMarketplaceItems(otherDistant),
+    otherDistantSellers: rankMarketplaceItems(otherDistantSellers),
   }
 }

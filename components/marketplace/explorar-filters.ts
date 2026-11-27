@@ -25,6 +25,8 @@ export interface ExploreFilterState {
     delivery: DeliveryFilter
     maxDistanceKm: number | null
     showcaseOnly: boolean
+    /** Agrupar resultados de busca em seções de proximidade (padrão: true). */
+    groupByProximity?: boolean
     /** Marcas selecionadas (usado na vitrine do vendedor). */
     brands?: string[]
 }
@@ -78,6 +80,7 @@ export const EMPTY_FILTER_STATE: ExploreFilterState = {
     delivery: "",
     maxDistanceKm: null,
     showcaseOnly: false,
+    groupByProximity: true,
     brands: [],
 }
 
@@ -401,6 +404,7 @@ export function serializeFiltersToParams(filters: ExploreFilterState, params: UR
     if (filters.delivery) params.set("entrega", filters.delivery)
     if (filters.maxDistanceKm) params.set("raio", String(filters.maxDistanceKm))
     if (filters.showcaseOnly) params.set("vitrine", "1")
+    if (filters.groupByProximity === false) params.set("agrupar", "0")
     if (filters.brands && filters.brands.length > 0) params.set("marca", filters.brands.join(","))
 }
 
@@ -427,6 +431,7 @@ export function parseFiltersFromParams(params: URLSearchParams | { get: (key: st
         delivery: (deliveryRaw === "entrega" || deliveryRaw === "retirada" || deliveryRaw === "frete") ? deliveryRaw as DeliveryFilter : "",
         maxDistanceKm: maxDistanceKm && maxDistanceKm > 0 ? maxDistanceKm : null,
         showcaseOnly: get("vitrine") === "1",
+        groupByProximity: get("agrupar") !== "0",
         brands: (get("marca") || "").split(",").map(b => b.trim()).filter(Boolean),
     }
 }

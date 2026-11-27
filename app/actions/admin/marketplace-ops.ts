@@ -239,7 +239,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         // Get profile from user_profiles (marketplace profile)
         const { data: profile } = await admin
             .from("user_profiles")
-            .select("user_id, full_name, avatar_url, phone, risk_score")
+            .select("user_id, full_name, phone, risk_score")
             .eq("user_id", order.buyer_id)
             .maybeSingle()
 
@@ -293,7 +293,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
             const driverUserId = latest.driver_id
             const { data: driverProf } = await admin
                 .from("user_profiles")
-                .select("user_id, full_name, avatar_url, phone")
+                .select("user_id, full_name, phone")
                 .eq("user_id", driverUserId)
                 .maybeSingle()
 
@@ -307,7 +307,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
                 type: "dudit_platform", // Entregador Dudit (convidado manualmente)
                 driver_id: driverUserId,
                 full_name: driverProf?.full_name || "Entregador Dudit",
-                avatar_url: driverProf?.avatar_url || null,
+                avatar_url: null,
                 phone: driverProf?.phone || null,
                 email: driverEmail,
                 city: (latest.delivery_drivers as any)?.city || null,
@@ -354,13 +354,12 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
                         if (partnerUser?.user_id) {
                             const { data: partnerUserProf } = await admin
                                 .from("user_profiles")
-                                .select("full_name, phone, avatar_url")
+                                .select("full_name, phone")
                                 .eq("user_id", partnerUser.user_id)
                                 .maybeSingle()
                             if (partnerUserProf) {
                                 courierName = partnerUserProf.full_name
                                 courierPhone = partnerUserProf.phone
-                                courierAvatar = partnerUserProf.avatar_url
                             }
                         }
                     }

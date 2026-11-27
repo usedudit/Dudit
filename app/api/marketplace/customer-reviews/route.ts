@@ -126,14 +126,14 @@ export async function GET(request: NextRequest) {
   if (reviewUserIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("user_profiles")
-      .select("user_id, full_name, avatar_url")
+      .select("user_id, full_name")
       .in("user_id", reviewUserIds)
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
         profilesMap.set(p.user_id, {
           full_name: p.full_name,
-          avatar_url: p.avatar_url,
+          avatar_url: null,
         })
       })
     }

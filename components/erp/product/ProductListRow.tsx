@@ -91,7 +91,9 @@ const ProductListItem = React.memo(
                                     ) : null}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                    {hasVariants ? "Múltiplos SKUs" : (product.sku || "-")}
+                                    {hasVariants
+                                        ? `${variationsCount} ${variationsCount === 1 ? "variação" : "variações"}`
+                                        : (product.sku || "-")}
                                 </span>
                             </div>
                         </div>
@@ -126,13 +128,6 @@ const ProductListItem = React.memo(
                             {reservedStock > 0 && (
                                 <div className={`mt-0.5 ${getAlignClass(columns.find(c => c.id === 'stock')?.align)}`}>
                                     <StockAvailabilityHint total={effectiveStock} reserved={reservedStock} />
-                                </div>
-                            )}
-                            {variationsCount > 0 && (
-                                <div className={`${getAlignClass(columns.find(c => c.id === 'stock')?.align)}`}>
-                                    <span className="text-[11px] font-bold text-brand-green underline decoration-brand-green/30">
-                                        {variationsCount} {variationsCount === 1 ? "variação" : "variações"}
-                                    </span>
                                 </div>
                             )}
                         </div>

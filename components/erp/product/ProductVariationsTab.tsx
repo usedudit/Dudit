@@ -977,7 +977,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                         </div>
                     </div>
 
-                    {filteredVariations.length > 0 && (
+                    {filteredVariations.length > 0 && totalPages > 1 && (
                         <div className={`mt-4 ${isMobile ? "sticky bottom-0 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-sm py-4 z-20 border-t border-brand-border dark:border-dark-border -mx-4 px-4" : ""} ${!isEditing ? "opacity-60 pointer-events-none" : ""}`}>
                             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                         </div>

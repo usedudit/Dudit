@@ -194,7 +194,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       .order("created_at", { ascending: false }),
     supabase
       .from("user_profiles")
-      .select("full_name, avatar_url")
+      .select("full_name")
       .eq("user_id", userId)
       .maybeSingle(),
     supabase
@@ -220,7 +220,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         address: defaultAddress?.city && defaultAddress?.state
           ? `${defaultAddress.city} - ${defaultAddress.state}`
           : null,
-        avatar_url: profileResult.data.avatar_url || null,
+        avatar_url: null,
       }
       : null,
     userAddresses,

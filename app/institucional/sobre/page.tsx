@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/reusable/Button';
 import { GridLines, SectionHeader, Navbar, Footer, CTA, FaqSection } from '@/components/InstitucionalShared';
 import { INSTITUTIONAL_FAQ } from '@/lib/constants/institutional-faq';
+import { InstagramIcon, WhatsappIcon } from '@/lib/icons';
 
 const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
     <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
@@ -220,21 +221,21 @@ const SemComplicacao = () => {
                     <div className="flex-1 bg-brand-green relative overflow-hidden flex items-center justify-center p-12">
                         <div className="relative z-10 w-full max-w-[340px] space-y-4">
                             <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-950/40 flex items-center justify-center text-pink-600 dark:text-pink-400 font-bold">📸</div>
+                                <div className="w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-950/40 flex items-center justify-center"><InstagramIcon /></div>
                                 <div>
                                     <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Instagram</div>
                                     <div className="text-[10px] text-brand-inactive-text">Coloque seu link Dudit na bio</div>
                                 </div>
                             </div>
                             <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/40 flex items-center justify-center text-green-600 dark:text-green-400 font-bold">💬</div>
+                                <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/40 flex items-center justify-center"><WhatsappIcon /></div>
                                 <div>
                                     <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">WhatsApp</div>
                                     <div className="text-[10px] text-brand-inactive-text">Receba pedidos organizados na hora</div>
                                 </div>
                             </div>
                             <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-dark dark:text-dark-heading font-bold">🏪</div>
+                                <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center"><img src="https://img.dudit.com.br/static/Icon.png" /></div>
                                 <div>
                                     <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Dudit</div>
                                     <div className="text-[10px] text-brand-inactive-text">Vendas no balcão, na cidade e em todo o Brasil</div>

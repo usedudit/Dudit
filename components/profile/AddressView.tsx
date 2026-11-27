@@ -4,9 +4,10 @@ import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { MapPinIcon, TrashIcon, CheckCircleIcon, EditIcon, HomeIcon, BriefcaseIcon, PlusIcon } from "@/lib/icons"
-import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, AlertModal, ActionsDropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
-import { Feedback, PageHeader, fade, View } from "./profile-shared"
-import { createAddressAction, updateAddressAction, deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
+import { Button, AlertModal, ActionsDropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
+import { AddressFormModal } from "@/components/reusable/AddressFormModal"
+import { PageHeader, fade, View } from "./profile-shared"
+import { deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useNotification } from "@/hooks/use-notification"
 import { notifyAddressUpdated } from "@/lib/utils/address-sync"
 
@@ -46,20 +47,14 @@ interface AddressViewProps {
     clearMessages: () => void
 }
 
-const emptyForm = {
-    zipCode: "", street: "", number: "", complement: "",
-    neighborhood: "", city: "", state: "", addressType: "casa", noNumber: false,
-    latitude: null as number | null, longitude: null as number | null,
-}
-
 export const AddressView = ({
     navigate, userId, addresses, setAddresses,
-    isLoading, setIsLoading, error, setError, success, setSuccess, clearMessages,
+    setIsLoading, setError, clearMessages,
 }: AddressViewProps) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
-    const [editingId, setEditingId] = useState<string | null>(null) // null = not editing, "new" = creating
-    const [form, setForm] = useState({ ...emptyForm })
+    const [isFormOpen, setIsFormOpen] = useState(false)
+    const [editingAddress, setEditingAddress] = useState<any | null>(null)
     const [addressToDelete, setAddressToDelete] = useState<any | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -73,32 +68,20 @@ export const AddressView = ({
 
     const startCreate = () => {
         clearMessages()
-        setForm({ ...emptyForm })
-        setEditingId("new")
+        setEditingAddress(null)
+        setIsFormOpen(true)
     }
 
     const startEdit = (addr: any) => {
         clearMessages()
-        const isNoNumber = addr.number === "S/N"
-        setForm({
-            zipCode: addr.zip_code || "",
-            street: addr.street || "",
-            number: isNoNumber ? "" : addr.number || "",
-            complement: addr.complement || "",
-            neighborhood: addr.neighborhood || "",
-            city: addr.city || "",
-            state: addr.state || "",
-            addressType: addr.address_type || "casa",
-            noNumber: isNoNumber,
-            latitude: addr.latitude ?? null,
-            longitude: addr.longitude ?? null,
-        })
-        setEditingId(addr.id)
+        setEditingAddress(addr)
+        setIsFormOpen(true)
     }
 
     const cancel = () => {
         clearMessages()
-        setEditingId(null)
+        setIsFormOpen(false)
+        setEditingAddress(null)
     }
 
     const getCSRF = async () => {
@@ -106,72 +89,20 @@ export const AddressView = ({
         return getCSRFToken()
     }
 
-    const handleSave = async () => {
-        const { zipCode, street, number, neighborhood, city, state, addressType, noNumber } = form
-        const finalNumber = noNumber ? "S/N" : number
-        if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
-            setError("Preencha todos os campos obrigatórios")
-            return
+    const handleAddressSaved = async (savedAddress: any, { isEdit }: { isEdit: boolean }) => {
+        if (isEdit) {
+            setAddresses(addresses.map((a: any) => a.id === savedAddress.id ? savedAddress : a))
+            notifySuccess("Sucesso", "Endereço atualizado!")
+        } else {
+            setAddresses([
+                ...(savedAddress?.is_default ? addresses.map((a: any) => ({ ...a, is_default: false })) : addresses),
+                savedAddress,
+            ])
+            notifySuccess("Sucesso", "Endereço adicionado!")
         }
-
-        setIsLoading(true)
-        clearMessages()
-
-        try {
-            const token = await getCSRF()
-
-            if (editingId === "new") {
-                const result = await createAddressAction({
-                    entityId: userId,
-                    entityType: "user",
-                    zipCode, street, number: finalNumber,
-                    complement: form.complement,
-                    neighborhood, city, state,
-                    isDefault: addresses.length === 0,
-                    addressType,
-                    latitude: form.latitude ?? null,
-                    longitude: form.longitude ?? null,
-                    csrf_token: token,
-                })
-                if (result.error) {
-                    setError(result.error)
-                    notifyError("Erro", result.error)
-                } else {
-                    setAddresses([...(result.address?.is_default ? addresses.map((a: any) => ({ ...a, is_default: false })) : addresses), result.address])
-                    notifySuccess("Sucesso", "Endereço adicionado!")
-                    setEditingId(null)
-                    notifyAddressUpdated(result.address?.id, result.address, (result as any)?.citySlug)
-                    router.refresh()
-                }
-            } else {
-                const result = await updateAddressAction({
-                    addressId: editingId!,
-                    entityId: userId,
-                    entityType: "user",
-                    zipCode, street, number: finalNumber,
-                    complement: form.complement,
-                    neighborhood, city, state,
-                    addressType,
-                    latitude: form.latitude ?? null,
-                    longitude: form.longitude ?? null,
-                    csrf_token: token,
-                })
-                if (result.error) {
-                    setError(result.error)
-                    notifyError("Erro", result.error)
-                } else {
-                    setAddresses(addresses.map((a: any) => a.id === editingId ? result.address : a))
-                    notifySuccess("Sucesso", "Endereço atualizado!")
-                    setEditingId(null)
-                    notifyAddressUpdated(result.address?.id, result.address, (result as any)?.citySlug)
-                    router.refresh()
-                }
-            }
-        } catch {
-            setError("Erro de segurança. Tente novamente.")
-        } finally {
-            setIsLoading(false)
-        }
+        setIsFormOpen(false)
+        setEditingAddress(null)
+        router.refresh()
     }
 
     const handleDelete = (addr: any) => {
@@ -191,7 +122,10 @@ export const AddressView = ({
             } else {
                 setAddresses(addresses.filter((a: any) => a.id !== addressToDelete.id))
                 notifySuccess("Sucesso", "Endereço removido!")
-                if (editingId === addressToDelete.id) setEditingId(null)
+                if (editingAddress?.id === addressToDelete.id) {
+                    setIsFormOpen(false)
+                    setEditingAddress(null)
+                }
                 notifyAddressUpdated()
                 router.refresh()
             }
@@ -228,67 +162,6 @@ export const AddressView = ({
             setIsLoading(false)
         }
     }
-
-    const renderForm = () => (
-        <motion.div key="form" {...fade} className="space-y-4">
-            <div className="flex items-center gap-3 mb-2 pb-2 border-b border-brand-border dark:border-dark-border">
-                {ADDRESS_TYPE_OPTIONS.map(opt => (
-                    <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, addressType: opt.value }))}
-                        className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${form.addressType === opt.value
-                            ? "bg-brand-green text-white border-brand-green"
-                            : "bg-white text-brand-inactive-text dark:bg-dark-surface dark:text-dark-body border-gray-200 dark:border-dark-border hover:border-gray-300 dark:hover:border-dark-border/60"
-                            }`}
-                    >
-                        {opt.label}
-                    </button>
-                ))}
-            </div>
-            <CepInput
-                id="zipCode"
-                name="zipCode"
-                value={form.zipCode}
-                onChange={val => setForm(f => ({ ...f, zipCode: val }))}
-                onAddressFetched={addr => {
-                    setForm(f => ({
-                        ...f,
-                        street: addr.street || f.street,
-                        number: addr.number || f.number,
-                        noNumber: addr.number ? addr.number === "S/N" : f.noNumber,
-                        neighborhood: addr.neighborhood || f.neighborhood,
-                        city: addr.city || f.city,
-                        state: addr.state || f.state,
-                        latitude: addr.latitude ?? f.latitude,
-                        longitude: addr.longitude ?? f.longitude,
-                    }))
-                }}
-            />
-            <Input label="Rua/Avenida" id="street" name="street" placeholder="Rua, Avenida, etc." value={form.street}
-                onChange={e => setForm(f => ({ ...f, street: e.target.value }))} />
-            <div className="grid grid-cols-2 gap-4">
-                <NumberInputWithCheckbox
-                    label="Número"
-                    number={form.number}
-                    noNumber={form.noNumber}
-                    onNumberChange={val => setForm(f => ({ ...f, number: val }))}
-                    onNoNumberChange={checked => setForm(f => ({ ...f, noNumber: checked, number: checked ? "S/N" : "" }))}
-                    placeholder="123"
-                />
-                <Input label="Complemento" id="complement" name="complement" placeholder="Apto, Bloco, etc." value={form.complement}
-                    onChange={e => setForm(f => ({ ...f, complement: e.target.value }))} />
-            </div>
-            <Input label="Bairro" id="neighborhood" name="neighborhood" placeholder="Nome do bairro" value={form.neighborhood}
-                onChange={e => setForm(f => ({ ...f, neighborhood: e.target.value }))} />
-            <div className="grid grid-cols-2 gap-4">
-                <Input label="Cidade" id="city" name="city" placeholder="Nome da cidade" value={form.city}
-                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
-                <StateComboBox value={form.state} onChange={v => setForm(f => ({ ...f, state: v }))} className="w-full" />
-            </div>
-            <Feedback error={error} success={success} />
-        </motion.div>
-    )
 
     return (
         <motion.div key="address" {...fade} className="w-full pb-24 lg:pb-0">
@@ -378,23 +251,15 @@ export const AddressView = ({
                 </div>
             )}
 
-            {/* Modal containing the address form */}
-            <DefaultModal
-                isOpen={editingId !== null}
+            {/* Modal único de criação/edição de endereço */}
+            <AddressFormModal
+                isOpen={isFormOpen}
                 onClose={cancel}
-                title={editingId === "new" ? "Adicionar endereço" : "Editar endereço"}
-                maxWidth="xl"
-                footer={
-                    <>
-                        <Button onClick={handleSave} disabled={isLoading}>
-                            {isLoading ? "Salvando..." : editingId === "new" ? "Adicionar" : "Salvar"}
-                        </Button>
-                        <Button variant="outline" onClick={cancel}>Cancelar</Button>
-                    </>
-                }
-            >
-                {editingId !== null && renderForm()}
-            </DefaultModal>
+                entityId={userId}
+                address={editingAddress}
+                isFirstAddress={addresses.length === 0}
+                onSaved={handleAddressSaved}
+            />
 
             {/* Delete Confirmation Modal */}
             <AlertModal

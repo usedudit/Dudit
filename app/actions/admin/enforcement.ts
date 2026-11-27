@@ -182,7 +182,7 @@ export async function getUsers(
 
     let query = supabase
         .from("user_profiles")
-        .select("user_id, full_name, avatar_url, phone, cpf, cpf_lookup_hash, banned_at, banned_until, banned_reason, banned_case_id, created_at")
+        .select("user_id, full_name, phone, cpf, cpf_lookup_hash, banned_at, banned_until, banned_reason, banned_case_id, created_at")
 
     if (preResolvedEmailUsers !== null) {
         query = query.in("user_id", preResolvedEmailUsers.map((u) => u.id))

@@ -15,7 +15,7 @@ import { parseSearchIntent, type ParsedSearchIntent } from "@/lib/search/intent-
 import { buildProximityRings, type ProximityRingsResult } from "@/lib/search/proximity-rings"
 import { enrichServicesWithAvailability } from "@/lib/search/service-availability"
 import { resolveAiSearchIntent } from "@/lib/search/ai-intent-fallback"
-import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
+import { applySellerDiversity, calcCategoryBrowseScore, rankMarketplaceItems } from "@/lib/marketplace/ranking"
 import { recordMarketplaceSearchTelemetry } from "@/lib/services/analytics.service"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
@@ -205,31 +205,11 @@ function itemDistanceKm(item: any): number {
 }
 
 /**
- * Ordena os resultados distantes pelo ranqueamento do marketplace (_searchRank da FTS,
- * ou marketplace_score como fallback) com um leve empate por proximidade.
- * A distancia pode reordenar itens cujo rank difere em no maximo 10% da faixa da lista;
- * nunca sobrepoe a relevancia do ranqueamento.
+ * Ordena os resultados distantes usando o mesmo ranqueamento unificado do marketplace
+ * (marketplace_score + popularidade + frescor + avaliação + reputação + relevância textual).
  */
 function sortDistantByRankAndDistance<T>(items: T[]): T[] {
-    const list = items as any[]
-    const bases = list.map((item) => {
-        if (typeof item?._searchRank === "number" && Number.isFinite(item._searchRank)) return item._searchRank
-        if (typeof item?.marketplace_score === "number" && Number.isFinite(item.marketplace_score)) return item.marketplace_score
-        return null
-    })
-    const finite = bases.filter((value): value is number => value !== null)
-    const min = finite.length > 0 ? Math.min(...finite) : 0
-    const span = finite.length > 0 ? Math.max(...finite) - min : 0
-
-    const scored = list.map((item, index) => {
-        const base = bases[index]
-        const baseNorm = base === null ? 0 : (span > 0 ? (base - min) / span : 1)
-        const distance = itemDistanceKm(item)
-        const distanceNorm = Number.isFinite(distance) ? Math.min(distance / 1000, 1) : 1
-        return { item, score: baseNorm - 0.1 * distanceNorm }
-    })
-    scored.sort((a, b) => b.score - a.score)
-    return scored.map((entry) => entry.item)
+    return rankMarketplaceItems(items as any[]) as T[]
 }
 
 /**
@@ -511,8 +491,13 @@ export const searchMarketplaceDirectFull = cache(async (
         ).slice(0, 20)
     }
 
-    // Fase 2: Quando a intenção é serviço (ou há janela de horário), prioriza serviços e checa
-    // disponibilidade real em um único batch (locais + distantes juntos) para evitar 2 roundtrips.
+    // Fase 2: Sempre enriquece serviços da 1ª página com horários disponíveis (hoje por padrão, ou janela pedida)
+    // em um único batch (locais + distantes juntos). Só prioriza serviços no topo quando a intenção é serviço.
+    const hasAnyServices =
+        isFirstPage &&
+        (resultsWithDistance.some((r: any) => r.itemType === "servico") ||
+            moreDistantItems.some((r: any) => r.itemType === "servico"))
+
     if (searchIntent && (searchIntent.intent === "service" || searchIntent.timeWindow)) {
         if (type === "tudo" && resultsWithDistance.length > 1) {
             resultsWithDistance = [
@@ -520,12 +505,15 @@ export const searchMarketplaceDirectFull = cache(async (
                 ...resultsWithDistance.filter((r: any) => r.itemType !== "servico"),
             ]
         }
+    }
+
+    if (hasAnyServices) {
         const supabase = getAdminClient()
         const localLen = resultsWithDistance.length
         const combined = [...resultsWithDistance, ...moreDistantItems]
         const enrichedCombined = await enrichServicesWithAvailability(
             combined,
-            searchIntent.timeWindow,
+            searchIntent?.timeWindow ?? null,
             supabase,
         )
         resultsWithDistance = enrichedCombined.slice(0, localLen)
@@ -931,6 +919,7 @@ async function hydrateMarketplaceSearchHits(
             const storeImage = item.logo_url
             const rawDelivery = Array.isArray(item.delivery_settings) ? item.delivery_settings[0] : item.delivery_settings
             const storeAddr = Array.isArray(item.addresses) ? item.addresses[0] : item.addresses
+            const storeRep = Number(item.marketplace_reputation ?? 0)
             results.push({
                 id: storeId,
                 short_id: item.short_id,
@@ -945,6 +934,9 @@ async function hydrateMarketplaceSearchHits(
                 category: item.partners?.category?.parent?.name || item.partners?.category?.name || "Loja Parceira",
                 is_showcase_active: item.is_showcase_active !== false,
                 delivery_settings: rawDelivery || null,
+                marketplace_score: storeRep,
+                marketplace_reputation: storeRep,
+                seller_reputation: storeRep,
                 partners: {
                     id: storeId,
                     short_id: item.short_id,
@@ -961,6 +953,8 @@ async function hydrateMarketplaceSearchHits(
                     neighborhood: storeAddr?.neighborhood || null,
                     reviewsCount: item.reviews?.[0]?.count || 0,
                     delivery_settings: rawDelivery || null,
+                    marketplace_reputation: storeRep,
+                    seller_reputation: storeRep,
                 },
                 created_at: item.created_at,
                 _searchRank: hit.rank,

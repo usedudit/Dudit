@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import type React from "react"
 import { useState, useMemo, useCallback } from "react"
@@ -99,10 +99,12 @@ interface ProductGeneralTabProps {
     onGenerateBarcode?: () => void
     isGeneratingDetails?: boolean
     onGenerateDetails?: () => void
+    isExternalErpLocked?: boolean
+    externalErpLabel?: string | null
 }
 
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isDesapego = false, onGenerateBarcode, isGeneratingDetails = false, onGenerateDetails
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isDesapego = false, onGenerateBarcode, isGeneratingDetails = false, onGenerateDetails, isExternalErpLocked = false, externalErpLabel = null
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
@@ -531,11 +533,11 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         <div className="grid grid-cols-12 gap-6">
                             <div className="col-span-12">
                                 <Input
-                                    label="Nome do Produto"
+                                    label={isExternalErpLocked ? `Nome do Produto (gerenciado pelo ${externalErpLabel})` : "Nome do Produto"}
                                     name="name"
                                     value={productData.name}
                                     onChange={handleFieldChange}
-                                    disabled={!isEditing || isGeneratingDetails}
+                                    disabled={!isEditing || isGeneratingDetails || isExternalErpLocked}
                                     required
                                     maxLength={150}
                                     error={fieldErrors?.has("name")}
@@ -647,7 +649,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                             handleFieldChange({ target: { name: "price", value: calculated } })
                                         }
                                     }}
-                                    disabled={!isEditing || !showPrice}
+                                    disabled={!isEditing || !showPrice || isExternalErpLocked}
                                     dataField="costPrice"
                                 />
                             )}
@@ -657,13 +659,13 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     name="price"
                                     value={productData.price || ""}
                                     onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                                    disabled={!isEditing || !showPrice}
+                                    disabled={!isEditing || !showPrice || isExternalErpLocked}
                                     required={showPrice}
                                     error={fieldErrors?.has("price")}
                                     errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
                                     dataField="price"
                                 />
-                                {isEditing && showPrice && !isDesapego && (
+                                {isEditing && showPrice && !isDesapego && !isExternalErpLocked && (
                                     <SalePriceCalculator
                                         costPrice={Number(productData.costPrice || 0)}
                                         sellingPrice={Number(productData.price || 0)}
@@ -983,15 +985,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                             value={productData.sku}
                                             placeholder="Gerar automaticamente"
                                             onChange={handleFieldChange}
-                                            disabled={!isEditing}
+                                            disabled={!isEditing || isExternalErpLocked}
                                             dataField="sku"
                                             suffix={
-                                                <div
-                                                    onClick={generateRandomCode}
-                                                    className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                >
-                                                    <DiceIcon size={20} />
-                                                </div>
+                                                !isExternalErpLocked ? (
+                                                    <div
+                                                        onClick={generateRandomCode}
+                                                        className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        <DiceIcon size={20} />
+                                                    </div>
+                                                ) : undefined
                                             }
                                         />
                                     )}
@@ -1004,15 +1008,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                     name="gtin"
                                                     value={productData.gtin || ""}
                                                     onChange={handleFieldChange}
-                                                    disabled={!isEditing}
+                                                    disabled={!isEditing || isExternalErpLocked}
                                                     dataField="gtin"
                                                     suffix={
-                                                        <div
-                                                            onClick={onGenerateBarcode}
-                                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            <DiceIcon size={20} />
-                                                        </div>
+                                                        !isExternalErpLocked ? (
+                                                            <div
+                                                                onClick={onGenerateBarcode}
+                                                                className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                            >
+                                                                <DiceIcon size={20} />
+                                                            </div>
+                                                        ) : undefined
                                                     }
                                                 />
                                             </div>
@@ -1084,7 +1090,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                 options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
                                                 value={productData.unidade}
                                                 onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
-                                                disabled={!isEditing}
+                                                disabled={!isEditing || isExternalErpLocked}
                                                 width="w-full"
                                             />
                                         </>
@@ -1103,15 +1109,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         value={productData.sku}
                                         placeholder="Gerar automaticamente"
                                         onChange={handleFieldChange}
-                                        disabled={!isEditing}
+                                        disabled={!isEditing || isExternalErpLocked}
                                         dataField="sku"
                                         suffix={
-                                            <div
-                                                onClick={generateRandomCode}
-                                                className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                            >
-                                                <DiceIcon size={20} />
-                                            </div>
+                                            !isExternalErpLocked ? (
+                                                <div
+                                                    onClick={generateRandomCode}
+                                                    className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                >
+                                                    <DiceIcon size={20} />
+                                                </div>
+                                            ) : undefined
                                         }
                                     />
                                 )}
@@ -1124,15 +1132,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                 name="gtin"
                                                 value={productData.gtin || ""}
                                                 onChange={handleFieldChange}
-                                                disabled={!isEditing}
+                                                disabled={!isEditing || isExternalErpLocked}
                                                 dataField="gtin"
                                                 suffix={
-                                                    <div
-                                                        onClick={onGenerateBarcode}
-                                                        className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <DiceIcon size={20} />
-                                                    </div>
+                                                    !isExternalErpLocked ? (
+                                                        <div
+                                                            onClick={onGenerateBarcode}
+                                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            <DiceIcon size={20} />
+                                                        </div>
+                                                    ) : undefined
                                                 }
                                             />
                                         </div>
@@ -1204,7 +1214,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                             options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
                                             value={productData.unidade}
                                             onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
-                                            disabled={!isEditing}
+                                            disabled={!isEditing || isExternalErpLocked}
                                             width="w-full"
                                         />
                                     </>

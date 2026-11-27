@@ -24,9 +24,11 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine, isInternalErpIntegrationTimelineEntry, isInternalErpIntegrationTimelineLine } from '@/lib/utils';
+import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { MarketplaceExchangeProductPicker, type MarketplaceSelectedExchangeItem } from '@/components/marketplace/MarketplaceExchangeProductPicker';
+import { BuyerReturnRequestTab } from '@/components/marketplace/BuyerReturnRequestTab';
 import { canReportReturnToDudit, getShippingPayerLabel } from '@/lib/returns/policy';
 import {
     getReverseLogisticsMethodLabel,
@@ -59,6 +61,17 @@ type ReturnReasonCategory =
     | "missing_parts"
     | "arrived_late"
     | "other";
+
+const RETURN_REASON_OPTIONS = [
+    { value: "wrong_item", label: "Item errado" },
+    { value: "defective", label: "Item com defeito" },
+    { value: "damaged", label: "Item danificado" },
+    { value: "different_from_description", label: "Diferente da descrição" },
+    { value: "missing_parts", label: "Faltam partes" },
+    { value: "arrived_late", label: "Chegou atrasado" },
+    { value: "changed_mind", label: "Mudou de ideia" },
+    { value: "other", label: "Outro" },
+];
 
 const RETURN_REASON_CATEGORY_MAP: Record<string, ReturnReasonCategory> = {
     wrong_item: "wrong_item",
@@ -518,6 +531,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [reportReturnOpen, setReportReturnOpen] = useState(false);
     const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
     const [returnReason, setReturnReason] = useState("changed_mind");
+    const [returnReasons, setReturnReasons] = useState<Record<string, string>>({});
     const [returnResolution, setReturnResolution] = useState<"exchange" | "refund" | "store_credit">("refund");
     const [returnMessage, setReturnMessage] = useState("");
     const [returnItems, setReturnItems] = useState<Record<string, number>>({});
@@ -595,7 +609,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
     };
 
-    const [activeTab, setActiveTab] = useState<"details" | "history" | "attachments" | "delivery">("details");
+    const [activeTab, setActiveTab] = useState<"details" | "history" | "attachments" | "delivery" | "return">("details");
     const [attachments, setAttachments] = useState<any[]>([]);
     const [loadingAttachments, setLoadingAttachments] = useState(false);
     const [storePolicy, setStorePolicy] = useState<any>(null);
@@ -802,7 +816,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         const allRaw = [...rawEntries, ...effectiveDepositEntries];
         if (allRaw.length === 0) return [];
 
-        const sanitized = allRaw.map((entry: any) => {
+        const sanitized = allRaw
+            .filter((entry: any) => !isInternalErpIntegrationTimelineEntry(entry))
+            .map((entry: any) => {
             const metadata = entry.metadata || {};
             const actorName = resolveTimelineActorName({
                 entry,
@@ -814,12 +830,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
             let changeLines = (entry.change_lines || []).map((line: string) => humanizeTimelineChangeLine(line)).filter(Boolean);
 
-            // Filter out internal seller notes edits from customer view
+            // Filter out internal seller notes edits and internal ERP sync logs from customer view
             changeLines = changeLines.filter(
                 (l: string) =>
                     !l.toLowerCase().includes("observações do pedido atualizadas") &&
                     !l.toLowerCase().includes("alterou as observações do pedido") &&
-                    !isInternalStockTimelineLine(l),
+                    !isInternalStockTimelineLine(l) &&
+                    !isInternalErpIntegrationTimelineLine(l),
             );
 
             // If event was a return rejection, filter out false refund/credit/exchange lines
@@ -1039,12 +1056,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isPendingExchangeShortfall = isExchangeOrder && exchangeShortfall > 0.009 && order.situation === "pending";
     const hasMercadoPagoOnline = order.payment_provider === "Mercado Pago" || Boolean(order.partners?.mp_public_key);
 
-    const paymentMethodName = isExchangeOrder
-        ? (exchangeShortfall > 0 ? "Troca (com diferença)" : "Troca (Quitada)")
-        : getPaymentTypeLabel();
-    const isMercadoPago = hasReceivedMpPayment(order) || (isExchangeOrder && hasMercadoPagoOnline) || (Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly) && hasMercadoPagoOnline);
+    const paymentMethodName = (() => {
+        const rawLabel = getPaymentTypeLabel();
+        const formatted = formatPaymentMethodLabel(rawLabel, null);
+        if (isExchangeOrder && (!formatted || formatted.toLowerCase() === "exchange" || formatted.toLowerCase() === "pix")) {
+            return "Crédito de Troca";
+        }
+        return formatted || rawLabel;
+    })();
+    const isMercadoPago = hasReceivedMpPayment(order) || order.payment_provider === "Mercado Pago" || (Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly) && hasMercadoPagoOnline);
     const paymentMethodKey = `${paymentMethodName} ${order.payment_method || ""}`.toLowerCase();
-    const isPixPayment = isExchangeOrder || paymentMethodKey.includes("pix") || paymentMethodKey.includes("bank_transfer");
+    const isExchangeCreditPayment =
+        paymentMethodKey.includes("crédito de troca") ||
+        paymentMethodKey.includes("credito de troca") ||
+        (isExchangeOrder && exchangeShortfall <= 0.009 && !hasReceivedMpPayment(order));
+    const isPixPayment = !isExchangeCreditPayment && (paymentMethodKey.includes("pix") || paymentMethodKey.includes("bank_transfer"));
     const isBoletoPayment = paymentMethodKey.includes("boleto") || paymentMethodKey.includes("bolbradesco") || paymentMethodKey.includes("ticket");
     const hasUnspecifiedMpCharge = paymentMethodKey.includes("mercado pago");
     const isPaymentExpired = Boolean(
@@ -1065,35 +1091,43 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isStoreCreditPaymentOrder = isStoreCreditMethodString(paymentMethodName) || (storeCreditUsed > 0.009 && storeCreditUsed >= Number(order.total_amount || 0) - 0.009);
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
-        const isStoreCredit = isStoreCreditPaymentOrder || isStoreCreditMethodString(order.payment_method);
-        const isSubscriptionCredits = order.payment_method === "Assinatura (Créditos)";
-        if (isSubscriptionCredits) {
-            return <div className="flex items-center gap-1.5"><RepeatIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" /></div>;
-        }
-        if (isStoreCredit) {
-            icons.push(
-                <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Crédito em loja" className="w-5 h-5 object-contain shrink-0" />
-            );
-            if (isStoreCreditMethodString(paymentMethodName)) {
-                return <div className="flex items-center gap-1.5">{icons}</div>;
-            }
-        } else if (isMercadoPago) {
+        const nameLower = paymentMethodName.toLowerCase();
+        const isVoucherType =
+            isExchangeCreditPayment ||
+            isStoreCreditPaymentOrder ||
+            isStoreCreditMethodString(order.payment_method) ||
+            nameLower.includes("assinatura") ||
+            nameLower.includes("subscription") ||
+            nameLower.includes("vale-compra") ||
+            nameLower.includes("vale_compra") ||
+            nameLower.includes("crédito de troca") ||
+            nameLower.includes("credito de troca") ||
+            nameLower.includes("crédito do cliente") ||
+            nameLower.includes("credito do cliente") ||
+            nameLower.includes("crédito em loja") ||
+            nameLower.includes("credito em loja") ||
+            nameLower.includes("voucher");
+
+        const showMpIcon = isMercadoPago && !isVoucherType;
+        if (showMpIcon) {
             icons.push(
                 <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
             );
         }
 
-        // Extract submethod name
-        const nameLower = paymentMethodName.toLowerCase();
-        if (nameLower.includes("pix") || isExchangeOrder) {
+        if (isVoucherType) {
+            icons.push(
+                <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt={paymentMethodName} className="w-5 h-5 object-contain shrink-0" />
+            );
+        } else if (nameLower.includes("pix")) {
             icons.push(<img key="pix" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />);
-        } else if (!isStoreCreditMethodString(nameLower) && (nameLower.includes("crédito") || nameLower.includes("credito") || nameLower.includes("credit") || nameLower.includes("débito") || nameLower.includes("debito") || nameLower.includes("debit"))) {
-            icons.push(<img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />);
-        } else if (nameLower.includes("dinheiro") || nameLower.includes("cash") || nameLower.includes("money")) {
-            icons.push(<MoneyIcon key="money" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />);
         } else if (nameLower.includes("boleto")) {
             icons.push(<img key="boleto" src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-5 h-5 object-contain shrink-0" />);
-        } else if (!isMercadoPago && !isStoreCredit) {
+        } else if (nameLower.includes("dinheiro") || nameLower.includes("cash") || nameLower.includes("money") || nameLower.includes("espécie")) {
+            icons.push(<img key="money" src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="w-5 h-5 object-contain shrink-0" />);
+        } else if (nameLower.includes("cartão") || nameLower.includes("cartao") || nameLower.includes("crédito") || nameLower.includes("credito") || nameLower.includes("credit") || nameLower.includes("débito") || nameLower.includes("debito") || nameLower.includes("debit")) {
+            icons.push(<img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />);
+        } else if (!showMpIcon) {
             icons.push(<CreditCardIcon key="default" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />);
         }
         return <div className="flex items-center gap-1.5">{icons}</div>;
@@ -1463,7 +1497,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     order_item_id: orderItemId,
                     name: item?.products?.name || item?.product_name || "Produto",
                     quantity: Number(quantity),
-                    reason: returnReason,
+                    reason: returnReasons[orderItemId] || returnReason || "changed_mind",
                     condition: returnConditions[orderItemId] || "opened"
                 };
             });
@@ -1476,12 +1510,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     order_item_id: orderItemId,
                     name: item?.services?.name || item?.product_name || "Serviço",
                     quantity: 1,
-                    reason: returnReason,
+                    reason: returnReasons[orderItemId] || returnReason || "changed_mind",
                     condition: "opened" as const
                 };
             });
 
         const allItems = [...productItems, ...serviceItems];
+        const primaryReason = allItems[0]?.reason || returnReason || "changed_mind";
 
         if (allItems.length === 0) {
             toast({ title: "Selecione ao menos um item", variant: "destructive" });
@@ -1530,18 +1565,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 `• *Data:* ${dateStrFull}`,
                 "",
                 `*🎯 Resolução desejada:* ${resolutionLabel}`,
-                `*📌 Motivo:* ${reasonLabels[returnReason] || returnReason}`,
+                `*📌 Motivo principal:* ${reasonLabels[primaryReason] || primaryReason}`,
                 "",
                 `*📦 Itens para ${resolutionLabel.toLowerCase()}:*`,
             ];
 
             productItems.forEach((p) => {
                 const cond = conditionLabels[p.condition] || p.condition;
-                lines.push(`• ${p.name} (x${p.quantity}) - Condição: ${cond}`);
+                const itemReason = reasonLabels[p.reason] || p.reason;
+                lines.push(`• ${p.name} (x${p.quantity}) - Motivo: ${itemReason} - Condição: ${cond}`);
             });
 
             serviceItems.forEach((s) => {
-                lines.push(`• ${s.name} (Serviço)`);
+                const itemReason = reasonLabels[s.reason] || s.reason;
+                lines.push(`• ${s.name} (Serviço) - Motivo: ${itemReason}`);
             });
 
             if (returnMessage.trim()) {
@@ -1586,8 +1623,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             const result = await createMarketplaceReturnRequestAction({
                 orderId: order.id,
                 resolution: returnResolution,
-                reason: returnReason,
-                reasonCategory: RETURN_REASON_CATEGORY_MAP[returnReason] || "other",
+                reason: primaryReason,
+                reasonCategory: RETURN_REASON_CATEGORY_MAP[primaryReason] || "other",
                 message: returnMessage,
                 items: allItems.map((item) => ({
                     order_item_id: item.order_item_id,
@@ -1872,14 +1909,22 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     </span>
                 }
                 bottomElement={
-                    canReport ? (
+                    <div className="flex flex-wrap items-center gap-4">
                         <Button
                             variant="link"
-                            onClick={() => setReportReturnOpen(true)}
+                            onClick={() => setActiveTab("return")}
                         >
-                            Reportar à Dudit
+                            Ver detalhes da solicitação
                         </Button>
-                    ) : undefined
+                        {canReport && (
+                            <Button
+                                variant="link"
+                                onClick={() => setReportReturnOpen(true)}
+                            >
+                                Reportar à Dudit
+                            </Button>
+                        )}
+                    </div>
                 }
             />
         );
@@ -1923,6 +1968,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <TabsTrigger value="details">Detalhes do Pedido</TabsTrigger>
                             {isDelivery && (
                                 <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                            )}
+                            {activeReturnRequest && (
+                                <TabsTrigger value="return">
+                                    {(activeReturnRequest.approved_resolution || activeReturnRequest.desired_resolution) === "exchange"
+                                        ? "Troca"
+                                        : "Devolução"}
+                                </TabsTrigger>
                             )}
                             <TabsTrigger value="history">Histórico do Pedido</TabsTrigger>
                             {attachments.length > 0 && (
@@ -2276,11 +2328,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     }
                                                     description={
                                                         <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
-                                                            {isStoreCreditPaymentOrder
-                                                                ? "Saldo em loja utilizado"
-                                                                : order.payment_provider === "Mercado Pago"
-                                                                    ? "Mercado Pago"
-                                                                    : "Pagamento direto"}
+                                                            {isExchangeCreditPayment
+                                                                ? "Crédito de troca aplicado"
+                                                                : isStoreCreditPaymentOrder
+                                                                    ? "Saldo em loja utilizado"
+                                                                    : order.payment_provider === "Mercado Pago"
+                                                                        ? "Mercado Pago"
+                                                                        : "Pagamento direto"}
                                                         </span>
                                                     }
                                                     className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
@@ -2609,6 +2663,16 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </div>
                         </TabsContent>
 
+                        {activeReturnRequest && (
+                            <TabsContent value="return" className="mt-0 focus-visible:ring-0">
+                                <BuyerReturnRequestTab
+                                    order={order}
+                                    returnRequest={activeReturnRequest}
+                                    onReportToDudit={() => setReportReturnOpen(true)}
+                                />
+                            </TabsContent>
+                        )}
+
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
                             <div className="space-y-8">
                                 {loadingBuyerHistory && combinedHistoryEntries.length === 0 ? (
@@ -2871,16 +2935,18 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     video_thumbnail: item.products?.video_thumbnail || null,
                                                     fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                                 });
-                                                return (
-                                                    <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3">
+                                                    const isItemChecked = Number(returnItems[item.id] || 0) > 0;
+                                                    return (
+                                                    <div key={item.id} className="space-y-3 rounded-xl border border-brand-border/60 dark:border-dark-border/60 p-3">
                                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                                             <Checkbox
-                                                                checked={Number(returnItems[item.id] || 0) > 0}
+                                                                checked={isItemChecked}
                                                                 disabled={remainingQuantities[item.id] <= 0}
                                                                 onChange={(checked) => {
                                                                     setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
                                                                     if (checked) {
-                                                                        setReturnConditions(prev => ({ ...prev, [item.id]: "opened" }));
+                                                                        setReturnConditions(prev => ({ ...prev, [item.id]: prev[item.id] || "opened" }));
+                                                                        setReturnReasons(prev => ({ ...prev, [item.id]: prev[item.id] || returnReason || "changed_mind" }));
                                                                     }
                                                                 }}
                                                             />
@@ -2901,32 +2967,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
-                                                            <div className="flex flex-col gap-1 w-24">
-                                                                <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
-                                                                <QuantitySelector
-                                                                    value={returnItems[item.id] || 1}
-                                                                    onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
-                                                                    min={1}
-                                                                    max={remainingQuantities[item.id] || 1}
-                                                                    disabled={!returnItems[item.id] || remainingQuantities[item.id] <= 0}
-                                                                    size="sm"
+                                                        {isItemChecked && (
+                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pl-8">
+                                                                <FormDropdown
+                                                                    label="Motivo"
+                                                                    value={returnReasons[item.id] || returnReason || "changed_mind"}
+                                                                    setValue={(val) => setReturnReasons(prev => ({ ...prev, [item.id]: val }))}
+                                                                    options={RETURN_REASON_OPTIONS}
                                                                 />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1 w-32">
                                                                 <FormDropdown
                                                                     label="Condição"
                                                                     value={returnConditions[item.id] || "opened"}
                                                                     setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
-                                                                    disabled={!returnItems[item.id]}
                                                                     options={[
                                                                         { value: "opened", label: "Aberto" },
                                                                         { value: "sealed", label: "Lacrado" },
                                                                         { value: "damaged", label: "Danificado" },
                                                                     ]}
                                                                 />
+                                                                <div className="flex flex-col gap-1">
+                                                                    <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
+                                                                    <QuantitySelector
+                                                                        value={returnItems[item.id] || 1}
+                                                                        onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
+                                                                        min={1}
+                                                                        max={remainingQuantities[item.id] || 1}
+                                                                        disabled={remainingQuantities[item.id] <= 0}
+                                                                        size="sm"
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 )
                                             })}
@@ -2943,35 +3014,52 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 const isCancelled = order.situation === "cancelled";
                                                 const serviceImage = item.services?.images?.[0] || item.services?.video_thumbnail || null;
                                                 return (
-                                                    <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                                        <Checkbox
-                                                            checked={!!returnServiceItems[item.id]}
-                                                            onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
-                                                            disabled={isCancelled || returnResolution === "exchange"}
-                                                        />
-                                                        {serviceImage ? (
-                                                            <img
-                                                                src={getR2ImageUrl(serviceImage)}
-                                                                alt={item.services?.name || item.product_name}
-                                                                className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                    <div key={item.id} className="space-y-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <Checkbox
+                                                                checked={!!returnServiceItems[item.id]}
+                                                                onChange={(checked) => {
+                                                                    setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }));
+                                                                    if (checked) {
+                                                                        setReturnReasons(prev => ({ ...prev, [item.id]: prev[item.id] || returnReason || "changed_mind" }));
+                                                                    }
+                                                                }}
+                                                                disabled={isCancelled || returnResolution === "exchange"}
                                                             />
-                                                        ) : (
-                                                            <div className="h-12 w-12 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                                                                <svg className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                </svg>
+                                                            {serviceImage ? (
+                                                                <img
+                                                                    src={getR2ImageUrl(serviceImage)}
+                                                                    alt={item.services?.name || item.product_name}
+                                                                    className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                                />
+                                                            ) : (
+                                                                <div className="h-12 w-12 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                                                                    <svg className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                    </svg>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
+                                                                    {isCancelled && (
+                                                                        <Badge variant="red">Cancelado</Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Serviço</p>
+                                                            </div>
+                                                        </div>
+                                                        {!!returnServiceItems[item.id] && (
+                                                            <div className="pl-8">
+                                                                <FormDropdown
+                                                                    label="Motivo"
+                                                                    value={returnReasons[item.id] || returnReason || "changed_mind"}
+                                                                    setValue={(val) => setReturnReasons(prev => ({ ...prev, [item.id]: val }))}
+                                                                    options={RETURN_REASON_OPTIONS}
+                                                                />
                                                             </div>
                                                         )}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
-                                                                {isCancelled && (
-                                                                    <Badge variant="red">Cancelado</Badge>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Serviço</p>
-                                                        </div>
                                                     </div>
                                                 )
                                             })}
@@ -2982,29 +3070,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     <InfoCard title="Atenção" message="Serviços não permitem troca. Selecione Reembolso ou Vale-compra." color="orange" />
                                 )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormDropdown
-                                        label="Motivo"
-                                        value={returnReason}
-                                        setValue={setReturnReason}
-                                        options={[
-                                            { value: "wrong_item", label: "Item errado" },
-                                            { value: "defective", label: "Item com defeito" },
-                                            { value: "damaged", label: "Item danificado" },
-                                            { value: "different_from_description", label: "Diferente da descrição" },
-                                            { value: "missing_parts", label: "Faltam partes" },
-                                            { value: "arrived_late", label: "Chegou atrasado" },
-                                            { value: "changed_mind", label: "Mudou de ideia" },
-                                            { value: "other", label: "Outro" },
-                                        ]}
-                                    />
-                                    <FormDropdown
-                                        label="Resolução"
-                                        value={returnResolution}
-                                        setValue={(val) => setReturnResolution(val as any)}
-                                        options={resolutionOptions}
-                                    />
-                                </div>
+                                <FormDropdown
+                                    label="Resolução"
+                                    value={returnResolution}
+                                    setValue={(val) => setReturnResolution(val as any)}
+                                    options={resolutionOptions}
+                                />
 
                                 {returnResolution === "exchange" && (
                                     <MarketplaceExchangeProductPicker
@@ -3060,16 +3131,18 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 video_thumbnail: item.products?.video_thumbnail || null,
                                                 fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                             });
+                                            const isItemChecked = Number(returnItems[item.id] || 0) > 0;
                                             return (
-                                                <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3">
+                                                <div key={item.id} className="space-y-3 rounded-xl border border-brand-border/60 dark:border-dark-border/60 p-3">
                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                                         <Checkbox
-                                                            checked={Number(returnItems[item.id] || 0) > 0}
+                                                            checked={isItemChecked}
                                                             disabled={remainingQuantities[item.id] <= 0}
                                                             onChange={(checked) => {
                                                                 setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
                                                                 if (checked) {
-                                                                    setReturnConditions(prev => ({ ...prev, [item.id]: "opened" }));
+                                                                    setReturnConditions(prev => ({ ...prev, [item.id]: prev[item.id] || "opened" }));
+                                                                    setReturnReasons(prev => ({ ...prev, [item.id]: prev[item.id] || returnReason || "changed_mind" }));
                                                                 }
                                                             }}
                                                         />
@@ -3090,32 +3163,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
-                                                        <div className="flex flex-col gap-1 w-24">
-                                                            <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
-                                                            <QuantitySelector
-                                                                value={returnItems[item.id] || 1}
-                                                                onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
-                                                                min={1}
-                                                                max={remainingQuantities[item.id] || 1}
-                                                                disabled={!returnItems[item.id] || remainingQuantities[item.id] <= 0}
-                                                                size="sm"
+                                                    {isItemChecked && (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pl-8">
+                                                            <FormDropdown
+                                                                label="Motivo"
+                                                                value={returnReasons[item.id] || returnReason || "changed_mind"}
+                                                                setValue={(val) => setReturnReasons(prev => ({ ...prev, [item.id]: val }))}
+                                                                options={RETURN_REASON_OPTIONS}
                                                             />
-                                                        </div>
-                                                        <div className="flex flex-col gap-1 w-32">
                                                             <FormDropdown
                                                                 label="Condição"
                                                                 value={returnConditions[item.id] || "opened"}
                                                                 setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
-                                                                disabled={!returnItems[item.id]}
                                                                 options={[
                                                                     { value: "opened", label: "Aberto" },
                                                                     { value: "sealed", label: "Lacrado" },
                                                                     { value: "damaged", label: "Danificado" },
                                                                 ]}
                                                             />
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
+                                                                <QuantitySelector
+                                                                    value={returnItems[item.id] || 1}
+                                                                    onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
+                                                                    min={1}
+                                                                    max={remainingQuantities[item.id] || 1}
+                                                                    disabled={remainingQuantities[item.id] <= 0}
+                                                                    size="sm"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             )
                                         })}
@@ -3171,29 +3249,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <InfoCard title="Atenção" message="Serviços não permitem troca. Selecione Reembolso ou Vale-compra." color="orange" />
                             )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormDropdown
-                                    label="Motivo"
-                                    value={returnReason}
-                                    setValue={setReturnReason}
-                                    options={[
-                                        { value: "wrong_item", label: "Item errado" },
-                                        { value: "defective", label: "Item com defeito" },
-                                        { value: "damaged", label: "Item danificado" },
-                                        { value: "different_from_description", label: "Diferente da descrição" },
-                                        { value: "missing_parts", label: "Faltam partes" },
-                                        { value: "arrived_late", label: "Chegou atrasado" },
-                                        { value: "changed_mind", label: "Mudou de ideia" },
-                                        { value: "other", label: "Outro" },
-                                    ]}
-                                />
-                                <FormDropdown
-                                    label="Resolução"
-                                    value={returnResolution}
-                                    setValue={(val) => setReturnResolution(val as any)}
-                                    options={resolutionOptions}
-                                />
-                            </div>
+                            <FormDropdown
+                                label="Resolução"
+                                value={returnResolution}
+                                setValue={(val) => setReturnResolution(val as any)}
+                                options={resolutionOptions}
+                            />
 
                             <FormTextarea
                                 label="Mensagem opcional"

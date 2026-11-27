@@ -691,12 +691,9 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                             <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
                                                 {/* Main Content - Left Column */}
                                                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
-                                                    <FormSection title="Frete grátis por estado (SuperFrete)">
+                                                    <FormSection title="Frete grátis por estado">
                                                         <div className="space-y-6">
                                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                    Defina a partir de qual valor do pedido o frete via transportadora fica grátis em estados específicos ou em todo o Brasil.
-                                                                </p>
                                                                 <Button
                                                                     variant="link"
                                                                     className="shrink-0 self-start sm:self-auto"

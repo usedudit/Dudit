@@ -63,7 +63,7 @@ export default async function ERPLayout({
   const [profileDataRes, allAccess] = await Promise.all([
     createAdminClient()
       .from("user_profiles")
-      .select("full_name, avatar_url")
+      .select("full_name")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(
@@ -78,7 +78,7 @@ export default async function ERPLayout({
     email: user.email || "",
     initials: (profileDataRes?.data?.full_name?.[0] || user.email?.[0] || "U").toUpperCase(),
     avatarColor: "bg-brand-primary",
-    imageUrl: profileDataRes?.data?.avatar_url || null,
+    imageUrl: null,
   }
 
   const hasOwnPartner = allAccess.some((a: typeof allAccess[number]) => a.roleId === "owner")

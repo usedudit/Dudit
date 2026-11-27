@@ -742,30 +742,78 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                     {sellerName}
                                 </p>
                                 {locationOnly ? (
-                                    (metaDistanceLabel || locationLabel) ? (
-                                        <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                            <span className="shrink-0">{metaDistanceLabel || locationLabel}</span>
-                                        </div>
-                                    ) : null
+                                    <div className="flex flex-col gap-0.5 mt-0.5">
+                                        {(metaDistanceLabel || locationLabel) && (
+                                            <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
+                                                <span className="shrink-0">{metaDistanceLabel || locationLabel}</span>
+                                                {itemType === "servico" && serviceDuration && (
+                                                    <>
+                                                        <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                        {itemType === "servico" && (product as any)._availability && (
+                                            <div className="flex flex-wrap items-center gap-1 text-[10px] leading-tight">
+                                                <span
+                                                    className={
+                                                        (product as any)._availability.status === "available"
+                                                            ? "text-brand-green font-semibold truncate"
+                                                            : (product as any)._availability.status === "closed" || (product as any)._availability.outOfServiceArea
+                                                                ? "text-amber-600 dark:text-amber-400 font-medium truncate"
+                                                                : "text-brand-inactive-text dark:text-dark-body font-medium truncate"
+                                                    }
+                                                >
+                                                    {(product as any)._availability.outOfServiceArea
+                                                        ? (product as any)._availability.travelFeeLabel
+                                                        : (product as any)._availability.availableSlots?.length > 0
+                                                            ? `${(product as any)._availability.label} · ${(product as any)._availability.availableSlots.slice(0, 2).join(", ")}`
+                                                            : (product as any)._availability.label}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : isBroadScope ? (
-                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {locationLabel && (
-                                            <span className="shrink-0">{locationLabel}</span>
-                                        )}
-                                        {itemType === "servico" && serviceDuration && (
-                                            <>
-                                                {locationLabel && <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />}
-                                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
-                                            </>
-                                        )}
-                                        {itemType === "produto" && deliveryFeeLabel && isFreeDelivery && (
-                                            <>
-                                                {locationLabel && <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />}
-                                                <span className="shrink-0 font-medium text-brand-green font-bold">{deliveryFeeLabel}</span>
-                                            </>
-                                        )}
-                                        {!locationLabel && !serviceDuration && (!deliveryFeeLabel || !isFreeDelivery) && (
-                                            <span>{sellerLabel || "Pronta entrega"}</span>
+                                    <div className="flex flex-col gap-0.5 mt-0.5">
+                                        <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
+                                            {locationLabel && (
+                                                <span className="shrink-0">{locationLabel}</span>
+                                            )}
+                                            {itemType === "servico" && serviceDuration && (
+                                                <>
+                                                    {locationLabel && <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />}
+                                                    <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
+                                                </>
+                                            )}
+                                            {itemType === "produto" && deliveryFeeLabel && isFreeDelivery && (
+                                                <>
+                                                    {locationLabel && <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />}
+                                                    <span className="shrink-0 font-medium text-brand-green font-bold">{deliveryFeeLabel}</span>
+                                                </>
+                                            )}
+                                            {!locationLabel && !serviceDuration && (!deliveryFeeLabel || !isFreeDelivery) && (
+                                                <span>{sellerLabel || "Pronta entrega"}</span>
+                                            )}
+                                        </div>
+                                        {itemType === "servico" && (product as any)._availability && (
+                                            <div className="flex flex-wrap items-center gap-1 text-[10px] leading-tight">
+                                                <span
+                                                    className={
+                                                        (product as any)._availability.status === "available"
+                                                            ? "text-brand-green font-semibold truncate"
+                                                            : (product as any)._availability.status === "closed" || (product as any)._availability.outOfServiceArea
+                                                                ? "text-amber-600 dark:text-amber-400 font-medium truncate"
+                                                                : "text-brand-inactive-text dark:text-dark-body font-medium truncate"
+                                                    }
+                                                >
+                                                    {(product as any)._availability.outOfServiceArea
+                                                        ? (product as any)._availability.travelFeeLabel
+                                                        : (product as any)._availability.availableSlots?.length > 0
+                                                            ? `${(product as any)._availability.label} · ${(product as any)._availability.availableSlots.slice(0, 2).join(", ")}`
+                                                            : (product as any)._availability.label}
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
                                 ) : itemType === "servico" ? (

@@ -1075,6 +1075,40 @@ interface UpdateProductData {
     storeId?: string
 }
 
+function getExternalErpLabel(provider?: string | null): string | null {
+    const p = String(provider || "").trim().toLowerCase()
+    if (p === "bling") return "Bling ERP"
+    if (p === "tiny") return "Tiny ERP"
+    return null
+}
+
+export async function unlinkProductFromExternalErpAction(productId: string): Promise<ActionResponse<{ unlinked: boolean }>> {
+    await requireRateLimit(RateLimitCategory.PRODUCT_UPDATE)
+    try {
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, external_provider")
+        const admin = getAdminClient()
+        const { error } = await admin
+            .from("products")
+            .update({
+                external_id: null,
+                external_provider: null,
+                last_external_sync_at: null,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", productId)
+            .eq("partner_id", product.partner_id)
+
+        if (error) return errorResponse(error.message)
+
+        await invalidateProductCache(productId, product.partner_id, "update")
+        await revalidateProducts(product.partner_id, productId)
+
+        return successResponse({ unlinked: true })
+    } catch (error: any) {
+        return errorResponse(error.message || "Erro ao desvincular produto do ERP")
+    }
+}
+
 export async function updateProductComprehensiveAction(productId: string, data: UpdateProductData): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
     // 1. GATEKEEPER â€” isolado
@@ -1083,10 +1117,11 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // 2. CSRF + ownership em paralelo (independentes)
         const [csrf, product] = await Promise.all([
             validateCSRF(data as Record<string, unknown>),
-            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, store_id, stock_quantity, images, sku, name, description, moderation_status, video_type, video_url, video_thumbnail"),
+            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, store_id, stock_quantity, images, sku, name, description, moderation_status, video_type, video_url, video_thumbnail, external_provider, external_id"),
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
         const cleanupUser = await requireUser()
+        const erpLabel = getExternalErpLabel((product as any).external_provider)
 
         for (const field of ["price", "costPrice", "minStock", "maxStock", "stockQuantity"] as const) {
             const value = data[field]
@@ -1261,6 +1296,20 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             ? 'flagged'
             : (product.moderation_status || 'approved')
 
+        // Produtos sincronizados com Bling/Tiny: protege campos críticos gerenciados pelo ERP
+        // (permite editar livremente campos de vitrine: descrição, fotos, vídeo, preço promocional, categoria, tags, etc.)
+        if (erpLabel) {
+            delete payload.name
+            delete payload.sku
+            delete payload.gtin
+            delete payload.unit
+            delete payload.price
+            delete payload.cost_price
+            delete payload.stock_quantity
+            delete fiscalPayload.ncm
+            delete fiscalPayload.origin
+        }
+
         const adminRpc = getAdminClient()
         const { data: updatedProduct, error: transactionError } = await adminRpc.rpc(
             "update_product_transaction_server",
@@ -1360,6 +1409,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         // Sincroniza estoque manual alterado no cadastro do produto com ERPs conectados (Tiny / Bling)
         if (
+            !erpLabel &&
             data.stockQuantity !== undefined &&
             Number(data.stockQuantity) !== Number(product.stock_quantity || 0)
         ) {
@@ -1403,7 +1453,11 @@ export async function createProductVariantAction(data: {
         if (String(data.variantType || "").length > 100 || String(data.variantName || "").length > 100) {
             return { error: "Dados da variante excedem o limite permitido" }
         }
-        const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
+        const product = await fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, store_id, sku, external_provider")
+        const erpLabel = getExternalErpLabel((product as any).external_provider)
+        if (erpLabel) {
+            return { error: `Este produto está sincronizado com o ${erpLabel}. Crie variações diretamente no ${erpLabel} ou desvincule o produto primeiro.` }
+        }
         if (Number(data.stockQuantity || 0) !== 0) {
             const user = await requireUser()
             await requirePermission(product.partner_id, "stock_movements", "create", user)
@@ -1512,9 +1566,13 @@ export async function createProductVariantsBatchAction(data: {
     try {
         const [csrf, product] = await Promise.all([
             validateCSRF(data as Record<string, unknown>),
-            fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, images, sku, name, promotional_price")
+            fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, images, sku, name, promotional_price, external_provider")
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
+        const erpLabel = getExternalErpLabel((product as any).external_provider)
+        if (erpLabel) {
+            return errorResponse(`Este produto está sincronizado com o ${erpLabel}. Gerencie as variações diretamente no ${erpLabel} ou desvincule o produto primeiro.`)
+        }
         const cleanupUser = await requireUser()
 
         if (data.variants.some((variant) => Number(variant.stockQuantity || 0) !== 0)) {
@@ -1719,7 +1777,11 @@ export async function deleteProductVariantAction(variantId: string): Promise<Act
         const { data: variant } = await supabase.from("product_variants").select("product_id, variant_options").eq("id", variantId).single()
         if (!variant) return errorResponse("Variante não encontrada")
 
-        const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit")
+        const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit", "id, partner_id, store_id, images, external_provider")
+        const erpLabel = getExternalErpLabel((product as any).external_provider)
+        if (erpLabel) {
+            return errorResponse(`Este produto está sincronizado com o ${erpLabel}. Remova a variação no ${erpLabel} ou desvincule o produto primeiro.`)
+        }
         const { error } = await supabase.from("product_variants").delete().eq("id", variantId).eq("product_id", variant.product_id)
         if (error) return errorResponse(error.message)
 
@@ -1765,7 +1827,14 @@ export async function updateProductVariantAction(variantId: string, data: {
         const { data: variant } = await supabase.from("product_variants").select("product_id, variant_options").eq("id", variantId).single()
         if (!variant) return errorResponse("Variante não encontrada")
 
-        const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit")
+        const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit", "id, partner_id, store_id, images, external_provider")
+        const erpLabel = getExternalErpLabel((product as any).external_provider)
+        if (
+            erpLabel &&
+            (data.variantName !== undefined || data.sku !== undefined || data.price !== undefined || data.stockQuantity !== undefined)
+        ) {
+            return errorResponse(`SKU, nome, preço e estoque de variações são gerenciados pelo ${erpLabel}. Altere no ${erpLabel} ou desvincule o produto primeiro.`)
+        }
         if (data.stockQuantity !== undefined) {
             const user = await requireUser()
             await requirePermission(product.partner_id, "stock_movements", "create", user)
@@ -1834,7 +1903,7 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
 
         const { data: variants } = await supabase
             .from("product_variants")
-            .select("id, product_id, variant_options, products!inner(partner_id, store_id, partners!inner(user_id))")
+            .select("id, product_id, variant_options, products!inner(partner_id, store_id, external_provider, partners!inner(user_id))")
             .in("id", variantIds)
 
         if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
@@ -1847,6 +1916,14 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
         }
         // 2) All variants must belong to a single partner (reject cross-tenant batches).
         const productPartnerId = await verifyVariantBatchOwnership(variants, user)
+
+        for (const v of variants as any[]) {
+            const prod = Array.isArray(v.products) ? v.products[0] : v.products
+            const erpLabel = getExternalErpLabel(prod?.external_provider)
+            if (erpLabel) {
+                return errorResponse(`Este produto está sincronizado com o ${erpLabel}. Remova variações diretamente no ${erpLabel} ou desvincule o produto primeiro.`)
+            }
+        }
 
         const candidateImages = variants.filter((v: any) => v.variant_options?.image).map((v: any) => v.variant_options.image)
 
@@ -1901,7 +1978,7 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
 
         const { data: variants } = await supabase
             .from("product_variants")
-            .select("id, product_id, variant_options, products!inner(partner_id, store_id, partners!inner(user_id))")
+            .select("id, product_id, variant_options, products!inner(partner_id, store_id, external_provider, partners!inner(user_id))")
             .in("id", variantIds)
 
         if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
@@ -1912,6 +1989,16 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
             return errorResponse("Uma ou mais variantes não foram encontradas")
         }
         const productPartnerId = await verifyVariantBatchOwnership(variants, user)
+
+        if (updates.some((u) => u.price !== undefined || u.stock !== undefined)) {
+            for (const v of variants as any[]) {
+                const prod = Array.isArray(v.products) ? v.products[0] : v.products
+                const erpLabel = getExternalErpLabel(prod?.external_provider)
+                if (erpLabel) {
+                    return errorResponse(`Preço e estoque das variações são gerenciados pelo ${erpLabel}. Altere no ${erpLabel} ou desvincule o produto primeiro.`)
+                }
+            }
+        }
 
         if (updates.some((update) => update.stock !== undefined)) {
             await requirePermission(productPartnerId, "stock_movements", "create", user)
@@ -2822,8 +2909,12 @@ export async function updateProductSalePriceAction(params: {
         if (params.price !== undefined && (!Number.isFinite(Number(params.price)) || Number(params.price) < 0)) {
             return { error: "Preço de venda inválido" }
         }
-        const product = await fetchProductAndVerifyOwnership(params.productId, "edit", "id, partner_id, store_id")
+        const product = await fetchProductAndVerifyOwnership(params.productId, "edit", "id, partner_id, store_id, external_provider")
         if (product.partner_id !== params.partnerId) return { error: "Produto não encontrado" }
+        const erpLabel = getExternalErpLabel((product as any).external_provider)
+        if (erpLabel && params.price !== undefined) {
+            return { error: `O preço de venda deste produto é gerenciado pelo ${erpLabel}. Altere no ${erpLabel} ou desvincule o produto primeiro.` }
+        }
         await requirePermission(params.partnerId, "products", "edit")
         const admin = getAdminClient()
 
@@ -2994,6 +3085,23 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
         }
 
         const admin = getAdminClient()
+
+        // Impede alteração em lote de preço ou estoque em produtos vinculados ao Bling/Tiny
+        const criticalIds = normalizedUpdates
+            .filter(({ data }) => "price" in data || "stock_quantity" in data)
+            .map(({ id }) => id)
+        if (criticalIds.length > 0) {
+            const { data: extRows } = await admin
+                .from("products")
+                .select("id, external_provider")
+                .eq("partner_id", partnerId)
+                .in("id", criticalIds)
+                .in("external_provider", ["bling", "tiny"])
+            if (extRows && extRows.length > 0) {
+                const erpLabel = getExternalErpLabel(extRows[0].external_provider) || "ERP externo"
+                return { error: `Um ou mais produtos selecionados estão sincronizados com o ${erpLabel}. Altere preço e estoque diretamente no ${erpLabel} ou desvincule-os primeiro.` }
+            }
+        }
 
         // Use RPC to handle batch updates safely if possible, or iterate
         // Given Supabase limitations, a series of updates or a specific RPC is best.

@@ -202,4 +202,67 @@ describe("TinyClient", () => {
     expect(callArgs[1]?.body).toContain(encodeURIComponent('"idProduto":12345'))
     expect(callArgs[1]?.body).toContain(encodeURIComponent('"quantidade":42'))
   })
+
+  it("launchOrderStock calls pedido.lancar.estoque.php and handles already-launched idempotently", async () => {
+    const client = createTinyClient(fakeToken)
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          retorno: { status_processamento: 3, status: "OK" },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          retorno: {
+            status_processamento: 2,
+            status: "Erro",
+            erros: [{ erro: "Estoque já lançado para este pedido" }],
+          },
+        }),
+      } as any)
+
+    const res1 = await client.launchOrderStock(998877)
+    expect(res1).toEqual({ launched: true })
+    expect(fetchSpy.mock.calls[0][0]).toContain("pedido.lancar.estoque.php")
+    expect(fetchSpy.mock.calls[0][1]?.body).toContain("id=998877")
+
+    const res2 = await client.launchOrderStock(998877)
+    expect(res2).toEqual({ launched: true, alreadyLaunched: true })
+  })
+
+  it("reverseOrderStock calls pedido.estornar.estoque.php and handles not-launched idempotently", async () => {
+    const client = createTinyClient(fakeToken)
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          retorno: { status_processamento: 3, status: "OK" },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          retorno: {
+            status_processamento: 2,
+            status: "Erro",
+            erros: [{ erro: "O estoque deste pedido não foi lançado" }],
+          },
+        }),
+      } as any)
+
+    const res1 = await client.reverseOrderStock(998877)
+    expect(res1).toEqual({ reversed: true })
+    expect(fetchSpy.mock.calls[0][0]).toContain("pedido.estornar.estoque.php")
+
+    const res2 = await client.reverseOrderStock(998877)
+    expect(res2).toEqual({ reversed: false, notLaunched: true })
+  })
 })

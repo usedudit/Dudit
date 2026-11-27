@@ -210,7 +210,7 @@ export default async function ExplorarPage({
         // Filtros aplicados (preço, promoção, avaliação, raio...) também são
         // "intenção de busca": sem isso, um link compartilhado com filtros
         // cairia na landing page e perderia tudo o que o usuário escolheu.
-        || ["preco_min", "preco_max", "promo", "cond", "envio", "avaliacao", "entrega", "raio", "vitrine", "ord"]
+        || ["preco_min", "preco_max", "promo", "cond", "envio", "avaliacao", "entrega", "raio", "vitrine", "agrupar", "ord"]
             .some((key) => resolvedSearchParams[key] !== undefined)
 
     const normalizeCityToSlug = (city: string, state: string) => {

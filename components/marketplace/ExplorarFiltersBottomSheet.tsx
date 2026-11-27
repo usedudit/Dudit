@@ -31,6 +31,7 @@ export interface AppliedFilters {
     delivery?: DeliveryFilter
     maxDistanceKm?: number | null
     showcaseOnly?: boolean
+    groupByProximity?: boolean
     brands?: string[]
     selectedBrands?: string[]
 }
@@ -60,6 +61,8 @@ interface ExplorarFiltersBottomSheetProps {
     delivery?: DeliveryFilter
     maxDistanceKm?: number | null
     showcaseOnly?: boolean
+    groupByProximity?: boolean
+    showProximityGrouping?: boolean
     brands?: string[]
     selectedBrands?: string[]
     /** Tipos (do filtro "Tipo") para os quais o filtro de marca se aplica. */
@@ -104,6 +107,8 @@ export function ExplorarFiltersBottomSheet({
     delivery = "",
     maxDistanceKm = null,
     showcaseOnly = false,
+    groupByProximity = true,
+    showProximityGrouping = false,
     brands = [],
     selectedBrands = [],
     brandTypes = [],
@@ -139,6 +144,7 @@ export function ExplorarFiltersBottomSheet({
     const [draftDelivery, setDraftDelivery] = useState<DeliveryFilter>(delivery)
     const [draftMaxDistance, setDraftMaxDistance] = useState<number | null>(maxDistanceKm)
     const [draftShowcaseOnly, setDraftShowcaseOnly] = useState(showcaseOnly)
+    const [draftGroupByProximity, setDraftGroupByProximity] = useState(groupByProximity)
     const [draftBrands, setDraftBrands] = useState<string[]>(selectedBrands)
 
     useEffect(() => {
@@ -154,6 +160,7 @@ export function ExplorarFiltersBottomSheet({
         setDraftDelivery(delivery)
         setDraftMaxDistance(maxDistanceKm)
         setDraftShowcaseOnly(showcaseOnly)
+        setDraftGroupByProximity(groupByProximity)
         setDraftBrands(selectedBrands)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
@@ -176,6 +183,7 @@ export function ExplorarFiltersBottomSheet({
         || !!draftDelivery
         || !!draftMaxDistance
         || draftShowcaseOnly
+        || !draftGroupByProximity
         || draftBrands.length > 0
 
     const draftCategoryList = useMemo(() => {
@@ -209,6 +217,7 @@ export function ExplorarFiltersBottomSheet({
             delivery: draftDelivery,
             maxDistanceKm: draftMaxDistance,
             showcaseOnly: draftShowcaseOnly,
+            groupByProximity: draftGroupByProximity,
             brands: draftBrands,
         })
         onClose()
@@ -626,6 +635,33 @@ export function ExplorarFiltersBottomSheet({
                             )}
                         </span>
                         Envio nacional
+                    </button>
+                </section>
+            )}
+
+            {/* Agrupar por proximidade (seções de cidades vizinhas / envio nacional / Brasil) */}
+            {showProximityGrouping && (
+                <section>
+                    <button
+                        onClick={() => setDraftGroupByProximity(!draftGroupByProximity)}
+                        className={checkboxRowClass(draftGroupByProximity)}
+                    >
+                        <span
+                            className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftGroupByProximity
+                                ? "border-brand-green bg-brand-green"
+                                : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
+                                }`}
+                        >
+                            {draftGroupByProximity && (
+                                <Check className="h-3.5 w-3.5 text-white" />
+                            )}
+                        </span>
+                        <span className="flex flex-col text-left">
+                            <span>Agrupar por proximidade</span>
+                            <span className="text-[11px] font-normal text-brand-inactive-text dark:text-dark-body">
+                                Separa cidades vizinhas, envio nacional e Brasil
+                            </span>
+                        </span>
                     </button>
                 </section>
             )}

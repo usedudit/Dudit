@@ -27,7 +27,7 @@ interface MySubscriptionsClientProps {
   initialSubscriptionId?: string | null
   userProfile?: any
   cartCount?: number
-  userId?: string | null
+  userId: string
 }
 
 export function MySubscriptionsClient({

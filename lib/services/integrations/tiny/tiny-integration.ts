@@ -198,7 +198,7 @@ export async function syncTinyProductsToDudit(params: {
           // Checa se já existe na Dudit pelo external_id (do próprio Tiny) ou SKU
           let { data: existingProduct } = await supabase
             .from("products")
-            .select("id, stock_quantity, stock_reserved")
+            .select("id, stock_quantity, stock_reserved, description, images, promotional_price")
             .eq("partner_id", partnerId)
             .eq("external_provider", TINY_PROVIDER)
             .eq("external_id", externalId)
@@ -207,7 +207,7 @@ export async function syncTinyProductsToDudit(params: {
           if (!existingProduct && sku) {
             const { data: bySku } = await supabase
               .from("products")
-              .select("id, stock_quantity, stock_reserved")
+              .select("id, stock_quantity, stock_reserved, description, images, promotional_price")
               .eq("partner_id", partnerId)
               .eq("sku", sku)
               .maybeSingle()
@@ -219,22 +219,25 @@ export async function syncTinyProductsToDudit(params: {
 
           if (existingProduct) {
             targetProductId = existingProduct.id
-            // Atualiza produto existente (sem ncm na tabela products)
+            const hasExistingDescription = Boolean(String(existingProduct.description || "").trim())
+            const hasExistingImages = Array.isArray(existingProduct.images) && existingProduct.images.length > 0
+            const hasExistingPromo = existingProduct.promotional_price !== null && existingProduct.promotional_price !== undefined && Number(existingProduct.promotional_price) > 0
+            // Atualiza produto existente (preservando customizações de vitrine da Dudit)
             const { error: updateErr } = await supabase
               .from("products")
               .update({
                 name,
                 price,
-                promotional_price: promotionalPrice,
+                promotional_price: !hasExistingPromo ? promotionalPrice : undefined,
                 cost_price: costPrice,
                 sku,
                 gtin,
                 unit,
                 min_stock: minStock,
                 stock_quantity: stock,
-                stock_reserved: Math.max(Number(existingProduct.stock_reserved || 0), stockReserved),
-                description: description || undefined,
-                images: images.length > 0 ? images : undefined,
+                stock_reserved: stockReserved,
+                description: !hasExistingDescription && description ? description : undefined,
+                images: !hasExistingImages && images.length > 0 ? images : undefined,
                 status: isActive ? "ativo" : "inativo",
                 deleted_at: null,
                 deleted_by: null,
@@ -818,6 +821,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
           name,
           sku,
           external_id,
+          external_provider,
           product_type
         ),
         product_variants (
@@ -1006,7 +1010,9 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
       carrierName = "Retirada na Loja"
     } else if (!isCarrier) {
       // Delivery / Entrega própria da loja (motoboy)
-      formaEnvio = "E"
+      // Na API v2 do Tiny, códigos válidos de forma_envio são: C (Correios), T (Transportadora), J (Jadlog), X/R (Retirada).
+      // Usar "T" com forma_frete "Delivery / Entrega Própria" garante que o campo Forma de Envio seja salvo e exibido no Tiny.
+      formaEnvio = "T"
       fretePorConta = "3"
       formaFrete = "Delivery / Entrega Própria"
       carrierName = "Entrega Própria (Delivery)"
@@ -1054,7 +1060,7 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
           if (variant.variant_name && !it.product_name.includes(variant.variant_name)) {
             itemDescricao = `${it.product_name} - ${variant.variant_name}`
           }
-        } else if (prod?.external_id) {
+        } else if (prod?.external_id && (!prod.external_provider || prod.external_provider === TINY_PROVIDER)) {
           idProduto = Number(prod.external_id) || undefined
         }
 
@@ -1217,53 +1223,67 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 
     const tinyRes = await client.createOrder(payload)
 
-    // Se o pedido já saiu entregue/enviado (ou PDV com baixa física imediata), marca como entregue/enviado
-    // e sincroniza o saldo físico real (balanço) de cada item/variante no Tiny para efetivar a baixa física.
+    // Se o pedido já saiu entregue/enviado (ou PDV com baixa física imediata), lança o estoque do pedido
+    // via `pedido.lancar.estoque.php` (que efetiva a baixa física E libera o saldoReservado no Tiny)
+    // e atualiza a situação para enviado/entregue. Se o lançamento por pedido falhar, faz fallback via balanço.
     // Caso contrário, se já estiver pago, aprova o pedido no Tiny para manter a reserva de estoque.
     if (tinyRes.id) {
       if (isDeliveredOrDeducted) {
         const tinySit = deliveryStatus === "sent" ? "enviado" : "entregue"
+        let orderStockLaunched = false
+
+        if (config.sync_stock !== false) {
+          try {
+            const launchRes = await client.launchOrderStock(tinyRes.id)
+            orderStockLaunched = Boolean(launchRes.launched)
+          } catch (launchErr: any) {
+            console.warn(`[TINY] Aviso ao lançar estoque do pedido ${tinyRes.id} via pedido.lancar.estoque.php:`, launchErr?.message)
+          }
+        }
+
         try {
           await client.updateOrderStatus(tinyRes.id, tinySit)
         } catch (statusErr: any) {
           console.warn(`[TINY] Aviso ao marcar pedido ${tinyRes.id} como ${tinySit} no Tiny:`, statusErr?.message)
         }
 
-        // Garante baixa física no estoque do Tiny (incluindo variantes) via balanço idempotente
-        const syncedKeys = new Set<string>()
-        for (const it of (order.order_items || []) as any[]) {
-          if (!it.product_id) continue
-          const key = it.variant_id ? `variant:${it.variant_id}` : `product:${it.product_id}`
-          if (syncedKeys.has(key)) continue
-          syncedKeys.add(key)
-          try {
-            let newStock = preOrderStockSnapshots.get(key)
-            if (newStock === undefined) {
-              if (it.variant_id) {
-                const { data: vRow } = await supabase
-                  .from("product_variants")
-                  .select("stock_quantity")
-                  .eq("id", it.variant_id)
-                  .maybeSingle()
-                newStock = Number(vRow?.stock_quantity || 0)
-              } else {
-                const { data: pRow } = await supabase
-                  .from("products")
-                  .select("stock_quantity")
-                  .eq("id", it.product_id)
-                  .maybeSingle()
-                newStock = Number(pRow?.stock_quantity || 0)
+        // Fallback: se não foi possível lançar o estoque diretamente no pedido, garante a baixa física via balanço
+        if (!orderStockLaunched && config.sync_stock !== false) {
+          const syncedKeys = new Set<string>()
+          for (const it of (order.order_items || []) as any[]) {
+            if (!it.product_id) continue
+            const key = it.variant_id ? `variant:${it.variant_id}` : `product:${it.product_id}`
+            if (syncedKeys.has(key)) continue
+            syncedKeys.add(key)
+            try {
+              let newStock = preOrderStockSnapshots.get(key)
+              if (newStock === undefined) {
+                if (it.variant_id) {
+                  const { data: vRow } = await supabase
+                    .from("product_variants")
+                    .select("stock_quantity")
+                    .eq("id", it.variant_id)
+                    .maybeSingle()
+                  newStock = Number(vRow?.stock_quantity || 0)
+                } else {
+                  const { data: pRow } = await supabase
+                    .from("products")
+                    .select("stock_quantity")
+                    .eq("id", it.product_id)
+                    .maybeSingle()
+                  newStock = Number(pRow?.stock_quantity || 0)
+                }
               }
+              await syncDuditStockToTiny({
+                partnerId: order.partner_id,
+                productId: it.product_id,
+                variantId: it.variant_id || undefined,
+                newStock,
+                reason: `Baixa venda Dudit #${order.order_number || order.id}`,
+              })
+            } catch (stockErr: any) {
+              console.warn(`[TINY] Aviso ao baixar estoque físico do item ${it.product_id} no Tiny:`, stockErr?.message)
             }
-            await syncDuditStockToTiny({
-              partnerId: order.partner_id,
-              productId: it.product_id,
-              variantId: it.variant_id || undefined,
-              newStock,
-              reason: `Baixa venda Dudit #${order.order_number || order.id}`,
-            })
-          } catch (stockErr: any) {
-            console.warn(`[TINY] Aviso ao baixar estoque físico do item ${it.product_id} no Tiny:`, stockErr?.message)
           }
         }
       } else if (isPaid) {
@@ -1335,12 +1355,15 @@ export async function exportDuditOrderToTiny(orderId: string): Promise<{
 }
 
 /**
- * Atualiza a situação de um pedido existente no Tiny ERP (ex: cancelado, aprovado)
+ * Atualiza a situação de um pedido existente no Tiny ERP (ex: cancelado, aprovado, enviado, entregue).
+ * Quando a situação avança para enviado/entregue, lança o estoque do pedido (`pedido.lancar.estoque.php`)
+ * para efetivar a baixa física e liberar o saldoReservado no Tiny.
+ * Quando cancelado, estorna eventual estoque lançado (`pedido.estornar.estoque.php`) antes de cancelar.
  */
 export async function updateTinyOrderStatus(params: {
   orderId: string
   situacao: "aberto" | "aprovado" | "cancelado" | "enviado" | "entregue"
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; stockLaunched?: boolean; stockReversed?: boolean; error?: string }> {
   const { orderId, situacao } = params
   const supabase = createAdminClient()
 
@@ -1359,7 +1382,29 @@ export async function updateTinyOrderStatus(params: {
   }
 
   try {
+    const integration = await findTinyIntegration(supabase, order.partner_id)
+    const syncStockEnabled = (integration?.config as TinyIntegrationConfig | undefined)?.sync_stock !== false
     const client = await getValidTinyClient(order.partner_id)
+
+    let stockLaunched = false
+    let stockReversed = false
+
+    if (syncStockEnabled && (situacao === "enviado" || situacao === "entregue")) {
+      try {
+        const launchRes = await client.launchOrderStock(order.external_order_id)
+        stockLaunched = Boolean(launchRes.launched)
+      } catch (launchErr: any) {
+        console.warn(`[TINY] Aviso ao lançar estoque do pedido ${order.external_order_id} no Tiny:`, launchErr?.message)
+      }
+    } else if (syncStockEnabled && situacao === "cancelado") {
+      try {
+        const revRes = await client.reverseOrderStock(order.external_order_id)
+        stockReversed = Boolean(revRes.reversed)
+      } catch (revErr: any) {
+        console.warn(`[TINY] Aviso ao estornar estoque do pedido ${order.external_order_id} no Tiny:`, revErr?.message)
+      }
+    }
+
     await client.updateOrderStatus(order.external_order_id, situacao)
 
     await logAuditEvent({
@@ -1368,15 +1413,19 @@ export async function updateTinyOrderStatus(params: {
       entityType: "order",
       entityId: orderId,
       actionType: "tiny_order_status_updated",
-      changeLines: [`Situação no Tiny ERP atualizada para: ${situacao}`],
+      changeLines: [
+        `Situação no Tiny ERP atualizada para: ${situacao}${stockLaunched ? " (estoque lançado e reserva liberada)" : stockReversed ? " (estoque estornado)" : ""}`,
+      ],
       source: "system",
       metadata: {
         tinyOrderId: order.external_order_id,
         situacao,
+        stockLaunched,
+        stockReversed,
       },
     })
 
-    return { success: true }
+    return { success: true, stockLaunched, stockReversed }
   } catch (err: any) {
     captureError(err, {
       module: "integrations",

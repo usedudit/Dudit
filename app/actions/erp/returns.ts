@@ -604,7 +604,7 @@ export async function getReturnRequestDetailsAction(
                 .select("*")
                 .eq("entity_type", "return_request")
                 .eq("entity_id", requestId)
-                .order("created_at", { ascending: true }),
+                .order("created_at", { ascending: false }),
             fetchExchangeOrder(),
         ])
         const auditLogsData = auditLogsRes.data
@@ -684,6 +684,9 @@ export async function getReturnRequestDetailsAction(
             )
             let actorName = e.actor_name || "Sistema"
             let sanitizedMeta = { ...meta }
+            if (sanitizedMeta.exchange_order_id && !sanitizedMeta.exchange_order_number && (exchangeOrder as any)?.order_number) {
+                sanitizedMeta.exchange_order_number = (exchangeOrder as any).order_number
+            }
 
             if (isDuditAction) {
                 if (isAdmin) {
@@ -795,8 +798,29 @@ export async function getReturnAuditLogsAction(
             .select("*")
             .eq("entity_type", "return_request")
             .eq("entity_id", requestId)
-            .order("created_at", { ascending: true })
+            .order("created_at", { ascending: false })
         if (error) throw error
+
+        const exchangeOrderIds = Array.from(
+            new Set(
+                (data || [])
+                    .map((e: any) => (e.metadata || e.new_values || {})?.exchange_order_id)
+                    .filter(Boolean)
+                    .map(String)
+            )
+        )
+        const exchangeOrderNumbersById = new Map<string, string>()
+        if (exchangeOrderIds.length > 0) {
+            const { data: exOrders } = await supabase
+                .from("orders")
+                .select("id, order_number")
+                .in("id", exchangeOrderIds)
+            for (const eo of exOrders || []) {
+                if (eo.id && eo.order_number) {
+                    exchangeOrderNumbersById.set(String(eo.id), String(eo.order_number))
+                }
+            }
+        }
 
         const actorUserIds = Array.from(new Set((data || []).map((e: any) => e.actor_user_id).filter(Boolean)))
         let namesByUserId = new Map<string, string>()
@@ -821,6 +845,12 @@ export async function getReturnAuditLogsAction(
             )
             let actorName = e.actor_name || "Sistema"
             let sanitizedMeta = { ...meta }
+            if (sanitizedMeta.exchange_order_id && !sanitizedMeta.exchange_order_number) {
+                const resolvedOrderNum = exchangeOrderNumbersById.get(String(sanitizedMeta.exchange_order_id))
+                if (resolvedOrderNum) {
+                    sanitizedMeta.exchange_order_number = resolvedOrderNum
+                }
+            }
 
             if (isDuditAction) {
                 if (isAdmin) {
@@ -1818,13 +1848,10 @@ export async function processReturnRequestAction(
         }
 
         // Apply chosen delivery type & status to the newly created/existing exchange order
-        if (
-            isExchange &&
-            isApprovedStatus &&
-            result?.exchange_order_id &&
-            (data.exchangeDeliveryType || data.exchangeDeliveryStatus)
-        ) {
-            const orderDeliveryPatch: Record<string, any> = {}
+        // and clear the auto-generated "Pedido gerado pela troca DVL-..." from notes
+        // (origin is shown via the dedicated "Origem do Pedido" card instead).
+        if (isExchange && isApprovedStatus && result?.exchange_order_id) {
+            const orderDeliveryPatch: Record<string, any> = { notes: null }
             if (data.exchangeDeliveryType) orderDeliveryPatch.delivery_type = data.exchangeDeliveryType
             if (data.exchangeDeliveryStatus) orderDeliveryPatch.delivery_status = data.exchangeDeliveryStatus
 

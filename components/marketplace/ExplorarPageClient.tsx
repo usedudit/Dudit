@@ -10,7 +10,7 @@ import { IconPlaceholder, DefaultModal, ThreeDotsLoader } from "@/components/reu
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import { Check } from "lucide-react"
-import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
+import { applySellerDiversity, calcCategoryBrowseScore, rankMarketplaceItems } from "@/lib/marketplace/ranking"
 import { applyVendorUrgencyBadges } from "@/lib/marketplace/badges"
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
@@ -340,6 +340,7 @@ export function ExplorarPageClient({
     const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("")
     const [maxDistanceKm, setMaxDistanceKm] = useState<number | null>(null)
     const [showcaseOnly, setShowcaseOnly] = useState(false)
+    const [groupByProximity, setGroupByProximity] = useState(true)
 
     // Estado consolidado dos filtros (usado na URL, nos chips e na aplicação).
     const filterState: ExploreFilterState = useMemo(() => ({
@@ -353,7 +354,8 @@ export function ExplorarPageClient({
         delivery: deliveryFilter,
         maxDistanceKm,
         showcaseOnly,
-    }), [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly])
+        groupByProximity,
+    }), [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, groupByProximity])
 
     const isFirstMountParamsRef = useRef(true)
     const prevParamsKeyRef = useRef("")
@@ -474,6 +476,7 @@ export function ExplorarPageClient({
         setDeliveryFilter(parsed.delivery)
         setMaxDistanceKm(parsed.maxDistanceKm)
         setShowcaseOnly(parsed.showcaseOnly)
+        setGroupByProximity(parsed.groupByProximity !== false)
 
         const ord = urlParams.get("ord") as SortOption | null
         setSortBy(ord && VALID_SORT_OPTIONS.includes(ord) ? ord : "relevancia")
@@ -802,34 +805,66 @@ export function ExplorarPageClient({
         return itemMatchesCategory(item, activeCat)
     }, [selectedCategories, isUncategorized])
 
+    // Quando o usuário desativa "Agrupar por proximidade" numa busca, mesclamos
+    // resultados locais + anéis/distantes (sem duplicar) numa única lista ranqueada.
+    const unifiedSearchResults = useMemo(() => {
+        if (!query || groupByProximity) return normalizedInitialResults
+
+        const seen = new Set<string>()
+        const merged: any[] = []
+        const pushUnique = (list: any[]) => {
+            for (const item of list) {
+                const key = `${item?.itemType || ""}:${item?.id || ""}`
+                if (!item?.id || seen.has(key)) continue
+                seen.add(key)
+                merged.push(item)
+            }
+        }
+
+        pushUnique(normalizedInitialResults)
+        if (proximityRings) {
+            pushUnique(normalizeMarketplaceItems(proximityRings.regionalSellers || []))
+            pushUnique(normalizeMarketplaceItems(proximityRings.otherDistantSellers || []))
+            pushUnique(normalizeMarketplaceItems(proximityRings.regional || []))
+            pushUnique(normalizeMarketplaceItems(proximityRings.nationalShipping || []))
+            pushUnique(normalizeMarketplaceItems(proximityRings.otherDistant || []))
+        }
+        pushUnique(normalizeMarketplaceItems(moreDistantSellers || []))
+        pushUnique(normalizeMarketplaceItems(moreDistantItems || []))
+
+        return merged
+    }, [query, groupByProximity, normalizedInitialResults, proximityRings, moreDistantSellers, moreDistantItems, normalizeMarketplaceItems])
+
     const { rawVitrinesDestaque, dataToFilter } = useMemo(() => {
+        const source = unifiedSearchResults
+
         if (currentType === 'vitrines') {
-            const list = normalizedInitialResults.filter(r => r.itemType === 'loja')
+            const list = source.filter(r => r.itemType === 'loja')
             return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'produtos') {
-            const list = normalizedInitialResults.filter(r => r.itemType === 'produto')
+            const list = source.filter(r => r.itemType === 'produto')
             return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'servicos') {
-            const list = normalizedInitialResults.filter(r => r.itemType === 'servico')
+            const list = source.filter(r => r.itemType === 'servico')
             return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'planos') {
-            const list = normalizedInitialResults.filter(r => r.itemType === 'plano')
+            const list = source.filter(r => r.itemType === 'plano')
             return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'negocios') {
-            const list = normalizedInitialResults.filter(r => r.itemType === 'loja')
+            const list = source.filter(r => r.itemType === 'loja')
             return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'bem-avaliados') {
-            const allItems = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+            const allItems = source.filter(r => r.itemType !== 'loja')
             const sortedItems = [...allItems]
                 .sort((a, b) => (b.rating || 0) - (a.rating || 0))
                 .slice(0, 20)
@@ -837,12 +872,12 @@ export function ExplorarPageClient({
         }
 
         if (currentType === 'em-oferta') {
-            const list = normalizedInitialResults.filter(r => r.itemType !== 'loja' && r.originalPrice !== undefined && r.originalPrice > r.price)
+            const list = source.filter(r => r.itemType !== 'loja' && r.originalPrice !== undefined && r.originalPrice > r.price)
             return { rawVitrinesDestaque: [], dataToFilter: list }
         }
 
         if (currentType === 'em-alta') {
-            const allItems = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+            const allItems = source.filter(r => r.itemType !== 'loja')
             const sortedItems = [...allItems]
                 .sort((a, b) => (b.sales_last_30_days || 0) - (a.sales_last_30_days || 0))
                 .slice(0, 20)
@@ -850,7 +885,7 @@ export function ExplorarPageClient({
         }
 
         if (currentType === 'novos-anunciados') {
-            const allItems = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+            const allItems = source.filter(r => r.itemType !== 'loja')
             const sortedItems = [...allItems]
                 .sort((a, b) => {
                     const dateA = new Date(a.created_at || 0)
@@ -862,18 +897,15 @@ export function ExplorarPageClient({
         }
 
         if (currentType === 'tudo') {
-            const vitrines = normalizedInitialResults
-                .filter(r => r.itemType === 'loja')
-            const sortedVitrines = [...vitrines]
-                .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-                .slice(0, 20)
-            const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
-            return { rawVitrinesDestaque: sortedVitrines, dataToFilter: list }
+            const vitrines = source.filter(r => r.itemType === 'loja')
+            const rankedVitrines = rankMarketplaceItems(vitrines).slice(0, 20)
+            const list = source.filter(r => r.itemType !== 'loja')
+            return { rawVitrinesDestaque: rankedVitrines, dataToFilter: list }
         }
 
-        const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
+        const list = source.filter(r => r.itemType !== 'loja')
         return { rawVitrinesDestaque: [], dataToFilter: list }
-    }, [normalizedInitialResults, currentType])
+    }, [unifiedSearchResults, currentType])
 
     // Categorias oferecidas no filtro. Em "Tudo" mostramos a união das três
     // listas (produtos + serviços + lojas), sem duplicar nomes.
@@ -1025,20 +1057,18 @@ export function ExplorarPageClient({
                 const db = getItemDistanceKm(b, userCoords) ?? Number.POSITIVE_INFINITY
                 return da - db
             })
-        } else if (opts?.preserveOrder) {
-            // Mantém a ordem já definida pelo ranking/distance do servidor (ex.: itens distantes)
-            return filtered
         } else {
-            return applySellerDiversity(
-                [...filtered].sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a)),
-            )
+            // Relevância padrão: sempre segue o ranqueamento unificado do marketplace
+            // (marketplace_score + popularidade + frescor + avaliação + reputação + relevância textual)
+            // com diversidade de vendedores em todas as seções (locais, vitrines e anéis distantes).
+            return rankMarketplaceItems(filtered)
         }
         return filtered
     }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, selectedSection, isUncategorized, userCoords, filterConfig])
 
     const vitrinesDestaque = useMemo(() => {
         if (rawVitrinesDestaque.length === 0 || hasProductOnlyFilterInTudo) return []
-        return applyBrowseFilters(rawVitrinesDestaque, { preserveOrder: true })
+        return applyBrowseFilters(rawVitrinesDestaque)
     }, [rawVitrinesDestaque, hasProductOnlyFilterInTudo, applyBrowseFilters])
 
     const filteredResults = useMemo(
@@ -1064,26 +1094,26 @@ export function ExplorarPageClient({
         })
     }, [query, currentType, selectedCitySlug, rawItems.length, isLoading])
 
-    // Itens e lojas distantes (fallback sem anéis): normalizados e filtrados.
+    // Itens e lojas distantes (fallback sem anéis): normalizados, filtrados e ranqueados.
     const filteredDistant = useMemo(() => {
-        if (!query || moreDistantItems.length === 0) return []
+        if (!query || !groupByProximity || moreDistantItems.length === 0) return []
         const normalized = normalizeMarketplaceItems(moreDistantItems)
         const typeFiltered = normalized.filter(matchesCurrentItemType)
-        return applyBrowseFilters(typeFiltered, { preserveOrder: true })
-    }, [query, moreDistantItems, normalizeMarketplaceItems, matchesCurrentItemType, applyBrowseFilters])
+        return applyBrowseFilters(typeFiltered)
+    }, [query, groupByProximity, moreDistantItems, normalizeMarketplaceItems, matchesCurrentItemType, applyBrowseFilters])
 
     const filteredDistantSellers = useMemo(() => {
-        if (!query || moreDistantSellers.length === 0 || hasProductOnlyFilterInTudo) return []
+        if (!query || !groupByProximity || moreDistantSellers.length === 0 || hasProductOnlyFilterInTudo) return []
         const showVitrines = currentType === "tudo" || currentType === "vitrines" || currentType === "negocios"
         if (!showVitrines) return []
         const normalized = normalizeMarketplaceItems(moreDistantSellers)
-        return applyBrowseFilters(normalized, { preserveOrder: true })
-    }, [query, moreDistantSellers, hasProductOnlyFilterInTudo, currentType, normalizeMarketplaceItems, applyBrowseFilters])
+        return applyBrowseFilters(normalized)
+    }, [query, groupByProximity, moreDistantSellers, hasProductOnlyFilterInTudo, currentType, normalizeMarketplaceItems, applyBrowseFilters])
 
     // Anéis de proximidade (Cidades vizinhas, Envio nacional CEP, Outras opções):
-    // todos passam pela mesma normalização, filtro de tipo, filtros avançados e ordenação.
+    // todos passam pela mesma normalização, filtro de tipo, filtros avançados e ranqueamento.
     const filteredProximityRings = useMemo<ProximityRingsResult<any> | null>(() => {
-        if (!query || !proximityRings) return null
+        if (!query || !groupByProximity || !proximityRings) return null
         const showVitrines =
             (currentType === "tudo" || currentType === "vitrines" || currentType === "negocios") &&
             !hasProductOnlyFilterInTudo
@@ -1092,13 +1122,13 @@ export function ExplorarPageClient({
             if (!list || list.length === 0) return []
             const normalized = normalizeMarketplaceItems(list)
             const typeFiltered = normalized.filter(matchesCurrentItemType)
-            return applyBrowseFilters(typeFiltered, { preserveOrder: true })
+            return applyBrowseFilters(typeFiltered)
         }
 
         const filterRingSellers = (list: any[]) => {
             if (!showVitrines || !list || list.length === 0) return []
             const normalized = normalizeMarketplaceItems(list)
-            return applyBrowseFilters(normalized, { preserveOrder: true })
+            return applyBrowseFilters(normalized)
         }
 
         return {
@@ -1109,7 +1139,7 @@ export function ExplorarPageClient({
             otherDistant: filterRingItems(proximityRings.otherDistant),
             otherDistantSellers: filterRingSellers(proximityRings.otherDistantSellers),
         }
-    }, [query, proximityRings, currentType, hasProductOnlyFilterInTudo, normalizeMarketplaceItems, matchesCurrentItemType, applyBrowseFilters])
+    }, [query, groupByProximity, proximityRings, currentType, hasProductOnlyFilterInTudo, normalizeMarketplaceItems, matchesCurrentItemType, applyBrowseFilters])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
@@ -1122,10 +1152,11 @@ export function ExplorarPageClient({
         if (deliveryFilter) count++
         if (maxDistanceKm) count++
         if (showcaseOnly) count++
+        if (!groupByProximity) count++
         if (sortBy !== "relevancia") count++
         if (currentType !== "tudo") count++
         return count
-    }, [selectedCategories, hasPriceFilter, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType])
+    }, [selectedCategories, hasPriceFilter, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, groupByProximity, sortBy, currentType])
 
     const isCategoryMode = pageMode === "category" && selectedCategories.length === 1
     const categoryName = isCategoryMode ? selectedCategories[0] : null
@@ -1402,6 +1433,7 @@ export function ExplorarPageClient({
         if ("delivery" in patch) setDeliveryFilter(patch.delivery || "")
         if ("maxDistanceKm" in patch) setMaxDistanceKm(patch.maxDistanceKm ?? null)
         if ("showcaseOnly" in patch) setShowcaseOnly(patch.showcaseOnly === true)
+        if ("groupByProximity" in patch) setGroupByProximity(patch.groupByProximity !== false)
         if (patch.sortBy) setSortBy(patch.sortBy)
         updateUrl(selectedCitySlug, patch.categories ?? selectedCategories, query, currentType, selectedSection, patch)
     }
@@ -1418,6 +1450,7 @@ export function ExplorarPageClient({
         setDeliveryFilter("")
         setMaxDistanceKm(null)
         setShowcaseOnly(false)
+        setGroupByProximity(true)
         setSortBy("relevancia")
         setCurrentType("tudo")
         updateUrl(selectedCitySlug, [], query, "tudo", selectedSection, { ...EMPTY_FILTER_STATE, sortBy: "relevancia" })
@@ -1435,6 +1468,7 @@ export function ExplorarPageClient({
         delivery?: DeliveryFilter
         maxDistanceKm?: number | null
         showcaseOnly?: boolean
+        groupByProximity?: boolean
     }) => {
         triggerFilterLoading()
         setCurrentType(filters.type as any)
@@ -1448,6 +1482,8 @@ export function ExplorarPageClient({
         setDeliveryFilter(filters.delivery || "")
         setMaxDistanceKm(filters.maxDistanceKm ?? null)
         setShowcaseOnly(filters.showcaseOnly === true)
+        const nextGroupByProximity = filters.groupByProximity !== false
+        setGroupByProximity(nextGroupByProximity)
         updateUrl(selectedCitySlug, filters.categories, query, filters.type, selectedSection, {
             categories: filters.categories,
             minPrice: filters.minPrice,
@@ -1459,6 +1495,7 @@ export function ExplorarPageClient({
             delivery: filters.delivery || "",
             maxDistanceKm: filters.maxDistanceKm ?? null,
             showcaseOnly: filters.showcaseOnly === true,
+            groupByProximity: nextGroupByProximity,
         })
     }
 
@@ -1568,6 +1605,14 @@ export function ExplorarPageClient({
                 onRemove: () => patchFilters({ showcaseOnly: false }),
             })
         }
+        if (query && !groupByProximity) {
+            chips.push({
+                key: "proximity_group",
+                label: "Exibição",
+                value: "Todos juntos",
+                onRemove: () => patchFilters({ groupByProximity: true }),
+            })
+        }
         if (sortBy !== "relevancia") {
             const sortLabel = contextualSortOptions.find(o => o.value === sortBy)?.label || sortBy
             chips.push({
@@ -1592,7 +1637,7 @@ export function ExplorarPageClient({
         }
         return chips
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType, selectedCitySlug, selectedSection, query, resolveCategoryName, triggerFilterLoading, contextualSortOptions, formatCitySlug])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, groupByProximity, sortBy, currentType, selectedCitySlug, selectedSection, query, resolveCategoryName, triggerFilterLoading, contextualSortOptions, formatCitySlug])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -1953,8 +1998,8 @@ export function ExplorarPageClient({
                                 </div>
                             ) : (
                                 <>
-                                    {/* Empty state with action buttons when no local results found in city/radius (but distant results exist) */}
-                                    {rawItems.length === 0 && !isCategoryMode && filteredDistantTotalCount > 0 && (
+                                    {/* Empty state with action buttons when no local results found in city/radius (only when grouping by proximity) */}
+                                    {rawItems.length === 0 && !isCategoryMode && groupByProximity && filteredDistantTotalCount > 0 && (
                                         <div className="flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
@@ -2072,7 +2117,7 @@ export function ExplorarPageClient({
                                     ) : null}
 
                                     {/* Anéis de Proximidade: Cidades vizinhas -> Envio nacional CEP -> Outras opções */}
-                                    {!!query && (
+                                    {!!query && groupByProximity && (
                                         <ProximityRingsSection
                                             rings={filteredProximityRings}
                                             currentType={currentType}
@@ -2121,6 +2166,8 @@ export function ExplorarPageClient({
                     delivery={deliveryFilter}
                     maxDistanceKm={maxDistanceKm}
                     showcaseOnly={showcaseOnly}
+                    groupByProximity={groupByProximity}
+                    showProximityGrouping={Boolean(query && hasRawDistantResults)}
                     typeOptions={typeOptions}
                     productCategories={productCategories}
                     serviceCategories={dbServiceCategories}
