@@ -25,6 +25,7 @@ import {
     Link2,
 } from 'lucide-react';
 import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
+import { trackEvent, getAcquisitionContext } from '@/lib/analytics';
 
 const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
@@ -44,12 +45,12 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                             Sua vitrine online, PDV, controle de estoque, agenda, ordens de serviço e integrações com Tiny ERP e Bling em um só lugar. Comece grátis com planos a partir de R$ 0/mês.
                         </p>
                         <div className="flex flex-wrap gap-4 mb-5">
-                            <Button onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
-                            <Button variant="outline" onClick={() => onNavigate('pricing')}>Ver planos</Button>
+                            <Button onClick={() => { trackEvent("cta_clicked", { source: "home_hero", target: "start_selling", ...getAcquisitionContext() }); onNavigate('start-selling'); }}>Começar grátis</Button>
+                            <Button variant="outline" onClick={() => { trackEvent("cta_clicked", { source: "home_hero", target: "pricing", ...getAcquisitionContext() }); onNavigate('pricing'); }}>Ver planos</Button>
                         </div>
                         <button
                             type="button"
-                            onClick={() => onNavigate('explore')}
+                            onClick={() => { trackEvent("cta_clicked", { source: "home_hero", target: "explore", ...getAcquisitionContext() }); onNavigate('explore'); }}
                             className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-inactive-text hover:text-brand-green transition-colors cursor-pointer"
                         >
                             Procurando produtos ou serviços para comprar? <span className="underline">Explorar Dudit</span>
@@ -309,7 +310,7 @@ const ComoFunciona = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
                             Comece a vender em 3 passos simples
                         </h2>
                     </div>
-                    <Button variant="outline" onClick={() => onNavigate('pricing')}>
+                    <Button variant="outline" onClick={() => { trackEvent("cta_clicked", { source: "home_steps", target: "pricing", ...getAcquisitionContext() }); onNavigate('pricing'); }}>
                         Ver planos a partir de R$ 0
                     </Button>
                 </div>
@@ -365,7 +366,7 @@ const ParaQuemCompra = ({ onNavigate }: { onNavigate: (page: string) => void }) 
                             Procurando algo hoje?
                         </h2>
                     </div>
-                    <Button variant="outline" onClick={() => onNavigate('explore')}>
+                    <Button variant="outline" onClick={() => { trackEvent("cta_clicked", { source: "home_buyer_section", target: "explore", ...getAcquisitionContext() }); onNavigate('explore'); }}>
                         Explorar lojas e produtos
                     </Button>
                 </div>

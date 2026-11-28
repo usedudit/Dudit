@@ -21,6 +21,8 @@ import { ListItem } from "@/components/reusable/ListItem"
 import { notFound } from "next/navigation"
 import { isValidCitySlug } from "@/lib/validation/city"
 import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
+import Link from "next/link"
+import { Button } from "@/components/reusable/Button"
 
 function isValidLocationSlug(slug: string): boolean {
     if (!slug) return false
@@ -281,71 +283,122 @@ export default async function ExplorarPage({
                 />
                 <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-                <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-8 lg:py-12 pb-24 lg:pb-12">
-                    <div className="mb-8 lg:mb-10">
-                        <h1 className="text-2xl lg:text-4xl font-bold text-brand-dark dark:text-dark-heading">
-                            Explore por categoria
+                <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-8 lg:py-12 pb-24 lg:pb-12 space-y-10">
+                    <div>
+                        <h1 className="text-2xl lg:text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+                            Explorar na Dudit
                         </h1>
+                        <p className="text-sm lg:text-base text-brand-inactive-text dark:text-dark-body max-w-2xl">
+                            Encontre produtos, serviços e lojas na sua cidade ou com envio para todo o Brasil.
+                        </p>
+
+                        <div className="flex flex-wrap gap-2.5 mt-6">
+                            <IntentPrefetchLink
+                                href="/explorar/brasil"
+                                className="px-4 py-2 rounded-full bg-brand-dark text-white dark:bg-brand-green text-sm font-semibold hover:opacity-90 transition-opacity"
+                            >
+                                Ver tudo no Brasil
+                            </IntentPrefetchLink>
+                            <IntentPrefetchLink
+                                href={`/explorar/${landingCitySlug}?type=produtos`}
+                                className="px-4 py-2 rounded-full border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-sm font-semibold text-brand-dark dark:text-dark-heading hover:border-brand-green transition-colors"
+                            >
+                                Produtos
+                            </IntentPrefetchLink>
+                            <IntentPrefetchLink
+                                href={`/explorar/${landingCitySlug}?type=servicos`}
+                                className="px-4 py-2 rounded-full border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-sm font-semibold text-brand-dark dark:text-dark-heading hover:border-brand-green transition-colors"
+                            >
+                                Serviços
+                            </IntentPrefetchLink>
+                            <IntentPrefetchLink
+                                href={`/explorar/${landingCitySlug}?type=vitrines`}
+                                className="px-4 py-2 rounded-full border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-sm font-semibold text-brand-dark dark:text-dark-heading hover:border-brand-green transition-colors"
+                            >
+                                Lojas e vitrines
+                            </IntentPrefetchLink>
+                        </div>
                     </div>
 
                     {(() => {
                         const productCategories = FALLBACK_CATEGORIES.filter(cat => cat.slug !== "servicos")
-                        const serviceCategory = FALLBACK_CATEGORIES.find(cat => cat.slug === "servicos")
+                        const serviceCategories = [
+                            { slug: "reformas-e-manutencao", name: "Reformas e Manutenção" },
+                            { slug: "assistencia-tecnica", name: "Assistência Técnica" },
+                            { slug: "beleza-e-estetica", name: "Beleza e Estética" },
+                            { slug: "fretes-e-profissionais", name: "Fretes e Profissionais" },
+                            { slug: "outros-servicos", name: "Outros Serviços" },
+                        ]
 
                         return (
                             <>
-                                <FormSection title="Categorias de Produtos" className="mb-8">
-                                    {productCategories.map((cat) => {
-                                        const href = `/explorar/${landingCitySlug}/${cat.slug}`
-                                        return (
-                                            <div className="space-y-6">
-                                                <IntentPrefetchLink key={cat.slug} href={href}>
-                                                    <ListItem
-                                                        icon={
-                                                            cat.icon_url ? (
-                                                                <img
-                                                                    src={cat.icon_url}
-                                                                    alt={cat.name}
-                                                                    className="w-6 h-6 object-contain"
-                                                                />
-                                                            ) : (
-                                                                <span className="text-lg">📦</span>
-                                                            )
-                                                        }
-                                                        className="px-4 py-3"
-                                                        title={cat.name}
-                                                        showChevron
-                                                    />
-                                                </IntentPrefetchLink>
-                                            </div>
-                                        )
-                                    })}
-                                </FormSection>
-
-                                {serviceCategory && (
-                                    <FormSection title="Categorias de Serviços" hasSeparator>
-                                        <div className="space-y-6">
-                                            <IntentPrefetchLink href={`/explorar/${landingCitySlug}?type=servicos`}>
+                                <FormSection title="Categorias de Produtos">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        {productCategories.map((cat) => (
+                                            <IntentPrefetchLink key={cat.slug} href={`/explorar/${landingCitySlug}/${cat.slug}`} className="block">
                                                 <ListItem
                                                     icon={
-                                                        serviceCategory.icon_url ? (
+                                                        cat.icon_url ? (
                                                             <img
-                                                                src={serviceCategory.icon_url}
-                                                                alt={serviceCategory.name}
+                                                                src={cat.icon_url}
+                                                                alt={cat.name}
                                                                 className="w-6 h-6 object-contain"
                                                             />
                                                         ) : (
-                                                            <span className="text-lg">🔧</span>
+                                                            <span className="text-lg" aria-hidden="true">📦</span>
                                                         )
                                                     }
                                                     className="px-4 py-3"
-                                                    title={serviceCategory.name}
+                                                    title={cat.name}
                                                     showChevron
                                                 />
                                             </IntentPrefetchLink>
-                                        </div>
-                                    </FormSection>
-                                )}
+                                        ))}
+                                    </div>
+                                </FormSection>
+
+                                <FormSection title="Categorias de Serviços" hasSeparator>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {serviceCategories.map((cat) => (
+                                            <IntentPrefetchLink key={cat.slug} href={`/explorar/${landingCitySlug}/${cat.slug}`} className="block">
+                                                <ListItem
+                                                    className="px-4 py-3"
+                                                    title={cat.name}
+                                                    showChevron
+                                                />
+                                            </IntentPrefetchLink>
+                                        ))}
+                                    </div>
+                                </FormSection>
+
+                                <FormSection title="Explorar por Estado" hasSeparator>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Object.entries(ESTADO_MAP).map(([uf, nome]) => (
+                                            <IntentPrefetchLink
+                                                key={uf}
+                                                href={`/explorar/estado-${uf}`}
+                                                className="px-3 py-1.5 rounded-full border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-medium text-brand-dark dark:text-dark-heading hover:border-brand-green hover:text-brand-green transition-colors"
+                                            >
+                                                {nome} ({uf.toUpperCase()})
+                                            </IntentPrefetchLink>
+                                        ))}
+                                    </div>
+                                </FormSection>
+
+                                <div className="relative bg-brand-dark rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 overflow-hidden">
+                                    <div className="absolute inset-0 opacity-10 pointer-events-none select-none" aria-hidden="true">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-white rounded-full" />
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] border border-white rounded-full" />
+                                    </div>
+                                    <p className="text-base md:text-lg font-bold text-white text-center sm:text-left relative z-10 leading-snug">
+                                        Tem um negócio? Venda na sua cidade e em todo o Brasil com 0% de comissão.
+                                    </p>
+                                    <Button asChild className="h-10 shrink-0 relative z-10">
+                                        <Link href="/auth/login?mode=partner" prefetch={false}>
+                                            Começar grátis
+                                        </Link>
+                                    </Button>
+                                </div>
                             </>
                         )
                     })()}

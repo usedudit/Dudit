@@ -157,12 +157,12 @@ export default function DpaPage() {
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
                                 <li><strong>Criptografia em Trânsito:</strong> Comunicação entre navegadores, dispositivos móveis e servidores protegida por protocolos criptográficos seguros (HTTPS sobre TLS 1.3/TLS 1.2 com cabeçalhos HSTS configurados na camada de borda);</li>
                                 <li><strong>Criptografia em Repouso:</strong> Dados estruturados e arquivos armazenados em infraestrutura de nuvem gerenciada (Supabase/PostgreSQL e Cloudflare R2) dotados de criptografia em repouso padrão de mercado provida pelos fornecedores de infraestrutura;</li>
-                                <li><strong>Criptografia em Nível de Aplicação:</strong> Mecanismo de cifragem simétrica (AES-256-GCM) com chaves derivadas por HKDF por contexto funcional implementado na biblioteca interna (<code>lib/cryptoService.ts</code>) para credenciais de pagamento e tokens de integração externos (WhatsApp, SuperFrete, Mercado Pago), condicionado ao provisionamento e ativação de chaves mestras no ambiente operacional;</li>
-                                <li><strong>Armazenamento de Senhas:</strong> Senhas de usuários gerenciadas em formato de hash criptográfico irreversível (algoritmo bcrypt provido pela camada de autenticação do Supabase Auth), complementadas por limitação de taxa de requisições (<code>lib/rate-limiter.ts</code>) para mitigação de ataques de força bruta;</li>
-                                <li><strong>Isolamento Lógico Multi-tenant:</strong> Segregação de dados entre diferentes Parceiros mediante associação obrigatória ao identificador de parceiro (<code>partner_id</code>), regras de controle de acesso em nível de linha (Row Level Security - RLS) na camada de dados e verificação programática nas ações de backend (<code>lib/services/authorized-customer-access.ts</code>);</li>
+                                <li><strong>Criptografia em Nível de Aplicação:</strong> Mecanismo de cifragem simétrica (AES-256-GCM) com chaves derivadas por HKDF por contexto funcional implementado na biblioteca interna para credenciais de pagamento e tokens de integração externos (WhatsApp, SuperFrete, Mercado Pago), condicionado ao provisionamento e ativação de chaves mestras no ambiente operacional;</li>
+                                <li><strong>Armazenamento de Senhas:</strong> Senhas de usuários gerenciadas em formato de hash criptográfico irreversível (algoritmo bcrypt provido pela camada de autenticação do Supabase Auth), complementadas por limitação de taxa de requisições para mitigação de ataques de força bruta;</li>
+                                <li><strong>Isolamento Lógico Multi-tenant:</strong> Segregação de dados entre diferentes Parceiros mediante associação obrigatória ao identificador de parceiro, regras de controle de acesso em nível de linha (Row Level Security - RLS) na camada de dados e verificação programática nas ações de backend;</li>
                                 <li><strong>Controle de Permissões de Equipe (RBAC):</strong> Módulo de controle de acessos da equipe interna do Parceiro permitindo restringir privilégios por loja, tela e operação (proprietário, administrador, gestor, operador e entregador em <code>lib/permissions/</code>);</li>
-                                <li><strong>Mecanismo de Backups Criptografados:</strong> Mecanismo técnico e utilitários de decodificação e restauração de dumps PostgreSQL criptografados em fluxo com algoritmo AES-256-GCM (<code>scripts/decrypt-database-backup.mjs</code> e <code>scripts/restore-database.mjs</code>), ressalvando-se que a frequência, execução de rotina contínua e ciclo de expurgo de cópias em produção dependem de parametrização e auditoria da infraestrutura do ambiente produtivo <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[CONTROLE EM FASE DE CONFIGURAÇÃO / PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>;</li>
-                                <li><strong>Sanitização de Registros Técnicos:</strong> Rotinas de mascaramento preventivo em código (<code>lib/secure-logger.ts</code>) para substituição de dados confidenciais (senhas, tokens, chaves e dados bancários) pelo marcador <code>[REDACTED]</code> nos logs tratados pela aplicação;</li>
+                                <li><strong>Mecanismo de Backups Criptografados:</strong> Mecanismo técnico e utilitários de decodificação e restauração de dumps PostgreSQL criptografados em fluxo com algoritmo AES-256-GCM e, ressalvando-se que a frequência, execução de rotina contínua e ciclo de expurgo de cópias em produção dependem de parametrização e auditoria da infraestrutura do ambiente produtivo <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[CONTROLE EM FASE DE CONFIGURAÇÃO / PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>;</li>
+                                <li><strong>Sanitização de Registros Técnicos:</strong> Rotinas de mascaramento preventivo em código para substituição de dados confidenciais (senhas, tokens, chaves e dados bancários) pelo marcador <code>[REDACTED]</code> nos logs tratados pela aplicação;</li>
                                 <li><strong>Proteção de Borda e Perímetro:</strong> Uso de rede de distribuição de conteúdo (CDN) e proteção contra ataques DDoS via Cloudflare, com desafios anti-bot no frontend por meio do Cloudflare Turnstile.</li>
                             </ul>
                             <div className="bg-brand-gray dark:bg-dark-border/40 p-6 rounded-xl border border-brand-border">
@@ -260,10 +260,10 @@ export default function DpaPage() {
                                             <td className="p-3">PostHog Data Processing Addendum (Online)</td>
                                         </tr>
                                         <tr>
-                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Gateway WhatsApp (Evolution API no Railway)</td>
+                                            <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Gateway WhatsApp</td>
                                             <td className="p-3">Disparo de mensagens e avisos automáticos de pedidos</td>
                                             <td className="p-3">Telefone de destino e texto da notificação do pedido</td>
-                                            <td className="p-3">EUA (Railway)</td>
+                                            <td className="p-3">EUA</td>
                                             <td className="p-3">Executado em infraestrutura própria sob gestão no Railway</td>
                                         </tr>
                                     </tbody>
@@ -276,7 +276,7 @@ export default function DpaPage() {
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
                                 <li><strong>Mercado Pago (Mercado Pago Instituição de Pagamento Ltda.):</strong> Atua na qualidade de <strong>Controlador Independente</strong>. Como instituição de pagamento regulada pelo Banco Central do Brasil (Bacen), o Mercado Pago determina autonomamente os meios e finalidades relativos à liquidação financeira, prevenção a fraudes, compliance bancário e combate à lavagem de dinheiro (AML), possuindo política de privacidade própria e obrigações regulatórias autônomas;</li>
                                 <li><strong>SuperFrete (SuperFrete Tecnologia Ltda.) e Transportadoras Integradas:</strong> Atuam na qualidade de <strong>Controladores Independentes</strong> no tocante à cotação, emissão de Conhecimento de Transporte Eletrônico (CT-e), despacho e transporte físico de mercadorias, determinando os dados indispensáveis para o cumprimento das normas postais e regulatórias da ANTT;</li>
-                                <li><strong>Serviços Públicos de Apoio e Geocodificação (ViaCEP, BrasilAPI, OpenStreetMap):</strong> Serviços utilitários abertos de localização que recebem consultas pontuais de CEP ou coordenadas geográficas. A DUDIT não controla o armazenamento técnico de logs HTTP nos servidores desses prestadores, sendo suas práticas regidas por suas respectivas políticas operacionais <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE VALIDAÇÃO DOCUMENTAL]</span>.</li>
+                                <li><strong>Serviços Públicos de Apoio e Geocodificação (ViaCEP, BrasilAPI, OpenStreetMap):</strong> Serviços utilitários abertos de localização que recebem consultas pontuais de CEP ou coordenadas geográficas. A DUDIT não controla o armazenamento técnico de logs HTTP nos servidores desses prestadores, sendo suas práticas regidas por suas respectivas políticas operacionais.</li>
                             </ul>
 
                             <p>
@@ -299,7 +299,7 @@ export default function DpaPage() {
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
                                 <li>O tratamento internacional de dados decorre da contratação necessária de infraestrutura em nuvem para a disponibilização do serviço SaaS solicitado pelo Parceiro (art. 33, IX, da LGPD);</li>
                                 <li>No âmbito operacional, os fornecedores internacionais disponibilizam aditivos de processamento de dados (DPAs online) e termos de serviço padrão de mercado que preveem medidas técnicas de segurança da informação e confidencialidade;</li>
-                                <li><strong>Adequação à Resolução CD/ANPD nº 19/2024:</strong> Tendo em vista que o prazo regulamentar transitório da referida Resolução já se encerrou, a DUDIT declara que a celebração formal de contratos bilaterais específicos com fornecedores estrangeiros contendo o texto das Cláusulas-Padrão Contratuais da ANPD encontra-se em fase de avaliação jurídica e operacional <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE FORMALIZAÇÃO BILATERAL DE CLÁUSULAS-PADRÃO DA ANPD COM FORNECEDORES ESTRANGEIROS]</span>;</li>
+                                <li><strong>Adequação à Resolução CD/ANPD nº 19/2024:</strong> Tendo em vista que o prazo regulamentar transitório da referida Resolução já se encerrou, a DUDIT declara que a celebração formal de contratos bilaterais específicos com fornecedores estrangeiros contendo o texto das Cláusulas-Padrão Contratuais da ANPD encontra-se em fase de avaliação jurídica e operacional;</li>
                                 <li><strong>Compromisso de Integralidade:</strong> Fica expressamente estipulado que, sempre que for adotado formalmente o mecanismo de Cláusulas-Padrão Contratuais aprovado pela ANPD entre as Partes ou com os suboperadores, será incorporado o <strong>texto oficial integral e sem alterações</strong>, conforme publicado no Anexo da Resolução CD/ANPD nº 19/2024.</li>
                             </ul>
                         </div>
@@ -368,7 +368,7 @@ export default function DpaPage() {
                                 <strong>11.2. Procedimentos de Descarte na Base Ativa:</strong> Após a solicitação definitiva de encerramento da conta pelo PARCEIRO:
                             </p>
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
-                                <li>A DUDIT iniciará os procedimentos técnicos para a exclusão lógica e anonimização dos registros operacionais da base ativa do ERP no prazo razoável estimado em até 30 (trinta) dias úteis <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE VALIDAÇÃO DE CRONOGRAMA EM PRODUÇÃO]</span>;</li>
+                                <li>A DUDIT iniciará os procedimentos técnicos para a exclusão lógica e anonimização dos registros operacionais da base ativa do ERP no prazo razoável estimado em até 30 (trinta) dias úteis;</li>
                                 <li>Eventuais pendências financeiras ou comerciais entre as Partes não autorizam a retenção indiscriminada de dados pessoais do ERP. A retenção pela DUDIT limitar-se-á estritamente aos documentos cadastrais e registros fiscais indispensáveis à cobrança legal ou ao cumprimento de obrigações tributárias e contábeis próprias (art. 16, I e II, da LGPD);</li>
                                 <li>Registros transacionais e de pedidos poderão ter seus dados pessoais anonimizados, preservando-se apenas valores contábeis e fiscais exigidos pela legislação.</li>
                             </ul>
@@ -376,12 +376,12 @@ export default function DpaPage() {
                                 <strong>11.3. Retenções Legalmente Justificadas:</strong> A DUDIT conservará os dados e registros estritamente necessários para:
                             </p>
                             <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
-                                <li>O cumprimento de deveres legais de guarda de registros previstos na legislação brasileira, inclusive a retenção de registros de acesso a aplicações de internet quando e na medida em que o art. 15 da Lei nº 12.965/2014 for legalmente exigível da DUDIT <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PENDENTE DE VALIDAÇÃO JURÍDICA QUANTO AO ENQUADRAMENTO DA OPERADORA]</span>, não se aplicando essa retenção aos cadastros gerais do ERP;</li>
+                                <li>O cumprimento de deveres legais de guarda de registros previstos na legislação brasileira, inclusive a retenção de registros de acesso a aplicações de internet quando e na medida em que o art. 15 da Lei nº 12.965/2014 for legalmente exigível da DUDIT, não se aplicando essa retenção aos cadastros gerais do ERP;</li>
                                 <li>O exercício regular de direitos em processos judiciais, administrativos ou arbitrais;</li>
                                 <li>O cumprimento de ordens emanadas de autoridades competentes.</li>
                             </ul>
                             <p>
-                                <strong>11.4. Cópias de Segurança (Backups Residuais):</strong> O PARCEIRO reconhece que cópias de segurança geradas para fins de integridade e recuperação de desastres não são passíveis de expurgo individualizado imediato devido à natureza compactada e criptografada dos snapshots globais do banco de dados. Tais cópias permanecem isoladas, seguras e inacessíveis para o uso operacional corrente, sendo descontinuadas e sobrescritas de forma automatizada ao longo do ciclo técnico regular de rotação de backups adotado pela infraestrutura <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">[PRAZO EXATO DE RETENÇÃO TÉCNICA DE BACKUPS: PENDENTE DE AUDITORIA OPERACIONAL EM PRODUÇÃO]</span>.
+                                <strong>11.4. Cópias de Segurança (Backups Residuais):</strong> O PARCEIRO reconhece que cópias de segurança geradas para fins de integridade e recuperação de desastres não são passíveis de expurgo individualizado imediato devido à natureza compactada e criptografada dos snapshots globais do banco de dados. Tais cópias permanecem isoladas, seguras e inacessíveis para o uso operacional corrente, sendo descontinuadas e sobrescritas de forma automatizada ao longo do ciclo técnico regular de rotação de backups adotado pela infraestrutura.
                             </p>
                         </div>
 
@@ -436,9 +436,6 @@ export default function DpaPage() {
 
                         {/* ANEXO I */}
                         <div className="mt-12 pt-10 border-t-2 border-brand-border space-y-6">
-                            <div className="inline-flex items-center gap-2 border border-brand-green/30 bg-brand-green/10 text-brand-green rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider">
-                                Anexo Técnico
-                            </div>
                             <h2 className="text-3xl font-bold text-brand-dark dark:text-dark-heading">
                                 ANEXO I — Quadro de Escopo do Tratamento de Dados Pessoais no ERP
                             </h2>
@@ -464,7 +461,7 @@ export default function DpaPage() {
                                             <td className="p-3 font-medium text-brand-dark dark:text-dark-heading">Categorias de Titulares</td>
                                             <td className="p-3 space-y-1">
                                                 <p className="mb-1">• Clientes e compradores do Parceiro</p>
-                                                <p className="mb-1">• Colaboradores, funcionários e equipe interna do Parceiro (<code>partner_users</code>)</p>
+                                                <p className="mb-1">• Colaboradores, funcionários e equipe interna do Parceiro</p>
                                                 <p className="mb-1">• Fornecedores, parceiros comerciais e prestadores de serviços do Parceiro</p>
                                                 <p className="mb-0">• Destinatários finais de pedidos e entregas</p>
                                             </td>
@@ -476,14 +473,14 @@ export default function DpaPage() {
                                                     <p className="font-semibold text-brand-dark dark:text-dark-heading mb-1">A) DADOS PESSOAIS COMUNS (art. 5º, I, LGPD):</p>
                                                     <p className="mb-1">• <strong>Identificação e Contato:</strong> Nome completo, CPF, CNPJ, e-mail, telefone/WhatsApp, endereço residencial ou de entrega.</p>
                                                     <p className="mb-1">• <strong>Pedidos e Consumo:</strong> Histórico de compras, produtos e serviços contratados, quantidades, valores, forma de pagamento, status de preparo e entrega.</p>
-                                                    <p className="mb-1">• <strong>Colaboradores e Equipe:</strong> Nome, e-mail comercial, telefone, cargo/função, loja associada, permissões de acesso atribuídas e registros de auditoria interna (<code>audit_logs</code>).</p>
+                                                    <p className="mb-1">• <strong>Colaboradores e Equipe:</strong> Nome, e-mail comercial, telefone, cargo/função, loja associada, permissões de acesso atribuídas e registros de auditoria interna.</p>
                                                     <p className="mb-1">• <strong>Agendamentos e Serviços:</strong> Data, horário, profissional responsável, especificações do serviço e observações operacionais do atendimento.</p>
                                                     <p className="mb-1">• <strong>Financeiro no ERP:</strong> Registros de contas a pagar/receber, conciliações, despesas e fluxo de caixa interno.</p>
                                                     <p className="text-xs text-brand-inactive-text italic mb-0">*(Nota jurídica: Nenhum dos dados acima é classificado como dado pessoal sensível pela LGPD, devendo receber o tratamento e proteção cabíveis aos dados pessoais comuns).*</p>
                                                 </div>
 
                                                 <div className="pt-2 border-t border-brand-border">
-                                                    <p className="font-semibold text-brand-red mb-1">B) DADOS PESSOAIS SENSÍVEIS (art. 5º, II, LGPD) — RESTRIÇÃO E VEDAÇÃO:</p>
+                                                    <p className="font-semibold text-brand-dark dark:text-dark-heading mb-1">B) DADOS PESSOAIS SENSÍVEIS (art. 5º, II, LGPD) — RESTRIÇÃO E VEDAÇÃO:</p>
                                                     <p className="mb-1">• O ERP da DUDIT é destinado à gestão comercial e empresarial geral.</p>
                                                     <p className="mb-0 leading-relaxed">• É <strong>expressamente vedado</strong> ao PARCEIRO cadastrar dados pessoais sensíveis (tais como dados de saúde, convicção religiosa, dados biométricos, opiniões políticas ou vida sexual) nas ferramentas padrão do ERP, salvo se houver funcionalidade expressamente desenhada e homologada para essa finalidade (como ficha de anamnese para estabelecimentos de saúde/estética, se aplicável), estrita necessidade comprovada e fundamentação em uma das bases legais específicas do art. 11 da LGPD, assumindo o PARCEIRO a exclusiva responsabilidade por essa inserção.</p>
                                                 </div>

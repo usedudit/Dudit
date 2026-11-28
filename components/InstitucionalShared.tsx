@@ -12,6 +12,7 @@ import { Badge } from '@/components/reusable/Badge';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import MarketplaceFooter from '@/components/marketplace/MarketplaceFooter';
+import { trackEvent, getAcquisitionContext } from '@/lib/analytics';
 
 export const GridLines = ({ dark = false }: { dark?: boolean }) => null;
 
@@ -275,7 +276,11 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         </p>
                         <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
                             <Button asChild className="h-11">
-                                <Link href="/auth/login?mode=partner" prefetch={false}>
+                                <Link
+                                    href="/auth/login?mode=partner"
+                                    prefetch={false}
+                                    onClick={() => trackEvent("cta_clicked", { source: "shared_cta", target: "start_selling", ...getAcquisitionContext() })}
+                                >
                                     Começar grátis
                                 </Link>
                             </Button>

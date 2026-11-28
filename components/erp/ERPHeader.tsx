@@ -148,14 +148,21 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     }
 
     const handleSignOut = async () => {
-        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
-        localStorage.removeItem("dudit_city")
+        const clearLocation = () => {
+            document.cookie = "dudit_city=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            document.cookie = "dudit_coords=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            try {
+                localStorage.removeItem("dudit_city")
+            } catch { }
+        }
+        clearLocation()
         try {
             await logLogoutAction()
         } catch {
             // Audit logging must never block logout.
         }
         await supabase.auth.signOut({ scope: 'local' })
+        clearLocation()
         window.location.href = "/"
     }
 

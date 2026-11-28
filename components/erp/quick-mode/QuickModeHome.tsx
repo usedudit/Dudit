@@ -20,7 +20,7 @@ import {
     Store,
     BriefcaseIcon,
 } from "@/lib/icons";
-import { Button, ListItem, FormSection, DefaultModal, InfoCard, RadioButton } from "@/components/reusable";
+import { Button, ListItem, FormSection, DefaultModal, InfoCard, RadioButton, Input } from "@/components/reusable";
 import { useToast } from "@/hooks/use-toast";
 import { deleteProductAction } from "@/app/actions/erp/products";
 import { deleteServiceAction } from "@/app/actions/erp/servicos";
@@ -166,7 +166,7 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                         variant="link"
                         size="sm"
                         onClick={() => setShowOptionsModal(true)}
-                        className="text-xs p-0 h-auto font-semibold text-brand-green hover:underline cursor-pointer"
+                        className="text-xs p-0 h-auto hover:underline"
                     >
                         Opções da Vitrine
                     </Button>
@@ -177,21 +177,14 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                 </p>
 
                 {/* Link Box */}
-                <div className="flex items-center justify-between gap-2 bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-xl p-2.5">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <LinkIcon size={16} className="text-brand-green shrink-0" />
-                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading truncate font-mono">
-                            {profileUrl}
-                        </span>
-                    </div>
+                <div className="flex gap-2 w-full">
+                    <Input value={profileUrl} readOnly onChange={() => { }} className="flex-1" />
                     <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-3 text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-white dark:hover:bg-dark-surface shrink-0 rounded-lg gap-1.5"
+                        variant="outline"
                         onClick={copyLink}
+                        className="gap-2 shrink-0 h-10 w-10"
                     >
-                        <CopyIcon size={13} />
-                        {copied ? "Copiado!" : "Copiar"}
+                        {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
                     </Button>
                 </div>
             </div>

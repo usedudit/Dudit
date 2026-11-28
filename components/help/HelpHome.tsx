@@ -22,6 +22,7 @@ import {
 import Link from "next/link"
 import { Button, Badge, InfoCard, ListItem, FormSection } from "@/components/reusable"
 import { SupportModal } from "@/components/support/SupportModal"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 
 const WavesBackground = React.memo(() => (
     <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
@@ -166,7 +167,11 @@ export default function HelpHome() {
                         </p>
 
                         <div className="space-y-3">
-                            <Link href="/auth/login?mode=partner" className="block">
+                            <Link
+                                href="/auth/login?mode=partner"
+                                className="block"
+                                onClick={() => trackEvent("cta_clicked", { source: "ajuda_home", target: "start_selling", ...getAcquisitionContext() })}
+                            >
                                 <ListItem
                                     title="Anunciar grátis"
                                     left={<StarIcon className="text-brand-green" />}

@@ -182,13 +182,13 @@ function sectionDisplay(
 
     const MAP: Record<string, Record<string, [string, string?]>> = {
         topVitrines: {
-            country: ["Lojas e vitrines locais"],
-            state: ["Lojas e vitrines pertinho de você!"],
+            country: ["Lojas e vitrines na Dudit"],
+            state: [`Lojas e vitrines em ${stateName}`],
             city: ["Lojas e vitrines pertinho de você!"],
         },
         trending: {
             country: ["Produtos na Dudit"],
-            state: ["Produtos pertinho de você!"],
+            state: [`Produtos em ${stateName}`],
             city: ["Produtos pertinho de você!"],
         },
         endingSoon: {
@@ -238,7 +238,7 @@ function sectionDisplay(
         },
         services: {
             country: ["Serviços e profissionais"],
-            state: ["Serviços pertinho de você!"],
+            state: [`Serviços em ${stateName}`],
             city: ["Serviços pertinho de você!"],
         },
         popular: {
@@ -287,6 +287,20 @@ interface PartnerTiersRaw {
     allStoreIds: string[]
 }
 
+function pickBestAddress(primary?: any, fallback?: any): any | null {
+    const toList = (val: any): any[] => (Array.isArray(val) ? val.filter(Boolean) : val ? [val] : [])
+    const pick = (list: any[]): any | null => {
+        if (list.length === 0) return null
+        return (
+            list.find((a) => a.is_default && (a.city || a.state)) ||
+            list.find((a) => (a.city || a.state) && a.latitude != null && a.longitude != null) ||
+            list.find((a) => a.city || a.state) ||
+            list[0]
+        )
+    }
+    return pick(toList(primary)) || pick(toList(fallback))
+}
+
 const getCachedPartnerIdsByTier = (
     city: string,
     state: string,
@@ -296,7 +310,7 @@ const getCachedPartnerIdsByTier = (
         const supabase = getAdminClient()
         const { data: rawStores, error } = await supabase
             .from("stores")
-            .select("id, partner_id, showcase_suspended_at, showcase_suspended_until, partners!inner(showcase_suspended_at, showcase_suspended_until), addresses!store_id!left(city, state)")
+            .select("id, partner_id, showcase_suspended_at, showcase_suspended_until, partners!inner(showcase_suspended_at, showcase_suspended_until, addresses!partner_id!left(city, state, is_default)), addresses!store_id!left(city, state, is_default)")
             .eq("is_active", true)
 
         if (error) {
@@ -329,7 +343,8 @@ const getCachedPartnerIdsByTier = (
             if (pid) allIds.add(pid)
             if (storeId) allStoreIds.add(storeId)
 
-            const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
+            const partner = Array.isArray((s as any).partners) ? (s as any).partners[0] : (s as any).partners
+            const addr = pickBestAddress((s as any).addresses, partner?.addresses)
             const storeState = normalizeStateToUF(addr?.state)
             if (targetState && storeState === targetState) {
                 if (pid) stateIds.add(pid)
@@ -356,7 +371,8 @@ const getCachedPartnerIdsByTier = (
             for (const s of stores) {
                 const pid = (s as any).partner_id
                 const storeId = (s as any).id
-                const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
+                const partner = Array.isArray((s as any).partners) ? (s as any).partners[0] : (s as any).partners
+                const addr = pickBestAddress((s as any).addresses, partner?.addresses)
                 const storeState = normalizeStateToUF(addr?.state)
                 if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug && (!targetState || !storeState || storeState === targetState)) {
                     if (pid) cityIds.add(pid)
@@ -377,7 +393,7 @@ const getCachedPartnerIdsByTier = (
             allStoreIds: Array.from(allStoreIds),
         }
     },
-    [`partner-ids-by-tier-v2-${city}-${state}-${stateOnly}`],
+    [`partner-ids-by-tier-v3-${city}-${state}-${stateOnly}`],
     {
         tags: ["partners", "addresses", "stores"],
         revalidate: 60
@@ -409,15 +425,14 @@ function getPartnerId(item: { partners?: any }): string | undefined {
 
 function getItemStoreId(item: any): string | undefined {
     const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
-    return item.store_id || rawStore?.id || (item.itemType === "vitrine" || (!item.itemType && item.slug && item.phone) ? item.id : undefined)
+    return item.store_id || rawStore?.id || (item.itemType === "vitrine" || (!item.itemType && item.slug && ("marketplace_reputation" in item || item.phone)) ? item.id : undefined)
 }
 
 function getItemStoreAddress(item: any): { city?: string | null; state?: string | null } | null {
     const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
-    const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+    const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const addr = pickBestAddress(rawStore?.addresses || item.addresses, rawPartner?.addresses)
     if (addr?.city || addr?.state) return addr
-    const selfAddr = Array.isArray(item.addresses) ? item.addresses[0] : item.addresses
-    if (selfAddr?.city || selfAddr?.state) return selfAddr
     return null
 }
 
@@ -488,12 +503,13 @@ const BASE_FIELDS = `id, short_id, store_id, partner_id, name, price, promotiona
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
-    id, is_showcase_active, showcase_suspended_at, showcase_suspended_until
+    id, is_showcase_active, showcase_suspended_at, showcase_suspended_until,
+    addresses!partner_id!left(city, state, neighborhood, latitude, longitude, is_default)
 ),
 stores!left(
     id, short_id, name, slug, description, logo_url, banner_url,
     phone, is_showcase_active, showcase_suspended_at, showcase_suspended_until, marketplace_reputation,
-    addresses!store_id!left(city, state, neighborhood, latitude, longitude),
+    addresses!store_id!left(city, state, neighborhood, latitude, longitude, is_default),
     delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)
 )`
 
@@ -519,7 +535,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
     const storeName = rawStore?.name || "Vendedor"
     const storeImage = rawStore?.logo_url
-    const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+    const addr = pickBestAddress(rawStore?.addresses, rawPartner?.addresses)
     const rawDelivery = Array.isArray(rawStore?.delivery_settings) ? rawStore.delivery_settings[0] : rawStore?.delivery_settings
     const storeCity = addr?.city || rawStore?.city || null
     const storeState = addr?.state || rawStore?.state || null
@@ -699,9 +715,9 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
         .select(`
             id, short_id, name, slug, description, logo_url, banner_url,
             phone, rating, is_showcase_active, showcase_suspended_at, showcase_suspended_until, partner_id, marketplace_reputation,
-            addresses!store_id!left(city, state, neighborhood, latitude, longitude),
+            addresses!store_id!left(city, state, neighborhood, latitude, longitude, is_default),
             delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer),
-            partners!inner(id, showcase_suspended_at, showcase_suspended_until, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
+            partners!inner(id, showcase_suspended_at, showcase_suspended_until, category_id, addresses!partner_id!left(city, state, neighborhood, latitude, longitude, is_default), category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
         .in("partner_id", allIds)
@@ -1617,7 +1633,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const rawStore: any = Array.isArray(item.stores) ? item.stores[0] : item.stores
         const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url
-        const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+        const addr = pickBestAddress(rawStore?.addresses, rawPartner?.addresses)
         const rawDelivery = Array.isArray(rawStore?.delivery_settings) ? rawStore.delivery_settings[0] : rawStore?.delivery_settings
         const storeCity = addr?.city || rawStore?.city || null
         const storeState = addr?.state || rawStore?.state || null
@@ -1690,8 +1706,8 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 // ─── 12. 🛍️ Vitrines (Lojas e Negócios Locais) ───────────────────────────────
 
 function mapVitrineItem(store: any) {
-    const p = store.partners
-    const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
+    const p = Array.isArray(store.partners) ? store.partners[0] : store.partners
+    const addr = pickBestAddress(store.addresses, p?.addresses)
     const rawDelivery = Array.isArray(store.delivery_settings) ? store.delivery_settings[0] : store.delivery_settings
     const storeName = store.name || p?.store_name || "Vendedor"
     const storeImage = store.logo_url || p?.store_image_url
@@ -1795,9 +1811,11 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     }, ctx.stateOnly ? undefined : ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
-    const isCountry = displayScope === "country"
-    const title = isCountry ? "Produtos na Dudit" : "Produtos pertinho de você!"
-    const subtitle = isCountry ? "Variedade para você" : "Disponíveis na sua região"
+    const display = sectionDisplay("trending", ctx, displayScope)
+    const title = display.title
+    const subtitle = displayScope === "country"
+        ? "Variedade para você"
+        : (displayScope === "state" ? `Disponíveis em ${ESTADOS[ctx.state] || ctx.state}` : "Disponíveis na sua região")
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {
@@ -2134,7 +2152,7 @@ const getSharedHomeSections = (
     ctx: DiscoverCtx,
 ) => unstable_cache(
     async () => getHomeSectionsUncached({ ...ctx, userId: null, coords: null }),
-    [`discover:home:shared:v2:${scope}:${citySlug}:${stateOnly ? "state" : "city"}`],
+    [`discover:home:shared:v3:${scope}:${citySlug}:${stateOnly ? "state" : "city"}`],
     {
         revalidate: 300, // Cache for 5 minutes (was 60s)
         tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],
@@ -2149,7 +2167,12 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         ctx
     )()
 
-    const sections = [...shared]
+    // Clone section objects so per-user enrichment/filtering never mutates unstable_cache entries in memory
+    const sections: HomeSection[] = shared.map((section) => ({
+        ...section,
+        items: Array.isArray(section.items) ? [...section.items] : [],
+        _allItems: Array.isArray(section._allItems) ? [...section._allItems] : undefined,
+    }))
 
     // Enriquecer distância em todas as seções quando temos coordenadas do usuário
     // (custo baixo: cálculo puro de haversine com lat/lng já selecionados)
@@ -2164,37 +2187,57 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    // Filtrar itens até 20km para Produtos, Serviços e Lojas/Vitrines
-    // Fallback gracioso para os itens da cidade/região caso não dê para calcular ou não encontre nada em 20km
-    for (const section of sections) {
-        const isProductSection = section.id === "trending" || section.id === "allProducts"
-        const isServiceSection = section.id === "services"
-        const isVitrineSection = section.id === "topVitrines"
+    // Priorizar itens pertinho (até 20km) no escopo de cidade sem excluir lojas da mesma cidade sem lat/lng
+    if (ctx.scope === "city") {
+        const proximityBand = (d: number | undefined): number => {
+            if (typeof d !== "number" || !Number.isFinite(d)) return 3
+            if (d <= 2) return 0
+            if (d <= 10) return 1
+            if (d <= 20) return 2
+            return 4
+        }
 
-        if (isProductSection || isServiceSection || isVitrineSection) {
-            const typeParam = isServiceSection ? "servicos" : isVitrineSection ? "vitrines" : "produtos"
-            const sectionName = isServiceSection ? "Serviços" : isVitrineSection ? "Lojas e vitrines" : "Produtos"
+        for (const section of sections) {
+            const isProductSection = section.id === "trending" || section.id === "allProducts"
+            const isServiceSection = section.id === "services"
+            const isVitrineSection = section.id === "topVitrines"
 
-            let filteredBy20km: any[] = []
-            if (ctx.coords) {
-                const candidates = (section._allItems && section._allItems.length > 0)
-                    ? section._allItems
-                    : section.items
+            if (isProductSection || isServiceSection || isVitrineSection) {
+                const typeParam = isServiceSection ? "servicos" : isVitrineSection ? "vitrines" : "produtos"
+                const sectionName = isServiceSection ? "Serviços" : isVitrineSection ? "Lojas e vitrines" : "Produtos"
 
-                filteredBy20km = candidates.filter((item: any) => {
-                    const d = item.distance_km ?? item.partners?.distance_km
-                    return typeof d === "number" && !isNaN(d) && d <= 20
-                })
-            }
+                if (ctx.coords) {
+                    const candidates = (section._allItems && section._allItems.length > 0)
+                        ? section._allItems
+                        : section.items
 
-            if (filteredBy20km.length > 0) {
-                section.items = filteredBy20km.slice(0, 20)
-                section.title = `${sectionName} pertinho de você!`
-                section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}&raio=20`
-            } else {
-                if (ctx.scope === "city" || ctx.scope === "state") {
+                    // Mantém itens dentro de 20km E itens da mesma cidade sem coordenadas geocodificadas
+                    const nearbyOrSameCity = candidates.filter((item: any) => {
+                        const d = item.distance_km ?? item.partners?.distance_km
+                        if (typeof d !== "number" || !Number.isFinite(d)) return true
+                        return d <= 20
+                    })
+
+                    const hasKnown20km = nearbyOrSameCity.some((item: any) => {
+                        const d = item.distance_km ?? item.partners?.distance_km
+                        return typeof d === "number" && Number.isFinite(d) && d <= 20
+                    })
+
+                    if (nearbyOrSameCity.length > 0) {
+                        const prioritized = nearbyOrSameCity
+                            .map((item, idx) => ({ item, idx, band: proximityBand(item.distance_km ?? item.partners?.distance_km) }))
+                            .sort((a, b) => (a.band !== b.band ? a.band - b.band : a.idx - b.idx))
+                            .map((entry) => entry.item)
+
+                        const finalList = isVitrineSection ? prioritized : applySellerDiversity(prioritized)
+                        section.items = finalList.slice(0, isVitrineSection ? 15 : 20)
+                        section.title = `${sectionName} pertinho de você!`
+                        section.seeMoreLink = hasKnown20km
+                            ? `/explorar/${ctx.citySlug}?type=${typeParam}&raio=20`
+                            : `/explorar/${ctx.citySlug}?type=${typeParam}`
+                    }
+                } else {
                     section.title = `${sectionName} pertinho de você!`
-                    section.subtitle = "Disponíveis na sua região"
                     section.seeMoreLink = `/explorar/${ctx.citySlug}?type=${typeParam}`
                 }
             }

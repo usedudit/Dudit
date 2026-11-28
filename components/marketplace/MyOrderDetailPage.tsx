@@ -24,7 +24,7 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine, isInternalErpIntegrationTimelineEntry, isInternalErpIntegrationTimelineLine } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine, isInternalStockTimelineLine, isInternalErpIntegrationTimelineEntry, isInternalErpIntegrationTimelineLine, isInternalMpStatusLine } from '@/lib/utils';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { MarketplaceExchangeProductPicker, type MarketplaceSelectedExchangeItem } from '@/components/marketplace/MarketplaceExchangeProductPicker';
@@ -830,13 +830,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                 let changeLines = (entry.change_lines || []).map((line: string) => humanizeTimelineChangeLine(line)).filter(Boolean);
 
-                // Filter out internal seller notes edits and internal ERP sync logs from customer view
+                // Filter out internal seller notes edits, internal ERP sync logs, and Mercado Pago status details from customer view
                 changeLines = changeLines.filter(
                     (l: string) =>
                         !l.toLowerCase().includes("observações do pedido atualizadas") &&
                         !l.toLowerCase().includes("alterou as observações do pedido") &&
                         !isInternalStockTimelineLine(l) &&
-                        !isInternalErpIntegrationTimelineLine(l),
+                        !isInternalErpIntegrationTimelineLine(l) &&
+                        !isInternalMpStatusLine(l),
                 );
 
                 // If event was a return rejection, filter out false refund/credit/exchange lines

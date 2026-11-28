@@ -25,7 +25,7 @@ export function HouseAdBanner({ variant = "banner", className = "" }: HouseAdBan
                 <button
                     type="button"
                     onClick={handleClick}
-                    className="group relative w-full text-left rounded-xl overflow-hidden p-3.5 bg-gradient-to-br from-[#003229] via-[#054437] to-[#00221c] text-white border border-[#0d5e49]/40 shadow-xs hover:border-[#10b981]/50 transition-all duration-300 flex items-center justify-between gap-2.5"
+                    className="group relative w-full text-left rounded-xl overflow-hidden p-3.5 bg-gradient-to-br from-[#09211b] via-[#054437] to-[#00221c] text-white border border-[#0d5e49]/40 shadow-xs hover:border-[#10b981]/50 transition-all duration-300 flex items-center justify-between gap-2.5"
                 >
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
@@ -40,7 +40,7 @@ export function HouseAdBanner({ variant = "banner", className = "" }: HouseAdBan
                             Alcance clientes na sua região
                         </p>
                     </div>
-                    <div className="shrink-0 bg-[#10b981] text-[#003229] p-1.5 rounded-lg group-hover:scale-105 transition-transform">
+                    <div className="shrink-0 bg-[#10b981] text-[#09211b] p-1.5 rounded-lg group-hover:scale-105 transition-transform">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
@@ -58,7 +58,7 @@ export function HouseAdBanner({ variant = "banner", className = "" }: HouseAdBan
             <button
                 type="button"
                 onClick={handleClick}
-                className="group relative w-full text-left rounded-xl sm:rounded-2xl overflow-hidden p-4 sm:p-5 bg-gradient-to-r from-[#003229] via-[#054437] to-[#00221c] text-white border border-[#0d5e49]/40 shadow-sm hover:border-[#10b981]/50 transition-all duration-300 flex items-center justify-between gap-4"
+                className="group relative w-full text-left rounded-xl sm:rounded-2xl overflow-hidden p-4 sm:p-5 bg-gradient-to-r from-[#09211b] via-[#054437] to-[#00221c] text-white border border-[#0d5e49]/40 shadow-sm hover:border-[#10b981]/50 transition-all duration-300 flex items-center justify-between gap-4"
             >
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">

@@ -94,6 +94,7 @@ interface PixPaymentWrapperProps {
     pixKey?: string | null
     pixKeyType?: string | null
     payDepositOnly?: boolean
+    isSubscription?: boolean
     returnPath?: string
 }
 
@@ -168,7 +169,7 @@ export function PaymentWrapper({
     orderDetails, orderNumber, sellerName, buyerId,
     useMercadoPago = false, partnerId, mpPublicKey, userEmail, userName, userAddress,
     mpAcceptedPaymentMethods,
-    partnerPhone, pixKey, pixKeyType, payDepositOnly, returnPath,
+    partnerPhone, pixKey, pixKeyType, payDepositOnly, isSubscription, returnPath,
 }: PixPaymentWrapperProps) {
     const { theme } = useTheme()
     const isDark = theme === "dark"
@@ -220,6 +221,15 @@ export function PaymentWrapper({
         const id = actualOrderId || orderId
         return id && !id.startsWith("temp-") ? id : undefined
     }, [actualOrderId, orderId])
+
+    const hasSubscriptionItem = useMemo(
+        () =>
+            Boolean(isSubscription) ||
+            Boolean(orderDetails?.items?.some((item) => item.itemType === "subscription")),
+        [isSubscription, orderDetails?.items],
+    )
+    const canRecoverWithPix = !hasSubscriptionItem && mpAcceptedPaymentMethods?.pix !== false
+    const canRecoverWithBoleto = !hasSubscriptionItem && !payDepositOnly && mpAcceptedPaymentMethods?.boleto !== false
 
     useEffect(() => {
         const targetOrderId = actualOrderId || orderId
@@ -474,7 +484,7 @@ export function PaymentWrapper({
                                 borderRadiusLarge: "12px",
                                 formPadding: "16px",
                             } : {
-                                textPrimaryColor: "#003229",
+                                textPrimaryColor: "#09211b",
                                 textSecondaryColor: "#6b7280",
                                 inputBackgroundColor: "#FFFFFF",
                                 formBackgroundColor: "#FFFFFF",
@@ -514,12 +524,12 @@ export function PaymentWrapper({
                         hideFormTitle: false,
                     },
                     paymentMethods: {
-                        ticket: payDepositOnly ? [] : mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
-                        bankTransfer: mpAcceptedPaymentMethods?.pix === false ? [] : "all",
-                        creditCard: mpAcceptedPaymentMethods?.credit_card === false ? [] : "all",
-                        debitCard: mpAcceptedPaymentMethods?.debit_card === false ? [] : "all",
-                        mercadoPago: payDepositOnly ? [] : (mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all"),
-                        atm: payDepositOnly ? [] : mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
+                        ticket: hasSubscriptionItem || payDepositOnly || mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
+                        bankTransfer: hasSubscriptionItem || mpAcceptedPaymentMethods?.pix === false ? [] : "all",
+                        creditCard: hasSubscriptionItem ? "all" : mpAcceptedPaymentMethods?.credit_card === false ? [] : "all",
+                        debitCard: hasSubscriptionItem || mpAcceptedPaymentMethods?.debit_card === false ? [] : "all",
+                        mercadoPago: hasSubscriptionItem || payDepositOnly || mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all",
+                        atm: hasSubscriptionItem || payDepositOnly || mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
                     },
                 },
                 callbacks: {
@@ -653,20 +663,35 @@ export function PaymentWrapper({
     }
 
     const getRejectionMessage = (statusDetail: string | null): string => {
-        if (!statusDetail) return "Seu pagamento foi recusado. Tente outro método de pagamento."
+        const hasAlternativeMethod = canRecoverWithPix || canRecoverWithBoleto
+        const fallbackSuggestion = hasAlternativeMethod
+            ? "Escolha outro método de pagamento ou tente outro cartão."
+            : "Tente novamente com outro cartão de crédito."
+
+        if (!statusDetail) return `Seu pagamento foi recusado. ${fallbackSuggestion}`
         const detailMap: Record<string, string> = {
-            cc_rejected_insufficient_funds: "Saldo insuficiente no cartão. Tente outro cartão ou pague com Pix.",
+            cc_rejected_insufficient_funds: canRecoverWithPix
+                ? "Saldo insuficiente no cartão. Tente outro cartão ou pague com Pix."
+                : hasAlternativeMethod
+                    ? "Saldo insuficiente no cartão. Tente outro cartão ou escolha outra forma de pagamento."
+                    : "Saldo insuficiente no cartão. Tente outro cartão de crédito.",
             cc_rejected_other_reason: "Cartão recusado pela emissora. Verifique os dados ou tente outro cartão.",
             cc_rejected_high_risk: "Transação bloqueada por segurança. Tente outro cartão.",
-            cc_rejected_blacklist: "Cartão bloqueado. Use outro método de pagamento.",
+            cc_rejected_blacklist: hasAlternativeMethod
+                ? "Cartão bloqueado. Use outro método de pagamento."
+                : "Cartão bloqueado. Tente outro cartão de crédito.",
             cc_rejected_bad_verifier: "Falha na validação do cartão. Tente novamente ou use outro cartão.",
-            cc_rejected_cannot_payment: "Não foi possível processar o pagamento. Tente outro cartão ou Pix.",
+            cc_rejected_cannot_payment: canRecoverWithPix
+                ? "Não foi possível processar o pagamento. Tente outro cartão ou Pix."
+                : "Não foi possível processar o pagamento. Tente outro cartão.",
             cc_rejected_invalid_installments: "Parcelamento não suportado para este cartão.",
         }
-        return detailMap[statusDetail] || "Pagamento recusado. Escolha outro método de pagamento."
+        return detailMap[statusDetail] || `Pagamento recusado. ${fallbackSuggestion}`
     }
 
     const handleRecoveryPayment = async (method: "pix" | "boleto") => {
+        if (method === "pix" && !canRecoverWithPix) return
+        if (method === "boleto" && !canRecoverWithBoleto) return
         const targetOrderId = actualOrderId || orderId
         if (!targetOrderId || targetOrderId.startsWith("temp-")) return
 
@@ -1493,43 +1518,50 @@ export function PaymentWrapper({
                             />
 
                             <div className="w-full max-w-md flex flex-col gap-3 mt-4">
+                                {canRecoverWithPix && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleRecoveryPayment("pix")}
+                                        disabled={isProcessingBrick}
+                                        className="w-full h-12 flex items-center justify-center gap-2"
+                                    >
+                                        {isProcessingBrick ? (
+                                            <Spinner className="mr-2" size={16} />
+                                        ) : (
+                                            <img
+                                                src="https://img.dudit.com.br/static/icons/payments/Pix.png"
+                                                alt="Pix"
+                                                className="w-5 h-5 object-contain shrink-0"
+                                            />
+                                        )}
+                                        Pagar com Pix
+                                    </Button>
+                                )}
+                                {canRecoverWithBoleto && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleRecoveryPayment("boleto")}
+                                        disabled={isProcessingBrick}
+                                        className="w-full h-12 flex items-center justify-center gap-2"
+                                    >
+                                        {isProcessingBrick ? (
+                                            <Spinner className="mr-2" size={16} />
+                                        ) : (
+                                            <img
+                                                src="https://img.dudit.com.br/static/icons/payments/Boleto.png"
+                                                alt="Boleto"
+                                                className="w-5 h-5 object-contain shrink-0"
+                                            />
+                                        )}
+                                        Pagar com Boleto
+                                    </Button>
+                                )}
                                 <Button
-                                    onClick={() => handleRecoveryPayment("pix")}
-                                    disabled={isProcessingBrick}
-                                    className="w-full h-12 flex items-center justify-center gap-2"
-                                >
-                                    {isProcessingBrick ? (
-                                        <Spinner className="mr-2" size={16} />
-                                    ) : (
-                                        <img
-                                            src="https://img.dudit.com.br/static/icons/payments/Pix.png"
-                                            alt="Pix"
-                                            className="w-5 h-5 object-contain shrink-0"
-                                        />
-                                    )}
-                                    Pagar com Pix
-                                </Button>
-                                <Button
-                                    onClick={() => handleRecoveryPayment("boleto")}
-                                    disabled={isProcessingBrick}
-                                    className="w-full h-12 flex items-center justify-center gap-2"
-                                >
-                                    {isProcessingBrick ? (
-                                        <Spinner className="mr-2" size={16} />
-                                    ) : (
-                                        <img
-                                            src="https://img.dudit.com.br/static/icons/payments/Boleto.png"
-                                            alt="Boleto"
-                                            className="w-5 h-5 object-contain shrink-0"
-                                        />
-                                    )}
-                                    Pagar com Boleto
-                                </Button>
-                                <Button
+                                    variant="outline"
                                     onClick={handleRetryCard}
-                                    className="w-full h-12 flex items-center justify-center gap-2"
+                                    className="w-full h-12"
+                                    leftIcon={<CreditCardIcon />}
                                 >
-                                    <CreditCardIcon className="w-5 h-5 shrink-0" />
                                     Tentar outro cartão
                                 </Button>
                                 <Separator />

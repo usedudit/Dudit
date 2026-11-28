@@ -11,6 +11,7 @@ import { Button } from '@/components/reusable/Button';
 import { GridLines, SectionHeader, Navbar, Footer, CTA, FaqSection } from '@/components/InstitucionalShared';
 import { INSTITUTIONAL_FAQ } from '@/lib/constants/institutional-faq';
 import { InstagramIcon, WhatsappIcon } from '@/lib/icons';
+import { trackEvent, getAcquisitionContext } from '@/lib/analytics';
 
 const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
     <section className="relative bg-white dark:bg-dark-surface pt-32 pb-20 overflow-hidden flex flex-col justify-center">
@@ -29,8 +30,8 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                         Venda pelo catálogo online, no balcão (PDV) ou pelo WhatsApp, entregue na sua cidade ou envie para todo o Brasil — e ative estoque, agenda e ordens de serviço só quando precisar.
                     </p>
                     <div className="flex flex-wrap gap-4">
-                        <Button onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
-                        <Button variant="outline" onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
+                        <Button onClick={() => { trackEvent("cta_clicked", { source: "sobre_hero", target: "start_selling", ...getAcquisitionContext() }); onNavigate('start-selling'); }}>Começar grátis</Button>
+                        <Button variant="outline" onClick={() => { trackEvent("cta_clicked", { source: "sobre_hero", target: "explore", ...getAcquisitionContext() }); onNavigate('explore'); }}>Explorar Dudit</Button>
                     </div>
                 </motion.div>
 
@@ -76,16 +77,6 @@ const PorQueExiste = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
                         <p className="text-brand-inactive-text text-base leading-relaxed mb-6">
                             <strong className="text-brand-dark dark:text-dark-heading">Criamos a Dudit para unir vendas locais, envio nacional e gestão simples em um só lugar:</strong> seus clientes da cidade podem retirar no balcão ou receber por entrega local, e você também despacha para qualquer estado do Brasil com cálculo automático de frete.
                         </p>
-                        <div className="p-4 rounded-xl bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border text-sm text-brand-inactive-text leading-relaxed">
-                            <strong className="text-brand-dark dark:text-dark-heading">Como a Dudit ganha dinheiro?</strong> Cobramos <strong className="text-brand-dark dark:text-dark-heading">0% de comissão</strong> sobre suas vendas e nos sustentamos apenas pela assinatura dos planos (com opção gratuita para começar). Em pagamentos online integrados, aplicam-se somente as taxas do meio de pagamento escolhido.{' '}
-                            <button
-                                type="button"
-                                onClick={() => onNavigate('pricing')}
-                                className="text-brand-green font-semibold hover:underline cursor-pointer"
-                            >
-                                Ver planos e preços →
-                            </button>
-                        </div>
                     </div>
 
                     <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border p-8 rounded-2xl relative">

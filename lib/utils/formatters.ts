@@ -550,6 +550,94 @@ export function isInternalErpIntegrationTimelineLine(line?: string | null): bool
   )
 }
 
+/**
+ * Linhas de status do Mercado Pago que não devem aparecer para o cliente final.
+ * São detalhes técnicos (ex.: "Status MP: pending. Detalhe: pending_waiting_transfer")
+ * úteis para o vendedor/admin, mas confusos para o cliente.
+ */
+export function isInternalMpStatusLine(line?: string | null): boolean {
+  if (!line) return false
+  const lower = String(line).toLowerCase()
+  return lower.startsWith("status mp:")
+}
+
+/**
+ * Traduz status e status_detail do Mercado Pago para português.
+ * Usado ao exibir linhas técnicas do histórico.
+ */
+export function translateMercadoPagoStatus(status: string, statusDetail?: string | null): string {
+  const statusMap: Record<string, string> = {
+    approved: "aprovado",
+    pending: "pendente",
+    rejected: "recusado",
+    cancelled: "cancelado",
+    refunded: "reembolsado",
+    charged_back: "estornado",
+    in_process: "em processamento",
+    in_mediation: "em mediação",
+    authorized: "autorizado",
+    partially_refunded: "parcialmente reembolsado",
+  }
+
+  const detailMap: Record<string, string> = {
+    pending_waiting_transfer: "aguardando transferência",
+    pending_contested: "contestado",
+    pending_review_manual: "em revisão manual",
+    cc_rejected_bad_filled_card_number: "número do cartão preenchido incorretamente",
+    cc_rejected_bad_filled_date: "data de validade preenchida incorretamente",
+    cc_rejected_bad_filled_other: "dados do cartão preenchidos incorretamente",
+    cc_rejected_bad_filled_security_code: "código de segurança preenchido incorretamente",
+    cc_rejected_blacklist: "cartão na lista negra",
+    cc_rejected_call_for_authorize: "necessária autorização por telefone",
+    cc_rejected_card_disabled: "cartão desabilitado",
+    cc_rejected_duplicated_payment: "pagamento duplicado",
+    cc_rejected_high_risk: "alto risco",
+    cc_rejected_insufficient_amount: "valor insuficiente",
+    cc_rejected_invalid_installments: "parcelas inválidas",
+    cc_rejected_max_attempts: "máximo de tentativas excedido",
+    cc_rejected_other_reason: "outro motivo",
+    cc_rejected_risk: "risco detectado",
+    cc_rejected_card_error: "erro no cartão",
+    cc_rejected_insufficient_data: "dados insuficientes",
+    cc_rejected_card_brand_not_processed: "bandeira do cartão não processada",
+    cc_rejected_issuer_not_authorized: "emissor não autorizado",
+    cc_rejected_issuer_null: "emissor não identificado",
+    cc_rejected_issuer_rejected: "emissor recusou",
+    cc_rejected_cvv_blacklist: "CVV na lista negra",
+    cc_rejected_cvv_does_not_match: "CVV não confere",
+    cc_rejected_cvv_empty: "CVV vazio",
+    cc_rejected_cvv_format_invalid: "formato CVV inválido",
+    cc_rejected_invalid_card_number: "número do cartão inválido",
+    cc_rejected_invalid_expiration_date: "data de validade inválida",
+    cc_rejected_invalid_installments_amount: "valor das parcelas inválido",
+    cc_rejected_invalid_payment_method: "método de pagamento inválido",
+    cc_rejected_maximum_attempts_exceeded: "máximo de tentativas excedido",
+    cc_rejected_operation_canceled: "operação cancelada",
+    cc_rejected_payment_method_not_allowed: "método de pagamento não permitido",
+    cc_rejected_processing_error: "erro de processamento",
+    cc_rejected_risk_rejected: "recusado por risco",
+    cc_rejected_security_code_invalid: "código de segurança inválido",
+    cc_rejected_3ds_authentication_failed: "falha na autenticação 3DS",
+    cc_rejected_3ds_authentication_required: "autenticação 3DS necessária",
+    boleto_rejected_insufficient_funds: "saldo insuficiente no boleto",
+    boleto_rejected_expired: "boleto expirado",
+    boleto_rejected_other_reason: "boleto recusado por outro motivo",
+    pix_rejected_insufficient_funds: "saldo insuficiente no Pix",
+    pix_rejected_expired: "Pix expirado",
+    pix_rejected_other_reason: "Pix recusado por outro motivo",
+    pending_waiting_payment: "aguardando pagamento",
+    pending_waiting_capture: "aguardando captura",
+    pending_waiting_refund: "aguardando reembolso",
+  }
+
+  const translatedStatus = statusMap[status.toLowerCase()] || status
+  if (statusDetail) {
+    const translatedDetail = detailMap[statusDetail.toLowerCase()] || statusDetail
+    return `${translatedStatus} (${translatedDetail})`
+  }
+  return translatedStatus
+}
+
 export interface ResolveTimelineActorParams {
   entry: {
     actor_user_id?: string | null
@@ -743,6 +831,18 @@ export function humanizeTimelineChangeLine(line: string): string {
     if (target.includes("pendente") || target.includes("aguardando") || target === "pending") return "Aguardando confirmação de pagamento."
     if (target.includes("análise") || target.includes("analise") || target.includes("processando") || target === "processing") return "Pagamento em análise."
     return `Status de pagamento: ${target}.`
+  }
+
+  // 2b. Linhas de status do Mercado Pago (ex.: "Status MP: pending. Detalhe: pending_waiting_transfer")
+  if (lower.startsWith("status mp:")) {
+    // Extrai status e status_detail da linha
+    const mpMatch = trimmed.match(/^Status MP:\s*([^.]+)(?:\.\s*Detalhe:\s*(.+))?$/i)
+    if (mpMatch) {
+      const mpStatus = mpMatch[1]?.trim() || ""
+      const mpDetail = mpMatch[2]?.trim() || null
+      return `Status no Mercado Pago: ${translateMercadoPagoStatus(mpStatus, mpDetail)}.`
+    }
+    return trimmed
   }
 
   // 3. Linhas de status de devolução / troca

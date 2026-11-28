@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/reusable/Button';
@@ -15,6 +15,7 @@ import { GridLines, Navbar, Footer, CTA } from '../../../components/Instituciona
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/reusable/Badge';
+import { trackEvent, getAcquisitionContext } from '@/lib/analytics';
 
 
 const PricingHero = () => {
@@ -213,7 +214,16 @@ const PricingCards = () => {
                         variant={plan.isDark ? "default" : "outline"}
                         className={`w-full mt-10 h-11 ${plan.isDark ? 'bg-brand-green text-white hover:bg-brand-green/90 border-0' : ''}`}
                      >
-                        <Link href="/auth/login?mode=partner" prefetch={false}>
+                        <Link
+                           href="/auth/login?mode=partner"
+                           prefetch={false}
+                           onClick={() => trackEvent("cta_clicked", {
+                              source: "planos_card",
+                              target: "start_selling",
+                              plan: plan.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+                              ...getAcquisitionContext(),
+                           })}
+                        >
                            {plan.ctaLabel}
                         </Link>
                      </Button>
@@ -467,7 +477,11 @@ const FAQ = () => {
 
             <div className="mt-12 text-center">
                <Button asChild variant="outline" className="text-brand-dark dark:text-dark-heading hover:text-brand-green border-brand-border">
-                  <Link href="/ajuda" prefetch={false}>
+                  <Link
+                     href="/ajuda"
+                     prefetch={false}
+                     onClick={() => trackEvent("cta_clicked", { source: "planos_faq", target: "help", ...getAcquisitionContext() })}
+                  >
                      Ver todas as dúvidas <ArrowRightIcon size={16} />
                   </Link>
                </Button>
@@ -526,6 +540,10 @@ const faqLd = {
 
 export default function PricingPage() {
    const router = useRouter();
+
+   useEffect(() => {
+      trackEvent("pricing_viewed", { ...getAcquisitionContext() });
+   }, []);
 
    const onNavigate = (page: string) => {
       if (page === 'home') router.push('/institucional/inicio');

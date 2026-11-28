@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/reusable/Button"
 import { Input } from "@/components/reusable/Input"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 import { Copy, Check, ExternalLink, ArrowRight } from "lucide-react"
 
 export default function GeradorLinkWhatsAppPage() {
@@ -37,6 +38,7 @@ export default function GeradorLinkWhatsAppPage() {
     const handleCopiar = () => {
         if (typeof window !== "undefined" && digitos.length >= 10) {
             navigator.clipboard.writeText(linkGerado)
+            trackEvent("tool_calculated", { tool: "link_whatsapp", ...getAcquisitionContext() })
             setCopiado(true)
             setTimeout(() => setCopiado(false), 2500)
         }

@@ -86,6 +86,7 @@ import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 import type { LocationContext } from "@/lib/utils/location-label"
 
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
+import { InfoCard } from "../reusable"
 
 interface MarketplaceHomeProps {
     sections?: HomeSection[]
@@ -136,7 +137,12 @@ export default function MarketplaceHome({
     const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
     const [showStateList, setShowStateList] = useState(false)
     const [showStateDropdown, setShowStateDropdown] = useState(false)
-    const [selectedStateFilter, setSelectedStateFilter] = useState<string>("brasil")
+    const [selectedStateFilter, setSelectedStateFilter] = useState<string>(() => {
+        if (selectedCitySlug?.startsWith("estado-")) {
+            return selectedCitySlug.replace("estado-", "").toLowerCase()
+        }
+        return "brasil"
+    })
     const [searchQuery, setSearchQuery] = useState("")
     const [isIpLoading, setIsIpLoading] = useState(false)
     const [citiesList, setCitiesList] = useState<string[]>([])
@@ -228,7 +234,10 @@ export default function MarketplaceHome({
 
     const handleSelectCitySlug = (slug: string) => {
         document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
-        localStorage.setItem('dudit_city', slug)
+        document.cookie = "dudit_coords=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+        try {
+            localStorage.setItem('dudit_city', slug)
+        } catch { }
         if (typeof window !== 'undefined') {
             if (window.location.pathname === '/') {
                 window.location.reload()
@@ -257,7 +266,10 @@ export default function MarketplaceHome({
                 const slug = `${formattedCity}-${uf}`
 
                 document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
-                localStorage.setItem('dudit_city', slug)
+                document.cookie = "dudit_coords=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+                try {
+                    localStorage.setItem('dudit_city', slug)
+                } catch { }
                 if (typeof window !== 'undefined') {
                     if (window.location.pathname === '/') {
                         window.location.reload()
@@ -443,7 +455,7 @@ export default function MarketplaceHome({
                     </Button>
 
                     {locationError && (
-                        <p className="text-xs text-red-500 text-center mt-2">{locationError}</p>
+                        <InfoCard className="mt-2" message={locationError} color="red"></InfoCard>
                     )}
 
                     {/* Account / saved addresses footer */}
@@ -481,7 +493,7 @@ export default function MarketplaceHome({
                         </div>
                     )}
                 </div>
-            </DefaultModal>
+            </DefaultModal >
         )
     }
 

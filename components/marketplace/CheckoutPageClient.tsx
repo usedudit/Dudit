@@ -1370,16 +1370,18 @@ export function CheckoutPageClient() {
         deliverySettings?.deliveryPayer === "seller"
     )
     // Carrinho com assinatura: assinaturas recorrentes só aceitam cartão de
-    // crédito no Mercado Pago (Pix volta apenas no fallback payment_failed).
+    // crédito no Mercado Pago (inclusive na tela de recuperação após recusa).
     const mpPaymentMethodsForCart: MpAcceptedPaymentMethods | undefined = useMemo(() => {
-        if (!mpAcceptedPaymentMethods || !requirements?.hasSubscriptionLines) return mpAcceptedPaymentMethods
-        return {
-            credit_card: true,
-            debit_card: false,
-            pix: false,
-            boleto: false,
-            mercado_pago_wallet: false,
+        if (requirements?.hasSubscriptionLines) {
+            return {
+                credit_card: true,
+                debit_card: false,
+                pix: false,
+                boleto: false,
+                mercado_pago_wallet: false,
+            }
         }
+        return mpAcceptedPaymentMethods
     }, [mpAcceptedPaymentMethods, requirements?.hasSubscriptionLines])
     const checkoutAmountsReady = Boolean(checkoutAmounts && !checkoutAmountsLoading)
     const paymentTypeLabelMap: Record<string, string> = {
@@ -4954,6 +4956,7 @@ export function CheckoutPageClient() {
                     pixKey={pixPaymentData.pixKey}
                     pixKeyType={pixPaymentData.pixKeyType}
                     payDepositOnly={pixPaymentData.payDepositOnly}
+                    isSubscription={Boolean(requirements?.hasSubscriptionLines)}
                     returnPath="/pedidos"
                 />
             )}

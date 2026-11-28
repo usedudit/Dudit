@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/reusable/Button"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 import { ArrowRight } from "lucide-react"
 
 export default function CalculadoraPontoEquilibrioPage() {
@@ -16,6 +17,19 @@ export default function CalculadoraPontoEquilibrioPage() {
     const [custosFixos, setCustosFixos] = useState<number>(4500)
     const [precoVendaMedio, setPrecoVendaMedio] = useState<number>(80)
     const [custoVariavelMedio, setCustoVariavelMedio] = useState<number>(35)
+    const hasTrackedRef = useRef(false)
+    const isFirstRenderRef = useRef(true)
+
+    useEffect(() => {
+        if (isFirstRenderRef.current) {
+            isFirstRenderRef.current = false
+            return
+        }
+        if (!hasTrackedRef.current) {
+            hasTrackedRef.current = true
+            trackEvent("tool_calculated", { tool: "ponto_equilibrio", ...getAcquisitionContext() })
+        }
+    }, [custosFixos, precoVendaMedio, custoVariavelMedio])
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')

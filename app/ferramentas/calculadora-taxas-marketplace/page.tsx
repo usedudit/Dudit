@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -11,6 +11,7 @@ import { Input } from "@/components/reusable/Input"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { PercentageInput } from "@/components/reusable/Inputs/PercentageInput"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 import { ArrowRight } from "lucide-react"
 
 export default function CalculadoraTaxasMarketplacePage() {
@@ -19,6 +20,19 @@ export default function CalculadoraTaxasMarketplacePage() {
     const [taxaPercentual, setTaxaPercentual] = useState<number>(18)
     const [taxaFixaPorPedido, setTaxaFixaPorPedido] = useState<number>(2.5)
     const [quantidadePedidos, setQuantidadePedidos] = useState<number>(160)
+    const hasTrackedRef = useRef(false)
+    const isFirstRenderRef = useRef(true)
+
+    useEffect(() => {
+        if (isFirstRenderRef.current) {
+            isFirstRenderRef.current = false
+            return
+        }
+        if (!hasTrackedRef.current) {
+            hasTrackedRef.current = true
+            trackEvent("tool_calculated", { tool: "taxas_marketplace", ...getAcquisitionContext() })
+        }
+    }, [faturamento, taxaPercentual, taxaFixaPorPedido, quantidadePedidos])
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')

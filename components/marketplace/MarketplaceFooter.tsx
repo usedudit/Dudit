@@ -81,10 +81,10 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
                             <h2 className="text-sm font-semibold text-white mb-6">Comprar e Vender</h2>
                             <ul className="space-y-3">
                                 <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar produtos e cidades</Link></li>
-                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Criar minha loja grátis</Link></li>
+                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Criar minha vitrine grátis</Link></li>
                                 <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Soluções por segmento</Link></li>
                                 <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Planos com 0% de comissão</Link></li>
-                                <li><Link href="/mapa-do-site" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Mapa do Site</Link></li>
+                                <li><Link href="/explorar/brasil" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Comprar no Brasil inteiro</Link></li>
                             </ul>
                         </div>
 

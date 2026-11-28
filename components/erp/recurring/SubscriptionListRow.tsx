@@ -48,6 +48,12 @@ export const getForecastTextClass = (raw: string | null | undefined): string => 
   return "text-brand-inactive-text dark:text-dark-body"
 }
 
+/** Verifica se deve mostrar a previsão (não mostra se cancelada/expirada) */
+export const shouldShowForecast = (status: string | null | undefined): boolean => {
+  if (!status) return true
+  return status !== "cancelled" && status !== "expired"
+}
+
 interface ColumnDef {
   id: string
   align?: "left" | "center" | "right"
@@ -129,7 +135,7 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
             <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
               {formatDate(sub.nextExecutionAt)}
             </span>
-            {sub.nextExecutionAt && (
+            {sub.nextExecutionAt && shouldShowForecast(sub.status) && (
               <span className={`text-xs font-medium ${getForecastTextClass(sub.nextExecutionAt)}`}>
                 {getForecastLabel(sub.nextExecutionAt)}
               </span>

@@ -11,7 +11,7 @@ const config = {
   secondary: { label: "Período Anterior", color: "#D1D5DB" },
 } satisfies ChartConfig
 
-export const CHART_COLORS = ["#79c325", "#003229", "#f3f9f6", "#bcf49d", "#fff085"]
+export const CHART_COLORS = ["#79c325", "#09211b", "#f3f9f6", "#bcf49d", "#fff085"]
 
 export const CHART_COLORS_VIVID = ["#79c325", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"]
 

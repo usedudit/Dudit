@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { humanizeTimelineChangeLine, humanizeAppointmentTimelineLine, resolveTimelineActorName, isDuditTeamActorName, isInternalStockTimelineLine } from "./formatters"
+import { humanizeTimelineChangeLine, humanizeAppointmentTimelineLine, resolveTimelineActorName, isDuditTeamActorName, isInternalStockTimelineLine, isInternalMpStatusLine, translateMercadoPagoStatus } from "./formatters"
 
 describe("isDuditTeamActorName", () => {
   it("matches only the official Dudit team label", () => {
@@ -372,5 +372,50 @@ describe("resolveTimelineActorName", () => {
       orderCustomerName: "Murilo Storari",
       storeName: "Dudit",
     })).toBe("Dudit (Vendedor)")
+  })
+})
+
+describe("isInternalMpStatusLine", () => {
+  it("flags Mercado Pago status lines for customer filtering", () => {
+    expect(isInternalMpStatusLine("Status MP: pending. Detalhe: pending_waiting_transfer")).toBe(true)
+    expect(isInternalMpStatusLine("Status MP: approved")).toBe(true)
+    expect(isInternalMpStatusLine("Status MP: rejected. Detalhe: cc_rejected_high_risk")).toBe(true)
+    expect(isInternalMpStatusLine("Status de pagamento: Pendente -> Pago")).toBe(false)
+    expect(isInternalMpStatusLine("Pagamento aprovado com sucesso.")).toBe(false)
+    expect(isInternalMpStatusLine(null)).toBe(false)
+    expect(isInternalMpStatusLine("")).toBe(false)
+  })
+})
+
+describe("translateMercadoPagoStatus", () => {
+  it("translates common Mercado Pago statuses", () => {
+    expect(translateMercadoPagoStatus("approved")).toBe("aprovado")
+    expect(translateMercadoPagoStatus("pending")).toBe("pendente")
+    expect(translateMercadoPagoStatus("rejected")).toBe("recusado")
+    expect(translateMercadoPagoStatus("cancelled")).toBe("cancelado")
+    expect(translateMercadoPagoStatus("refunded")).toBe("reembolsado")
+    expect(translateMercadoPagoStatus("charged_back")).toBe("estornado")
+    expect(translateMercadoPagoStatus("unknown_status")).toBe("unknown_status")
+  })
+
+  it("translates common status details", () => {
+    expect(translateMercadoPagoStatus("pending", "pending_waiting_transfer")).toBe("pendente (aguardando transferência)")
+    expect(translateMercadoPagoStatus("pending", "pending_contested")).toBe("pendente (contestado)")
+    expect(translateMercadoPagoStatus("rejected", "cc_rejected_high_risk")).toBe("recusado (alto risco)")
+    expect(translateMercadoPagoStatus("rejected", "cc_rejected_bad_filled_card_number")).toBe("recusado (número do cartão preenchido incorretamente)")
+    expect(translateMercadoPagoStatus("pending", "unknown_detail")).toBe("pendente (unknown_detail)")
+  })
+})
+
+describe("humanizeTimelineChangeLine - Mercado Pago status", () => {
+  it("translates Status MP lines to Portuguese", () => {
+    expect(humanizeTimelineChangeLine("Status MP: pending. Detalhe: pending_waiting_transfer"))
+      .toBe("Status no Mercado Pago: pendente (aguardando transferência).")
+    expect(humanizeTimelineChangeLine("Status MP: approved"))
+      .toBe("Status no Mercado Pago: aprovado.")
+    expect(humanizeTimelineChangeLine("Status MP: rejected. Detalhe: cc_rejected_high_risk"))
+      .toBe("Status no Mercado Pago: recusado (alto risco).")
+    expect(humanizeTimelineChangeLine("Status MP: cancelled"))
+      .toBe("Status no Mercado Pago: cancelado.")
   })
 })

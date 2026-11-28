@@ -22,7 +22,7 @@ import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getCitiesData } from "@/lib/data/cities-loader"
 import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
-import { IconPlaceholder } from "../reusable"
+import { IconPlaceholder, InfoCard } from "../reusable"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
 import { useModalLayer } from "@/lib/modal-stack"
@@ -243,6 +243,11 @@ const Header: React.FC<HeaderProps> = ({
 
         if (stored) {
             setCitySlug(stored)
+            if (stored === "brasil") {
+                setSelectedStateFilter("brasil")
+            } else if (stored.startsWith("estado-")) {
+                setSelectedStateFilter(stored.replace("estado-", "").toLowerCase())
+            }
             return
         }
 
@@ -358,7 +363,10 @@ const Header: React.FC<HeaderProps> = ({
 
     const handleSelectCitySlug = (slug: string) => {
         document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
-        localStorage.setItem('dudit_city', slug)
+        document.cookie = "dudit_coords=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+        try {
+            localStorage.setItem('dudit_city', slug)
+        } catch { }
         if (currentView === 'home' || (typeof window !== 'undefined' && window.location.pathname === '/')) {
             window.location.reload()
         } else {
@@ -536,7 +544,7 @@ const Header: React.FC<HeaderProps> = ({
                     </Button>
 
                     {locationError && (
-                        <p className="text-xs text-red-500 text-center mt-2">{locationError}</p>
+                        <InfoCard className="mt-2" message={locationError} color="red"></InfoCard>
                     )}
 
                     {/* Account / saved addresses footer */}
@@ -820,14 +828,21 @@ const Header: React.FC<HeaderProps> = ({
     }, [citySlug])
 
     const handleSignOut = useCallback(async () => {
-        document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
-        localStorage.removeItem("dudit_city")
+        const clearLocation = () => {
+            document.cookie = "dudit_city=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            document.cookie = "dudit_coords=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            try {
+                localStorage.removeItem("dudit_city")
+            } catch { }
+        }
+        clearLocation()
         try {
             await logLogoutAction()
         } catch {
             // Audit logging must never block logout.
         }
         await supabase.auth.signOut({ scope: 'local' })
+        clearLocation()
         setIsUserMenuOpen(false)
         setIsMobileUserMenuOpen(false)
         window.location.href = "/"

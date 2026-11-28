@@ -12,6 +12,7 @@ import {
 } from '@/lib/icons';
 import { GridLines, SectionHeader, CTA, Navbar, Footer } from '@/components/InstitucionalShared';
 import { useRouter } from 'next/navigation';
+import { trackEvent, getAcquisitionContext } from '@/lib/analytics';
 
 const segments = [
   {
@@ -219,8 +220,8 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
             De lojas de roupas a oficinas, salões e confeitarias: monte sua vitrine, organize o atendimento e venda na sua cidade ou para todo o Brasil com 0% de comissão da Dudit.
           </p>
           <div className="flex flex-wrap gap-4">
-            <Button onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
-            <Button variant="outline" onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
+            <Button onClick={() => { trackEvent("cta_clicked", { source: "segmentos_hero", target: "start_selling", ...getAcquisitionContext() }); onNavigate('start-selling'); }}>Começar grátis</Button>
+            <Button variant="outline" onClick={() => { trackEvent("cta_clicked", { source: "segmentos_hero", target: "explore", ...getAcquisitionContext() }); onNavigate('explore'); }}>Explorar Dudit</Button>
           </div>
         </motion.div>
 
@@ -281,6 +282,7 @@ const SegmentsGrid = () => (
               <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                 <Link
                   href={segment.href}
+                  onClick={() => trackEvent("cta_clicked", { source: "segmentos_card", target: "segment", segment: segment.type, ...getAcquisitionContext() })}
                   className="hover:text-brand-green transition-colors after:absolute after:inset-0"
                 >
                   {segment.title}

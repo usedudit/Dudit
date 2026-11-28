@@ -58,10 +58,38 @@ export type AccountEvent =
     | "account_deletion_completed"
 
 /**
+ * Acquisition, marketing, and free tool events.
+ */
+export type MarketingEvent =
+    | "cta_clicked"
+    | "pricing_viewed"
+    | "tool_calculated"
+
+/**
+ * Extract safe acquisition context (pathname + UTM params, no PII).
+ */
+export function getAcquisitionContext(): Record<string, string> {
+    if (typeof window === "undefined") return {}
+    const ctx: Record<string, string> = {
+        path: window.location.pathname,
+    }
+    try {
+        const params = new URLSearchParams(window.location.search)
+        for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
+            const val = params.get(key)
+            if (val) ctx[key] = val
+        }
+    } catch {
+        // Ignore URL parsing issues
+    }
+    return ctx
+}
+
+/**
  * Capture an analytics event safely from client components
  */
 export function trackEvent(
-    event: MarketplaceEvent | AuthEvent | ErpEvent | AccountEvent | (string & {}),
+    event: MarketplaceEvent | AuthEvent | ErpEvent | AccountEvent | MarketingEvent | (string & {}),
     properties?: Record<string, any>
 ) {
     if (typeof window === "undefined") return

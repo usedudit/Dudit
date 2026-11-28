@@ -72,7 +72,7 @@ import {
     type ExploreFilterState,
 } from "./explorar-filters"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
-import { trackEvent } from "@/lib/analytics"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 
 // Navegação por grupo na página inicial de Explorar (modo "Tudo").
 // Clica num grupo -> mostra as categorias daquele tipo no mesmo lugar.
@@ -2152,7 +2152,16 @@ export function ExplorarPageClient({
                                                     : "Tem um negócio? Venda na sua cidade e em todo o Brasil com 0% de comissão."}
                                             </p>
                                             <Button asChild className="h-10 shrink-0 relative z-10">
-                                                <Link href="/auth/login?mode=partner" prefetch={false}>
+                                                <Link
+                                                    href="/auth/login?mode=partner"
+                                                    prefetch={false}
+                                                    onClick={() => trackEvent("cta_clicked", {
+                                                        source: "explorar_merchant_banner",
+                                                        target: "start_selling",
+                                                        city: selectedCitySlug || "brasil",
+                                                        ...getAcquisitionContext(),
+                                                    })}
+                                                >
                                                     Começar grátis
                                                 </Link>
                                             </Button>

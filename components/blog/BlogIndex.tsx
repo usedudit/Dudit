@@ -10,6 +10,7 @@ import BlogCard from "./BlogCard"
 import { BLOG_ACCENT_CLASSES } from "./category-styles"
 import { GridLines } from "../InstitucionalShared"
 import BlogHeader from "./BlogHeader"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 
 interface BlogIndexProps {
     posts: BlogPostSummary[]
@@ -238,10 +239,22 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                                 </p>
                                 <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
                                     <Button asChild className="h-11">
-                                        <Link href="/ajuda" prefetch={false}>Central de Ajuda</Link>
+                                        <Link
+                                            href="/ajuda"
+                                            prefetch={false}
+                                            onClick={() => trackEvent("cta_clicked", { source: "blog_cta", target: "help", ...getAcquisitionContext() })}
+                                        >
+                                            Central de Ajuda
+                                        </Link>
                                     </Button>
                                     <Button asChild variant="outline" className="h-11 bg-transparent text-white border-white/25 hover:bg-white/10 hover:text-white">
-                                        <Link href="/ferramentas" prefetch={false}>Calculadoras grátis</Link>
+                                        <Link
+                                            href="/ferramentas"
+                                            prefetch={false}
+                                            onClick={() => trackEvent("cta_clicked", { source: "blog_cta", target: "tools", ...getAcquisitionContext() })}
+                                        >
+                                            Calculadoras grátis
+                                        </Link>
                                     </Button>
                                 </div>
                             </div>

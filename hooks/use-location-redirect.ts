@@ -121,12 +121,17 @@ export function useLocationRedirect(redirectTo?: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const applyCitySlug = (slug: string): boolean => {
+  const applyCitySlug = (slug: string, coords?: { lat: number; lng: number } | null): boolean => {
     if (!isValidCitySlug(slug)) {
       return false;
     }
 
     document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`;
+    if (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
+      document.cookie = `dudit_coords=${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}; path=/; max-age=${60 * 60 * 24}`;
+    } else {
+      document.cookie = `dudit_coords=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+    }
     try {
       localStorage.setItem('dudit_city', slug);
     } catch {}
@@ -147,7 +152,7 @@ export function useLocationRedirect(redirectTo?: string) {
 
   const fallbackToIpOrError = async (fallbackError: string) => {
     const ipSlug = await fetchCityByIp();
-    if (ipSlug && applyCitySlug(ipSlug)) {
+    if (ipSlug && applyCitySlug(ipSlug, null)) {
       return;
     }
     setError(fallbackError);
@@ -169,7 +174,7 @@ export function useLocationRedirect(redirectTo?: string) {
           const { latitude, longitude } = position.coords;
           const slug = await reverseGeocodeCoords(latitude, longitude);
 
-          if (slug && applyCitySlug(slug)) {
+          if (slug && applyCitySlug(slug, { lat: latitude, lng: longitude })) {
             return;
           }
 

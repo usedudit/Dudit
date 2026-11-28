@@ -49,24 +49,24 @@ export const metadata: Metadata = {
     },
 }
 
-async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName, savedCitySlug }: any) {
+async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName, savedCitySlug, cookieCoords }: any) {
     let sections: HomeSection[] = []
     let homeAds: SponsoredAd[] = []
     let displayCityName: string | null = cityName
 
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
-        const isDefaultSP = citySlug === "sao-paulo-sp" && cityName === "Estado de São Paulo"
-        const isCountryScope = citySlug === "brasil" || cityName === "Brasil" || isDefaultSP
+        const isCountryScope = citySlug === "brasil" || cityName === "Brasil"
         const isStateScope = citySlug.startsWith("estado-")
 
         const matchesSavedAddress = Boolean(savedCitySlug && savedCitySlug === citySlug)
-
-        const coords = matchesSavedAddress && userProfile?.latitude && userProfile?.longitude
-            ? { lat: userProfile.latitude, lng: userProfile.longitude }
-            : null
-
         const scope = isCountryScope ? "country" : (isStateScope ? "state" : "city")
+
+        const coords = scope === "city"
+            ? (matchesSavedAddress && userProfile?.latitude && userProfile?.longitude
+                ? { lat: Number(userProfile.latitude), lng: Number(userProfile.longitude) }
+                : (cookieCoords || null))
+            : null
 
         // Scope display values
         const ctxCity = scope === "country" ? "Brasil" : cityName
@@ -88,9 +88,9 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
                 scope,
             }),
             getSponsoredAdsForSlot("home", {
-                lat: userProfile?.latitude ?? null,
-                lng: userProfile?.longitude ?? null,
-                citySlug,
+                lat: coords?.lat ?? null,
+                lng: coords?.lng ?? null,
+                citySlug: ctxCitySlug,
                 city: ctxCity,
                 state: ctxState,
             }),
@@ -148,14 +148,26 @@ export default async function HomePage() {
     const dbProfile = sessionData?.profile
 
     // Resolve city selection:
-    // 1. Explicit city cookie (user selected a city or used current location) takes priority.
+    // 1. Explicit city cookie (user selected a city, state, Brasil, or used current location) takes priority.
     // 2. For authenticated users without an explicit override cookie, use their default address.
-    // 3. Fallback to default state SP (Brasil scope).
+    // 3. Fallback to Brasil (country scope).
     let citySlug: string | null = null
     let cityName: string | null = null
 
     const cookieStore = await cookies()
-    const cookieCity = cookieStore.get("dudit_city")?.value
+    const rawCookieCity = cookieStore.get("dudit_city")?.value
+    const cookieCity = rawCookieCity ? decodeURIComponent(rawCookieCity).trim().toLowerCase() : null
+
+    const rawCookieCoords = cookieStore.get("dudit_coords")?.value
+    let cookieCoords: { lat: number; lng: number } | null = null
+    if (rawCookieCoords) {
+        const [latStr, lngStr] = decodeURIComponent(rawCookieCoords).split(",")
+        const lat = Number(latStr)
+        const lng = Number(lngStr)
+        if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+            cookieCoords = { lat, lng }
+        }
+    }
 
     if (cookieCity === "brasil") {
         citySlug = "brasil"
@@ -186,49 +198,56 @@ export default async function HomePage() {
         citySlug = savedCitySlug
     }
 
-    let isDefaultStateSP = false
     if (!citySlug || !cityName) {
-        citySlug = "sao-paulo-sp"
-        cityName = "Estado de São Paulo"
-        isDefaultStateSP = true
+        citySlug = "brasil"
+        cityName = "Brasil"
     }
 
-    const resolvedHeaderAddress = cityName && citySlug
-        ? (isDefaultStateSP || citySlug === "brasil"
-            ? "Brasil"
-            : (citySlug.startsWith("estado-")
-                ? cityName
-                : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`))
-        : (dbProfile?.city ? `${dbProfile.city} - ${dbProfile.state}` : null)
+    const isCountry = citySlug === "brasil" || cityName === "Brasil"
+    const isState = citySlug.startsWith("estado-")
+    const isCity = !isCountry && !isState
 
-    const resolvedHeaderState = citySlug === "brasil" || isDefaultStateSP
+    const resolvedHeaderAddress = isCountry
+        ? "Brasil"
+        : (isState
+            ? cityName
+            : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`)
+
+    const resolvedHeaderState = isCountry
         ? "BR"
-        : (citySlug?.startsWith("estado-")
+        : (isState
             ? citySlug.replace("estado-", "").toUpperCase()
-            : (citySlug ? citySlug.split("-").pop()?.toUpperCase() : dbProfile?.state) || null)
+            : citySlug.split("-").pop()?.toUpperCase() || dbProfile?.state || null)
 
-    let userProfile = dbProfile
+    const effectiveLat = isCity
+        ? ((savedCitySlug && savedCitySlug === citySlug && dbProfile?.latitude != null) ? dbProfile.latitude : (cookieCoords?.lat ?? null))
+        : null
+    const effectiveLng = isCity
+        ? ((savedCitySlug && savedCitySlug === citySlug && dbProfile?.longitude != null) ? dbProfile.longitude : (cookieCoords?.lng ?? null))
+        : null
+
+    const userProfile = dbProfile
         ? {
             full_name: dbProfile.full_name,
-            latitude: dbProfile.latitude,
-            longitude: dbProfile.longitude,
+            latitude: effectiveLat,
+            longitude: effectiveLng,
             address: resolvedHeaderAddress,
-            city: (isDefaultStateSP || citySlug === "brasil") ? "Brasil" : (cityName || dbProfile.city || null),
+            city: isCountry ? "Brasil" : (cityName || dbProfile.city || null),
             state: resolvedHeaderState,
         }
-        : (cityName && citySlug ? {
+        : {
             full_name: null,
-            latitude: null,
-            longitude: null,
+            latitude: effectiveLat,
+            longitude: effectiveLng,
             address: resolvedHeaderAddress,
-            city: (isDefaultStateSP || citySlug === "brasil") ? "Brasil" : cityName,
+            city: isCountry ? "Brasil" : cityName,
             state: resolvedHeaderState,
-        } : null)
+        }
 
     const cartCount = sessionData?.cartCount || 0
-    const exploreHref = (isDefaultStateSP || citySlug === "brasil")
+    const exploreHref = isCountry
         ? "/explorar/brasil"
-        : (citySlug ? `/explorar/${citySlug}` : "/explorar")
+        : `/explorar/${citySlug}`
 
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[80px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading overflow-x-clip">
@@ -246,6 +265,7 @@ export default async function HomePage() {
                         citySlug={citySlug}
                         cityName={cityName}
                         savedCitySlug={savedCitySlug}
+                        cookieCoords={cookieCoords}
                     />
                 </Suspense>
             </main>

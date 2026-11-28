@@ -1,7 +1,7 @@
 "use client"
 
 import useSWR from "swr"
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useAddressSync } from "@/lib/utils/address-sync"
 
@@ -133,20 +133,27 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     }
 
     if (derivedSlug) {
-      if (typeof window !== "undefined") {
-        try {
-          const hasExplicitCookie = /(?:^|; )dudit_city=([^;]+)/.test(document.cookie)
-          if (!hasExplicitCookie) {
-            localStorage.setItem("dudit_city", derivedSlug)
-            document.cookie = `dudit_city=${derivedSlug}; path=/; max-age=${60 * 60 * 24 * 30}`
-          }
-        } catch {}
-      }
       return { ...raw, citySlug: derivedSlug }
     }
 
     return raw
   }, [serverData, data?.profile])
+
+  // Sincroniza o cookie dudit_city a partir do endereço salvo SOMENTE quando autenticado
+  // e sem preferência explícita no cookie (evita regravar a cidade antiga durante logout).
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (isAuthLoading || !user) return
+    const slug = resolvedProfile?.citySlug
+    if (!slug || slug === "brasil" || slug.startsWith("estado-")) return
+    try {
+      const hasExplicitCookie = /(?:^|; )dudit_city=([^;]+)/.test(document.cookie)
+      if (!hasExplicitCookie) {
+        localStorage.setItem("dudit_city", slug)
+        document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
+      }
+    } catch {}
+  }, [user, isAuthLoading, resolvedProfile?.citySlug])
 
   return {
     profile: resolvedProfile,

@@ -1463,7 +1463,7 @@ const PaymentModal = ({
                                 borderRadiusLarge: "12px",
                                 formPadding: "16px",
                             } : {
-                                textPrimaryColor: "#003229",
+                                textPrimaryColor: "#09211b",
                                 textSecondaryColor: "#6b7280",
                                 inputBackgroundColor: "#FFFFFF",
                                 formBackgroundColor: "#FFFFFF",

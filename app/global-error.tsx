@@ -73,13 +73,13 @@ export default function GlobalError({
     const message = safeErrorMessage(error)
 
     const pageBg = isDark ? "#18181b" : "#ffffff"
-    const headerBg = isDark ? "#18181b" : "#003229"
-    const footerBg = isDark ? "#18181b" : "#003229"
-    const titleColor = isDark ? "#f0f0f0" : "#003229"
+    const headerBg = isDark ? "#18181b" : "#09211b"
+    const footerBg = isDark ? "#18181b" : "#09211b"
+    const titleColor = isDark ? "#f0f0f0" : "#09211b"
     const subtitleColor = isDark ? "#a1a1aa" : "#6b7280"
     const tryAgainBorder = isDark ? "#24252b" : "#ebebeb"
     const tryAgainBg = isDark ? "#18181b" : "#ffffff"
-    const tryAgainText = isDark ? "#f0f0f0" : "#003229"
+    const tryAgainText = isDark ? "#f0f0f0" : "#09211b"
     const cardBg = isDark ? "rgba(127, 29, 29, 0.1)" : "#fef2f2"
     const cardBorder = isDark ? "rgba(127, 29, 29, 0.3)" : "#fee2e2"
     const cardTextColor = isDark ? "rgba(252, 165, 165, 0.8)" : "#b91c1c"

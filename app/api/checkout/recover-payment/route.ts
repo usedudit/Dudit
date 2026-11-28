@@ -8,6 +8,10 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { captureError } from "@/lib/monitoring/sentry"
 import { getOrderPaidAmount, getOrderTotalAmount } from "@/lib/payments/order-financial-state"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
+import {
+  findMercadoPagoIntegration,
+  mapToMpPartnerFields,
+} from "@/lib/services/payments/mercadopago-integration"
 
 interface RecoverPaymentRequest {
   orderId: string
@@ -53,6 +57,7 @@ async function handler(request: NextRequest) {
           variant_id,
           quantity,
           service_id,
+          recurring_plan_id,
           line_type,
           product_name
         )
@@ -75,6 +80,50 @@ async function handler(request: NextRequest) {
     if (order.situation !== "payment_failed") {
       return NextResponse.json(
         { error: "Este pedido não está disponível para recuperação de pagamento" },
+        { status: 400 }
+      )
+    }
+
+    // Assinaturas recorrentes só podem ser pagas com cartão de crédito (nunca Pix ou Boleto)
+    const hasSubscriptionItem =
+      Boolean((order as any).recurring_subscription_id) ||
+      (order.order_items || []).some(
+        (item: any) => item.line_type === "subscription" || Boolean(item.recurring_plan_id)
+      )
+
+    if (hasSubscriptionItem) {
+      return NextResponse.json(
+        { error: "Assinaturas aceitam apenas pagamento com cartão de crédito. Tente outro cartão." },
+        { status: 400 }
+      )
+    }
+
+    // Sinal / entrada não aceita boleto
+    const isDepositCheckout = Boolean((order.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
+    if (method === "boleto" && isDepositCheckout) {
+      return NextResponse.json(
+        { error: "Pagamento via Boleto não está disponível para pagamento de sinal." },
+        { status: 400 }
+      )
+    }
+
+    // Validar que o vendedor aceita Pix / Boleto via Mercado Pago
+    const partnerIntegration = await findMercadoPagoIntegration(adminClient, order.partner_id)
+    const accepted =
+      mapToMpPartnerFields(partnerIntegration).mp_accepted_payment_methods ||
+      ({} as Record<string, boolean>)
+    const methodAllowed =
+      method === "pix"
+        ? accepted.pix !== false
+        : method === "boleto"
+          ? accepted.boleto !== false
+          : false
+
+    if (!methodAllowed) {
+      return NextResponse.json(
+        {
+          error: `O vendedor não aceita pagamento via ${method === "pix" ? "Pix" : "Boleto"} pelo Mercado Pago.`,
+        },
         { status: 400 }
       )
     }

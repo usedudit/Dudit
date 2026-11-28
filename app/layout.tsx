@@ -41,7 +41,7 @@ const libreBarcode = Libre_Barcode_128_Text({
 })
 
 export const viewport: Viewport = {
-    themeColor: "#003229",
+    themeColor: "#09211b",
     width: "device-width",
     initialScale: 1,
     colorScheme: "light",
@@ -119,7 +119,7 @@ export const metadata: Metadata = {
     manifest: "/manifest.webmanifest",
     other: {
         "mobile-web-app-capable": "yes",
-        "msapplication-TileColor": "#003229",
+        "msapplication-TileColor": "#09211b",
     },
 }
 

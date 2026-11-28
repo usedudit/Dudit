@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -10,6 +10,7 @@ import { Button } from "@/components/reusable/Button"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { PercentageInput } from "@/components/reusable/Inputs/PercentageInput"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
+import { trackEvent, getAcquisitionContext } from "@/lib/analytics"
 import { ArrowRight } from "lucide-react"
 
 export default function CalculadoraMargemLucroPage() {
@@ -18,6 +19,19 @@ export default function CalculadoraMargemLucroPage() {
     const [despesasVariaveis, setDespesasVariaveis] = useState<number>(10)
     const [despesasFixas, setDespesasFixas] = useState<number>(15)
     const [margemLucroDesejada, setMargemLucroDesejada] = useState<number>(25)
+    const hasTrackedRef = useRef(false)
+    const isFirstRenderRef = useRef(true)
+
+    useEffect(() => {
+        if (isFirstRenderRef.current) {
+            isFirstRenderRef.current = false
+            return
+        }
+        if (!hasTrackedRef.current) {
+            hasTrackedRef.current = true
+            trackEvent("tool_calculated", { tool: "margem_lucro", ...getAcquisitionContext() })
+        }
+    }, [custoProduto, despesasVariaveis, despesasFixas, margemLucroDesejada])
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')

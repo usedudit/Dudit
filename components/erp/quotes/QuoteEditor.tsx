@@ -747,7 +747,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-3">Temas de Cor</label>
                                 <div className="flex flex-wrap gap-2">
                                     {[
-                                        { p: "#003229", s: "#d4f995", label: "Padrão" },
+                                        { p: "#09211b", s: "#d4f995", label: "Padrão" },
                                         { p: "#1e40af", s: "#bfdbfe", label: "Azul" },
                                         { p: "#065f46", s: "#a7f3d0", label: "Verde" },
                                         { p: "#6b21a8", s: "#e9d5ff", label: "Roxo" },

@@ -1,5 +1,5 @@
 /** Cores padrão do preview de orçamento (`CreateQuote` / `QuotePreview`). */
-export const QUOTE_PREVIEW_PRIMARY_COLOR = "#003229"
+export const QUOTE_PREVIEW_PRIMARY_COLOR = "#09211b"
 export const QUOTE_PREVIEW_SECONDARY_COLOR = "#d4f995"
 
 export function getThemeColorsByAvatarColor(colorClass: string) {
@@ -28,7 +28,7 @@ export function getThemeColorsByAvatarColor(colorClass: string) {
     if (c.includes("pink")) {
         return { primary: "#9d174d", secondary: "#fbcfe8" };
     }
-    return { primary: "#003229", secondary: "#d4f995" };
+    return { primary: "#09211b", secondary: "#d4f995" };
 }
 
 export function applyQuotePreviewTheme<T extends { primaryColor?: string; secondaryColor?: string }>(

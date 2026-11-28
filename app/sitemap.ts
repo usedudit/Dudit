@@ -8,6 +8,26 @@ import { getPublishedBlogSlugs } from "@/lib/blog/queries"
 
 export const revalidate = 86400
 
+function escapeXmlUrl(url: string): string {
+    return url
+        .trim()
+        .replace(/&(?!(?:amp|lt|gt|quot|apos);)/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;")
+}
+
+function sanitizeSitemap(entries: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
+    return entries.map((entry) => ({
+        ...entry,
+        url: escapeXmlUrl(entry.url),
+        ...(entry.images?.length
+            ? { images: entry.images.map((img) => escapeXmlUrl(img)) }
+            : {}),
+    }))
+}
+
 const CATEGORY_SLUGS = [
     // Produtos
     "alimentacao", "casa", "tecnologia", "moda-e-beleza", "saude",
@@ -45,7 +65,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { url: "https://dudit.com.br/institucional/termos", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
         { url: "https://dudit.com.br/institucional/privacidade", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
         { url: "https://dudit.com.br/institucional/estatisticas", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-        { url: "https://dudit.com.br/mapa", lastModified: now, changeFrequency: "weekly", priority: 0.6 },
     ]
 
     // --- Public Tool Pages (Tool SEO) ---
@@ -129,7 +148,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ...categoryUrls
     ]
 
-    if (!supabase) return baseUrls
+    if (!supabase) return sanitizeSitemap(baseUrls)
 
     try {
         const [storesResponse, productsResponse, servicesResponse, citiesResponse] = await Promise.all([
@@ -260,9 +279,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             ...citiesSitemap,
         ]
 
-        return completeSitemap
+        return sanitizeSitemap(completeSitemap)
     } catch (error) {
         console.error("Erro gerando sitemap:", error)
-        return baseUrls
+        return sanitizeSitemap(baseUrls)
     }
 }

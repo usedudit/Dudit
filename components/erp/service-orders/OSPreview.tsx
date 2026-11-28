@@ -13,7 +13,7 @@ import {
     ReceiptA4Footer,
 } from "@/components/erp/orders/receipt/ReceiptComponents";
 
-const DEFAULT_PRIMARY = "#003229";
+const DEFAULT_PRIMARY = "#09211b";
 const DEFAULT_SECONDARY = "#d4f995";
 
 interface OSPreviewProps {
