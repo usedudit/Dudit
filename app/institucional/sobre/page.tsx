@@ -22,15 +22,15 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
                 >
-                    <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
-                        Um jeito mais simples de vender, gerenciar e ser encontrado em todo o Brasil.
+                    <h1 className="text-4xl md:text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6 leading-tight">
+                        A plataforma de vendas e gestão para negócios locais e nacionais — com 0% de comissão.
                     </h1>
                     <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                        A Dudit conecta pessoas e negócios para descobrir, comprar, agendar, vender no balcão físico, na sua cidade e enviar para todo o país com 0% de comissão.
+                        Venda pelo catálogo online, no balcão (PDV) ou pelo WhatsApp, entregue na sua cidade ou envie para todo o Brasil — e ative estoque, agenda e ordens de serviço só quando precisar.
                     </p>
                     <div className="flex flex-wrap gap-4">
-                        <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
-                        <Button variant="outline" onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+                        <Button onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+                        <Button variant="outline" onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
                     </div>
                 </motion.div>
 
@@ -43,7 +43,7 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                     <div className="relative z-10 w-full max-w-[460px]">
                         <img
                             src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                            alt="Sobre Nós"
+                            alt="Mascote da Dudit representando vendas locais e entregas para todo o Brasil"
                             className="w-full h-auto object-contain"
                         />
                     </div>
@@ -55,42 +55,54 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
     </section>
 );
 
-const PorQueExiste = () => {
+const PorQueExiste = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <section className="py-24 bg-white dark:bg-dark-surface relative border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
-                    subtitle="POR QUE A DUDIT EXISTE?"
-                    title="Hoje muita coisa acontece espalhada"
+                    subtitle="POR QUE CRIAMOS A DUDIT"
+                    title="Vender e organizar um negócio não precisava ser tão caro nem tão espalhado"
                 />
 
                 <div className="grid md:grid-cols-2 gap-12 items-center">
                     <div>
                         <p className="text-brand-dark dark:text-dark-heading text-lg md:text-xl font-medium leading-relaxed mb-6">
-                            Vender produtos, oferecer serviços ou divulgar uma empresa nem sempre é simples.
+                            A Dudit nasceu de uma dor muito real de quem empreende no Brasil: vender online sem abrir mão da própria margem.
                         </p>
                         <p className="text-brand-inactive-text text-base leading-relaxed mb-6">
-                            Muitas vezes as pessoas procuram no Instagram, no WhatsApp, em grupos ou dependem de marketplaces tradicionais com taxas abusivas de 12% a 20%. Por outro lado, quem vende fica refém de softwares caros ou limitados a clientes que passam na porta.
+                            Hoje, quem tem loja ou presta serviço acaba preso entre atender pedidos soltos no WhatsApp e Instagram ou depender de marketplaces tradicionais que costumam cobrar entre 12% e 20% por venda. Do outro lado, sistemas de gestão costumam ser caros, engessados ou desconectados da vitrine online.
                         </p>
-                        <p className="text-brand-inactive-text text-base leading-relaxed">
-                            <strong className="text-brand-dark dark:text-dark-heading">A Dudit nasceu para unir comércio de proximidade e alcance nacional com 0% de comissão:</strong> permitindo que clientes da sua cidade retirem no balcão ou recebam via motoboy, e que você envie pedidos para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.
+                        <p className="text-brand-inactive-text text-base leading-relaxed mb-6">
+                            <strong className="text-brand-dark dark:text-dark-heading">Criamos a Dudit para unir vendas locais, envio nacional e gestão simples em um só lugar:</strong> seus clientes da cidade podem retirar no balcão ou receber por entrega local, e você também despacha para qualquer estado do Brasil com cálculo automático de frete.
                         </p>
+                        <div className="p-4 rounded-xl bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border text-sm text-brand-inactive-text leading-relaxed">
+                            <strong className="text-brand-dark dark:text-dark-heading">Como a Dudit ganha dinheiro?</strong> Cobramos <strong className="text-brand-dark dark:text-dark-heading">0% de comissão</strong> sobre suas vendas e nos sustentamos apenas pela assinatura dos planos (com opção gratuita para começar). Em pagamentos online integrados, aplicam-se somente as taxas do meio de pagamento escolhido.{' '}
+                            <button
+                                type="button"
+                                onClick={() => onNavigate('pricing')}
+                                className="text-brand-green font-semibold hover:underline cursor-pointer"
+                            >
+                                Ver planos e preços →
+                            </button>
+                        </div>
                     </div>
 
                     <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border p-8 rounded-2xl relative">
                         <div className="space-y-4">
-                            <div className="flex items-center gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">1</div>
-                                <div className="text-xs text-brand-dark dark:text-dark-heading font-semibold">Quem compra: acha produtos locais ou com entrega para todo o Brasil</div>
+                            <div className="flex items-start gap-3.5 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
+                                <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs shrink-0 mt-0.5">1</div>
+                                <div>
+                                    <div className="text-sm text-brand-dark dark:text-dark-heading font-bold mb-1">Para quem vende e gerencia</div>
+                                    <div className="text-xs text-brand-inactive-text leading-relaxed">Vitrine online com 0% de comissão da Dudit, entrega local e frete nacional — integrada a PDV balcão, estoque com grade, ordens de serviço e agendamentos.</div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
-                                <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs">2</div>
-                                <div className="text-xs text-brand-dark dark:text-dark-heading font-semibold">Quem vende: ganha vitrine com 0% de comissão, entrega local e frete nacional</div>
-                            </div>
-                            <div className="flex items-center gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
-                                <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-xs">3</div>
-                                <div className="text-xs text-brand-dark dark:text-dark-heading font-semibold">Quem organiza: PDV balcão, estoque com grade, OS e agendamentos</div>
+                            <div className="flex items-start gap-3.5 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-100 dark:border-dark-border shadow-xs">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0 mt-0.5">2</div>
+                                <div>
+                                    <div className="text-sm text-brand-dark dark:text-dark-heading font-bold mb-1">Para quem compra</div>
+                                    <div className="text-xs text-brand-inactive-text leading-relaxed">Descobre lojas, produtos e serviços por perto ou com entrega para todo o Brasil, compra direto no catálogo ou fala no WhatsApp sem intermediários.</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -103,22 +115,22 @@ const PorQueExiste = () => {
 const BentoPillars = () => {
     const cards = [
         {
-            title: "Para quem procura",
-            subtitle: "DESCOBERTA",
-            description: "Encontrar produtos locais ou com frete nacional para todo o Brasil, agendar serviços e comprar com contato direto.",
-            type: "buy"
-        },
-        {
-            title: "Para quem vende",
-            subtitle: "VISIBILIDADE E ALCANCE",
-            description: "Vender presencialmente no PDV, online na sua cidade ou despachar para todo o país com 0% de comissão por venda.",
+            title: "Vitrine local e nacional",
+            subtitle: "VENDAS COM 0% DE COMISSÃO",
+            description: "Venda presencialmente no balcão, entregue na sua cidade ou despache para todo o Brasil sem pagar comissão por pedido para a Dudit.",
             type: "sell"
         },
         {
-            title: "Para quem organiza",
-            subtitle: "GESTÃO COMPLETA",
-            description: "Frente de caixa (PDV), controle de estoque com variações, ordens de serviço e agendamentos sem complexidade.",
+            title: "Gestão no mesmo lugar",
+            subtitle: "PDV, ESTOQUE E AGENDA",
+            description: "Frente de caixa (PDV), controle de estoque com variações, ordens de serviço e agendamentos integrados — ative só o que o seu negócio usa.",
             type: "organize"
+        },
+        {
+            title: "Descoberta para clientes",
+            subtitle: "PARA QUEM COMPRA",
+            description: "Clientes encontram lojas e prestadores por perto ou com envio nacional, agendam serviços e compram com contato direto.",
+            type: "buy"
         }
     ];
 
@@ -127,11 +139,11 @@ const BentoPillars = () => {
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
-                    subtitle="UMA PLATAFORMA PARA TODOS"
-                    title="Feita para pessoas e negócios"
+                    subtitle="COMO A DUDIT FUNCIONA"
+                    title="Uma base única para vender, organizar e ser encontrado"
                 />
                 <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-                    Três pilares fundamentais pensados para aproximar e facilitar o dia a dia.
+                    Comece pelo que você precisa hoje — catálogo online, PDV ou agenda — e ative os outros módulos conforme o seu negócio cresce.
                 </p>
 
                 <div className="grid md:grid-cols-3 gap-8">
@@ -235,7 +247,7 @@ const SemComplicacao = () => {
                                 </div>
                             </div>
                             <div className="bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center gap-3 shadow-md">
-                                <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center"><img src="https://img.dudit.com.br/static/Icon.png" /></div>
+                                <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center"><img src="https://img.dudit.com.br/static/Icon.png" alt="Ícone da Dudit" className="w-6 h-6 object-contain" /></div>
                                 <div>
                                     <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Dudit</div>
                                     <div className="text-[10px] text-brand-inactive-text">Vendas no balcão, na cidade e em todo o Brasil</div>
@@ -269,7 +281,7 @@ export default function SobrePage() {
             <Navbar onNavigate={onNavigate} />
             <main>
                 <SobreHero onNavigate={onNavigate} />
-                <PorQueExiste />
+                <PorQueExiste onNavigate={onNavigate} />
                 <BentoPillars />
                 <SemComplicacao />
                 <FaqSection

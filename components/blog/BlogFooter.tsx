@@ -81,7 +81,7 @@ export default function BlogFooter() {
 
                 <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 md:flex-row">
                     <p className="text-center text-xs text-gray-400 md:text-left">
-                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        © {new Date().getFullYear()} Dudit. Todos os direitos reservados.
                     </p>
                     <div className="flex items-center gap-3 text-xs text-gray-400">
                         <Link href="/institucional/termos" prefetch={false} className="transition-colors hover:text-brand-green">Termos</Link>

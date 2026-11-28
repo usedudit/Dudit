@@ -185,7 +185,7 @@ export default function GlobalError({
                     <footer style={{ ...styles.footer, backgroundColor: footerBg }}>
                         <div style={styles.footerInner}>
                             <p style={styles.footerText}>
-                                © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os
+                                © {new Date().getFullYear()} Dudit. Todos os
                                 direitos reservados.
                             </p>
                         </div>

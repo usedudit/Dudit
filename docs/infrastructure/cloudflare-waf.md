@@ -5,7 +5,7 @@ incidente de bot de 16/10/2026 e da correção do Cloudflare Turnstile.
 
 - **Plano Cloudflare:** Free
 - **Zona:** `dudit.com.br` (inclui `www.dudit.com.br`, `img.dudit.com.br`)
-- **Última revisão:** 18/10/2026
+- **Última revisão:** 28/11/2026
 
 ---
 
@@ -74,17 +74,23 @@ Limitações do plano **Free** que definem o desenho:
 
 ## 3. Regras customizadas (copiar/colar)
 
-### Regra 1 - Webhook MercadoPago (posição: **First**) - `Skip`
+### Regra 1 - Whitelist Webhooks (posição: **First**) - `Skip`
 
 ```
-starts_with(http.request.uri.path, "/api/mercadopago/webhook")
+(starts_with(http.request.uri.path, "/api/mercadopago/webhook")) or
+(starts_with(http.request.uri.path, "/api/integrations/tiny/webhook")) or
+(starts_with(http.request.uri.path, "/api/integrations/bling/webhook")) or
+(starts_with(http.request.uri.path, "/api/shipping/superfrete/webhook")) or
+(starts_with(http.request.uri.path, "/api/whatsapp/webhook")) or
+(starts_with(http.request.uri.path, "/api/webhooks/"))
 ```
 
 **Componentes de WAF a ignorar:**
-- [x] All remaining custom rules in this phase
-- [x] All Rate Limiting rules
-- [x] All Managed rules *(se disponível no plano)*
-- [x] All Super Bot Fight Mode rules *(se disponível no plano)*
+- [x] Todas as regras personalizadas restantes
+- [x] Todas as regras de Rate Limiting
+- [x] Todas as regras gerenciadas
+- [x] Todas as regras do modo Super Bot Fight *(se disponível no plano)*
+- [x] Verificação da integridade do navegador *(Browser Integrity Check, em "Mais componentes a ignorar")*
 
 > Objetivo: o webhook do MercadoPago **nunca** pode cair em challenge/block.
 >
@@ -107,24 +113,26 @@ starts_with(http.request.uri.path, "/api/mercadopago/webhook")
 
 ---
 
-### Regra 2 - Skip bots bons - `Skip` → *All remaining custom rules*
+### Regra 2 - Skip bots bons - `Skip`
 
 ```
 (cf.client.bot)
 ```
 
-> Protege GoogleBot/SEO e os monitores de uptime (UptimeRobot, SentryUptimeBot)
-> de tomarem challenge. `cf.client.bot` está disponível no plano **Free** e é
-> confiável (o Cloudflare valida bot por IP/reverse-DNS/assinatura, não por texto).
+**Componentes de WAF a ignorar:**
+- [x] Todas as regras personalizadas restantes *(não combinar `phase` com `phases` — usar "restantes")*
+- [x] Todas as regras gerenciadas *(evita `403` da regra gerenciada `Block AI user-agent bots (AI Assistant) on ad pages` em bots verificados como `ChatGPT-User` e `Claude-User`)*
+- [x] Verificação da integridade do navegador *(Browser Integrity Check)*
+
+> Protege GoogleBot/SEO, assistentes de IA verificados (`ChatGPT-User`, `Claude-User`, etc.) e os monitores de uptime (UptimeRobot, SentryUptimeBot) de tomarem challenge ou `403`. `cf.client.bot` está disponível no plano **Free** e é confiável (o Cloudflare valida bot por IP/reverse-DNS/assinatura, não por texto).
+>
+> **AI Crawl Control (painel Cloudflare):** manter `Ativar sincronização de preferências de bots` **OFF** (para não sobrescrever `app/robots.ts` com `# BEGIN Cloudflare Managed content`) e políticas de **Pesquisa** e **Agentes** em **Permitir (não bloquear)**.
 >
 > ⚠️ **Não** use `http.user_agent contains "UptimeRobot"`/`"SentryUptimeBot"`:
 > User-Agent é **trivialmente falsificável**. Qualquer bot pode mandar
-> `User-Agent: UptimeRobot` e entrar no **Skip → All remaining custom rules**,
-> furando na prática a regra de país, os scanners e o bloqueio de automação.
-> Os dois monitores já são **verified bots**, então `cf.client.bot` os cobre.
->
-> Variante mais restrita (opcional), se quiser limitar a superfície do bypass:
-> `(cf.client.bot and (http.request.uri.path eq "/" or starts_with(http.request.uri.path, "/api/health")))`
+> `User-Agent: UptimeRobot` e entrar no **Skip**, furando a regra de país,
+> os scanners e o bloqueio de automação. Os dois monitores já são **verified bots**,
+> então `cf.client.bot` os cobre.
 
 ---
 
@@ -146,15 +154,14 @@ starts_with(http.request.uri.path, "/api/mercadopago/webhook")
 (http.request.uri.path contains "/credentials") or
 (http.request.uri.path contains "/token") or
 (http.request.uri.path contains "/docker-compose") or
-(http.request.uri.path contains "/.well-known") or
 (http.request.uri.path contains "/terraform") or
 (http.request.uri.path contains "/service_account") or
 (http.request.uri.path contains "/.config.php")
 ```
 
-> **Revisar (possíveis falsos positivos):** `/.well-known` (ACME / Apple Pay
-> `apple-developer-merchantid-domain-association`), `/token` (OAuth) e
-> `/package.json`. Se algo legítimo usar esses caminhos, remover da lista.
+> **Revisão 28/11/2026:** `/.well-known` removido da lista para não bloquear
+> arquivos padrão (Apple Pay, Universal Links, `assetlinks.json`, `security.txt`).
+> `/token` mantido bloqueado por enquanto.
 
 ---
 
@@ -218,21 +225,20 @@ em *Action* escolha a ação; em *Zone* selecione *This website*; salve.
 **Expressão (Free aceita somente Path):**
 
 ```
-http.request.uri.path eq "/"
+starts_with(http.request.uri.path, "/auth")
 ```
 
 - Característica: **IP**
-- Rate: **60 requests / 10s**
+- Rate: **20 requests / 10s**
 - Ação: **Block** por 10s
 
-> Backstop para o **próximo** IP desconhecido. Não aplicar limite baixo a tudo
-> (pegaria carregamento de assets de visitante real).
+> Focado em `/auth` (login, cadastro, recuperação de senha) como camada de borda
+> complementar ao Turnstile.
 >
 > ⚠️ **Não** inclua `/monitoring` aqui: esse path é o `tunnelRoute` do Sentry
 > (`next.config.mjs`), por onde o SDK do browser entrega eventos. Limitar
-> 60/10s nesse endpoint pode atrapalhar a entrega de eventos do Sentry em
-> usuários atrás de NAT. Se quiser cobrir `/monitoring`, use um limite bem
-> mais alto (ex.: 300/10s).
+> nesse endpoint pode atrapalhar a entrega de eventos do Sentry em usuários
+> atrás de NAT.
 
 ---
 

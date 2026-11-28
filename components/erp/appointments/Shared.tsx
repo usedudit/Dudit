@@ -134,7 +134,9 @@ export const ActivityLog = ({ activity }: { activity?: any[] }) => {
     const entries = logs.map(log => ({
         id: String(log.id),
         actor_name: log.user || 'Sistema',
-        change_lines: [log.description],
+        change_lines: Array.isArray(log.change_lines) && log.change_lines.length > 0
+            ? log.change_lines
+            : [log.description || 'Atualização no agendamento'],
         created_at: log.timestamp,
         entry_type: log.type
     }));
@@ -145,6 +147,7 @@ export const ActivityLog = ({ activity }: { activity?: any[] }) => {
                 entries={entries}
                 emptyMessage="Não foram encontrados eventos para este agendamento."
                 disableDuditHighlight
+                entityType="appointment"
             />
         </div>
     )

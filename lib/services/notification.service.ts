@@ -44,6 +44,24 @@ export async function createNotification(
     .maybeSingle()
 
   if (existing) {
+    if (input.refreshExisting) {
+      const existingData = (existing.data ?? {}) as Record<string, unknown>
+      const { data: refreshed } = await admin
+        .from("notifications")
+        .update({
+          title: input.title,
+          message: input.message,
+          data: { ...existingData, ...input.data },
+        })
+        .eq("id", existing.id)
+        .select("*")
+        .maybeSingle()
+
+      return {
+        notification: (refreshed as NotificationRecord) ?? (existing as NotificationRecord),
+        created: false,
+      }
+    }
     return { notification: existing as NotificationRecord, created: false }
   }
 

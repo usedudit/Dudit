@@ -236,9 +236,9 @@ export default function HelpHeader({
 
                         {/* Mobile Header Title */}
                         <div className="lg:hidden flex-1 flex items-center justify-center h-[38px] relative mx-2">
-                            <h1 className="text-brand-dark dark:text-dark-heading font-bold text-[15px] truncate px-2 whitespace-nowrap">
+                            <span className="text-brand-dark dark:text-dark-heading font-bold text-[15px] truncate px-2 whitespace-nowrap">
                                 Central de Ajuda
-                            </h1>
+                            </span>
                         </div>
                     </div>
 

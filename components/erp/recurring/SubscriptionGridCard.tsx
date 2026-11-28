@@ -12,7 +12,7 @@ import {
   getRecurringStatusVariant,
 } from "@/lib/types/recurring"
 import { formatDate, formatCurrency } from "@/lib/utils"
-import { getForecastLabel, getForecastLabelVariant, type SubscriptionRowTab } from "./SubscriptionListRow"
+import { getForecastLabel, getForecastTextClass, type SubscriptionRowTab } from "./SubscriptionListRow"
 
 interface SubscriptionGridCardProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
@@ -99,11 +99,9 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
               {formatDate(sub.nextExecutionAt) || "-"}
             </span>
             {sub.nextExecutionAt && (
-              <div className="mt-0.5">
-                <Badge variant={getForecastLabelVariant(sub.nextExecutionAt)} className="scale-90 origin-left">
-                  {getForecastLabel(sub.nextExecutionAt)}
-                </Badge>
-              </div>
+              <span className={`text-xs font-medium ${getForecastTextClass(sub.nextExecutionAt)}`}>
+                {getForecastLabel(sub.nextExecutionAt)}
+              </span>
             )}
           </div>
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } fro
 import dynamic from "next/dynamic"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown, ThreeDotsLoader } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown, ThreeDotsLoader, InfoCard } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon, SparklesIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 import { useNotification } from "@/hooks/use-notification"
@@ -1230,22 +1230,29 @@ const AddProductPage: FC<AddProductPageProps> = ({
                         {/* Tab Content */}
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             {isExternalErpLocked && externalErpLabel && (
-                                <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/30 px-4 py-3 text-sm">
-                                    <div className="text-blue-900 dark:text-blue-200">
-                                        <span className="font-semibold">Sincronizado com o {externalErpLabel}.</span>{" "}
-                                        Nome, SKU, código de barras, unidade, preço, custo e variações são gerenciados pelo {externalErpLabel} para evitar divergências. Você pode editar livremente descrição, fotos, vídeo, preço promocional, categoria e visibilidade na vitrine.
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setShowUnlinkErpModal(true)}
-                                        className="shrink-0 whitespace-nowrap"
-                                        data-unsaved-changes-ignore="true"
-                                    >
-                                        Desvincular do {externalErpLabel.replace(" ERP", "")}
-                                    </Button>
-                                </div>
+                                <InfoCard
+                                    message={
+                                        <>
+                                            Sincronizado com o {externalErpLabel}.
+                                            Nome, SKU, código de barras, unidade, preço, custo e variações
+                                            são gerenciados pelo {externalErpLabel} para evitar divergências.
+                                            Você pode editar livremente descrição, fotos, vídeo, preço
+                                            promocional, categoria e visibilidade na vitrine.
+                                        </>
+                                    }
+                                    color="blue"
+                                    bottomElement={
+                                        <Button
+                                            variant="link"
+                                            onClick={() => setShowUnlinkErpModal(true)}
+                                            className="shrink-0 whitespace-nowrap"
+                                            data-unsaved-changes-ignore="true"
+                                        >
+                                            Desvincular do {externalErpLabel.replace(" ERP", "")}
+                                        </Button>
+                                    }
+                                    className="mb-6"
+                                />
                             )}
                             <AnimatePresence mode="wait">
                                 {activeTab === "general" && (
@@ -1409,64 +1416,74 @@ const AddProductPage: FC<AddProductPageProps> = ({
                             </>
                         )}
                     </div>
-                </Tabs>
+                </Tabs >
 
                 {/* Modals */}
-                {unsavedChangesDialogOpen && (
-                    <AlertModal
-                        isOpen={unsavedChangesDialogOpen}
-                        onClose={handleUnsavedChangesDialogClose}
-                        onConfirm={handleUnsavedChangesConfirm}
-                        title="Sair sem salvar?"
-                        description="Você tem alterações no produto que ainda não foram salvas."
-                        confirmText="Sair sem salvar"
-                        cancelText="Continuar editando"
-                        variant="warning"
-                    />
-                )}
-                {showDeleteModal && (
-                    <AlertModal
-                        isOpen
-                        onClose={() => setShowDeleteModal(false)}
-                        onConfirm={handleDeleteProduct}
-                        title="Excluir produto?"
-                        description="Esta ação é irreversível. O produto será removido permanentemente."
-                        confirmText="Excluir"
-                    />
-                )}
-                {showValidationModal && (
-                    <AlertModal
-                        isOpen
-                        onClose={() => {
-                            setShowValidationModal(false)
-                            scrollToFirstError()
-                        }}
-                        title="Campos obrigatórios"
-                        description="Existem campos pendentes. Verifique os erros abaixo antes de salvar."
-                        message={<ul className="list-disc list-inside">{validationErrors.map((e, i) => <li key={i}>{e.message}</li>)}</ul>}
-                        variant="warning"
-                    />
-                )}
-                {showAlertModal && (
-                    <AlertModal
-                        isOpen
-                        onClose={() => setShowAlertModal(false)}
-                        onConfirm={confirmNavigation}
-                        title="Sair sem salvar?"
-                        description="Você tem alterações no produto que ainda não foram salvas."
-                        confirmText="Sair sem salvar"
-                        cancelText="Continuar editando"
-                        variant="warning"
-                    />
-                )}
-                {showImageCropper && selectedImageForCrop && (
-                    <ImageCropperModal
-                        isOpen
-                        imageFile={selectedImageForCrop}
-                        onClose={() => setShowImageCropper(false)}
-                        onCropComplete={handleImageCropComplete}
-                    />
-                )}
+                {
+                    unsavedChangesDialogOpen && (
+                        <AlertModal
+                            isOpen={unsavedChangesDialogOpen}
+                            onClose={handleUnsavedChangesDialogClose}
+                            onConfirm={handleUnsavedChangesConfirm}
+                            title="Sair sem salvar?"
+                            description="Você tem alterações no produto que ainda não foram salvas."
+                            confirmText="Sair sem salvar"
+                            cancelText="Continuar editando"
+                            variant="warning"
+                        />
+                    )
+                }
+                {
+                    showDeleteModal && (
+                        <AlertModal
+                            isOpen
+                            onClose={() => setShowDeleteModal(false)}
+                            onConfirm={handleDeleteProduct}
+                            title="Excluir produto?"
+                            description="Esta ação é irreversível. O produto será removido permanentemente."
+                            confirmText="Excluir"
+                        />
+                    )
+                }
+                {
+                    showValidationModal && (
+                        <AlertModal
+                            isOpen
+                            onClose={() => {
+                                setShowValidationModal(false)
+                                scrollToFirstError()
+                            }}
+                            title="Campos obrigatórios"
+                            description="Existem campos pendentes. Verifique os erros abaixo antes de salvar."
+                            message={<ul className="list-disc list-inside">{validationErrors.map((e, i) => <li key={i}>{e.message}</li>)}</ul>}
+                            variant="warning"
+                        />
+                    )
+                }
+                {
+                    showAlertModal && (
+                        <AlertModal
+                            isOpen
+                            onClose={() => setShowAlertModal(false)}
+                            onConfirm={confirmNavigation}
+                            title="Sair sem salvar?"
+                            description="Você tem alterações no produto que ainda não foram salvas."
+                            confirmText="Sair sem salvar"
+                            cancelText="Continuar editando"
+                            variant="warning"
+                        />
+                    )
+                }
+                {
+                    showImageCropper && selectedImageForCrop && (
+                        <ImageCropperModal
+                            isOpen
+                            imageFile={selectedImageForCrop}
+                            onClose={() => setShowImageCropper(false)}
+                            onCropComplete={handleImageCropComplete}
+                        />
+                    )
+                }
                 <NcmSelectionModal
                     isOpen={showNcmModal}
                     onClose={() => setShowNcmModal(false)}
@@ -1474,14 +1491,16 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     onSelect={handleNcmSelect}
                     isLoading={isLoadingNcmSuggestion}
                 />
-                {isImageAnalysisModalOpen && (
-                    <ImageAnalysisModal
-                        isOpen
-                        onClose={() => setIsImageAnalysisModalOpen(false)}
-                        onAnalyze={handleAnalyzeImages}
-                        isLoading={isAnalyzingImage}
-                    />
-                )}
+                {
+                    isImageAnalysisModalOpen && (
+                        <ImageAnalysisModal
+                            isOpen
+                            onClose={() => setIsImageAnalysisModalOpen(false)}
+                            onAnalyze={handleAnalyzeImages}
+                            isLoading={isAnalyzingImage}
+                        />
+                    )
+                }
                 <DefaultModal
                     isOpen={metadataModal.isOpen}
                     onClose={() => setMetadataModal(prev => ({ ...prev, isOpen: false }))}
@@ -1524,17 +1543,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     </div>
                 </DefaultModal>
 
-                {showShareModal && (
-                    <ShareModal
-                        isOpen={showShareModal}
-                        onClose={() => setShowShareModal(false)}
-                        url={sharePartner && typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(productData, sharePartner)}` : ""}
-                        title={productData.name}
-                        shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${productData.name}*\nConfere aqui os detalhes:`}
-                        label="Link do produto"
-                        isLoading={isLoadingSharePartner || !sharePartner}
-                    />
-                )}
+                {
+                    showShareModal && (
+                        <ShareModal
+                            isOpen={showShareModal}
+                            onClose={() => setShowShareModal(false)}
+                            url={sharePartner && typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(productData, sharePartner)}` : ""}
+                            title={productData.name}
+                            shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${productData.name}*\nConfere aqui os detalhes:`}
+                            label="Link do produto"
+                            isLoading={isLoadingSharePartner || !sharePartner}
+                        />
+                    )
+                }
 
                 <AlertModal
                     isOpen={showArchiveModal}
@@ -1560,8 +1581,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     isOpen={isSavingProduct || isArchivingProduct || isUnlinkingErp}
                     text={isUnlinkingErp ? "Desvinculando produto..." : isArchivingProduct ? "Arquivando produto..." : internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
                 />
-            </div>
-        </FadeIn>
+            </div >
+        </FadeIn >
     )
 }
 

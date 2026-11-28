@@ -23,14 +23,20 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
     const [query, setQuery] = useState(initialQuery)
     const [selectedCategory, setSelectedCategory] = useState<string>("all")
 
-    const featuredPosts = useMemo(() => posts.filter((post) => post.is_featured), [posts])
-    const latestFeatured = featuredPosts[0] ?? null
+    const displayedFeatured = useMemo(
+        () => posts.filter((post) => post.is_featured).slice(0, 3),
+        [posts]
+    )
+    const displayedFeaturedIds = useMemo(
+        () => new Set(displayedFeatured.map((post) => post.id)),
+        [displayedFeatured]
+    )
 
     const filtered = useMemo(() => {
         const normalizedQuery = normalize(query.trim())
         const isFilteringNow = normalizedQuery.length > 0 || selectedCategory !== "all"
         return posts.filter((post) => {
-            if (!isFilteringNow && latestFeatured && post.id === latestFeatured.id) return false
+            if (!isFilteringNow && displayedFeaturedIds.has(post.id)) return false
             const matchesCategory = selectedCategory === "all" || post.category === selectedCategory
             if (!matchesCategory) return false
             if (!normalizedQuery) return true
@@ -46,10 +52,10 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
 
             return haystack.includes(normalizedQuery)
         })
-    }, [posts, query, selectedCategory, latestFeatured])
+    }, [posts, query, selectedCategory, displayedFeaturedIds])
 
     const isFiltering = query.trim().length > 0 || selectedCategory !== "all"
-    const showFeatured = !isFiltering && latestFeatured
+    const showFeatured = !isFiltering && displayedFeatured.length > 0
 
     return (
         <div className="w-full">
@@ -158,20 +164,13 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                                 <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
                                     <div className="flex items-center gap-2">
                                         <SparklesIcon size={20} className="text-brand-green" />
-                                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Dica em destaque</h2>
+                                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {displayedFeatured.length === 1 ? "Dica em destaque" : "Dicas em destaque"}
+                                        </h2>
                                     </div>
-                                    {featuredPosts.length > 1 && (
-                                        <Link
-                                            href={`/blog/categoria/${latestFeatured.category}`}
-                                            prefetch={false}
-                                            className="text-sm font-semibold text-brand-green hover:underline"
-                                        >
-                                            Ver todas as {featuredPosts.length} dicas de {getBlogCategory(latestFeatured.category).shortLabel}
-                                        </Link>
-                                    )}
                                 </div>
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {featuredPosts.slice(0, 3).map((post) => (
+                                    {displayedFeatured.map((post) => (
                                         <BlogCard key={post.id} post={post} featured />
                                     ))}
                                 </div>
@@ -240,6 +239,9 @@ export default function BlogIndex({ posts, initialQuery = "" }: BlogIndexProps) 
                                 <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
                                     <Button asChild className="h-11">
                                         <Link href="/ajuda" prefetch={false}>Central de Ajuda</Link>
+                                    </Button>
+                                    <Button asChild variant="outline" className="h-11 bg-transparent text-white border-white/25 hover:bg-white/10 hover:text-white">
+                                        <Link href="/ferramentas" prefetch={false}>Calculadoras grátis</Link>
                                     </Button>
                                 </div>
                             </div>

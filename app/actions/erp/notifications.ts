@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/notification.service"
 import { buildNotificationContent } from "@/lib/notifications/templates"
 import { getNotificationRecipientRoles } from "@/lib/notifications/audience"
+import { fetchLowStockProducts } from "@/lib/erp/replenishment"
 
 export async function notifyLowStockAction(productId: string) {
     try {
@@ -68,16 +69,17 @@ export async function notifyReplenishmentSuggestedAction() {
         if (!partnerId) return
 
         const admin = getAdminClient()
-        const { data: products } = await admin
-            .from("products")
-            .select("id")
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .gt("min_stock", 0)
+        // Mesmo critério da aba Sugestões & Oportunidades: só produtos com
+        // estoque no/abaixo do mínimo e escopados pela loja ativa.
+        const lowStockProducts = await fetchLowStockProducts(admin, {
+            partnerId,
+            storeId: partnerContext?.activeStoreId ?? null,
+            select: "id, stock_quantity, min_stock",
+        })
 
-        if (!products || products.length === 0) return
+        if (lowStockProducts.length === 0) return
 
-        const count = products.length
+        const count = lowStockProducts.length
         const userIds = await getPartnerTeamUserIds(
             partnerId,
             getNotificationRecipientRoles("replenishment_suggested"),
@@ -95,6 +97,9 @@ export async function notifyReplenishmentSuggestedAction() {
             entityId: null,
             data: { partner_id: partnerId, count },
             idempotencyKey: buildIdempotencyKey("replenishment_suggested", "product", partnerId, uid),
+            // Mantém o aviso único por usuário, mas atualiza o texto quando a
+            // quantidade de produtos a repor muda (evita contagem defasada).
+            refreshExisting: true,
         }))
     } catch (err) {
         console.error("[notifications] replenishment suggested failed", err instanceof Error ? err.message : err)

@@ -36,7 +36,7 @@ const PricingHero = () => {
                </h1>
 
                <p className="text-brand-inactive-text text-lg max-w-2xl mx-auto">
-                  Uma vitrine e gestão simples para seu negócio, sem intermediários, taxas por pedido ou surpresas no fim do mês.
+                  Vitrine online e gestão simples para seu negócio, sem comissão da Dudit e sem fidelidade. Comece grátis e mude de plano quando quiser.
                </p>
             </motion.div>
          </div>
@@ -48,6 +48,7 @@ const PricingCards = () => {
    const plans = [
       {
          name: "Começar",
+         ctaLabel: "Começar grátis",
          price: "0",
          highlight: false,
          objective: "Pra começar a vender e organizar seu negócio",
@@ -73,6 +74,7 @@ const PricingCards = () => {
       },
       {
          name: "Crescer",
+         ctaLabel: "Começar no Crescer",
          price: "29,90",
          highlight: false,
          popular: true,
@@ -81,11 +83,12 @@ const PricingCards = () => {
             "Tudo do plano Começar +",
             "Receba pedidos direto pelo sistema",
             "Pagamentos online com Mercado Pago",
+            "Integração nativa com Tiny ERP e Bling",
             "Cupons para vender mais",
             "Variações de produtos (cor, tamanho e mais)",
             "Complementos e adicionais",
             "Gestão de trocas e devoluções",
-            "Configuração simples de entregas",
+            "Configuração simples de entregas locais",
             "Controle financeiro com visão do lucro",
             "Relatórios do negócio",
             "Gestão organizada de fornecedores",
@@ -101,14 +104,16 @@ const PricingCards = () => {
       },
       {
          name: "Escalar",
+         ctaLabel: "Começar no Escalar",
          price: "49,90",
          highlight: true,
          popular: false,
          objective: "Pra negócios que precisam de mais controle",
          features: [
             "Tudo do plano Crescer +",
+            "Frete nacional automático (Correios e transportadoras)",
             "Financeiro completo com fluxo de caixa e DRE",
-            "Controle de entregas e envios",
+            "Controle de expedição e envios",
             "Campanhas promocionais",
             "Metas e desempenho da equipe",
             "Lembretes e envios automáticos via WhatsApp",
@@ -209,12 +214,18 @@ const PricingCards = () => {
                         className={`w-full mt-10 h-11 ${plan.isDark ? 'bg-brand-green text-white hover:bg-brand-green/90 border-0' : ''}`}
                      >
                         <Link href="/auth/login?mode=partner" prefetch={false}>
-                           Começar agora
+                           {plan.ctaLabel}
                         </Link>
                      </Button>
+                     <p className={`text-[11px] text-center mt-3 ${plan.isDark ? 'text-gray-400' : 'text-brand-inactive-text'}`}>
+                        Sem fidelidade · Cancele quando quiser
+                     </p>
                   </motion.div>
                ))}
             </div>
+            <p className="text-xs text-brand-inactive-text text-center mt-8 max-w-2xl mx-auto leading-relaxed">
+               0% de comissão da Dudit em todos os planos. Caso você ative o checkout online via Mercado Pago, aplicam-se apenas as taxas do próprio meio de pagamento.
+            </p>
          </div>
       </section>
    );
@@ -247,14 +258,15 @@ const ComparisonTable = () => {
          title: "Serviços",
          items: [
             { name: "Agendamentos online", g: "check", v: "check", c: "check" },
-            { name: "Ordens de serviço", g: "check", v: "check", c: "check" },
+            { name: "Ordens de serviço", g: "x", v: "check", c: "check" },
             { name: "Agendamentos/mês", g: "30", v: "150", c: "Ilimitado" },
          ]
       },
       {
          title: "Entrega",
          items: [
-            { name: "Configuração de entregas", g: "x", v: "check", c: "check" },
+            { name: "Configuração de entregas locais", g: "x", v: "check", c: "check" },
+            { name: "Frete nacional automático (Correios e transportadoras)", g: "x", v: "x", c: "check" },
             { name: "Controle de expedição", g: "x", v: "x", c: "check" },
          ]
       },
@@ -267,8 +279,9 @@ const ComparisonTable = () => {
          ]
       },
       {
-         title: "Marketing e Gestão",
+         title: "Marketing, Integrações e Gestão",
          items: [
+            { name: "Integração com Tiny ERP e Bling", g: "x", v: "check", c: "check" },
             { name: "Cupons de desconto", g: "x", v: "check", c: "check" },
             { name: "Campanhas promocionais", g: "x", v: "x", c: "check" },
             { name: "Metas e desempenho", g: "x", v: "x", c: "check" },
@@ -279,16 +292,31 @@ const ComparisonTable = () => {
          ]
       },
       {
-         title: "Equipe",
+         title: "Equipe e Suporte",
          items: [
             { name: "Usuários", g: "1", v: "3", c: "10" },
+            { name: "Suporte", g: "Central de ajuda", v: "Prioritário", c: "Prioritário" },
          ]
       }
    ];
 
    const renderValue = (val: string) => {
-      if (val === "check") return <CheckCircleIcon size={20} className="text-brand-green mx-auto" />;
-      if (val === "x") return <XIcon size={20} className="text-brand-inactive-text/30 mx-auto" />;
+      if (val === "check") {
+         return (
+            <span className="inline-flex items-center justify-center">
+               <CheckCircleIcon size={20} className="text-brand-green mx-auto" aria-hidden="true" />
+               <span className="sr-only">Incluído</span>
+            </span>
+         );
+      }
+      if (val === "x") {
+         return (
+            <span className="inline-flex items-center justify-center">
+               <XIcon size={20} className="text-brand-inactive-text/30 mx-auto" aria-hidden="true" />
+               <span className="sr-only">Não incluído</span>
+            </span>
+         );
+      }
       return <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{val}</span>;
    };
 
@@ -367,7 +395,7 @@ const FAQ = () => {
       },
       {
          q: "Tem taxa ou comissão sobre vendas?",
-         a: "Não. Você vende direto e fica com o valor das suas vendas."
+         a: "A Dudit cobra 0% de comissão sobre suas vendas. Você paga apenas a assinatura do plano (ou usa o plano gratuito). Se optar por receber por pagamento online integrado, aplicam-se somente as taxas do meio de pagamento escolhido."
       },
       {
          q: "Posso usar sem ter empresa?",
@@ -412,31 +440,27 @@ const FAQ = () => {
                      className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface hover:border-brand-green/30 transition-colors"
                   >
                      <button
+                        type="button"
+                        aria-expanded={openIndex === i}
+                        aria-controls={`planos-faq-panel-${i}`}
                         onClick={() => toggle(i)}
-                        className="w-full flex items-center justify-between p-6 text-left hover:bg-brand-gray dark:hover:bg-dark-border/40 transition-colors"
+                        className="w-full flex items-center justify-between p-6 text-left hover:bg-brand-gray dark:hover:bg-dark-border/40 transition-colors cursor-pointer"
                      >
                         <span className="font-semibold text-brand-dark dark:text-dark-heading text-lg">{item.q}</span>
-                        <motion.div
-                           animate={{ rotate: openIndex === i ? 180 : 0 }}
-                           transition={{ duration: 0.2 }}
-                        >
+                        <div className={`shrink-0 transition-transform duration-200 ${openIndex === i ? 'rotate-180' : ''}`}>
                            <ChevronDownIcon size={20} className="text-brand-inactive-text" />
-                        </motion.div>
+                        </div>
                      </button>
-                     <AnimatePresence>
-                        {openIndex === i && (
-                           <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.3, ease: "easeInOut" }}
-                           >
-                              <div className="px-6 pb-6 text-brand-inactive-text leading-relaxed">
-                                 {item.a}
-                              </div>
-                           </motion.div>
-                        )}
-                     </AnimatePresence>
+                     <div
+                        id={`planos-faq-panel-${i}`}
+                        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${openIndex === i ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+                     >
+                        <div className="overflow-hidden">
+                           <div className="px-6 pb-6 text-brand-inactive-text leading-relaxed">
+                              {item.a}
+                           </div>
+                        </div>
+                     </div>
                   </motion.div>
                ))}
             </div>
@@ -470,7 +494,7 @@ const faqLd = {
          name: "Tem taxa ou comissão sobre vendas?",
          acceptedAnswer: {
             "@type": "Answer",
-            text: "Não. Você vende direto e fica com o valor das suas vendas.",
+            text: "A Dudit cobra 0% de comissão sobre suas vendas. Você paga apenas a assinatura do plano (ou usa o plano gratuito). Se optar por receber por pagamento online integrado, aplicam-se somente as taxas do meio de pagamento escolhido.",
          },
       },
       {

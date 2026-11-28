@@ -761,7 +761,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                                         (product as any)._availability.status === "available"
                                                             ? "text-brand-green font-semibold truncate"
                                                             : (product as any)._availability.status === "closed" || (product as any)._availability.outOfServiceArea
-                                                                ? "text-amber-600 dark:text-amber-400 font-medium truncate"
+                                                                ? "text-brand-orange font-medium truncate"
                                                                 : "text-brand-inactive-text dark:text-dark-body font-medium truncate"
                                                     }
                                                 >
@@ -803,7 +803,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                                         (product as any)._availability.status === "available"
                                                             ? "text-brand-green font-semibold truncate"
                                                             : (product as any)._availability.status === "closed" || (product as any)._availability.outOfServiceArea
-                                                                ? "text-amber-600 dark:text-amber-400 font-medium truncate"
+                                                                ? "text-brand-orange font-medium truncate"
                                                                 : "text-brand-inactive-text dark:text-dark-body font-medium truncate"
                                                     }
                                                 >
@@ -834,7 +834,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                                         (product as any)._availability.status === "available"
                                                             ? "text-brand-green font-semibold truncate"
                                                             : (product as any)._availability.status === "closed" || (product as any)._availability.outOfServiceArea
-                                                                ? "text-amber-600 dark:text-amber-400 font-medium truncate"
+                                                                ? "text-brand-orange font-medium truncate"
                                                                 : "text-brand-inactive-text dark:text-dark-body font-medium truncate"
                                                     }
                                                 >

@@ -16,37 +16,43 @@ import { useRouter } from 'next/navigation';
 const segments = [
   {
     title: "Lojas de Roupas e Comércio",
-    description: "Controle de estoque por grade (tamanho e cor), etiquetas com código de barras, vitrine online e PDV balcão com 0% de comissão.",
+    description: "Controle de estoque por grade (tamanho e cor), etiquetas com código de barras, vitrine online e PDV balcão com 0% de comissão da Dudit.",
+    planNote: "Grade de variações a partir do plano Crescer",
     type: "fashion",
     href: "/segmentos/lojas-de-roupas-e-calcados"
   },
   {
     title: "Salões de Beleza e Barbearias",
     description: "Agenda online disponível 24h para seus clientes, controle de horários de profissionais e fechamento de caixa sem confusão.",
+    planNote: "Comece grátis no plano Começar",
     type: "beauty",
     href: "/segmentos/saloes-e-barbearias"
   },
   {
     title: "Oficinas Mecânicas e Auto Centers",
     description: "Emissão de ordens de serviço digitais com fotos, controle de peças e orçamentos claros enviados direto pelo WhatsApp.",
+    planNote: "Ordens de serviço a partir do plano Crescer",
     type: "technical",
     href: "/segmentos/oficinas-e-tecnicos"
   },
   {
     title: "Assistência Técnica e Celulares",
     description: "Ficha de entrada com fotos do aparelho, histórico da OS, orçamentos pelo WhatsApp e acompanhamento do conserto online.",
+    planNote: "Ordens de serviço a partir do plano Crescer",
     type: "assistance",
     href: "/segmentos/assistencia-tecnica-celulares"
   },
   {
     title: "Confeitarias, Docerias e Marmitas",
-    description: "Receba pedidos organizados, monte seu cardápio digital sem comissão por venda e controle produtos e estoque.",
+    description: "Receba pedidos organizados, monte seu cardápio digital com 0% de comissão da Dudit e controle produtos e estoque.",
+    planNote: "Comece grátis no plano Começar",
     type: "confectionery",
     href: "/segmentos/confeitarias-e-alimentacao"
   },
   {
     title: "Autônomos e Prestadores de Serviços",
-    description: "Monte sua vitrine de serviços, envie orçamentos em PDF, organize a agenda e receba com o valor do serviço todo seu.",
+    description: "Monte sua vitrine de serviços, envie orçamentos em PDF, organize a agenda e venda sem comissão da plataforma.",
+    planNote: "Comece grátis no plano Começar",
     type: "freelance",
     href: "/segmentos/autonomos-e-prestadores-de-servicos"
   }
@@ -120,15 +126,18 @@ const SegmentMockup = ({ type }: { type: string }) => {
       return (
         <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[240px] rounded-xl border border-brand-border">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ordem de Serviço</span>
-            <FileIcon size={12} className="text-brand-inactive-text" />
+            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Ficha de Bancada</span>
+            <CheckCircleIcon size={12} className="text-brand-green" />
           </div>
-          <div className="border-2 border-dashed border-brand-border rounded-lg p-3">
-            <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading mb-1">OS #1284</div>
-            <div className="text-[8px] text-brand-inactive-text mb-3">Troca de tela - iPhone 12</div>
-            <div className="flex justify-between items-center">
-              <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">R$ 380,00</div>
-              <div className="bg-brand-orange-light dark:bg-brand-orange/20 text-brand-orange text-[8px] font-bold px-2 py-0.5 rounded">EM ANDAMENTO</div>
+          <div className="bg-brand-gray dark:bg-dark-border/40 rounded-lg p-3">
+            <div className="flex justify-between items-center mb-1">
+              <div className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">OS #2041</div>
+              <div className="bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-[8px] font-bold px-2 py-0.5 rounded">APROVADA</div>
+            </div>
+            <div className="text-[9px] text-brand-inactive-text mb-2">iPhone 12 · Troca de tela</div>
+            <div className="flex justify-between items-center pt-2 border-t border-brand-border">
+              <div className="text-[8px] text-brand-inactive-text">Garantia 90 dias</div>
+              <div className="text-[10px] font-bold text-brand-green">R$ 380,00</div>
             </div>
           </div>
         </div>
@@ -169,7 +178,7 @@ const SegmentMockup = ({ type }: { type: string }) => {
             <div className="h-1.5 w-3/4 bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
             <div className="h-1.5 w-1/2 bg-brand-gray dark:bg-dark-border/40 rounded-full"></div>
           </div>
-          <Button variant="default" className="w-full py-1.5 text-[8px] h-auto bg-brand-green text-white">Enviar por WhatsApp</Button>
+          <div className="w-full py-1.5 text-[8px] font-bold text-center rounded-md bg-brand-green text-white">Enviar por WhatsApp</div>
         </div>
       );
     case 'home':
@@ -203,15 +212,15 @@ const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
-            Produtos, serviços e negócios de todos os tipos.
+          <h1 className="text-4xl md:text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6 leading-tight">
+            A Dudit se adapta ao jeito que o seu negócio vende.
           </h1>
           <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-            Na Dudit você encontra desde produtos até profissionais e empresas da sua cidade ou de todo o Brasil para resolver o seu dia a dia.
+            De lojas de roupas a oficinas, salões e confeitarias: monte sua vitrine, organize o atendimento e venda na sua cidade ou para todo o Brasil com 0% de comissão da Dudit.
           </p>
           <div className="flex flex-wrap gap-4">
-            <Button onClick={() => onNavigate('explore')}>Explorar categorias</Button>
-            <Button variant="outline" onClick={() => onNavigate('start-selling')}>Divulgar meu negócio</Button>
+            <Button onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+            <Button variant="outline" onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
           </div>
         </motion.div>
 
@@ -242,34 +251,44 @@ const SegmentsGrid = () => (
     <GridLines />
     <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
       <SectionHeader
-        subtitle="PARA TODOS OS TIPOS DE NEGÓCIOS"
-        title="Encontre o que precisa ou mostre o que você faz"
+        subtitle="SOLUÇÕES POR SEGMENTO"
+        title="Feita para diferentes tipos de negócios"
       />
       <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-        De produtos locais a profissionais autônomos, tudo organizado e conectado de forma simples.
+        Escolha seu segmento para ver como a Dudit organiza vendas, estoque, agenda e entregas no dia a dia.
       </p>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
         {segments.map((segment, idx) => (
-          <motion.div
+          <motion.article
             key={idx}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: idx * 0.1 }}
+            className="group relative flex flex-col h-full"
           >
-            <Link href={segment.href} className="group block h-full">
-              <div className="bg-brand-gray dark:bg-dark-border/40 border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6 group-hover:border-brand-green/40 transition-colors">
-                <SegmentMockup type={segment.type} />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors">{segment.title}</h4>
-                </div>
-                <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
-              </div>
-            </Link>
-          </motion.div>
+            <div
+              aria-hidden="true"
+              className="bg-brand-gray dark:bg-dark-border/40 border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6 group-hover:border-brand-green/40 transition-colors"
+            >
+              <SegmentMockup type={segment.type} />
+            </div>
+            <div className="flex flex-col flex-1">
+              <span className="text-[11px] font-semibold text-brand-green mb-1.5">
+                {segment.planNote}
+              </span>
+              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+                <Link
+                  href={segment.href}
+                  className="hover:text-brand-green transition-colors after:absolute after:inset-0"
+                >
+                  {segment.title}
+                </Link>
+              </h3>
+              <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
+            </div>
+          </motion.article>
         ))}
       </div>
     </div>

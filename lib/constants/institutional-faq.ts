@@ -10,7 +10,7 @@ export const INSTITUTIONAL_FAQ: InstitutionalFaqItem[] = [
     },
     {
         question: "A Dudit cobra comissão sobre as vendas realizadas?",
-        answer: "Não. A Dudit opera com 0% de comissão por venda. Diferente dos marketplaces tradicionais que cobram percentuais sobre o seu faturamento, na Dudit o valor das suas vendas fica com você. A plataforma é remunerada pela assinatura do plano."
+        answer: "Não. A Dudit opera com 0% de comissão por venda. Diferente dos marketplaces tradicionais que cobram percentuais sobre o seu faturamento, na Dudit a plataforma é remunerada apenas pela assinatura do plano. Caso você utilize pagamento online integrado, aplicam-se somente as taxas do meio de pagamento escolhido."
     },
     {
         question: "Como vender pelo WhatsApp usando a Dudit?",

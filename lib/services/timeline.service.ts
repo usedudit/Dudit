@@ -420,6 +420,11 @@ function isRoutineCrud(actionType: string, entityType: string, metadata?: Record
 
   // Check if action type is routine
   if (routineActions.has(actionType)) {
+    // Appointment creation is the first meaningful event of its history,
+    // so keep it even though other entities skip routine "created" events.
+    if (entityType === "appointment" && actionType === "created") {
+      return false
+    }
     return true
   }
 

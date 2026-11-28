@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { humanizeTimelineChangeLine, resolveTimelineActorName, isDuditTeamActorName, isInternalStockTimelineLine } from "./formatters"
+import { humanizeTimelineChangeLine, humanizeAppointmentTimelineLine, resolveTimelineActorName, isDuditTeamActorName, isInternalStockTimelineLine } from "./formatters"
 
 describe("isDuditTeamActorName", () => {
   it("matches only the official Dudit team label", () => {
@@ -62,6 +62,38 @@ describe("humanizeTimelineChangeLine", () => {
     expect(humanizeTimelineChangeLine("Vale-compra gerado: R$ 50,00")).toBe("Vale-compra gerado: R$ 50,00")
     expect(humanizeTimelineChangeLine("Pedido de troca criado: #ABCD1234")).toBe("Pedido de troca criado: #ABCD1234")
     expect(humanizeTimelineChangeLine("Itens restaurados ao estoque físico")).toBe("Itens restaurados ao estoque físico")
+  })
+})
+
+describe("humanizeAppointmentTimelineLine", () => {
+  it("never turns appointment status transitions into return requests", () => {
+    expect(humanizeAppointmentTimelineLine("alterou status: Confirmado -> Concluído")).toBe("Agendamento concluído.")
+    expect(humanizeAppointmentTimelineLine("alterou status: Agendado → Concluída")).toBe("Agendamento concluído.")
+    expect(humanizeAppointmentTimelineLine('Status do agendamento alterado de "Confirmado" para "Concluído".')).toBe("Agendamento concluído.")
+  })
+
+  it("describes appointment status transitions with appointment vocabulary", () => {
+    expect(humanizeAppointmentTimelineLine("alterou status: Reservado -> Confirmado")).toBe("Agendamento confirmado.")
+    expect(humanizeAppointmentTimelineLine("alterou status: Confirmado -> Cancelado")).toBe("Agendamento cancelado.")
+    expect(humanizeAppointmentTimelineLine("alterou status: Confirmado -> Ausência")).toBe("Cliente marcado como ausente.")
+    expect(humanizeAppointmentTimelineLine("alterou status: Confirmado -> Pago")).toBe("Agendamento marcado como pago.")
+    expect(humanizeAppointmentTimelineLine("alterou status: Confirmado -> Em andamento")).toBe("Atendimento iniciado.")
+    expect(humanizeAppointmentTimelineLine("alterou status: Reservado -> Status desconhecido")).toBe('Status do agendamento alterado de "Reservado" para "Status desconhecido".')
+  })
+
+  it("humanizes appointment-specific audit lines", () => {
+    expect(humanizeAppointmentTimelineLine("criou agendamento para Maria.")).toBe("Agendamento criado para Maria.")
+    expect(humanizeAppointmentTimelineLine("Agendamento criado para Maria: Corte em 01/12/2026 às 10:00.")).toBe("Agendamento criado para Maria: Corte em 01/12/2026 às 10:00.")
+    expect(humanizeAppointmentTimelineLine("atualizou informações do agendamento.")).toBe("Informações do agendamento atualizadas.")
+    expect(humanizeAppointmentTimelineLine("excluiu agendamento de Maria (Corte).")).toBe("Agendamento excluído de Maria (Corte).")
+    expect(humanizeAppointmentTimelineLine("atualizou itens de estoque (2 itens)")).toBe("Itens de estoque atualizados (2 itens).")
+  })
+
+  it("keeps already humanized appointment lines intact", () => {
+    expect(humanizeAppointmentTimelineLine("Reagendou o atendimento de 01/12/2026 às 10:00 para 02/12/2026 às 11:00."))
+      .toBe("Reagendou o atendimento de 01/12/2026 às 10:00 para 02/12/2026 às 11:00.")
+    expect(humanizeAppointmentTimelineLine("Alterou o serviço de \"Corte\" para \"Corte + Barba\"."))
+      .toBe("Alterou o serviço de \"Corte\" para \"Corte + Barba\".")
   })
 })
 

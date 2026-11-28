@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Segmentos Atendidos - Vendas Locais e Nacionais",
-    description: "Soluções completas para lojas de roupas, oficinas, salões de beleza, confeitarias e autônomos. Venda no balcão, na sua cidade e envie para todo o Brasil com 0% de comissão.",
+    description: "Soluções para lojas de roupas, oficinas, salões, confeitarias e autônomos. Venda no balcão, na cidade ou no Brasil com 0% de comissão.",
     openGraph: {
         title: "Segmentos Atendidos - Vendas Locais e Nacionais",
-        description: "Soluções completas para lojas de roupas, oficinas, salões de beleza, confeitarias e autônomos. Venda no balcão, na sua cidade e envie para todo o Brasil com 0% de comissão.",
+        description: "Soluções para lojas de roupas, oficinas, salões, confeitarias e autônomos. Venda no balcão, na cidade ou no Brasil com 0% de comissão.",
         url: "https://dudit.com.br/institucional/segmentos",
         siteName: "Dudit",
         images: [
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     twitter: {
         card: "summary_large_image",
         title: "Segmentos Atendidos - Vendas Locais e Nacionais",
-        description: "Soluções completas para lojas de roupas, oficinas, salões de beleza, confeitarias e autônomos. Venda no balcão, na sua cidade e envie para todo o Brasil com 0% de comissão.",
+        description: "Soluções para lojas de roupas, oficinas, salões, confeitarias e autônomos. Venda no balcão, na cidade ou no Brasil com 0% de comissão.",
         images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {

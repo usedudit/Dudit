@@ -37,6 +37,7 @@ import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { resolveAppointmentCustomerIds } from "@/lib/erp/appointment-customer-resolution"
+import { formatCurrency, formatDateToBR } from "@/lib/utils/formatters"
 
 export type AppointmentStatus =
   | "Reservado"
@@ -201,6 +202,95 @@ function isPartialStatus(status: string | null | undefined) {
 function isOrderPriceLocked(situation: string | null | undefined) {
   const normalized = String(situation || "").toLowerCase()
   return normalized === "paid" || normalized === "partially_paid"
+}
+
+function normalizeHistoryValue(value: unknown): string {
+  return String(value ?? "").trim()
+}
+
+function formatAppointmentSlot(date?: string | null, time?: string | null): string {
+  const formattedDate = date ? formatDateToBR(String(date).slice(0, 10)) : ""
+  const formattedTime = time ? String(time).slice(0, 5) : ""
+  if (formattedDate && formattedTime) return `${formattedDate} às ${formattedTime}`
+  return formattedDate || formattedTime || "horário não informado"
+}
+
+/**
+ * Monta linhas de histórico específicas do agendamento.
+ *
+ * Evita o genérico "atualizou informações", que fazia o histórico perder o
+ * contexto e ainda podia ser interpretado como uma solicitação de troca/devolução.
+ */
+function buildAppointmentUpdateLines(
+  current: Record<string, any>,
+  updated: Record<string, any>,
+  paymentStatus: string,
+  paidAmount: number,
+): string[] {
+  const lines: string[] = []
+
+  const oldStatus = normalizeHistoryValue(current.status)
+  const newStatus = normalizeHistoryValue(updated.status)
+  if (newStatus && oldStatus !== newStatus) {
+    lines.push(`Status do agendamento alterado de "${oldStatus || "não informado"}" para "${newStatus}".`)
+  }
+
+  const oldDate = normalizeHistoryValue(current.start_date)
+  const oldTime = normalizeHistoryValue(current.start_time)
+  const newDate = normalizeHistoryValue(updated.start_date)
+  const newTime = normalizeHistoryValue(updated.start_time)
+  if ((oldDate !== newDate || oldTime.slice(0, 5) !== newTime.slice(0, 5)) && (newDate || newTime)) {
+    lines.push(`Reagendou o atendimento de ${formatAppointmentSlot(oldDate, oldTime)} para ${formatAppointmentSlot(newDate, newTime)}.`)
+  }
+
+  const oldDuration = Number(current.duration_minutes || 0)
+  const newDuration = Number(updated.duration_minutes || 0)
+  if (oldDuration !== newDuration && newDuration > 0) {
+    lines.push(`Alterou a duração do atendimento de ${oldDuration} min para ${newDuration} min.`)
+  }
+
+  const oldService = normalizeHistoryValue(current.service_name)
+  const newService = normalizeHistoryValue(updated.service_name)
+  if (newService && oldService !== newService) {
+    lines.push(`Alterou o serviço de "${oldService || "não informado"}" para "${newService}".`)
+  }
+
+  const oldStaff = normalizeHistoryValue(current.staff_name)
+  const newStaff = normalizeHistoryValue(updated.staff_name)
+  if (newStaff && oldStaff !== newStaff) {
+    lines.push(`Alterou o profissional de "${oldStaff || "não informado"}" para "${newStaff}".`)
+  }
+
+  const oldCustomer = normalizeHistoryValue(current.customer_name)
+  const newCustomer = normalizeHistoryValue(updated.customer_name)
+  if (newCustomer && oldCustomer !== newCustomer) {
+    lines.push(`Alterou o cliente de "${oldCustomer || "não informado"}" para "${newCustomer}".`)
+  }
+
+  const oldPrice = Number(current.price || 0)
+  const newPrice = Number(updated.price || 0)
+  if (Math.abs(oldPrice - newPrice) > 0.009) {
+    lines.push(`Alterou o valor de ${formatCurrency(oldPrice)} para ${formatCurrency(newPrice)}.`)
+  }
+
+  const oldPaymentStatus = normalizeHistoryValue(current.payment_status)
+  const newPaymentStatus = normalizeHistoryValue(paymentStatus)
+  if (newPaymentStatus && oldPaymentStatus !== newPaymentStatus) {
+    lines.push(`Alterou a situação de pagamento de "${oldPaymentStatus || "não informada"}" para "${newPaymentStatus}".`)
+  }
+
+  const oldPaidAmount = Number(current.paid_amount || 0)
+  if (Math.abs(oldPaidAmount - Number(paidAmount || 0)) > 0.009) {
+    lines.push(`Atualizou o valor pago de ${formatCurrency(oldPaidAmount)} para ${formatCurrency(paidAmount)}.`)
+  }
+
+  const oldNotes = normalizeHistoryValue(current.notes)
+  const newNotes = normalizeHistoryValue(updated.notes)
+  if (oldNotes !== newNotes) {
+    lines.push(newNotes ? "Atualizou as observações do agendamento." : "Removeu as observações do agendamento.")
+  }
+
+  return lines
 }
 
 async function createAppointmentSaleAndSyncGoals(params: {
@@ -1469,17 +1559,21 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
     // Audit logs - run in parallel (each is an independent insert)
     await Promise.all(
-      createdRows.map((row: any) =>
-        logAuditEvent({
-          partnerId,
-          actorUserId: user.id,
-          entityType: "appointment",
-          entityId: row.id,
-          actionType: "created",
-          changeLines: [`criou agendamento para ${row.customer_name}.`],
-          metadata: { status: row.status, source: row.source },
-        })
-      )
+      createdRows
+        .filter((row: any) => row.source !== "unavailable")
+        .map((row: any) =>
+          logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "appointment",
+            entityId: row.id,
+            actionType: "created",
+            changeLines: [
+              `Agendamento criado para ${row.customer_name || "cliente"}: ${row.service_name || "serviço"} em ${formatAppointmentSlot(row.start_date, row.start_time)}.`,
+            ],
+            metadata: { status: row.status, source: row.source },
+          })
+        )
     )
 
     // Increment usage counter for each created appointment
@@ -1830,13 +1924,22 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       .select("*")
       .single()
 
+    const appointmentChangeLines = buildAppointmentUpdateLines(
+      current,
+      updated,
+      String(paymentStatusValue || ""),
+      effectivePaidAmount,
+    )
+
     await logAuditEvent({
       partnerId,
       actorUserId: user.id,
       entityType: "appointment",
       entityId: appointmentId,
       actionType: "updated",
-      changeLines: ["atualizou informações do agendamento."],
+      changeLines: appointmentChangeLines.length > 0
+        ? appointmentChangeLines
+        : ["Atualizou informações do agendamento."],
       metadata: { oldStatus: current.status, newStatus: normalizedStatus, paidAmount: effectivePaidAmount },
     })
 
@@ -2064,6 +2167,7 @@ export async function getAppointmentHistoryAction(appointmentId: string) {
       id: entry.id || `${idx}`,
       type: entry.action_type,
       description: entry.change_lines?.[0] || "Atualização no agendamento",
+      change_lines: entry.change_lines?.length ? entry.change_lines : ["Atualização no agendamento"],
       timestamp: entry.created_at,
       user: entry.actor_name || "Sistema",
     }))

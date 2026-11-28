@@ -4,12 +4,12 @@ import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 
 export const metadata: Metadata = {
     title: {
-        absolute: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Taxa)",
+        absolute: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Comissão)",
     },
-    description: "Sistema de vendas e gestão com 0% de comissão: PDV, Tiny ERP e Bling, catálogo digital, agendamento, OS e envios locais ou nacionais.",
+    description: "Plataforma de vendas e gestão com 0% de comissão: vitrine online, PDV, estoque, agenda, OS, Tiny ERP, Bling e envio nacional.",
     openGraph: {
-        title: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Taxa)",
-        description: "Sistema de vendas e gestão com 0% de comissão: PDV, Tiny ERP e Bling, catálogo digital, agendamento, OS e envios locais ou nacionais.",
+        title: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Comissão)",
+        description: "Plataforma de vendas e gestão com 0% de comissão: vitrine online, PDV, estoque, agenda, OS, Tiny ERP, Bling e envio nacional.",
         url: "https://dudit.com.br/institucional/inicio",
         siteName: "Dudit",
         images: [
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        title: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Taxa)",
-        description: "Sistema de vendas e gestão com 0% de comissão: PDV, Tiny ERP e Bling, catálogo digital, agendamento, OS e envios locais ou nacionais.",
+        title: "Dudit | Venda no Balcão, na Cidade ou no Brasil (0% Comissão)",
+        description: "Plataforma de vendas e gestão com 0% de comissão: vitrine online, PDV, estoque, agenda, OS, Tiny ERP, Bling e envio nacional.",
         images: ["https://dudit.com.br/og-image.png"],
     },
     alternates: {

@@ -52,11 +52,11 @@ export default function HelpHome() {
                         </Badge>
 
                         <h1 className="text-4xl lg:text-6xl font-black text-brand-dark dark:text-dark-heading mb-6 leading-tight tracking-tight">
-                            Descubra o que tem por aqui
+                            Como podemos ajudar?
                         </h1>
 
                         <p className="text-lg lg:text-xl text-brand-inactive-text dark:text-dark-body leading-relaxed max-w-2xl mb-12">
-                            Tudo que você precisa para gerenciar sua operação local em um só lugar. Venda, divulgue ou organize seu dia a dia sem complicação.
+                            Encontre tutoriais passo a passo para vender no balcão, na sua cidade e em todo o Brasil, configurar integrações e organizar seu negócio sem complicação.
                         </p>
 
                         <div className="flex flex-wrap items-center justify-center gap-4">
@@ -75,56 +75,64 @@ export default function HelpHome() {
                 {/* QUICK START SECTION */}
                 <FormSection title="Primeiros Passos" description="Guia essencial para configurar sua presença na Dudit">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ListItem
-                            icon={<UserIcon className="text-brand-green" />}
-                            title="Acessando sua conta"
-                            description="Veja como entrar na plataforma e configurar seu acesso inicial."
-                            className="px-6 py-5"
-                            showChevron
-                            onClick={() => window.location.href = "/ajuda/login-registro/acessando-conta"}
-                        />
-                        <ListItem
-                            icon={<SettingsIcon className="text-brand-orange" />}
-                            title="Configurando sua empresa"
-                            description="Complete seu perfil e deixe sua vitrine pronta para o público."
-                            className="px-6 py-5"
-                            showChevron
-                            onClick={() => window.location.href = "/ajuda/login-registro/cadastro-parceiro"}
-                        />
-                        <ListItem
-                            icon={<PackageIcon className="text-blue-500" />}
-                            title="Criando seus primeiros anúncios"
-                            description="Adicione produtos ou serviços com fotos e descrições atraentes."
-                            className="px-6 py-5"
-                            showChevron
-                            onClick={() => window.location.href = "/ajuda/produtos-estoque/como-cadastrar-produto"}
-                        />
-                        <ListItem
-                            icon={<TruckIcon className="text-purple-500" />}
-                            title="Configurando delivery"
-                            description="Defina taxas de entrega e horários de funcionamento."
-                            className="px-6 py-5"
-                            showChevron
-                            onClick={() => window.location.href = "/ajuda/entregas/configurando-entregas-loja"}
-                        />
+                        <Link href="/ajuda/login-registro/acessando-conta" className="block">
+                            <ListItem
+                                icon={<UserIcon className="text-brand-green" />}
+                                title="Acessando sua conta"
+                                description="Veja como entrar na plataforma e configurar seu acesso inicial."
+                                className="px-6 py-5"
+                                showChevron
+                            />
+                        </Link>
+                        <Link href="/ajuda/login-registro/cadastro-parceiro" className="block">
+                            <ListItem
+                                icon={<SettingsIcon className="text-brand-orange" />}
+                                title="Configurando sua empresa"
+                                description="Complete seu perfil e deixe sua vitrine pronta para o público."
+                                className="px-6 py-5"
+                                showChevron
+                            />
+                        </Link>
+                        <Link href="/ajuda/produtos-estoque/como-cadastrar-produto" className="block">
+                            <ListItem
+                                icon={<PackageIcon className="text-blue-500" />}
+                                title="Criando seus primeiros anúncios"
+                                description="Adicione produtos ou serviços com fotos e descrições atraentes."
+                                className="px-6 py-5"
+                                showChevron
+                            />
+                        </Link>
+                        <Link href="/ajuda/entregas/configurando-entregas-loja" className="block">
+                            <ListItem
+                                icon={<TruckIcon className="text-purple-500" />}
+                                title="Configurando delivery e envios"
+                                description="Defina taxas de entrega local, frete nacional e horários de funcionamento."
+                                className="px-6 py-5"
+                                showChevron
+                            />
+                        </Link>
                     </div>
                 </FormSection>
 
                 {/* MODULES GRID - DASHBOARD STYLE */}
-                <FormSection title="Explore os Módulos" description="Explore as funcionalidades detalhadas do sistema e da vitrine">
+                <FormSection title="Explore os Módulos" description="Explore as funcionalidades detalhadas do sistema, integrações e da vitrine">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        <ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Produtos e Estoque" onClick={() => window.location.href = "/ajuda/produtos-estoque/visao-geral-produtos-estoque"} />
-                        <ListItem className="px-4 py-3" icon={<StoreIcon />} title="Vitrine Online" onClick={() => window.location.href = "/ajuda/vitrine-online/visao-geral-vitrine-online"} />
-                        <ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Vendas" onClick={() => window.location.href = "/ajuda/vendas/visao-geral-vendas"} />
-                        <ListItem className="px-4 py-3" icon={<TruckIcon />} title="Entregas" onClick={() => window.location.href = "/ajuda/entregas/visao-geral-entregas"} />
-                        <ListItem className="px-4 py-3" icon={<ServiceIcon />} title="Serviços" onClick={() => window.location.href = "/ajuda/servicos/visao-geral-servicos"} />
-                        <ListItem className="px-4 py-3" icon={<UserIcon />} title="Clientes" onClick={() => window.location.href = "/ajuda/clientes/visao-geral-clientes"} />
-                        <ListItem className="px-4 py-3" icon={<MoneyIcon />} title="Financeiro" onClick={() => window.location.href = "/ajuda/financeiro/visao-geral-financeiro"} />
-                        <ListItem className="px-4 py-3" icon={<MegaphoneIcon />} title="Marketing" onClick={() => window.location.href = "/ajuda/marketing/visao-geral-cupons"} />
-                        <ListItem className="px-4 py-3" icon={<AnalyticsIcon />} title="Desempenho" onClick={() => window.location.href = "/ajuda/desempenho/visao-geral-desempenho"} />
-                        <ListItem className="px-4 py-3" icon={<RepeatIcon />} title="Assinaturas" onClick={() => window.location.href = "/ajuda/assinaturas/planos-recorrentes"} />
-                        <ListItem className="px-4 py-3" icon={<SettingsIcon />} title="Configurações" onClick={() => window.location.href = "/ajuda/configuracoes/visao-geral-configuracoes"} />
-                        <ListItem className="px-4 py-3" icon={<CreditCardIcon />} title="Planos" onClick={() => window.location.href = "/ajuda/planos/planos-e-limites"} />
+                        <Link href="/ajuda/produtos-estoque/visao-geral-produtos-estoque" className="block"><ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Produtos e Estoque" /></Link>
+                        <Link href="/ajuda/vitrine-online/visao-geral-vitrine-online" className="block"><ListItem className="px-4 py-3" icon={<StoreIcon />} title="Vitrine Online" /></Link>
+                        <Link href="/ajuda/vendas/visao-geral-vendas" className="block"><ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Vendas" /></Link>
+                        <Link href="/ajuda/entregas/visao-geral-entregas" className="block"><ListItem className="px-4 py-3" icon={<TruckIcon />} title="Entregas" /></Link>
+                        <Link href="/ajuda/servicos/visao-geral-servicos" className="block"><ListItem className="px-4 py-3" icon={<ServiceIcon />} title="Serviços" /></Link>
+                        <Link href="/ajuda/clientes/visao-geral-clientes" className="block"><ListItem className="px-4 py-3" icon={<UserIcon />} title="Clientes" /></Link>
+                        <Link href="/ajuda/financeiro/visao-geral-financeiro" className="block"><ListItem className="px-4 py-3" icon={<MoneyIcon />} title="Financeiro" /></Link>
+                        <Link href="/ajuda/marketing/visao-geral-cupons" className="block"><ListItem className="px-4 py-3" icon={<MegaphoneIcon />} title="Marketing" /></Link>
+                        <Link href="/ajuda/integracoes" className="block"><ListItem className="px-4 py-3" icon={<RocketIcon />} title="Integrações & ERPs" /></Link>
+                        <Link href="/ajuda/desempenho/visao-geral-desempenho" className="block"><ListItem className="px-4 py-3" icon={<AnalyticsIcon />} title="Desempenho" /></Link>
+                        <Link href="/ajuda/assinaturas/planos-recorrentes" className="block"><ListItem className="px-4 py-3" icon={<RepeatIcon />} title="Assinaturas" /></Link>
+                        <Link href="/ajuda/configuracoes/visao-geral-configuracoes" className="block"><ListItem className="px-4 py-3" icon={<SettingsIcon />} title="Configurações" /></Link>
+                        <Link href="/ajuda/planos/planos-e-limites" className="block"><ListItem className="px-4 py-3" icon={<CreditCardIcon />} title="Planos e Limites" /></Link>
+                        <Link href="/ajuda/marketplace" className="block"><ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Comprando na Dudit" /></Link>
+                        <Link href="/ajuda/boas-vindas" className="block"><ListItem className="px-4 py-3" icon={<RocketIcon />} title="Boas-vindas" /></Link>
+                        <Link href="/ajuda/login-registro" className="block"><ListItem className="px-4 py-3" icon={<KeyIcon />} title="Login e Registro" /></Link>
                     </div>
                 </FormSection>
 
@@ -140,7 +148,7 @@ export default function HelpHome() {
                         <InfoCard
                             color="blue"
                             title="Fotos que convertem"
-                            message="Anúncios com fotos claras e bem iluminadas vendem 3x mais. Use nosso editor simples para ajustar suas imagens."
+                            message="Anúncios com fotos claras e bem iluminadas costumam vender muito mais. Use nosso editor simples para ajustar suas imagens."
                             className="p-6"
                         />
                         <InfoCard
@@ -158,24 +166,26 @@ export default function HelpHome() {
                         </p>
 
                         <div className="space-y-3">
-                            <ListItem
-                                title="Anunciar grátis"
-                                left={<StarIcon className="text-brand-green" />}
-                                className="px-4 py-3 border-x-0 border-t-0 border-b-1 rounded-none"
-                                onClick={() => window.location.href = "/auth/login?mode=partner"}
-                            />
+                            <Link href="/auth/login?mode=partner" className="block">
+                                <ListItem
+                                    title="Anunciar grátis"
+                                    left={<StarIcon className="text-brand-green" />}
+                                    className="px-4 py-3 border-x-0 border-t-0 border-b-1 rounded-none"
+                                />
+                            </Link>
                             <ListItem
                                 title="Falar com suporte"
                                 left={<InfoIcon className="text-brand-blue" />}
                                 className="px-4 py-3 border-x-0 border-t-0 border-b-1 rounded-none"
                                 onClick={() => setIsSupportOpen(true)}
                             />
-                            <ListItem
-                                title="Recuperar minha senha"
-                                left={<KeyIcon className="text-brand-orange" />}
-                                className="px-4 py-3 border-x-0 border-b-0 rounded-none"
-                                onClick={() => window.location.href = "/auth/login?mode=forgot-password"}
-                            />
+                            <Link href="/auth/login?mode=forgot-password" className="block">
+                                <ListItem
+                                    title="Recuperar minha senha"
+                                    left={<KeyIcon className="text-brand-orange" />}
+                                    className="px-4 py-3 border-x-0 border-b-0 rounded-none"
+                                />
+                            </Link>
                         </div>
                     </div>
                 </FormSection>
@@ -184,10 +194,14 @@ export default function HelpHome() {
                 <footer className="pt-12 border-t border-brand-border dark:border-dark-border flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                            © 2026 Dudit Tecnologia. Todos os direitos reservados.
+                            © 2026 Dudit. Todos os direitos reservados.
                         </p>
                     </div>
-                    <div className="flex items-center gap-6 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                    <div className="flex flex-wrap items-center justify-center gap-6 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                        <Link href="/institucional/inicio" prefetch={false} className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors">Início</Link>
+                        <Link href="/institucional/planos" prefetch={false} className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors">Planos</Link>
+                        <Link href="/blog" prefetch={false} className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors">Blog</Link>
+                        <Link href="/ferramentas" prefetch={false} className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors">Ferramentas</Link>
                         <Link href="/institucional/termos" prefetch={false} className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors">Termos</Link>
                         <Link href="/institucional/privacidade" prefetch={false} className="hover:text-brand-dark dark:hover:text-dark-heading transition-colors">Privacidade</Link>
                     </div>

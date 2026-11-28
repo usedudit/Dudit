@@ -7,6 +7,8 @@ import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
 import type { LocationContext } from "@/lib/utils/location-label"
 import { IconPlaceholder, DefaultModal, ThreeDotsLoader } from "@/components/reusable"
+import { Button } from "@/components/reusable/Button"
+import Link from "next/link"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import { Check } from "lucide-react"
@@ -1262,7 +1264,7 @@ export function ExplorarPageClient({
         if (currentType === "em-oferta") return `Em oferta${citySuffix}`
         if (currentType === "em-alta") return `Em alta${citySuffix}`
         if (currentType === "novos-anunciados") return `Novos anunciados${citySuffix}`
-        return `Itens${citySuffix}`
+        return `Produtos e serviços${citySuffix}`
     }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName, rawItems.length, type, cidade])
 
     useEffect(() => {
@@ -2134,6 +2136,28 @@ export function ExplorarPageClient({
                                         title="Patrocinados na sua região"
                                         className="mt-12 pt-8 border-t border-gray-100 dark:border-dark-border"
                                     />
+
+                                    {/* Banner compacto de captação de lojistas */}
+                                    {!isLandingPage && !isEmptyListing && (
+                                        <div className="mt-10 relative bg-brand-dark rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 overflow-hidden">
+                                            <div className="absolute inset-0 opacity-10 pointer-events-none select-none" aria-hidden="true">
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-white rounded-full" />
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] border border-white rounded-full" />
+                                            </div>
+                                            <p className="text-base md:text-lg font-bold text-white text-center sm:text-left relative z-10 leading-snug">
+                                                {selectedCitySlug && selectedCitySlug !== "brasil"
+                                                    ? selectedCitySlug.startsWith("estado-")
+                                                        ? `Tem um negócio em ${ESTADO_MAP[selectedCitySlug.replace("estado-", "").toLowerCase()] || selectedCitySlug.replace("estado-", "").toUpperCase()}? Venda com 0% de comissão.`
+                                                        : `Tem um negócio em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}? Venda com 0% de comissão.`
+                                                    : "Tem um negócio? Venda na sua cidade e em todo o Brasil com 0% de comissão."}
+                                            </p>
+                                            <Button asChild className="h-10 shrink-0 relative z-10">
+                                                <Link href="/auth/login?mode=partner" prefetch={false}>
+                                                    Começar grátis
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
 

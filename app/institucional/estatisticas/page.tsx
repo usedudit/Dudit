@@ -19,7 +19,7 @@ const datasetSchema = {
     description: "Dados estatísticos sobre comissões cobradas por marketplaces e economia gerada pelo modelo de taxa zero.",
     creator: {
         "@type": "Organization",
-        name: "Dudit Tecnologia",
+        name: "Dudit",
         url: "https://dudit.com.br",
     },
     temporalCoverage: "2026/2026",
@@ -74,7 +74,7 @@ export default function EstatisticasPage() {
 
                             <div className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-dark-body mt-4">
                                 <Calendar className="w-3.5 h-3.5" />
-                                <span>Última atualização: Setembro de 2026 • Fonte primária: Dudit Tecnologia Ltda.</span>
+                                <span>Última atualização: Setembro de 2026 • Fonte primária: Dudit.</span>
                             </div>
                         </motion.div>
                     </div>

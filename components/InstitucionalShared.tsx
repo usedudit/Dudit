@@ -101,34 +101,28 @@ export const FaqSection = ({ title = "Dúvidas Frequentes", description, items }
                             >
                                 <button
                                     type="button"
+                                    aria-expanded={isOpen}
+                                    aria-controls={`faq-panel-${idx}`}
                                     onClick={() => setOpenIndex(isOpen ? null : idx)}
                                     className="w-full flex items-center justify-between gap-4 p-6 text-left hover:bg-brand-gray dark:hover:bg-dark-border/40 transition-colors cursor-pointer"
                                 >
                                     <span className="font-semibold text-brand-dark dark:text-dark-heading text-lg">
                                         {item.question}
                                     </span>
-                                    <motion.div
-                                        animate={{ rotate: isOpen ? 180 : 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="shrink-0"
-                                    >
-                                        <ChevronDown className="w-5 h-5 text-brand-inactive-text" />
-                                    </motion.div>
+                                    <ChevronDown
+                                        className={`w-5 h-5 text-brand-inactive-text shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                    />
                                 </button>
-                                <AnimatePresence>
-                                    {isOpen && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                        >
-                                            <p className="px-6 pb-6 text-brand-inactive-text text-sm leading-relaxed">
-                                                {item.answer}
-                                            </p>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                <div
+                                    id={`faq-panel-${idx}`}
+                                    className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+                                >
+                                    <div className="overflow-hidden">
+                                        <p className="px-6 pb-6 text-brand-inactive-text text-sm leading-relaxed">
+                                            {item.answer}
+                                        </p>
+                                    </div>
+                                </div>
                             </motion.div>
                         );
                     })}
@@ -277,7 +271,7 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                             Pronto para vender na sua cidade e em todo o Brasil?
                         </h2>
                         <p className="text-white/70 text-base md:text-lg leading-relaxed mb-6">
-                            Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda com 0% de comissão. Sem taxas por pedido ou surpresas no fim do mês.
+                            Crie sua vitrine em minutos, receba pedidos pelo WhatsApp ou direto na Dudit e venda com 0% de comissão da plataforma. Em pagamentos online, aplicam-se apenas as taxas do meio de pagamento.
                         </p>
                         <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
                             <Button asChild className="h-11">

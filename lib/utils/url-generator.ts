@@ -66,8 +66,8 @@ export function getStoreUrl(store: any): string {
     const storeSlug = createSlug(storeName)
 
     const address = s?.addresses?.[0] || store?.addresses?.[0] || store?.address || s || store
-    const city = s?.city || store?.city || address?.city
-    const state = s?.state || store?.state || address?.state
+    const city = s?.city || store?.city || s?.store_city || store?.store_city || address?.city
+    const state = s?.state || store?.state || s?.store_state || store?.store_state || address?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 

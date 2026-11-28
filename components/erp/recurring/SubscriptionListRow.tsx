@@ -39,6 +39,15 @@ export const getForecastLabelVariant = (raw: string | null | undefined): "green"
   return "gray"
 }
 
+/** Classe de cor (texto simples) para a previsão de execução */
+export const getForecastTextClass = (raw: string | null | undefined): string => {
+  const variant = getForecastLabelVariant(raw)
+  if (variant === "red") return "text-brand-red"
+  if (variant === "orange") return "text-brand-orange"
+  if (variant === "green") return "text-brand-green"
+  return "text-brand-inactive-text dark:text-dark-body"
+}
+
 interface ColumnDef {
   id: string
   align?: "left" | "center" | "right"
@@ -121,9 +130,9 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
               {formatDate(sub.nextExecutionAt)}
             </span>
             {sub.nextExecutionAt && (
-              <Badge variant={getForecastLabelVariant(sub.nextExecutionAt)}>
+              <span className={`text-xs font-medium ${getForecastTextClass(sub.nextExecutionAt)}`}>
                 {getForecastLabel(sub.nextExecutionAt)}
-              </Badge>
+              </span>
             )}
           </div>
         )

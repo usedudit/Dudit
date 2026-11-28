@@ -237,6 +237,30 @@ const nextConfig = {
         ],
       },
       {
+        // Agent Readiness: Link headers (RFC 8288) on homepage for AI/search discovery
+        source: '/',
+        headers: [
+          {
+            key: 'Link',
+            value:
+              '<https://dudit.com.br/llms.txt>; rel="describedby"; type="text/markdown", <https://dudit.com.br/sitemap.xml>; rel="sitemap"; type="application/xml", <https://dudit.com.br/ajuda>; rel="help"; type="text/html"',
+          },
+        ],
+      },
+      {
+        source: '/(llms|llms-full).txt',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'text/markdown; charset=utf-8',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=14400, must-revalidate',
+          },
+        ],
+      },
+      {
         // Private pages: never cached
         source: '/(erp|account|auth|cart|profile|pedidos|dashboard|payment)(.*)',
         headers: [

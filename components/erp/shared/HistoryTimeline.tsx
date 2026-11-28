@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon, CheckCircleIcon, RouteIcon } from "@/lib/icons"
-import { formatDateTime, cn, humanizeTimelineChangeLine, isDuditTeamActorName } from "@/lib/utils"
+import { formatDateTime, cn, humanizeTimelineChangeLine, humanizeAppointmentTimelineLine, isDuditTeamActorName } from "@/lib/utils"
 import { IconPlaceholder } from "@/components/reusable"
 
 export interface HistoryEntry {
@@ -25,6 +25,8 @@ interface HistoryTimelineProps {
     subtitle?: string
     /** Disable Dudit/admin highlighting (green icon circle) - use for standard audit logs like appointment history */
     disableDuditHighlight?: boolean
+    /** Entity whose history is being rendered, so lines are humanized with the right vocabulary. */
+    entityType?: string
 }
 
 /**
@@ -97,8 +99,13 @@ export function HistoryTimeline({
     emptyMessage = "Nenhum histórico encontrado.",
     title,
     subtitle,
-    disableDuditHighlight
+    disableDuditHighlight,
+    entityType
 }: HistoryTimelineProps) {
+    const humanizeLine = entityType === "appointment"
+        ? humanizeAppointmentTimelineLine
+        : humanizeTimelineChangeLine
+
     if (entries.length === 0) {
         return (
             <IconPlaceholder icon={ClockIcon} title="Nenhum histórico encontrado" subtitle={emptyMessage} />
@@ -195,7 +202,7 @@ export function HistoryTimeline({
                                             key={`${entry.id}-line-${lIdx}`}
                                             className="text-[14px] leading-relaxed text-brand-dark/90 dark:text-dark-body"
                                         >
-                                            {humanizeTimelineChangeLine(line)}
+                                            {humanizeLine(line)}
                                         </p>
                                     ))}
                                 </div>

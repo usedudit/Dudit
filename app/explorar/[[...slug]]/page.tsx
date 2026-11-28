@@ -118,13 +118,13 @@ export async function generateMetadata({
         if (categoryName) {
             return buildExploreMetadata(
                 `${categoryName} no Brasil inteiro`,
-                `Encontre ${categoryName.toLowerCase()} em todo o Brasil. Compre direto de quem vende, sem taxa e sem sair de casa.`
+                `Encontre ${categoryName.toLowerCase()} em todo o Brasil. Compre direto de quem vende na Dudit, com 0% de comissão da plataforma.`
             )
         }
 
         return buildExploreMetadata(
             "Comprar no Brasil inteiro - Produtos e serviços",
-            "Encontre produtos e serviços em todo o Brasil. Compre de quem vende perto de você, direto e sem taxa."
+            "Encontre produtos, serviços e lojas em todo o Brasil. Compre direto de quem vende na Dudit, com 0% de comissão da plataforma."
         )
     }
 
@@ -137,13 +137,13 @@ export async function generateMetadata({
         if (categoryName) {
             return buildExploreMetadata(
                 `${categoryName} em ${estadoNome}`,
-                `Encontre ${categoryName.toLowerCase()} em ${estadoNome}. Compre de quem vende perto de você, sem taxa.`
+                `Encontre ${categoryName.toLowerCase()} em ${estadoNome}. Compre direto de lojas e prestadores na Dudit, sem comissão da plataforma.`
             )
         }
 
         return buildExploreMetadata(
             `Comprar em ${estadoNome} - Produtos e serviços`,
-            `Encontre produtos e serviços em ${estadoNome}. Compre de quem vende perto de você, direto e sem taxa.`
+            `Encontre produtos e serviços em ${estadoNome}. Compre direto de quem vende na Dudit, sem comissão da plataforma.`
         )
     }
 
@@ -164,13 +164,13 @@ export async function generateMetadata({
     if (categoryName) {
         return buildExploreMetadata(
             `${categoryName} em ${cidadeDisplay}`,
-            `Encontre ${categoryName.toLowerCase()} em ${cidadeDisplay}. Compre de quem vende perto de você, sem taxa.`
+            `Encontre ${categoryName.toLowerCase()} em ${cidadeDisplay}. Compre direto de quem vende perto de você, sem comissão da plataforma.`
         )
     }
 
     return buildExploreMetadata(
         `Comprar em ${cidadeDisplay} - Produtos e serviços`,
-        `Encontre produtos e serviços em ${cidadeDisplay}. Compre de quem vende perto de você, direto e sem taxa.`
+        `Encontre produtos e serviços em ${cidadeDisplay}. Compre direto de quem vende perto de você, sem comissão da plataforma.`
     )
 }
 
@@ -648,12 +648,19 @@ export default async function ExplorarPage({
             item: "https://dudit.com.br/explorar/brasil",
         })
     } else if (routeFirstSlug && cidade) {
-        const cidadeNome = cidade
+        const cidadeNome = resolvedCityName || cidade
             .split("-")
             .slice(0, -1)
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join(" ")
-        const uf = cidade.split("-").pop()?.toUpperCase() || ""
+        const ufRaw = cidade.split("-").pop()?.toLowerCase() || ""
+        const uf = ufRaw.toUpperCase()
+        if (ufRaw && ESTADO_MAP[ufRaw]) {
+            breadcrumbItems.push({
+                name: ESTADO_MAP[ufRaw],
+                item: `https://dudit.com.br/explorar/estado-${ufRaw}`,
+            })
+        }
         breadcrumbItems.push({
             name: `${cidadeNome}, ${uf}`,
             item: `https://dudit.com.br/explorar/${cidade}`,

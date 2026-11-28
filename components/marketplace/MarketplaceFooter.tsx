@@ -117,7 +117,7 @@ const Footer: React.FC<FooterProps> = ({ setView, showOnMobile = false }) => {
                 {/* Barra Inferior: Copyright + Links Legais */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
                     <p className="text-gray-400 text-xs text-center md:text-left">
-                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        © {new Date().getFullYear()} Dudit. Todos os direitos reservados.
                     </p>
 
                     {/* Links Legais - Lado Direito no Desktop */}

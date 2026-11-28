@@ -833,7 +833,104 @@ export function humanizeTimelineChangeLine(line: string): string {
   return trimmed
 }
 
+/**
+ * Extrai a transição de status de linhas como:
+ * - `alterou status: Pendente -> Concluído`
+ * - `Status do agendamento alterado de "Confirmado" para "Concluído".`
+ */
+function extractStatusTransition(line: string): { oldLabel: string; newLabel: string } | null {
+  const arrowParts = line.split(/\s*(?:→|->)\s*/)
+  if (arrowParts.length >= 2) {
+    const newLabel = arrowParts
+      .pop()!
+      .trim()
+      .replace(/\.$/, "")
+      .replace(/^["']|["']$/g, "")
+      .trim()
+    const oldLabel = arrowParts
+      .join(" ")
+      .trim()
+      .replace(/^.*?status(?:\s+do\s+agendamento)?(?:\s+(?:alterado|alterou|mudou|atualizou))?(?:\s+de)?[:\s]*/i, "")
+      .replace(/^["']|["']$/g, "")
+      .replace(/\.$/, "")
+      .trim()
 
+    if (oldLabel && newLabel) return { oldLabel, newLabel }
+  }
+
+  const transitionMatch = line.match(/\bde\s+["']?(.+?)["']?\s+para\s+["']?(.+?)["']?\.?$/i)
+  if (transitionMatch) {
+    const oldLabel = transitionMatch[1].trim()
+    const newLabel = transitionMatch[2].trim()
+    if (oldLabel && newLabel) return { oldLabel, newLabel }
+  }
+
+  return null
+}
+
+function describeAppointmentStatus(status: string): string | null {
+  const normalized = String(status || "").toLowerCase()
+  if (!normalized) return null
+
+  if (normalized.includes("cancel")) return "Agendamento cancelado."
+  if (normalized.includes("conclu") || normalized.includes("finaliz") || normalized.includes("realiz")) return "Agendamento concluído."
+  if (normalized.includes("ausência") || normalized.includes("ausencia") || normalized.includes("no_show") || normalized.includes("no show")) return "Cliente marcado como ausente."
+  if (normalized.includes("pago parcialmente") || normalized.includes("partially paid") || normalized.includes("parcial")) return "Agendamento marcado como pago parcialmente."
+  if (normalized.includes("pago") || normalized === "paid") return "Agendamento marcado como pago."
+  if (normalized.includes("confirm")) return "Agendamento confirmado."
+  if (normalized.includes("andamento") || normalized.includes("iniciad")) return "Atendimento iniciado."
+  if (normalized.includes("reservad") || normalized.includes("aguardando") || normalized.includes("pendente")) return "Agendamento aguardando confirmação."
+  return null
+}
+
+function ensureTrailingPeriod(text: string): string {
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
+
+/**
+ * Humaniza linhas do histórico de agendamentos.
+ *
+ * Diferente do histórico de pedidos/solicitações, aqui não existe
+ * "solicitação de troca/devolução": uma transição como
+ * `alterou status: Confirmado -> Concluído` significa apenas que o
+ * agendamento foi concluído.
+ */
+export function humanizeAppointmentTimelineLine(line: string): string {
+  if (!line || typeof line !== "string") return ""
+  const trimmed = line.trim()
+  if (!trimmed) return ""
+  const lower = trimmed.toLowerCase()
+
+  // Transições de status do agendamento (formato atual e legado)
+  if (lower.includes("status") || lower.includes("→") || trimmed.includes("->")) {
+    const transition = extractStatusTransition(trimmed)
+    if (transition) {
+      return describeAppointmentStatus(transition.newLabel)
+        || `Status do agendamento alterado de "${transition.oldLabel}" para "${transition.newLabel}".`
+    }
+  }
+
+  if (lower.startsWith("criou agendamento")) {
+    return ensureTrailingPeriod(trimmed.replace(/^criou agendamento/i, "Agendamento criado"))
+  }
+  if (lower.startsWith("agendamento criado")) {
+    return ensureTrailingPeriod(trimmed)
+  }
+  if (lower === "atualizou informações do agendamento." || lower === "atualizou informações do agendamento") {
+    return "Informações do agendamento atualizadas."
+  }
+  if (lower.startsWith("excluiu agendamento")) {
+    return ensureTrailingPeriod(trimmed.replace(/^excluiu agendamento/i, "Agendamento excluído"))
+  }
+  if (lower.startsWith("excluiu série de horários indisponíveis")) {
+    return ensureTrailingPeriod(trimmed.replace(/^excluiu série de horários indisponíveis/i, "Série de horários indisponíveis excluída"))
+  }
+  if (lower.startsWith("atualizou itens de estoque")) {
+    return ensureTrailingPeriod(trimmed.replace(/^atualizou itens de estoque/i, "Itens de estoque atualizados"))
+  }
+
+  return humanizeTimelineChangeLine(trimmed)
+}
 
 /**
  * Formats a delivery estimate range in pt-BR.

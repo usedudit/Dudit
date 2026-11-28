@@ -39,6 +39,7 @@ import {
     roundMoney,
     sortPricingAlerts,
 } from "@/lib/erp/pricing-alerts"
+import { fetchLowStockProducts, getReplenishmentQuantity } from "@/lib/erp/replenishment"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
 import { scheduleDeferredImageModeration } from "@/lib/moderation/deferred-image-moderation"
@@ -2601,29 +2602,16 @@ export async function getReplenishmentSuggestionsAction(partnerId: string, store
         await requirePermission(partnerId, "suppliers", "view", context.user)
         const admin = getAdminClient()
 
-        let query = admin
-            .from("products")
-            .select(`
+        // Mesmo critério da notificação "Sugestão de reposição": estoque <= mínimo.
+        const lowStockProducts = await fetchLowStockProducts(admin, {
+            partnerId,
+            storeId: context.storeId,
+            select: `
                 id, name, sku, gtin, stock_quantity, min_stock, cost_price, unit, images,
                 variants:product_variants(count),
                 product_suppliers(supplier_id, cost_price)
-            `)
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .gt("min_stock", 0)
-            .order("name")
-            .limit(200)
-
-        if (context.storeId) query = query.or(`store_id.eq.${context.storeId},store_id.is.null`)
-
-        const { data, error } = await query
-
-        if (error) return { error: error.message }
-
-        // Filter in-memory: stock_quantity <= min_stock
-        const lowStockProducts = (data || []).filter((p: any) =>
-            (Number(p.stock_quantity) || 0) <= (Number(p.min_stock) || 0)
-        )
+            `,
+        })
 
         // Batch resolve supplier names
         const supplierIds = [...new Set(lowStockProducts.flatMap((p: any) =>
@@ -2647,7 +2635,7 @@ export async function getReplenishmentSuggestionsAction(partnerId: string, store
         const suggestions = lowStockProducts.map((p: any) => {
             const stock = Number(p.stock_quantity) || 0
             const min = Number(p.min_stock) || 0
-            const suggestion = Math.max(0, min - stock)
+            const suggestion = getReplenishmentQuantity(p)
             const primarySupplier = p.product_suppliers?.[0]
             const agg = variantAggregates[p.id]
             return {

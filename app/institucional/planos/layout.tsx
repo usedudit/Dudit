@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 
 export const metadata: Metadata = {
     title: "Planos e Preços - Sistema de Gestão Completo",
-    description: "Conheça os planos da Dudit: Começar Grátis (R$ 0), Crescer (R$ 29,90/mês) e Escalar (R$ 49,90/mês). Vitrine online, PDV balcão, pedidos e estoque com 0% de taxa por venda.",
+    description: "Planos Dudit: Começar (R$ 0), Crescer (R$ 29,90/mês) e Escalar (R$ 49,90/mês). Vitrine online, PDV, Tiny ERP, Bling e 0% de comissão.",
     openGraph: {
         title: "Planos e Preços - Venda com 0% de Comissão",
-        description: "Crie sua vitrine online, gerencie pedidos, controle estoque e emita ordens de serviço sem pagar comissões abusivas por venda.",
+        description: "Crie sua vitrine online, gerencie pedidos, controle estoque e emita ordens de serviço com 0% de comissão por venda.",
         url: "https://dudit.com.br/institucional/planos",
         siteName: "Dudit",
         images: [
@@ -30,11 +31,51 @@ export const metadata: Metadata = {
     },
 };
 
+const softwareApplicationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Dudit",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: "https://dudit.com.br/institucional/planos",
+    offers: [
+        {
+            "@type": "Offer",
+            name: "Plano Começar",
+            price: "0.00",
+            priceCurrency: "BRL",
+            availability: "https://schema.org/InStock",
+        },
+        {
+            "@type": "Offer",
+            name: "Plano Crescer",
+            price: "29.90",
+            priceCurrency: "BRL",
+            availability: "https://schema.org/InStock",
+        },
+        {
+            "@type": "Offer",
+            name: "Plano Escalar",
+            price: "49.90",
+            priceCurrency: "BRL",
+            availability: "https://schema.org/InStock",
+        },
+    ],
+};
+
 export default function InstitucionalPlanosLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    return <>{children}</>;
+    return (
+        <>
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(softwareApplicationJsonLd) }}
+            />
+            {children}
+        </>
+    );
 }
 

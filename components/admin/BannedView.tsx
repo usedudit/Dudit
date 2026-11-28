@@ -56,7 +56,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark dark:bg-dark-surface">
                 <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
                     <p className="text-white text-xs sm:text-sm font-medium tracking-tight">
-                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        © {new Date().getFullYear()} Dudit. Todos os direitos reservados.
                     </p>
                 </div>
             </footer>

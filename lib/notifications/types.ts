@@ -60,6 +60,12 @@ export interface CreateNotificationInput {
   data?: Record<string, unknown>
   idempotencyKey: string
   origin?: "manual" | "automation" | "system"
+  /**
+   * Quando já existe uma notificação com a mesma idempotencyKey, atualiza
+   * título/mensagem/data em vez de manter o conteúdo antigo. Útil para avisos
+   * agregados cujo número muda com o tempo (ex.: sugestões de reposição).
+   */
+  refreshExisting?: boolean
 }
 
 export interface NotificationPageCursor {

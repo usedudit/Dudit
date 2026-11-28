@@ -37,16 +37,24 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        <h1 className="text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6">
-                            O que você precisa hoje pode estar na <span className="text-brand-green">Dudit.</span>
+                        <h1 className="text-4xl md:text-5xl font-bold text-brand-dark dark:text-dark-heading mb-6 leading-tight">
+                            Venda no balcão, na sua cidade e em todo o Brasil — com <span className="text-brand-green">0% de comissão.</span>
                         </h1>
                         <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                            Descubra produtos, serviços e negócios perto de você ou com envio para todo o Brasil. Compre, anuncie ou agende de um jeito simples.
+                            Sua vitrine online, PDV, controle de estoque, agenda, ordens de serviço e integrações com Tiny ERP e Bling em um só lugar. Comece grátis com planos a partir de R$ 0/mês.
                         </p>
-                        <div className="flex flex-wrap gap-4">
-                            <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
-                            <Button variant="outline" onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+                        <div className="flex flex-wrap gap-4 mb-5">
+                            <Button onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
+                            <Button variant="outline" onClick={() => onNavigate('pricing')}>Ver planos</Button>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('explore')}
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-inactive-text hover:text-brand-green transition-colors cursor-pointer"
+                        >
+                            Procurando produtos ou serviços para comprar? <span className="underline">Explorar Dudit</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                     </motion.div>
 
                     <motion.div
@@ -62,25 +70,16 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
                                     <div className="w-2.5 h-2.5 rounded-full bg-brand-green"></div>
                                 </div>
-                                <div className="bg-white dark:bg-dark-surface px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100 dark:border-dark-border">dudit.com.br</div>
+                                <div className="bg-white dark:bg-dark-surface px-3 py-1 rounded text-[10px] text-brand-inactive-text flex-1 text-center font-mono border border-gray-100 dark:border-dark-border">dudit.com.br/sualoja</div>
                             </div>
                             <div className="p-6 space-y-3">
-                                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
-                                        <ShoppingBag className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Descubra</div>
-                                        <div className="text-xs text-brand-inactive-text">Produtos, serviços e negócios perto de você</div>
-                                    </div>
-                                </div>
                                 <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/40 rounded-lg border border-green-100 dark:border-green-900/50">
                                     <div className="w-8 h-8 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-center justify-center">
                                         <Store className="w-4 h-4 text-green-600 dark:text-green-400" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Anuncie</div>
-                                        <div className="text-xs text-brand-inactive-text">Seja descoberto por mais pessoas</div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Vitrine online</div>
+                                        <div className="text-xs text-brand-inactive-text">Link na bio, WhatsApp, entrega local e envio nacional</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-950/40 rounded-lg border border-purple-100 dark:border-purple-900/50">
@@ -88,26 +87,35 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                         <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Organize</div>
-                                        <div className="text-xs text-brand-inactive-text">Gestão simples para o seu dia a dia</div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gestão integrada</div>
+                                        <div className="text-xs text-brand-inactive-text">PDV, estoque, agenda, OS, Tiny ERP e Bling</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+                                        <ShoppingBag className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Mais visibilidade</div>
+                                        <div className="text-xs text-brand-inactive-text">Sua loja descoberta por clientes na Dudit</div>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-100 dark:border-dark-border flex items-center justify-between">
-                                    <div className="text-center">
+                                    <div className="text-center flex-1">
                                         <div className="text-xl font-bold text-brand-green">0%</div>
-                                        <div className="text-[10px] text-brand-inactive-text">comissão</div>
+                                        <div className="text-[10px] text-brand-inactive-text">comissão da Dudit</div>
                                     </div>
                                     <div className="h-8 w-px bg-gray-100 dark:bg-dark-border/40"></div>
-                                    <div className="text-center">
-                                        <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">100%</div>
-                                        <div className="text-[10px] text-brand-inactive-text">do valor da venda é seu</div>
+                                    <div className="text-center flex-1">
+                                        <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">R$ 0</div>
+                                        <div className="text-[10px] text-brand-inactive-text">para começar</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <motion.div
-                            className="absolute -right-4 md:-right-8 -bottom-6 w-44 bg-white dark:bg-dark-surface rounded-2xl p-4 border border-gray-100 dark:border-dark-border shadow-lg hidden md:block"
+                            className="absolute -right-4 md:-right-8 -bottom-6 w-48 bg-white dark:bg-dark-surface rounded-2xl p-4 border border-gray-100 dark:border-dark-border shadow-lg hidden md:block"
                             animate={{ y: [0, -10, 0] }}
                             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                         >
@@ -115,12 +123,15 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                 <div className="w-8 h-8 bg-brand-green/20 rounded-full flex items-center justify-center">
                                     <TrendingUp className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
                                 </div>
-                                <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Nova venda</div>
+                                <div>
+                                    <div className="text-xs font-bold text-brand-dark dark:text-dark-heading">Exemplo de venda</div>
+                                    <div className="text-[9px] text-brand-inactive-text">Pedido R$ 150,00</div>
+                                </div>
                             </div>
                             <div className="bg-brand-green/10 rounded-lg p-2 text-xs">
                                 <div className="flex justify-between font-bold text-brand-dark dark:text-dark-heading">
-                                    <span>Você recebe</span>
-                                    <span className="text-brand-green">R$ 150,00</span>
+                                    <span>Comissão Dudit</span>
+                                    <span className="text-brand-green">R$ 0,00</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -134,28 +145,28 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 const BentoFeaturesComoAjuda = () => {
     const cards = [
         {
-            title: "Precisa de alguma coisa?",
-            subtitle: "PARA QUEM PROCURA",
-            description: "Encontrar lojas, produtos, serviços e oportunidades perto de você ou em qualquer cidade do Brasil.",
-            type: "buy"
-        },
-        {
-            title: "Tem algo para vender?",
-            subtitle: "DESAPEGOS E PRODUTOS",
-            description: "Anuncie produtos, serviços ou qualquer coisa de forma simples.",
-            type: "sell"
-        },
-        {
-            title: "Tem um negócio?",
-            subtitle: "PARA EMPREENDEDORES",
-            description: "Mostre o que você vende e facilite para clientes encontrarem você.",
+            title: "Vitrine online e WhatsApp",
+            subtitle: "VENDAS LOCAIS E NACIONAIS",
+            description: "Compartilhe seu link na bio, receba pedidos no WhatsApp ou no checkout e envie para todo o Brasil com 0% de comissão da Dudit.",
             type: "store"
         },
         {
-            title: "Precisa marcar um horário?",
-            subtitle: "AGENDAMENTOS",
-            description: "Encontre profissionais e agende serviços na hora, sem espera.",
+            title: "PDV, estoque e ERPs",
+            subtitle: "GESTÃO INTEGRADA",
+            description: "Frente de caixa no balcão, controle de estoque com variações e integração nativa com Tiny ERP e Bling.",
+            type: "erp"
+        },
+        {
+            title: "Agenda e ordens de serviço",
+            subtitle: "PARA SERVIÇOS",
+            description: "Agendamento online 24h, orçamentos rápidos e ordens de serviço digitais com fotos e histórico.",
             type: "schedule"
+        },
+        {
+            title: "Descoberta e anúncios",
+            subtitle: "VITRINE ABERTA",
+            description: "Sua loja aparece para quem busca na Dudit — e se quiser anunciar algo avulso ou desapegar, também pode começar grátis.",
+            type: "buy"
         }
     ];
 
@@ -164,11 +175,11 @@ const BentoFeaturesComoAjuda = () => {
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                 <SectionHeader
-                    subtitle="RESOLVER O QUE VOCÊ PRECISA HOJE"
-                    title="O que dá pra fazer na Dudit"
+                    subtitle="JEITOS DE USAR A DUDIT"
+                    title="Tudo que o seu negócio precisa para vender e organizar"
                 />
                 <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-                    A Dudit conecta o que as pessoas procuram com o que os negócios e profissionais oferecem.
+                    Comece pela vitrine online, pelo PDV ou pela agenda — e ative os outros recursos conforme for crescendo.
                 </p>
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -181,7 +192,60 @@ const BentoFeaturesComoAjuda = () => {
                             viewport={{ once: true }}
                             className="group flex flex-col justify-between"
                         >
-                            <div className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
+                            <div aria-hidden="true" className="bg-brand-slate dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center">
+                                {card.type === 'store' && (
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
+                                            <Store className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Sua Vitrine Online</span>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded text-[9px] font-mono text-brand-inactive-text mb-2 text-center">
+                                            dudit.com.br/sualoja
+                                        </div>
+                                        <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
+                                            Entrega local e frete nacional
+                                        </div>
+                                    </div>
+                                )}
+
+                                {card.type === 'erp' && (
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex justify-between mb-3 border-b border-gray-50 dark:border-dark-border pb-2">
+                                            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Gestão & ERP</span>
+                                            <div className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded text-[8px] font-bold">Sincronizado</div>
+                                        </div>
+                                        <div className="space-y-1.5 text-[10px]">
+                                            <div className="flex justify-between bg-gray-50 dark:bg-dark-border/30 p-1.5 rounded">
+                                                <span className="font-medium text-brand-dark dark:text-dark-heading">PDV & Estoque</span>
+                                                <span className="text-brand-green font-bold">Ativo</span>
+                                            </div>
+                                            <div className="flex justify-between bg-gray-50 dark:bg-dark-border/30 p-1.5 rounded">
+                                                <span className="font-medium text-brand-dark dark:text-dark-heading">Tiny ERP / Bling</span>
+                                                <span className="text-blue-600 dark:text-blue-400 font-bold">Integrado</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {card.type === 'schedule' && (
+                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
+                                        <div className="flex justify-between items-center mb-3 border-b border-gray-50 dark:border-dark-border pb-2">
+                                            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
+                                            <Calendar size={12} className="text-brand-inactive-text" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-950/40 p-1.5 rounded text-[10px]">
+                                                <span className="font-bold text-blue-800 dark:text-blue-300">14:00 - Corte</span>
+                                                <span className="text-blue-600 dark:text-blue-400 font-semibold text-[8px]">Confirmado</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-gray-50 dark:bg-dark-border/30 p-1.5 rounded text-[10px]">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">16:30 - Revisão</span>
+                                                <span className="text-brand-green font-semibold text-[8px]">OS aberta</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {card.type === 'buy' && (
                                     <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
                                         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
@@ -200,58 +264,10 @@ const BentoFeaturesComoAjuda = () => {
                                         </div>
                                     </div>
                                 )}
-
-                                {card.type === 'sell' && (
-                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
-                                        <div className="flex justify-between mb-3 border-b border-gray-50 dark:border-dark-border pb-2">
-                                            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Novo anúncio</span>
-                                            <div className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded text-[8px] font-bold">Ativo</div>
-                                        </div>
-                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-0.5">Violão Seminovo</div>
-                                        <div className="text-brand-green font-extrabold text-xs mb-3">R$ 280,00</div>
-                                        <div className="w-full bg-brand-green text-white py-1.5 rounded text-[9px] font-bold text-center flex items-center justify-center gap-1">
-                                            <ShoppingBag size={10} /> Ver na Dudit
-                                        </div>
-                                    </div>
-                                )}
-
-                                {card.type === 'store' && (
-                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50 dark:border-dark-border">
-                                            <Store className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                                            <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading">Sua Vitrine Online</span>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-dark-border/30 p-2 rounded text-[9px] font-mono text-brand-inactive-text mb-2 text-center">
-                                            dudit.com.br/sualoja
-                                        </div>
-                                        <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
-                                            Clientes locais e de todo o Brasil
-                                        </div>
-                                    </div>
-                                )}
-
-                                {card.type === 'schedule' && (
-                                    <div className="bg-white dark:bg-dark-surface p-4 w-full max-w-[220px] rounded-lg border border-gray-100 dark:border-dark-border text-xs">
-                                        <div className="flex justify-between items-center mb-3 border-b border-gray-50 dark:border-dark-border pb-2">
-                                            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
-                                            <Calendar size={12} className="text-brand-inactive-text" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-950/40 p-1.5 rounded text-[10px]">
-                                                <span className="font-bold text-blue-800 dark:text-blue-300">14:00 - Corte</span>
-                                                <span className="text-blue-600 dark:text-blue-400 font-semibold text-[8px]">Disponível</span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-gray-50 dark:bg-dark-border/30 p-1.5 rounded text-[10px]">
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">16:30 - Manutenção</span>
-                                                <span className="text-brand-green font-semibold text-[8px]">Agendar</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                             <div className="pt-5">
                                 <span className="text-xs font-bold text-brand-green block mb-1">{card.subtitle}</span>
-                                <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">{card.title}</h4>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">{card.title}</h3>
                                 <p className="text-brand-inactive-text text-sm leading-relaxed">{card.description}</p>
                             </div>
                         </motion.div>
@@ -262,35 +278,99 @@ const BentoFeaturesComoAjuda = () => {
     );
 };
 
-const ParaQuemCompra = () => {
-    const items = [
+const ComoFunciona = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+    const steps = [
         {
-            icon: Search,
-            title: "Encontre o que precisa",
-            desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou receber de qualquer lugar do Brasil. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
+            num: "01",
+            title: "Crie sua vitrine grátis",
+            desc: "Faça seu cadastro em minutos, sem precisar de cartão de crédito nem fidelidade.",
         },
         {
-            icon: ShoppingBag,
-            title: "Produtos & Serviços",
-            desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, na sua cidade ou com envio nacional.",
+            num: "02",
+            title: "Cadastre produtos ou serviços",
+            desc: "Adicione fotos, preços, variações ou horários de atendimento — ou sincronize com Tiny ERP e Bling.",
         },
         {
-            icon: MessageCircle,
-            title: "Contato direto",
-            desc: "Compre direto na vitrine, agende pelo sistema ou fale no WhatsApp de quem vende. Sem intermediários e sem burocracia.",
+            num: "03",
+            title: "Venda e organize tudo",
+            desc: "Compartilhe seu link no Instagram e WhatsApp, atenda no balcão (PDV) e entregue na sua cidade ou em todo o Brasil.",
         },
     ];
 
     return (
-        <section className="relative py-24 bg-white dark:bg-dark-surface overflow-hidden border-t border-gray-100 dark:border-dark-border">
+        <section className="py-20 bg-brand-slate/60 dark:bg-dark-border/20 relative border-t border-gray-100 dark:border-dark-border">
+            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                    <div>
+                        <span className="text-sm font-medium tracking-wider uppercase mb-3 block text-brand-inactive-text">
+                            COMO A DUDIT FUNCIONA
+                        </span>
+                        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-brand-dark dark:text-dark-heading">
+                            Comece a vender em 3 passos simples
+                        </h2>
+                    </div>
+                    <Button variant="outline" onClick={() => onNavigate('pricing')}>
+                        Ver planos a partir de R$ 0
+                    </Button>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-6">
+                    {steps.map((step) => (
+                        <div
+                            key={step.num}
+                            className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-gray-100 dark:border-dark-border"
+                        >
+                            <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-brand-green/15 text-brand-green font-bold text-xs mb-4">
+                                {step.num}
+                            </span>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">{step.title}</h3>
+                            <p className="text-sm text-brand-inactive-text leading-relaxed">{step.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+};
+
+const ParaQuemCompra = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+    const items = [
+        {
+            icon: Search,
+            title: "Encontre o que precisa",
+            desc: "Descubra lojas, produtos e serviços perto de você ou com entrega para todo o Brasil.",
+        },
+        {
+            icon: ShoppingBag,
+            title: "Produtos & Serviços",
+            desc: "De roupas e eletrônicos a confeitarias, salões e oficinas. Tudo organizado em um só lugar.",
+        },
+        {
+            icon: MessageCircle,
+            title: "Contato direto",
+            desc: "Compre direto na vitrine, agende pelo sistema ou fale no WhatsApp de quem vende, sem intermediários.",
+        },
+    ];
+
+    return (
+        <section className="relative py-20 bg-white dark:bg-dark-surface overflow-hidden border-t border-gray-100 dark:border-dark-border">
             <GridLines />
             <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
-                <SectionHeader
-                    subtitle="PARA QUEM PROCURA"
-                    title="O que você procura?"
-                />
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+                    <div>
+                        <span className="text-sm font-medium tracking-wider uppercase mb-3 block text-brand-inactive-text">
+                            PARA QUEM COMPRA
+                        </span>
+                        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-brand-dark dark:text-dark-heading">
+                            Procurando algo hoje?
+                        </h2>
+                    </div>
+                    <Button variant="outline" onClick={() => onNavigate('explore')}>
+                        Explorar lojas e produtos
+                    </Button>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mt-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mt-6">
                     {items.map((item, idx) => (
                         <motion.div
                             key={idx}
@@ -304,7 +384,7 @@ const ParaQuemCompra = () => {
                                 <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center">
                                     <item.icon className="w-5 h-5 text-white" />
                                 </div>
-                                <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{item.title}</h4>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{item.title}</h3>
                             </div>
                             <p className="text-brand-inactive-text text-sm leading-relaxed">
                                 {item.desc}
@@ -333,8 +413,8 @@ const ParaQuemVende = () => {
         },
         {
             num: "03",
-            title: "Sem comissão",
-            desc: "O valor da venda fica com você. A Dudit cobra apenas uma mensalidade fixa, sem taxa por venda.",
+            title: "0% de comissão da Dudit",
+            desc: "A Dudit não cobra porcentagem sobre as suas vendas — você usa o plano gratuito ou paga apenas uma mensalidade fixa. Em pagamentos online, aplicam-se somente as taxas do meio de pagamento.",
         },
         {
             num: "04",
@@ -405,6 +485,9 @@ const ParaQuemVende = () => {
                                         className={`border-t border-gray-200 dark:border-dark-border ${idx === items.length - 1 ? 'border-b' : ''}`}
                                     >
                                         <button
+                                            type="button"
+                                            aria-expanded={isOpen}
+                                            aria-controls={`home-vende-panel-${idx}`}
                                             onClick={() => setOpenIndex(isOpen ? null : idx)}
                                             className="w-full flex items-center gap-4 py-5 text-left group cursor-pointer"
                                         >
@@ -418,21 +501,16 @@ const ParaQuemVende = () => {
                                                 className={`w-5 h-5 text-brand-inactive-text transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
                                             />
                                         </button>
-                                        <AnimatePresence initial={false}>
-                                            {isOpen && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: "auto", opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                                                    className="overflow-hidden"
-                                                >
-                                                    <p className="text-brand-inactive-text text-sm leading-relaxed pb-5 pl-12 pr-8">
-                                                        {item.desc}
-                                                    </p>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
+                                        <div
+                                            id={`home-vende-panel-${idx}`}
+                                            className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+                                        >
+                                            <div className="overflow-hidden">
+                                                <p className="text-brand-inactive-text text-sm leading-relaxed pb-5 pl-12 pr-8">
+                                                    {item.desc}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </motion.div>
                                 );
                             })}
@@ -458,22 +536,25 @@ const GlobalScale = () => {
                         </div>
 
                         <div className="relative z-10 text-white">
-                            <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SEU LUCRO.</span>
-                            <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />Sem comissão sobre a venda.</h2>
-                            <p className="text-gray-300 text-lg mb-12 max-w-md leading-relaxed">
-                                A Dudit é mais uma vitrine para o seu negócio ser encontrado. Sem taxas escondidas e sem porcentagem sobre as suas vendas.
+                            <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SUA MARGEM.</span>
+                            <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />Sem comissão da Dudit.</h2>
+                            <p className="text-gray-300 text-lg mb-8 max-w-md leading-relaxed">
+                                A Dudit não cobra porcentagem sobre os seus pedidos. Você começa grátis ou escolhe um plano fixo mensal conforme o seu negócio cresce.
                             </p>
 
-                            <div className="flex gap-12 pt-8">
+                            <div className="flex gap-12 pt-6">
                                 <div>
                                     <div className="text-3xl font-bold text-brand-green mb-1">0%</div>
-                                    <div className="text-gray-300 text-xs">de comissão por venda</div>
+                                    <div className="text-gray-300 text-xs">de comissão da Dudit</div>
                                 </div>
                                 <div>
-                                    <div className="text-3xl font-bold text-brand-green mb-1">100%</div>
-                                    <div className="text-gray-300 text-xs">do valor da venda fica com você</div>
+                                    <div className="text-3xl font-bold text-brand-green mb-1">R$ 0</div>
+                                    <div className="text-gray-300 text-xs">para começar no plano grátis</div>
                                 </div>
                             </div>
+                            <p className="text-gray-400 text-[11px] mt-6 max-w-md">
+                                *Em pagamentos online integrados, aplicam-se apenas as taxas do meio de pagamento escolhido.
+                            </p>
                         </div>
                     </div>
 
@@ -483,19 +564,22 @@ const GlobalScale = () => {
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] border border-white/20 rounded-full opacity-30"></div>
                         </div>
 
-                        <div className="relative z-10 w-full h-full min-h-[400px]">
+                        <div aria-hidden="true" className="relative z-10 w-full h-full min-h-[400px]">
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-white/80 bg-black/15 px-2.5 py-1 rounded-full mb-4">
+                                Exemplos ilustrativos
+                            </span>
                             <motion.div
                                 initial={{ y: 20, opacity: 0 }}
                                 whileInView={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.1, duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="absolute top-[10%] left-0 lg:left-[5%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
+                                className="absolute top-[14%] left-0 lg:left-[5%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
                             >
                                 <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-dark-border/30 flex items-center justify-center shrink-0">
                                     <Store size={20} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Oficina do Seu Manoel</span> vendeu</p>
+                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Oficina Exemplo</span> vendeu</p>
                                     <p className="text-sm text-brand-dark dark:text-dark-heading font-bold mt-0.5">Troca de Óleo</p>
                                 </div>
                                 <div className="text-brand-green font-bold text-sm">R$ 180,00</div>
@@ -506,13 +590,13 @@ const GlobalScale = () => {
                                 whileInView={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.3, duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="absolute top-[40%] right-0 lg:right-[5%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[320px]"
+                                className="absolute top-[44%] right-0 lg:right-[5%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[320px]"
                             >
                                 <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-dark-border/30 flex items-center justify-center shrink-0">
                                     <User size={20} className="text-brand-inactive-text" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Ana Bolos</span> vendeu</p>
+                                    <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark dark:text-dark-heading">Confeitaria Exemplo</span> vendeu</p>
                                     <p className="text-sm text-brand-dark dark:text-dark-heading font-bold mt-0.5">Bolo de Festa</p>
                                 </div>
                                 <div className="text-brand-green font-bold text-sm">R$ 120,00</div>
@@ -523,7 +607,7 @@ const GlobalScale = () => {
                                 whileInView={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.5, duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="absolute bottom-[10%] left-0 lg:left-[10%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
+                                className="absolute bottom-[8%] left-0 lg:left-[10%] bg-white dark:bg-dark-surface rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
                             >
                                 <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-dark-border/30 flex items-center justify-center shrink-0">
                                     <ShoppingBag size={20} className="text-brand-inactive-text" />
@@ -567,9 +651,10 @@ export default function HomePage() {
             <main>
                 <Hero onNavigate={onNavigate} />
                 <BentoFeaturesComoAjuda />
-                <ParaQuemCompra />
+                <ComoFunciona onNavigate={onNavigate} />
                 <ParaQuemVende />
                 <GlobalScale />
+                <ParaQuemCompra onNavigate={onNavigate} />
                 <CTA onNavigate={onNavigate} />
             </main>
             <Footer onNavigate={onNavigate} />

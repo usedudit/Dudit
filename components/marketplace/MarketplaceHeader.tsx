@@ -1036,7 +1036,7 @@ const Header: React.FC<HeaderProps> = ({
                             >
                                 <MapPinIcon size={14} className="shrink-0 text-white" />
                                 <span className="text-[12px] font-normal truncate text-white">
-                                    {userLocation ? `Você está em ${userLocation}` : "Escolher localização"}
+                                    {userLocation ? `Buscando em ${userLocation}` : "Escolher localização"}
                                 </span>
                                 <ChevronRightIcon size={14} className="opacity-60 shrink-0 text-white" />
                             </button>
@@ -1311,7 +1311,7 @@ const Header: React.FC<HeaderProps> = ({
                     >
                         {userLocation ? (
                             <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
-                                Você está em
+                                Buscando em
                             </span>
                         ) : null}
                         <div className="flex items-center gap-1">
@@ -1466,14 +1466,18 @@ const Header: React.FC<HeaderProps> = ({
 
                         {user && <NotificationBell variant="marketplace" />}
 
-                        <IntentPrefetchLink href="/pedidos" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
-                            <Package size={18} />
+                        <IntentPrefetchLink href="/pedidos" aria-label="Meus pedidos" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+                            <Package size={18} aria-hidden="true" />
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
                         </IntentPrefetchLink>
 
-                        <IntentPrefetchLink href="/sacola" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+                        <IntentPrefetchLink
+                            href="/sacola"
+                            aria-label={cartCount > 0 ? `Sacola (${cartCount} itens)` : "Sacola"}
+                            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white"
+                        >
                             <div className="relative">
-                                <ShoppingBagIcon size={18} />
+                                <ShoppingBagIcon size={18} aria-hidden="true" />
                                 {cartCount > 0 && (
                                     <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                         {cartCount}

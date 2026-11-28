@@ -765,13 +765,20 @@ export function buildNotificationContent(
                     ? `Atenção! O produto "${ctx.productName}" está com estoque baixo (${formatQuantityWithUnit(ctx.stock || "0", ctx.unit)}) - mínimo ${formatQuantityWithUnit(ctx.minStock || "0", ctx.unit)} 📉`
                     : "Alguns produtos estão com estoque abaixo do mínimo.",
             }
-        case "replenishment_suggested":
+        case "replenishment_suggested": {
+            const count = Number(ctx.count) || 0
+            if (count > 0) {
+                const products = count === 1 ? "produto precisa" : "produtos precisam"
+                return {
+                    title: "📋 Sugestão de reposição",
+                    message: `Temos sugestões! ${count} ${products} de reposição de estoque. Clique para conferir. 📦`,
+                }
+            }
             return {
                 title: "📋 Sugestão de reposição",
-                message: ctx.count
-                    ? `Temos sugestões! ${ctx.count} produto(s) precisam de reposição de estoque. Clique para conferir. 📦`
-                    : "Há produtos que precisam de reposição.",
+                message: "Há produtos que precisam de reposição.",
             }
+        }
         case "admin_announcement":
             return {
                 title: ctx.storeName || "📢 Comunicado Importante",

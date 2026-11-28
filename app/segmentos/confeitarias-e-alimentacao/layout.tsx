@@ -5,7 +5,7 @@ export const metadata: Metadata = {
     description: "Receba encomendas pelo WhatsApp, controle produtos e estoque, organize entregas e tenha um catálogo online com 0% de comissão por venda.",
     openGraph: {
         title: "Sistema para Confeitarias e Pequena Alimentação | Dudit",
-        description: "Catálogo digital, encomendas pelo WhatsApp, controle de produtos e entregas sem taxas abusivas de aplicativos.",
+        description: "Catálogo digital, encomendas pelo WhatsApp, controle de produtos e entregas sem comissões altas de aplicativos.",
         url: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao",
         siteName: "Dudit",
         images: [
