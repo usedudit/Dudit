@@ -106,6 +106,36 @@ export async function onMarketplaceOrderPaid(
   orderId: string,
 ): Promise<void> {
   await recordMarketplaceOrderMetrics(supabase, orderId)
+  await recordCartAbandonmentConversionForOrder(orderId)
+}
+
+async function recordCartAbandonmentConversionForOrder(orderId: string): Promise<void> {
+  try {
+    const server = getAdminClient()
+    const { data: order } = await server
+      .from("orders")
+      .select("id, partner_id, buyer_id, total_amount, paid_amount, customer_name, created_at")
+      .eq("id", orderId)
+      .maybeSingle()
+
+    if (!order?.partner_id || !order?.buyer_id) return
+
+    const { recordCartAbandonmentConversion } = await import("@/lib/services/cart-abandonment.service")
+    const amount = Number(order.total_amount || order.paid_amount || 0)
+    await recordCartAbandonmentConversion(
+      {
+        partnerId: String(order.partner_id),
+        buyerId: String(order.buyer_id),
+        orderId: String(order.id),
+        amount,
+        customerName: order.customer_name || null,
+        orderCreatedAt: order.created_at || null,
+      },
+      server,
+    )
+  } catch (err) {
+    console.warn("[marketplace-metrics] recordCartAbandonmentConversionForOrder:", err)
+  }
 }
 
 async function invalidatePartnerStatsForOrder(

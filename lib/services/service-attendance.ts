@@ -34,7 +34,10 @@ export function normalizeServiceAttendanceSettings(
     raw: Record<string, unknown> | null | undefined,
 ): ServiceAttendanceSettings {
     if (!raw) return { ...DEFAULT_SETTINGS }
-    const mode = (raw.travel_fee_mode as ServiceTravelFeeMode) || (raw.mode as ServiceTravelFeeMode)
+    const mode =
+        (raw.travel_fee_mode as ServiceTravelFeeMode) ||
+        (raw.travelFeeMode as ServiceTravelFeeMode) ||
+        (raw.mode as ServiceTravelFeeMode)
     const validMode = mode && ["free", "flat", "per_km", "tiered"].includes(mode) ? mode : "free"
     let tiers: Array<{ upToKm: number; fee: number }> = []
     try {

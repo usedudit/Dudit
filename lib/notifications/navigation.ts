@@ -57,6 +57,15 @@ export function getNotificationHref(params: {
   }
 
   if (entityType === "cart") {
+    if (type === "cart_abandoned") {
+      const partnerId =
+        (typeof data?.partner_id === "string" && data.partner_id) ||
+        (typeof data?.partnerId === "string" && data.partnerId) ||
+        null
+      return partnerId
+        ? `/sacola?from=cart_abandoned&partner=${encodeURIComponent(partnerId)}`
+        : "/sacola?from=cart_abandoned"
+    }
     return "/sacola"
   }
 

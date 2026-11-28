@@ -6,7 +6,10 @@ import Link from "next/link"
 import type { NotificationRecord } from "@/lib/notifications/types"
 import { getNotificationHref } from "@/lib/notifications/navigation"
 import type { NotificationAudience } from "@/lib/notifications/types"
-import { switchNotificationContextAction } from "@/app/actions/notifications"
+import {
+  switchNotificationContextAction,
+  trackCartAbandonmentClickAction,
+} from "@/app/actions/notifications"
 import { useStoreOrNull } from "@/lib/store-context"
 import { cn } from "@/lib/utils"
 
@@ -86,6 +89,12 @@ export function NotificationItem({
   }, [notification.id, onVisible])
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (notification.type === "cart_abandoned" && !href.includes("from=cart_abandoned")) {
+      void trackCartAbandonmentClickAction({
+        partnerId,
+        notificationId: notification.id,
+      })
+    }
     if (!needsContextSwitch) {
       onNavigate?.()
       return

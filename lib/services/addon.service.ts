@@ -1218,7 +1218,7 @@ export async function getAddonMetrics(
       .eq("partner_id", partnerId)
       .eq("addon_slug", addonSlug)
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(1000)
 
     if (!error && events && events.length > 0) {
       for (const ev of events) {

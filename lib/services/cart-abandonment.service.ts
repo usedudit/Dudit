@@ -7,6 +7,8 @@ import { checkIsAddonActive, recordAddonEvent } from "@/lib/services/addon.servi
 
 const ABANDONMENT_THRESHOLD_MINUTES = 4 * 60
 const NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000
+const ATTRIBUTION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+const CLICK_FALLBACK_DEDUP_MS = 24 * 60 * 60 * 1000
 const MAX_PRODUCT_NAMES = 3
 
 interface SweepResult {
@@ -123,7 +125,7 @@ export async function sweepAbandonedCarts(
     )
 
     try {
-      await createNotification({
+      const { notification, created } = await createNotification({
         userId,
         type: "cart_abandoned",
         title,
@@ -145,22 +147,25 @@ export async function sweepAbandonedCarts(
         idempotencyKey,
         origin: "system",
       })
-      result.notified++
+      if (created) {
+        result.notified++
 
-      // Registra métrica do aplicativo
-      await recordAddonEvent({
-        partnerId,
-        addonSlug: "cart_abandonment",
-        eventType: "sent",
-        entityType: "cart",
-        entityId: userId,
-        metadata: {
-          itemCount,
-          totalQuantity,
-          productNames,
-          customerName,
-        },
-      })
+        // Registra métrica do aplicativo
+        await recordAddonEvent({
+          partnerId,
+          addonSlug: "cart_abandonment",
+          eventType: "sent",
+          entityType: "cart",
+          entityId: userId,
+          metadata: {
+            itemCount,
+            totalQuantity,
+            productNames,
+            customerName,
+            notificationId: notification?.id,
+          },
+        })
+      }
     } catch (err) {
       result.errors++
       console.error(
@@ -289,5 +294,168 @@ async function fetchUserProfiles(
   } catch (err) {
     console.error("[cart-abandonment] Unexpected error fetching user profiles:", err)
     return new Map()
+  }
+}
+
+/**
+ * Registra clique/interação do cliente em uma notificação de carrinho abandonado.
+ * Idempotente por lembrete enviado: múltiplos cliques ou recarregamentos da sacola
+ * não duplicam a métrica.
+ */
+export async function recordCartAbandonmentClick(
+  params: {
+    userId: string
+    partnerId?: string | null
+    notificationId?: string | null
+  },
+  client: ReturnType<typeof getAdminClient> = getAdminClient(),
+): Promise<boolean> {
+  if (!params.userId) return false
+
+  try {
+    const windowStart = new Date(Date.now() - ATTRIBUTION_WINDOW_MS).toISOString()
+
+    let sentQuery = client
+      .from("partner_addon_events")
+      .select("id, partner_id, metadata, created_at")
+      .eq("addon_slug", "cart_abandonment")
+      .eq("event_type", "sent")
+      .eq("entity_id", params.userId)
+      .gte("created_at", windowStart)
+
+    if (params.partnerId) {
+      sentQuery = sentQuery.eq("partner_id", params.partnerId)
+    }
+
+    const { data: sentRows } = await sentQuery
+      .order("created_at", { ascending: false })
+      .limit(1)
+    const sentEvent = Array.isArray(sentRows) ? sentRows[0] : null
+    const resolvedPartnerId = (sentEvent?.partner_id as string | undefined) || params.partnerId || null
+
+    if (!resolvedPartnerId) return false
+
+    const dedupSince =
+      (sentEvent?.created_at as string | undefined) ||
+      new Date(Date.now() - CLICK_FALLBACK_DEDUP_MS).toISOString()
+
+    const { data: existingClicks } = await client
+      .from("partner_addon_events")
+      .select("id")
+      .eq("partner_id", resolvedPartnerId)
+      .eq("addon_slug", "cart_abandonment")
+      .eq("event_type", "clicked")
+      .eq("entity_id", params.userId)
+      .gte("created_at", dedupSince)
+      .limit(1)
+
+    if (existingClicks && existingClicks.length > 0) {
+      return false
+    }
+
+    const sentMeta = (sentEvent?.metadata as Record<string, unknown> | undefined) || {}
+
+    await recordAddonEvent({
+      partnerId: resolvedPartnerId,
+      addonSlug: "cart_abandonment",
+      eventType: "clicked",
+      entityType: "cart",
+      entityId: params.userId,
+      metadata: {
+        customerName: sentMeta.customerName || undefined,
+        itemCount: sentMeta.itemCount || undefined,
+        notificationId: params.notificationId || undefined,
+        sentEventId: sentEvent?.id || undefined,
+      },
+    })
+
+    return true
+  } catch (err) {
+    console.warn("[cart-abandonment] Erro ao registrar clique:", err)
+    return false
+  }
+}
+
+/**
+ * Registra conversão (venda recuperada) quando um pedido do marketplace é pago
+ * (online ou manualmente no ERP) e o comprador recebeu lembrete de carrinho abandonado
+ * dessa loja dentro da janela de atribuição (7 dias).
+ * Idempotente por orderId.
+ */
+export async function recordCartAbandonmentConversion(
+  params: {
+    partnerId: string
+    buyerId: string
+    orderId: string
+    amount: number
+    customerName?: string | null
+    orderCreatedAt?: string | null
+    itemCount?: number | null
+  },
+  client: ReturnType<typeof getAdminClient> = getAdminClient(),
+): Promise<boolean> {
+  if (!params.partnerId || !params.buyerId || !params.orderId) return false
+
+  try {
+    const { data: existingConversions } = await client
+      .from("partner_addon_events")
+      .select("id")
+      .eq("partner_id", params.partnerId)
+      .eq("addon_slug", "cart_abandonment")
+      .eq("event_type", "converted")
+      .eq("entity_type", "order")
+      .eq("entity_id", params.orderId)
+      .limit(1)
+
+    if (existingConversions && existingConversions.length > 0) {
+      return false
+    }
+
+    const parsedOrderDate = params.orderCreatedAt ? new Date(params.orderCreatedAt) : null
+    const referenceMs =
+      parsedOrderDate && !Number.isNaN(parsedOrderDate.getTime())
+        ? parsedOrderDate.getTime()
+        : Date.now()
+    const referenceIso = new Date(referenceMs).toISOString()
+    const windowStartIso = new Date(referenceMs - ATTRIBUTION_WINDOW_MS).toISOString()
+
+    const { data: sentRows } = await client
+      .from("partner_addon_events")
+      .select("id, metadata, created_at")
+      .eq("partner_id", params.partnerId)
+      .eq("addon_slug", "cart_abandonment")
+      .eq("event_type", "sent")
+      .eq("entity_id", params.buyerId)
+      .gte("created_at", windowStartIso)
+      .lte("created_at", referenceIso)
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    const sentEvent = Array.isArray(sentRows) ? sentRows[0] : null
+    if (!sentEvent) return false
+
+    const sentMeta = (sentEvent.metadata as Record<string, unknown> | undefined) || {}
+    const safeAmount = Number.isFinite(params.amount) ? Math.max(0, Number(params.amount)) : 0
+
+    await recordAddonEvent({
+      partnerId: params.partnerId,
+      addonSlug: "cart_abandonment",
+      eventType: "converted",
+      entityType: "order",
+      entityId: params.orderId,
+      metadata: {
+        orderId: params.orderId,
+        buyerId: params.buyerId,
+        amount: safeAmount,
+        customerName: params.customerName || sentMeta.customerName || undefined,
+        itemCount: params.itemCount || sentMeta.itemCount || 1,
+        sentEventId: sentEvent.id,
+      },
+    })
+
+    return true
+  } catch (err) {
+    console.warn("[cart-abandonment] Erro ao registrar conversão:", err)
+    return false
   }
 }

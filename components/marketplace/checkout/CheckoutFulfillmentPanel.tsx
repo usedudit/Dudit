@@ -177,31 +177,35 @@ export function CheckoutFulfillmentPanel({
   const [saving, setSaving] = useState(false)
 
   // Validação de raio de atendimento por serviço quando "No meu endereço" é
-  // escolhido. Bloqueia a opção caso o endereço esteja fora do raio configurado.
+  // escolhido. Exibe o aviso caso o endereço esteja fora do raio configurado.
   const [serviceAttendance, setServiceAttendance] = useState<Record<string, {
     checked: boolean
+    checking?: boolean
     covered: boolean
     error: string | null
     distanceKm: number | null
   }>>({})
   const lastValidatedAddressKey = useRef<string | null>(null)
+  const validationSeqRef = useRef<Record<string, number>>({})
 
   const validateServiceAddress = useCallback(async (line: MarketplaceCheckoutDisplayLine) => {
     const lineId = line.lineId
-    setServiceAttendance((prev) => ({
-      ...prev,
-      [lineId]: { checked: false, covered: false, error: null, distanceKm: null },
-    }))
+    const seq = (validationSeqRef.current[lineId] || 0) + 1
+    validationSeqRef.current[lineId] = seq
+
+    // Sem endereço ainda selecionado: permite escolher "No meu endereço" para que
+    // o bloco de endereço apareça na tela de checkout e o cliente possa informá-lo.
     if (!deliveryAddress) {
       setServiceAttendance((prev) => ({
         ...prev,
-        [lineId]: { checked: true, covered: false, error: "Selecione um endereço de atendimento.", distanceKm: null },
+        [lineId]: { checked: true, checking: false, covered: true, error: null, distanceKm: null },
       }))
-      return false
+      return true
     }
+
     setServiceAttendance((prev) => ({
       ...prev,
-      [lineId]: { checked: true, covered: false, error: null, distanceKm: null },
+      [lineId]: { checked: false, checking: true, covered: false, error: null, distanceKm: null },
     }))
     try {
       const res = await checkServiceAttendanceAction({
@@ -211,10 +215,12 @@ export function CheckoutFulfillmentPanel({
         deliveryAddress,
         destinationCoords: destinationCoords ?? null,
       })
-      if (res.success && !res.outOfRadius) {
+      if (validationSeqRef.current[lineId] !== seq) return true
+      const isBlockedByRadius = Boolean(res.success && res.outOfRadius && res.enforceServiceArea !== false)
+      if (res.success && !isBlockedByRadius) {
         setServiceAttendance((prev) => ({
           ...prev,
-          [lineId]: { checked: true, covered: true, error: null, distanceKm: res.distanceKm },
+          [lineId]: { checked: true, checking: false, covered: true, error: null, distanceKm: res.distanceKm },
         }))
         return true
       }
@@ -222,6 +228,7 @@ export function CheckoutFulfillmentPanel({
         ...prev,
         [lineId]: {
           checked: true,
+          checking: false,
           covered: false,
           error: res.success
             ? "Endereço fora do raio de atendimento deste serviço."
@@ -231,9 +238,10 @@ export function CheckoutFulfillmentPanel({
       }))
       return false
     } catch {
+      if (validationSeqRef.current[lineId] !== seq) return true
       setServiceAttendance((prev) => ({
         ...prev,
-        [lineId]: { checked: true, covered: false, error: "Não foi possível validar o atendimento neste endereço.", distanceKm: null },
+        [lineId]: { checked: true, checking: false, covered: false, error: "Não foi possível validar o atendimento neste endereço.", distanceKm: null },
       }))
       return false
     }
@@ -241,10 +249,10 @@ export function CheckoutFulfillmentPanel({
 
   // Re-valida serviços marcados como "No meu endereço" quando o endereço muda.
   useEffect(() => {
+    if (!modalOpen) return
     const addressKey = deliveryAddress ? `${deliveryAddress}` : "__none__"
     if (addressKey === lastValidatedAddressKey.current) return
     lastValidatedAddressKey.current = addressKey
-    if (!modalOpen) return
     void (async () => {
       for (const line of serviceLines) {
         const draft = modalDrafts[line.lineId]
@@ -263,6 +271,8 @@ export function CheckoutFulfillmentPanel({
       drafts[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
     }
     setModalDrafts(drafts)
+    setServiceAttendance({})
+    lastValidatedAddressKey.current = null
     setModalOpen(true)
   }, [serviceLines])
 
@@ -271,19 +281,11 @@ export function CheckoutFulfillmentPanel({
     if (mode === "customer_location") {
       const line = serviceLines.find((l) => l.lineId === lineId)
       if (line) {
-        const covered = await validateServiceAddress(line)
-        if (!covered) {
-          // Fora do raio / sem endereço: força de volta para o estabelecimento
-          // e limpa o aviso - a opção "No meu endereço" não fica mais marcada.
-          setModalDrafts((prev) => ({ ...prev, [lineId]: "on_site" }))
-          setServiceAttendance((prev) => ({
-            ...prev,
-            [lineId]: { checked: true, covered: false, error: null, distanceKm: null },
-          }))
-        }
+        await validateServiceAddress(line)
       }
     } else {
-      setServiceAttendance((prev) => ({ ...prev, [lineId]: { checked: true, covered: false, error: null, distanceKm: null } }))
+      validationSeqRef.current[lineId] = (validationSeqRef.current[lineId] || 0) + 1
+      setServiceAttendance((prev) => ({ ...prev, [lineId]: { checked: true, checking: false, covered: false, error: null, distanceKm: null } }))
     }
   }, [serviceLines, validateServiceAddress])
 
@@ -328,16 +330,11 @@ export function CheckoutFulfillmentPanel({
     setSaving(true)
     try {
       for (const change of changes) {
-        if (change.mode === "customer_location") {
+        if (change.mode === "customer_location" && deliveryAddress) {
           const line = serviceLines.find((l) => l.lineId === change.cartItemId)
           if (line) {
             const covered = await validateServiceAddress(line)
             if (!covered) {
-              setModalDrafts((prev) => ({ ...prev, [change.cartItemId]: "on_site" }))
-              setServiceAttendance((prev) => ({
-                ...prev,
-                [change.cartItemId]: { checked: true, covered: false, error: null, distanceKm: null },
-              }))
               return
             }
           }
@@ -598,7 +595,20 @@ export function CheckoutFulfillmentPanel({
         title="Forma de atendimento"
         footer={
           servicesWithChoice.length > 0 ? (
-            <Button variant="default" onClick={handleModalSave} disabled={saving} isLoading={saving} className="flex-1">
+            <Button
+              variant="default"
+              onClick={handleModalSave}
+              disabled={
+                saving ||
+                servicesWithChoice.some((line) => {
+                  if (modalDrafts[line.lineId] !== "customer_location") return false
+                  const att = serviceAttendance[line.lineId]
+                  return Boolean(att?.checking || att?.error)
+                })
+              }
+              isLoading={saving}
+              className="flex-1"
+            >
               Salvar
             </Button>
           ) : undefined
@@ -614,6 +624,7 @@ export function CheckoutFulfillmentPanel({
 
           {servicesWithChoice.map((line) => {
             const currentDraft = modalDrafts[line.lineId] || "on_site"
+            const attendance = serviceAttendance[line.lineId]
             return (
               <div
                 key={line.lineId}
@@ -640,14 +651,35 @@ export function CheckoutFulfillmentPanel({
                     checked={currentDraft === "customer_location"}
                     onChange={() => handleDraftChange(line.lineId, "customer_location")}
                   />
-                  {serviceAttendance[line.lineId]?.error && (
-                    <p className="text-[10px] text-brand-red text-center mt-1 leading-tight">
-                      {serviceAttendance[line.lineId].error}
+                  {attendance?.checking && (
+                    <p className="text-[10px] text-brand-inactive-text text-center mt-1 leading-tight">
+                      Verificando...
                     </p>
                   )}
-                  {serviceAttendance[line.lineId]?.distanceKm != null && serviceAttendance[line.lineId]?.covered && (
+                  {attendance?.error && (
+                    <div className="flex flex-col items-center mt-1 gap-1">
+                      <p className="text-[10px] text-brand-red text-center leading-tight">
+                        {attendance.error}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalOpen(false)
+                          if (addressProps.userAddresses.length > 0) {
+                            addressProps.onOpenModal()
+                          } else {
+                            addressProps.onOpenForm()
+                          }
+                        }}
+                        className="text-[10px] font-semibold text-brand-green underline cursor-pointer"
+                      >
+                        {addressProps.userAddresses.length > 0 ? "Trocar endereço" : "Adicionar endereço"}
+                      </button>
+                    </div>
+                  )}
+                  {attendance?.distanceKm != null && attendance?.covered && (
                     <p className="text-[10px] text-brand-inactive-text text-center mt-1">
-                      {Number(serviceAttendance[line.lineId].distanceKm).toFixed(2)} km
+                      {Number(attendance.distanceKm).toFixed(2)} km
                     </p>
                   )}
                 </div>

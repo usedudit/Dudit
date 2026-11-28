@@ -18,6 +18,7 @@ interface ListItemProps {
     iconContainerClassName?: string
     className?: string
     disabled?: boolean
+    wrapRight?: boolean
 }
 
 export const ListItem: React.FC<ListItemProps> = ({
@@ -34,6 +35,7 @@ export const ListItem: React.FC<ListItemProps> = ({
     iconContainerClassName = "",
     className = "",
     disabled = false,
+    wrapRight = true,
 }) => {
     const isComponent =
         typeof icon === "function" ||
@@ -74,62 +76,89 @@ export const ListItem: React.FC<ListItemProps> = ({
         onClick?.()
     }
 
+    const shouldWrapRight = Boolean(right && wrapRight)
+    const hasLeading = Boolean(left || icon)
+
     return (
         <div
             onClick={disabled ? undefined : (right ? handleContainerClick : onClick)}
             className={cn(
-                "group flex items-center rounded-2xl gap-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface transition-all",
+                "group flex items-center rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface transition-all",
+                shouldWrapRight ? "flex-wrap gap-x-4 gap-y-3" : "gap-4",
                 disabled
                     ? "opacity-50 cursor-not-allowed"
                     : "hover:border-brand-dark/30 dark:hover:border-brand-gray/30 cursor-pointer",
                 className
             )}
         >
-            {left && <div className="shrink-0">{left}</div>}
+            <div
+                className={cn(
+                    "flex items-center gap-4 flex-1 min-w-0",
+                    shouldWrapRight &&
+                        (hasLeading
+                            ? "min-w-[min(100%,210px)]"
+                            : "min-w-[min(100%,150px)]")
+                )}
+            >
+                {left && <div className="shrink-0">{left}</div>}
 
-            {icon && (
-                <div
-                    className={cn(
-                        "w-12 h-12 rounded-full flex border items-center justify-center shrink-0 transition-colors overflow-hidden",
-                        iconContainerClassName ||
-                            "bg-brand-slate dark:bg-dark-border/50 border-brand-border dark:border-dark-border group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90"
-                    )}
-                >
-                    {isComponent ? (
-                        React.createElement(icon as React.ComponentType<any>, {
-                            className: "text-brand-dark dark:text-dark-heading",
-                        })
-                    ) : typeof icon === "string" ? (
-                        <img
-                            src={icon}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                        />
-                    ) : (
-                        icon
+                {icon && (
+                    <div
+                        className={cn(
+                            "w-12 h-12 rounded-full flex border items-center justify-center shrink-0 transition-colors overflow-hidden",
+                            iconContainerClassName ||
+                                "bg-brand-slate dark:bg-dark-border/50 border-brand-border dark:border-dark-border group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90"
+                        )}
+                    >
+                        {isComponent ? (
+                            React.createElement(icon as React.ComponentType<any>, {
+                                className: "text-brand-dark dark:text-dark-heading",
+                            })
+                        ) : typeof icon === "string" ? (
+                            <img
+                                src={icon}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                            />
+                        ) : (
+                            icon
+                        )}
+                    </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                    <h3
+                        className={cn(
+                            "text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate",
+                            titleClassName
+                        )}
+                    >
+                        {title}
+                    </h3>
+
+                    {description && (
+                        <p
+                            className={cn(
+                                "text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words",
+                                descriptionClassName
+                            )}
+                        >
+                            {description}
+                        </p>
                     )}
                 </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-                <h3
-                    className={`text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate ${titleClassName}`}
-                >
-                    {title}
-                </h3>
-
-                {description && (
-                    <p
-                        className={`text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words ${descriptionClassName}`}
-                    >
-                        {description}
-                    </p>
-                )}
             </div>
 
             {right ? (
-                <div ref={rightRef} className={cn("shrink-0", rightClassName)}>
+                <div
+                    ref={rightRef}
+                    className={cn(
+                        "shrink-0 max-w-full",
+                        shouldWrapRight && "ml-auto",
+                        rightClassName
+                    )}
+                >
                     {right}
                 </div>
             ) : showChevron ? (

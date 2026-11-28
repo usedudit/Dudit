@@ -155,3 +155,23 @@ export async function switchNotificationContextAction(params: {
     return { success: false, url: "/erp", error: "Erro ao trocar de contexto" }
   }
 }
+
+export async function trackCartAbandonmentClickAction(params: {
+  partnerId?: string | null
+  notificationId?: string | null
+}): Promise<{ success: boolean }> {
+  try {
+    const user = await requireUser()
+    if (!user) return { success: false }
+
+    const { recordCartAbandonmentClick } = await import("@/lib/services/cart-abandonment.service")
+    await recordCartAbandonmentClick({
+      userId: user.id,
+      partnerId: params.partnerId || null,
+      notificationId: params.notificationId || null,
+    })
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}

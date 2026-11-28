@@ -121,11 +121,13 @@ async function resolveDeliveryContext(
   supabase: any,
   partnerId: string,
   storeId?: string | null,
+  options?: { requireOriginCoords?: boolean },
 ): Promise<DeliveryContext> {
+  const requireOriginCoords = Boolean(options?.requireOriginCoords)
   const cacheKey = `${partnerId}|${storeId || ""}`
   const now = Date.now()
   const cachedCtx = deliveryContext.get(cacheKey, now)
-  if (cachedCtx) return cachedCtx
+  if (cachedCtx && (!requireOriginCoords || cachedCtx.originCoords)) return cachedCtx
 
   let rulesQuery = supabase.from("delivery_fee_rules").select("*").eq("partner_id", partnerId).eq("is_active", true)
   if (storeId) {
@@ -162,12 +164,13 @@ async function resolveDeliveryContext(
     originCoords = { lat: Number(storeAddr.latitude), lng: Number(storeAddr.longitude) }
   }
 
-  if (!originCoords && shouldCalculateDistance) {
-    if (storeId) {
+  if (!originCoords && (shouldCalculateDistance || requireOriginCoords)) {
+    const effectiveStoreId = storeId || store?.id || null
+    if (effectiveStoreId) {
       const { data: directAddr } = await supabase
         .from("addresses")
         .select("id, street, number, neighborhood, city, state, zip_code, latitude, longitude")
-        .eq("store_id", storeId)
+        .eq("store_id", effectiveStoreId)
         .limit(1)
         .maybeSingle()
       if (directAddr?.latitude != null && directAddr?.longitude != null) {
@@ -743,7 +746,9 @@ export async function calculateServiceTravelFeeForOrder(input: {
 
   let distanceKm: number | null = null
   try {
-    const ctx = await resolveDeliveryContext(input.supabase, input.partnerId, input.storeId || null)
+    const ctx = await resolveDeliveryContext(input.supabase, input.partnerId, input.storeId || null, {
+      requireOriginCoords: true,
+    })
     if (ctx.originCoords && input.destinationCoords) {
       distanceKm = Number(calculateDistance(ctx.originCoords, input.destinationCoords).toFixed(2))
     } else if (ctx.originCoords && input.deliveryAddress) {
@@ -800,6 +805,7 @@ export async function checkServiceAttendanceAction(input: {
   maxServiceKm: number | null
   fee: number
   outOfRadius: boolean
+  enforceServiceArea: boolean
 } | { success: false; error: string }> {
   if (!input.deliveryAddress) {
     return { success: false, error: "Selecione um endereço para verificar o atendimento." }
@@ -815,12 +821,17 @@ export async function checkServiceAttendanceAction(input: {
     orderSubtotal: 0,
   })
   if (!res.success) return { success: false, error: res.error || "Endereço fora do raio de atendimento deste serviço." }
+  const maxServiceKm = typeof res.breakdown?.maxServiceKm === "number" ? res.breakdown.maxServiceKm : null
+  const enforceServiceArea = res.breakdown?.enforceServiceArea !== undefined
+    ? Boolean(res.breakdown.enforceServiceArea)
+    : true
   return {
     success: true,
     distanceKm: res.distanceKm,
-    maxServiceKm: null,
+    maxServiceKm,
     fee: res.fee,
     outOfRadius: res.outOfRadius,
+    enforceServiceArea,
   }
 }
 

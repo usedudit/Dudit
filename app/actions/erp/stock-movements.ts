@@ -16,6 +16,13 @@ import { revalidateStockMovements } from "@/lib/utils/revalidation"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 
+function getExternalErpLabelForStock(provider?: string | null): string | null {
+    const p = String(provider || "").trim().toLowerCase()
+    if (p === "bling") return "Bling ERP"
+    if (p === "tiny") return "Tiny ERP"
+    return null
+}
+
 async function requireMovementItemAccess(
     partnerId: string,
     activeStoreId: string | null,
@@ -25,7 +32,7 @@ async function requireMovementItemAccess(
     const variantIds = Array.from(new Set(items.map((item) => item.variantId).filter((id): id is string => Boolean(id))))
     const admin = createAdminClient()
     const [{ data: products, error: productsError }, { data: variants, error: variantsError }] = await Promise.all([
-        admin.from("products").select("id, partner_id, store_id").eq("partner_id", partnerId).in("id", productIds),
+        admin.from("products").select("id, name, partner_id, store_id, external_provider").eq("partner_id", partnerId).in("id", productIds),
         variantIds.length > 0
             ? admin.from("product_variants").select("id, product_id").in("id", variantIds)
             : Promise.resolve({ data: [] as Array<{ id: string; product_id: string }>, error: null }),
@@ -42,6 +49,10 @@ async function requireMovementItemAccess(
     for (const item of items) {
         const product = productById.get(String(item.productId))
         if (!product) throw new Error("Produto não encontrado no parceiro ativo.")
+        const erpLabel = getExternalErpLabelForStock(product.external_provider)
+        if (erpLabel) {
+            throw new Error(`O produto "${product.name || "selecionado"}" está sincronizado com o ${erpLabel}. Movimente ou ajuste o estoque diretamente no ${erpLabel} ou desvincule o produto primeiro.`)
+        }
         if (activeStoreId && product.store_id && product.store_id !== activeStoreId) {
             throw new Error("O produto pertence a outra loja ativa.")
         }
@@ -208,7 +219,7 @@ export async function createStockMovementAction(data: {
         return successResponse(movementRecord)
     } catch (err: any) {
         console.error("createStockMovementAction error:", err)
-        return errorResponse("Erro interno ao processar a movimentação")
+        return errorResponse(err?.message || "Erro interno ao processar a movimentação")
     }
 }
 
@@ -414,7 +425,7 @@ export async function createBatchStockMovementAction(data: {
         return successResponse(movementRecord)
     } catch (err: any) {
         console.error("createBatchStockMovementAction error:", err)
-        return errorResponse("Erro interno ao processar a movimentação")
+        return errorResponse(err?.message || "Erro interno ao processar a movimentação")
     }
 }
 

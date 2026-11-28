@@ -1821,7 +1821,7 @@ export function ExplorarPageClient({
                 {hasAnyRawResults && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
-                <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 lg:mt-8 px-4">
+                <div className="container mx-auto max-w-[1400px] flex-grow pb-28 mt-12 lg:pb-12 lg:mt-8 px-4">
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) - Hide when completely empty */}
                     {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && !isEmptyListing && (
                         <div className="mb-6 lg:mb-8">
